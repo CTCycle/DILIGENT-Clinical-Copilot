@@ -1,10 +1,22 @@
-# DILIGENT Clinical Copilot
+<p align="center">
+  <img src="app/client/public/diligent-logo.png" alt="DILIGENT logo" width="88">
+</p>
 
-<p align="center"><img src="app/client/public/diligent-logo.png" alt="DILIGENT logo" width="112"></p>
+<h1 align="center">DILIGENT Clinical Copilot</h1>
 
-**A local, single-user decision-support tool for structured review of possible drug-induced liver injury (DILI).**
+<p align="center"><strong>A local, single-user decision-support tool for structured review of possible drug-induced liver injury (DILI).</strong></p>
 
-[![License](https://img.shields.io/github/license/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square)](LICENSE) [![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag&style=flat-square)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![CI](https://img.shields.io/github/actions/workflow/status/CTCycle/DILIGENT-Clinical-Copilot/ci.yml?branch=develop&label=CI&style=flat-square)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop) [![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white&style=flat-square)](app/server/pyproject.toml) [![Angular](https://img.shields.io/badge/Angular-21-DD0031?logo=angular&logoColor=white&style=flat-square)](app/client/package.json) [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white&style=flat-square)](https://www.microsoft.com/windows)
+<p align="center">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
+  <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases"><img alt="Release" src="https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag&style=flat-square"></a>
+  <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CTCycle/DILIGENT-Clinical-Copilot/ci.yml?branch=develop&label=CI&style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="app/server/pyproject.toml"><img alt="Python 3.14+" src="https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white&style=flat-square"></a>
+  <a href="app/client/package.json"><img alt="Angular 21" src="https://img.shields.io/badge/Angular-21-DD0031?logo=angular&logoColor=white&style=flat-square"></a>
+  <a href="https://www.microsoft.com/windows"><img alt="Platform: Windows" src="https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white&style=flat-square"></a>
+</p>
 
 ## Overview
 
@@ -21,15 +33,15 @@ DILIGENT brings clinical history, medication exposure, symptoms, laboratory resu
 
 ## Screenshots
 
-Enter clinical context in the DILI Agent before starting an assessment.
+Enter a fictional case in the DILI Agent. The analysis has not been run.
 
 ![DILI Agent case entry](assets/figures/01-dili-agent.png)
 
-Open a saved session to review its report and structured findings. This documentation-only example is synthetic; it does not represent a patient, clinical assessment, or model output.
+Review a saved, synthetic documentation example. It does not represent a real patient, clinical assessment, or model output.
 
 ![Synthetic clinical session report](assets/figures/02-clinical-session-synthetic-report.png)
 
-Configure retrieval and ranking behavior in Settings. Changes are saved automatically.
+Review retrieval and ranking options in Settings; the autosave status is visible in the dialog.
 
 ![RAG settings with autosave status](assets/figures/03-rag-settings-autosave.png)
 
