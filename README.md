@@ -31,6 +31,14 @@ DILIGENT brings clinical history, medication exposure, symptoms, laboratory resu
 - Save sessions, compare revisions, review timelines, and export reports.
 - Inspect local drug catalogs and reference resources, and configure model providers, roles, access keys, and retrieval options.
 
+## Typical Workflow
+
+1. In **Settings → Models**, choose a local or cloud provider and assign the model roles. Configure retrieval when you want to include prepared reference evidence.
+2. In **DILI Agent**, enter the clinical history, suspected medication and exposure dates, symptoms, and available laboratory results. Baseline values and laboratory-specific upper limits of normal help provide context.
+3. Review preflight feedback and address blocking issues before running the assessment. Read warnings and their stated limitations before deciding whether to continue.
+4. Review the generated narrative alongside structured findings, medication matches, evidence, and uncertainty. Verify statements against the supplied records.
+5. Save the session to revisit the report, compare revisions, review its timeline, or copy and export the output.
+
 ## Screenshots
 
 Enter a fictional case in the DILI Agent. The analysis has not been run.
@@ -69,6 +77,10 @@ Choose **Install dependencies**, then **Launch application**. The source-mode UI
 Choose a local or cloud model provider and assign model roles in **Settings**. Source-mode environment settings are stored in `settings/.env`; the launcher creates it from `settings/.env.example` when needed. Keep provider credentials private.
 
 Editing a saved report can clear its saved attachment and session metadata. Re-enter any required metadata after editing.
+
+## Data Handling and Privacy
+
+DILIGENT runs as a Windows desktop app or as a local web app in source mode, with application data stored in a local SQLite database. Model processing can use a local or cloud provider. When a cloud provider is configured, case text may be sent to that provider. Confirm provider, retrieval, and institutional privacy policies before entering protected health information.
 
 ## Documentation
 
