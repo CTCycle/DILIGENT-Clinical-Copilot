@@ -40,7 +40,6 @@ from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
-
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(
@@ -438,7 +437,6 @@ def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncate
     assert normalized.patches == []
     assert any("not fully available" in issue for issue in normalized.unresolved_issues)
 
-
 ###############################################################################
 @pytest.mark.parametrize("prefix", ["", "Read the session context once, then "])
 def test_requested_append_sentence_is_extracted_from_explicit_instruction(
@@ -626,6 +624,7 @@ def test_revision_job_persists_job_identity_before_worker_start(
     session_id = save_revision_source_session(serializer)
     observed: dict[str, Any] = {}
 
+    ###############################################################################
     class ObservingJobManager(JobManager):
 
         # -------------------------------------------------------------------------
@@ -1093,7 +1092,6 @@ class FailingRevisionRunner:
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         raise RuntimeError("Synthetic revision failure")
 
-
 ###############################################################################
 def test_running_revision_persists_job_recovery_metadata(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -1152,10 +1150,14 @@ def test_unattributed_retryable_revision_failure_keeps_runtime_metadata(
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
 
+    ###############################################################################
     class RetryableFailure(RuntimeError):
         retryable = True
 
+    ###############################################################################
     class RetryableRevisionRunner:
+
+        # -------------------------------------------------------------------------
         def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
             raise RetryableFailure("Transient provider failure")
 

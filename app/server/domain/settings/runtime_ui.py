@@ -15,11 +15,9 @@ RuntimeSettingsCategory = Literal[
     "general", "data", "integrations", "matching", "advanced"
 ]
 
-
 ###############################################################################
 class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
 
 ###############################################################################
 class _PatchModel(_StrictModel):
@@ -34,15 +32,14 @@ class _PatchModel(_StrictModel):
                 raise ValueError(f"{field_name} cannot be null.")
         return self
 
-
 ###############################################################################
 class GeneralRuntimeSettings(_StrictModel):
     polling_interval: float = Field(gt=0.0, le=60.0)
 
 
+###############################################################################
 class GeneralRuntimeSettingsPatch(_PatchModel):
     polling_interval: float | None = Field(default=None, gt=0.0, le=60.0)
-
 
 ###############################################################################
 class DataRuntimeSettings(_StrictModel):
@@ -79,6 +76,7 @@ class DataRuntimeSettings(_StrictModel):
         return self
 
 
+###############################################################################
 class DataRuntimeSettingsPatch(_PatchModel):
     drug_name_min_length: int | None = Field(default=None, ge=1, le=200)
     drug_name_max_length: int | None = Field(default=None, ge=1, le=1000)
@@ -95,7 +93,6 @@ class DataRuntimeSettingsPatch(_PatchModel):
     moderate_confidence_min_score: float | None = Field(default=None, ge=0.0, le=100.0)
     moderate_confidence_min_margin: float | None = Field(default=None, ge=0.0, le=100.0)
 
-
 ###############################################################################
 class IntegrationRuntimeSettings(_StrictModel):
     ncbi_contact_email: NCBIContactEmail
@@ -108,6 +105,7 @@ class IntegrationRuntimeSettings(_StrictModel):
     rxnav_max_concurrency: int = Field(ge=1, le=64)
 
 
+###############################################################################
 class IntegrationRuntimeSettingsPatch(_PatchModel):
     ncbi_contact_email: NCBIContactEmail | None = None
     livertox_download_timeout: float | None = Field(default=None, gt=0.0, le=3600.0)
@@ -119,7 +117,6 @@ class IntegrationRuntimeSettingsPatch(_PatchModel):
     livertox_monograph_max_workers: int | None = Field(default=None, ge=1, le=64)
     rxnav_request_timeout: float | None = Field(default=None, gt=0.0, le=120.0)
     rxnav_max_concurrency: int | None = Field(default=None, ge=1, le=64)
-
 
 ###############################################################################
 class MatchingRuntimeSettings(_StrictModel):
@@ -139,6 +136,7 @@ class MatchingRuntimeSettings(_StrictModel):
     spelling_long_max_distance: int = Field(ge=0, le=16)
 
 
+###############################################################################
 class MatchingRuntimeSettingsPatch(_PatchModel):
     direct_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     master_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -154,7 +152,6 @@ class MatchingRuntimeSettingsPatch(_PatchModel):
     spelling_short_name_length: int | None = Field(default=None, ge=1, le=128)
     spelling_short_max_distance: int | None = Field(default=None, ge=0, le=16)
     spelling_long_max_distance: int | None = Field(default=None, ge=0, le=16)
-
 
 ###############################################################################
 class AdvancedRuntimeSettings(_StrictModel):
@@ -183,6 +180,7 @@ class AdvancedRuntimeSettings(_StrictModel):
         return self
 
 
+###############################################################################
 class AdvancedRuntimeSettingsPatch(_PatchModel):
     default_llm_timeout: float | None = Field(default=None, gt=0.0, le=86400.0)
     parser_llm_timeout: float | None = Field(default=None, gt=0.0, le=86400.0)
@@ -195,7 +193,6 @@ class AdvancedRuntimeSettingsPatch(_PatchModel):
     ollama_server_start_timeout: float | None = Field(default=None, gt=0.0, le=3600.0)
     max_excerpt_length: int | None = Field(default=None, ge=500, le=100000)
 
-
 ###############################################################################
 class RuntimeSettingsValues(_StrictModel):
     general: GeneralRuntimeSettings
@@ -203,7 +200,6 @@ class RuntimeSettingsValues(_StrictModel):
     integrations: IntegrationRuntimeSettings
     matching: MatchingRuntimeSettings
     advanced: AdvancedRuntimeSettings
-
 
 ###############################################################################
 class RuntimeSettingsUpdateRequest(_StrictModel):
@@ -222,7 +218,6 @@ class RuntimeSettingsUpdateRequest(_StrictModel):
             if getattr(self, field_name) is None:
                 raise ValueError(f"{field_name} cannot be null.")
         return self
-
 
 ###############################################################################
 class RuntimeSettingsStateResponse(_StrictModel):

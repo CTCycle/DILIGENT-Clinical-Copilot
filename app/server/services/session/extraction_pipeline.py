@@ -31,6 +31,7 @@ from services.clinical.job_progress import ClinicalJobCancelled
 T = TypeVar("T")
 
 
+###############################################################################
 async def _await_with_stop_check(
     awaitable: Awaitable[T],
     *,
@@ -55,7 +56,6 @@ async def _await_with_stop_check(
         with contextlib.suppress(BaseException):
             await task
         raise
-
 
 ###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):

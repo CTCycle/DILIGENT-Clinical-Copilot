@@ -22,7 +22,6 @@ from repositories.session_timeline_repository import SessionTimelineRepository  
 SEED_PATIENT_NAME = "CI Browser Regression Subject"
 SEED_TIMESTAMP = datetime(2026, 9, 29, 8, 0)
 
-
 ###############################################################################
 def seed_browser_regression_database() -> tuple[int, int]:
     database_settings = get_server_settings().database

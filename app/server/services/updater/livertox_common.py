@@ -19,7 +19,6 @@ NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
 DOWNLOAD_CHUNK_SIZE = 262_144
 DOWNLOAD_PROGRESS_BYTE_INTERVAL = 5 * 1024 * 1024
 
-
 ###############################################################################
 def build_ncbi_http_headers(contact_email: str) -> dict[str, str]:
     return {
@@ -29,7 +28,6 @@ def build_ncbi_http_headers(contact_email: str) -> dict[str, str]:
         ),
         "Accept-Encoding": "gzip, deflate",
     }
-
 
 ###############################################################################
 def load_json(path: str | Path) -> dict[str, Any] | None:
@@ -41,7 +39,6 @@ def load_json(path: str | Path) -> dict[str, Any] | None:
             return json.load(handle)
     except json.JSONDecodeError, OSError:
         return None
-
 
 ###############################################################################
 def save_masterlist_metadata(path: str | Path, payload: dict[str, Any]) -> None:
@@ -55,13 +52,11 @@ def save_masterlist_metadata(path: str | Path, payload: dict[str, Any]) -> None:
             exc,
         )
 
-
 ###############################################################################
 def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
     return stored.get("last_modified") == remote.get("last_modified") and int(
         stored.get("size", 0)
     ) == int(remote.get("size", 0))
-
 
 ###############################################################################
 async def download_file(
@@ -107,7 +102,6 @@ async def download_file(
                         message=message,
                     )
 
-
 ###############################################################################
 def emit_progress(
     progress_callback: Callable[[float, str], None] | None,
@@ -119,7 +113,6 @@ def emit_progress(
         return
     bounded_progress = min(100.0, max(0.0, float(progress)))
     progress_callback(bounded_progress, message)
-
 
 ###############################################################################
 def should_cancel(should_stop: Callable[[], bool] | None) -> bool:

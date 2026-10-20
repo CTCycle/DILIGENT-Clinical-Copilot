@@ -19,7 +19,6 @@ from repositories.serialization.session_timelines import build_timeline_preview_
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
 
-
 ###############################################################################
 class FakeTimelineClient:
 
@@ -122,7 +121,6 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 
     assert [event.event_id for event in result.events] == ["grounded"]
 
-
 ###############################################################################
 def test_timeline_extractor_rejects_unsupported_source_evidence() -> None:
     extractor = PatientTimelineExtractor(
@@ -159,7 +157,6 @@ def test_timeline_extractor_rejects_unsupported_source_evidence() -> None:
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
 
-
 ###############################################################################
 def test_timeline_source_is_derived_from_the_matching_canonical_field() -> None:
     extractor = PatientTimelineExtractor(
@@ -195,7 +192,6 @@ def test_timeline_source_is_derived_from_the_matching_canonical_field() -> None:
 
     assert result.events[0].source == "laboratory_analysis"
 
-
 ###############################################################################
 def test_timeline_source_is_cleared_when_evidence_matches_distinct_fields() -> None:
     extractor = PatientTimelineExtractor(
@@ -225,12 +221,14 @@ def test_timeline_source_is_cleared_when_evidence_matches_distinct_fields() -> N
 
     assert result.events[0].source is None
 
-
 ###############################################################################
 def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> None:
+
+    ###############################################################################
     class CapturingTimelineExtractor(PatientTimelineExtractor):
         events_before_normalize: list[PatientTimelineEvent]
 
+        # -------------------------------------------------------------------------
         def normalize_events(
             self, events: list[PatientTimelineEvent]
         ) -> list[PatientTimelineEvent]:
@@ -266,7 +264,6 @@ def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> N
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
 
-
 ###############################################################################
 def test_timeline_extractor_rejects_empty_result_with_clinical_source_text() -> None:
     extractor = PatientTimelineExtractor(
@@ -289,7 +286,6 @@ def test_timeline_extractor_rejects_empty_result_with_clinical_source_text() -> 
 
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
-
 
 ###############################################################################
 def test_timeline_extractor_allows_empty_result_without_clinical_source_text() -> None:

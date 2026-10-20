@@ -18,9 +18,9 @@ from common.constants import (
 )
 
 
+###############################################################################
 class NCBIClientError(RuntimeError):
     """Raised when an official NCBI machine-access response is unusable."""
-
 
 ###############################################################################
 async def search_bookshelf_record(
@@ -46,7 +46,6 @@ async def search_bookshelf_record(
         contact_email=contact_email,
         accession=accession,
     )
-
 
 ###############################################################################
 async def summarize_bookshelf_record(
@@ -88,7 +87,6 @@ async def summarize_bookshelf_record(
         raise NCBIClientError("NCBI Bookshelf returned conflicting records.")
     return matches[0]
 
-
 ###############################################################################
 async def resolve_books_oai_master_list_url(
     client: httpx.AsyncClient,
@@ -109,7 +107,6 @@ async def resolve_books_oai_master_list_url(
         raise NCBIClientError("Books-OAI returned conflicting master-list links.")
     return next(iter(candidates), None)
 
-
 ###############################################################################
 async def list_metadata_formats(
     client: httpx.AsyncClient,
@@ -128,7 +125,6 @@ async def list_metadata_formats(
         if _local_name(element.tag) == "metadataPrefix" and (element.text or "").strip()
     }
 
-
 ###############################################################################
 async def get_books_oai_record(
     client: httpx.AsyncClient,
@@ -145,7 +141,6 @@ async def get_books_oai_record(
             "metadataPrefix": metadata_prefix,
         },
     )
-
 
 ###############################################################################
 def _extract_master_list_candidates(xml_payload: str, *, accession: str) -> set[str]:
@@ -178,7 +173,6 @@ def _extract_master_list_candidates(xml_payload: str, *, accession: str) -> set[
                 candidates.add(candidate)
     return candidates
 
-
 ###############################################################################
 def _validate_master_list_url(value: str, *, accession: str) -> str | None:
     raw_value = value.strip()
@@ -200,7 +194,6 @@ def _validate_master_list_url(value: str, *, accession: str) -> str | None:
         return None
     return urlunsplit(parsed)
 
-
 ###############################################################################
 async def _get_json(
     client: httpx.AsyncClient,
@@ -219,7 +212,6 @@ async def _get_json(
         raise NCBIClientError("NCBI E-utilities returned an invalid JSON object.")
     return payload
 
-
 ###############################################################################
 async def _get_text(
     client: httpx.AsyncClient,
@@ -233,7 +225,6 @@ async def _get_text(
     except httpx.HTTPError as exc:
         raise NCBIClientError("NCBI machine-access request failed.") from exc
 
-
 ###############################################################################
 def _extract_id_list(payload: dict[str, Any]) -> list[str]:
     result = payload.get("esearchresult")
@@ -246,13 +237,11 @@ def _extract_id_list(payload: dict[str, Any]) -> list[str]:
         raise NCBIClientError("NCBI ESearch returned an invalid identifier list.")
     return [item.strip() for item in id_list if item.strip()]
 
-
 ###############################################################################
 def _numeric_accession(accession: str) -> str:
     if not accession.upper().startswith("NBK") or not accession[3:].isdigit():
         raise NCBIClientError("NCBI Bookshelf accession is invalid.")
     return accession[3:]
-
 
 ###############################################################################
 def _parse_xml(payload: str, description: str) -> ElementTree.Element:
@@ -263,7 +252,6 @@ def _parse_xml(payload: str, description: str) -> ElementTree.Element:
     if any(_local_name(element.tag) == "error" for element in root.iter()):
         raise NCBIClientError(f"{description} returned an error.")
     return root
-
 
 ###############################################################################
 def _local_name(tag: str) -> str:

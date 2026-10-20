@@ -116,6 +116,7 @@ def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
     assert settings["local_llm_timeout_cap"] == 8.0
 
 
+###############################################################################
 def test_runtime_settings_use_default_ncbi_contact_when_missing_or_blank() -> None:
     for value in (None, "", "   "):
         runtime = build_settings_payload(
@@ -125,6 +126,7 @@ def test_runtime_settings_use_default_ncbi_contact_when_missing_or_blank() -> No
         assert runtime["ncbi_contact_email"] == DEFAULT_NCBI_CONTACT_EMAIL
 
 
+###############################################################################
 def test_runtime_settings_normalize_custom_ncbi_contact() -> None:
     runtime = build_settings_payload(
         {"runtime": {"ncbi_contact_email": "  developer@example.org  "}},
