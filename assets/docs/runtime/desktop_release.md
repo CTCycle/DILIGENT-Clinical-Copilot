@@ -1,18 +1,21 @@
 # Windows Desktop Release
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
-## Published release: v3.4.0
+## Published release: v3.5.0
 
-The public [v3.4.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0) is the latest release. Tag v3.4.0 resolves to source commit d4efa5e0bccfa552c80a5edeff2168bfaa718639. Prepare run [39109627873](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39109627873) and approved publish run [39125173765](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39125173765) succeeded.
+The public [v3.5.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.0) is the latest release. Tag v3.5.0 resolves to source commit `7a1b23e6f27b3d1987f1106eb2fb5f9aa40b2820`. Prepare run [39382912130](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39382912130) and protected, approved publish run [39419567722](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39419567722) succeeded.
 
 | Published artifact | SHA-256 |
 |---|---|
-| DILIGENT-v3.4.0-windows-x64-portable.exe | 702f8df1ff1520fe3a43aafc8cfbc589c10a9502cdf2eb2d0264d78a049acd26 |
-| DILIGENT-v3.4.0-windows-x64.msi | 3587f93c019e9983e11a5b54955d88e747d0dfbc08b3d369e0447d12e502243d |
+| DILIGENT-v3.5.0-windows-x64-portable.exe | 981fe5e3bf1db072f0e210de85c63b6baaa17be5f6a1027915124ac846435204 |
+| DILIGENT-v3.5.0-windows-x64.msi | 4c6ff76d69693564b7889c26bec4784602324b404d539886ded5ab7716df8916 |
+| DILIGENT-v3.5.0-windows-x64.sha256 | 8ee62e76c9f1e175a975f01dc46e4616899e4259d8cc314dde4554031286487e |
 
-The published and downloaded EXE/MSI bytes matched. The downloaded portable EXE opened DILI Agent, returned an OK health response, and closed cleanly. The hosted prepare run passed the required Windows MSI lifecycle, portable/deep-path smoke, backend and browser gates, PostgreSQL persistence, dependency audits, and LiveProvider E2E.
+The publication workflow promoted the immutable prepare candidate without rebuilding. Its distribution verification succeeded, and the published asset digests match the candidate receipt. The candidate EXE opened DILI Agent and the other inspected pages on the local Windows 11 Pro host, returned `{"status":"ok"}` from `/api/health`, and closed cleanly. The hosted prepare run passed the required MSI lifecycle, portable/deep-path smoke, backend and browser gates, PostgreSQL persistence, dependency audits, and LiveProvider E2E.
 
-The binaries are unsigned under the policy authorized on 2026-10-18. The public release notes disclose the missing publisher signature and warn of a possible unknown-publisher or SmartScreen prompt. The clean-host WebView2 check was waived because validation was limited to one Windows machine; this is not clean-host compatibility evidence. Native populated-workflow findings and the waiver are in the [single retained v3.4.0 evidence report](../../QA/release-gates-20261018/report.md).
+The binaries are unsigned. The public release notes disclose the missing publisher signature and warn of a possible unknown-publisher or SmartScreen prompt.
+
+The release owner explicitly waived a candidate-specific populated native analysis and clean-host Windows 11/WebView2 run, relying on the existing [project validation ledger](../project_status_ledger.md) for tested feature coverage. The v3.5.0 local smoke verifies package launch and health only; it is not a populated analysis or clean-host compatibility result. The approval comment records these waivers. Detailed release evidence is in the [v3.5.0 report](../../QA/release-gates-20261020/report.md). The previous [v3.4.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0) and its evidence remain documented in the [v3.4.0 report](../../QA/release-gates-20261018/report.md).
 
 Release acceptance recorded a manual-edit metadata issue that remains in the current source. Its current behavior and user workaround are in the [status ledger](../project_status_ledger.md) and [session guide](../user/sessions_timeline_and_data.md); it was not changed in v3.4.0.
 
