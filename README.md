@@ -7,7 +7,7 @@
 <p align="center"><strong>A local, single-user decision-support tool for structured review of possible drug-induced liver injury (DILI).</strong></p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat-square"></a>
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases"><img alt="Release" src="https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag&style=flat-square"></a>
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CTCycle/DILIGENT-Clinical-Copilot/ci.yml?branch=develop&label=CI&style=flat-square"></a>
 </p>
