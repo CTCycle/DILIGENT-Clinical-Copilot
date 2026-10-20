@@ -28,10 +28,12 @@ from services.inspection.runtime import coerce_optional_str
 T = TypeVar("T")
 
 
+###############################################################################
 class TimelineGenerationCancelled(Exception):
     """Raised when a timeline job is stopped before its result is persisted."""
 
 
+###############################################################################
 async def _await_with_stop_check(
     awaitable: Awaitable[T],
     *,
@@ -60,10 +62,10 @@ async def _await_with_stop_check(
         raise
 
 
+###############################################################################
 def _raise_if_stopped(stop_check: Callable[[], bool] | None) -> None:
     if stop_check is not None and stop_check():
         raise TimelineGenerationCancelled("Timeline generation stopped.")
-
 
 ###############################################################################
 def _report_progress(
@@ -193,7 +195,6 @@ def _timeline_fallback_note(
         "Check the configured local model runtime and backend logs for details.",
     )
     return f"Local timeline extraction did not complete. {message} Retry when ready."
-
 
 ###############################################################################
 def _fallback_event_context(source_text: str) -> tuple[str, dict[str, Any]]:

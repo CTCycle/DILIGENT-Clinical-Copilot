@@ -13,26 +13,29 @@ from typing import Any
 
 DEFAULT_MODEL = "qwen3.5:2b"
 
-
 ###############################################################################
 class FakeOllamaState:
+
+    # -------------------------------------------------------------------------
     def __init__(self, model: str) -> None:
         self.lock = Lock()
         self.models: set[str] = {model}
 
+    # -------------------------------------------------------------------------
     def list_models(self) -> list[str]:
         with self.lock:
             return sorted(self.models)
 
+    # -------------------------------------------------------------------------
     def add_model(self, model: str) -> None:
         with self.lock:
             self.models.add(model)
-
 
 ###############################################################################
 class FakeOllamaHandler(BaseHTTPRequestHandler):
     server: "FakeOllamaServer"
 
+    # -------------------------------------------------------------------------
     def _send_json(self, payload: dict[str, Any], *, status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
@@ -41,6 +44,7 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # -------------------------------------------------------------------------
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0:
@@ -48,6 +52,7 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
         payload = json.loads(self.rfile.read(length).decode("utf-8"))
         return payload if isinstance(payload, dict) else {}
 
+    # -------------------------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         if self.path == "/" or self.path == "/api/tags":
             self._send_json(self._tags_payload())
@@ -60,6 +65,7 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
             return
         self._send_json({"error": "not found"}, status=404)
 
+    # -------------------------------------------------------------------------
     def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
         if self.path == "/api/pull":
             payload = self._read_json()
@@ -100,6 +106,7 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
             return
         self._send_json({"error": "not found"}, status=404)
 
+    # -------------------------------------------------------------------------
     def _tags_payload(self) -> dict[str, Any]:
         return {
             "models": [
@@ -118,16 +125,17 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
             ]
         }
 
+    # -------------------------------------------------------------------------
     def log_message(self, _format: str, *_args: object) -> None:
         return
 
-
 ###############################################################################
 class FakeOllamaServer(ThreadingHTTPServer):
+
+    # -------------------------------------------------------------------------
     def __init__(self, address: tuple[str, int], model: str) -> None:
         self.state = FakeOllamaState(model)
         super().__init__(address, FakeOllamaHandler)
-
 
 ###############################################################################
 def main() -> None:

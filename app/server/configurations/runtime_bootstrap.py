@@ -10,7 +10,6 @@ from pathlib import Path
 
 from common.runtime_layout import RuntimeLayout, resolve_runtime_layout
 
-
 ###############################################################################
 def configure_cache_environment() -> None:
     """Keep packaged dependency and model caches inside the runtime cache root."""
@@ -37,7 +36,6 @@ def configure_cache_environment() -> None:
         f'--basetemp="{pytest_root / "basetemp"}" -o cache_dir="{pytest_root}"'
     )
 
-
 ###############################################################################
 def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
     """Atomically seed one persistent file without overwriting user data."""
@@ -54,7 +52,6 @@ def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
         temporary.unlink(missing_ok=True)
     return True
 
-
 ###############################################################################
 def create_mutable_data_directories() -> None:
     layout = resolve_runtime_layout()
@@ -68,7 +65,6 @@ def create_mutable_data_directories() -> None:
         "state",
     ):
         (mutable_root / relative_path).mkdir(parents=True, exist_ok=True)
-
 
 ###############################################################################
 def _find_data_migration_conflicts(source: Path, destination: Path) -> list[Path]:
@@ -86,7 +82,6 @@ def _find_data_migration_conflicts(source: Path, destination: Path) -> list[Path
             )
         return conflicts
     return [source]
-
 
 ###############################################################################
 def _merge_data_path(source: Path, destination: Path) -> None:
@@ -107,7 +102,6 @@ def _merge_data_path(source: Path, destination: Path) -> None:
         source.rmdir()
         return
     raise RuntimeError("Data migration encountered a conflicting path")
-
 
 ###############################################################################
 def migrate_legacy_data_layout(layout: RuntimeLayout | None = None) -> None:
@@ -163,7 +157,6 @@ def migrate_legacy_data_layout(layout: RuntimeLayout | None = None) -> None:
         legacy_root.rmdir()
     except OSError:
         pass
-
 
 ###############################################################################
 def ensure_runtime_data_layout() -> None:

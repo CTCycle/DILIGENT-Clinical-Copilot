@@ -45,7 +45,6 @@ pytestmark = pytest.mark.skipif(
     reason="Set DILIGENT_LIVE_PROVIDER_E2E=1 to run the live provider gate.",
 )
 
-
 ###############################################################################
 def _seed_release_gate_catalogs() -> None:
     """Provide the minimum public catalog evidence required by clinical preflight."""
@@ -78,7 +77,6 @@ def _seed_release_gate_catalogs() -> None:
         )
     )
 
-
 ###############################################################################
 def _clinical_input() -> str:
     return (
@@ -94,7 +92,6 @@ def _clinical_input() -> str:
         "On 2026-09-08 ALT was 210 U/L with ULN 40 U/L, AST was 170 U/L, ALP was "
         "130 U/L with ULN 120 U/L, and total bilirubin was 2.1 mg/dL."
     )
-
 
 ###############################################################################
 def _wait_for_job(
@@ -119,12 +116,10 @@ def _wait_for_job(
         f"{timeout_seconds}s: status={last_payload.get('status')}"
     )
 
-
 ###############################################################################
 def _assert_secret_absent(value: Any, provider_key: str, *, scope: str) -> None:
     serialized = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     assert provider_key not in serialized, f"Provider credential leaked in {scope}."
-
 
 ###############################################################################
 def _assert_live_provider_logs_are_sanitized(provider_key: str) -> None:
@@ -142,7 +137,6 @@ def _assert_live_provider_logs_are_sanitized(provider_key: str) -> None:
         assert provider_key not in content, (
             f"Provider credential leaked in live-provider log {log_path.name}."
         )
-
 
 ###############################################################################
 def _read_revision_attempt(
@@ -243,7 +237,6 @@ def _read_revision_attempt(
         "revision_version_id": resolved_revision_version_id,
     }
 
-
 ###############################################################################
 def _wait_for_browser_job_submission(
     page: Page,
@@ -282,7 +275,6 @@ def _wait_for_browser_job_submission(
         return response.json()
     finally:
         page.remove_listener("response", capture)
-
 
 ###############################################################################
 def test_live_opencode_go_provider_and_browser_clinical_flow(

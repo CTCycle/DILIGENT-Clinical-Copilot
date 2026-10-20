@@ -26,6 +26,7 @@ GATES = (
 )
 
 
+###############################################################################
 def _responses() -> dict:
     base = f"repos/{REPO}"
     return {
@@ -57,6 +58,7 @@ def _responses() -> dict:
     }
 
 
+###############################################################################
 def _invoke(
     tmp_path: Path, responses: dict, action: str = "Candidate"
 ) -> subprocess.CompletedProcess:
@@ -114,6 +116,7 @@ def _invoke(
     )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "failure",
     [
@@ -155,6 +158,7 @@ def test_release_rejects_incomplete_or_unrelated_evidence(
     assert not (tmp_path / "output").exists()
 
 
+###############################################################################
 def test_release_rejects_modified_candidate_before_publication(tmp_path: Path) -> None:
     qa = tmp_path / "qa"
     qa.mkdir()
@@ -179,6 +183,7 @@ def test_release_rejects_modified_candidate_before_publication(tmp_path: Path) -
     assert "Unexpected mutation" not in result.stderr
 
 
+###############################################################################
 def test_complete_candidate_reaches_approval_without_publication(
     tmp_path: Path,
 ) -> None:

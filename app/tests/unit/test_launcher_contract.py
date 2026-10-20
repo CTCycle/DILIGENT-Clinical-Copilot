@@ -14,13 +14,13 @@ def _launcher_text() -> str:
     return LAUNCHER_PATH.read_text(encoding="utf-8")
 
 
+###############################################################################
 def _function_body(source: str, name: str) -> str:
     marker = f"function {name}"
     start = source.index(marker)
     next_function = source.find("\nfunction ", start + len(marker))
     end = len(source) if next_function == -1 else next_function
     return source[start:end]
-
 
 ###############################################################################
 def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
@@ -46,6 +46,7 @@ def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
     assert "Assert-NoForeignPortListeners" in explicit_cleanup
 
 
+###############################################################################
 def test_launch_resolves_ports_once_immediately_before_process_start() -> None:
     source = _launcher_text()
     start_application = _function_body(source, "Start-Application")
@@ -60,6 +61,7 @@ def test_launch_resolves_ports_once_immediately_before_process_start() -> None:
     assert "Get-FrontendBuildStatus" in start_application
 
 
+###############################################################################
 def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> None:
     process_discovery = _function_body(_launcher_text(), "Get-ApplicationProcessRecords")
 
@@ -70,6 +72,7 @@ def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> No
     assert "candidateIds.Contains($parentId)" in process_discovery
 
 
+###############################################################################
 def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundaries() -> None:
     source = _launcher_text()
     conflict_message = _function_body(source, "New-PortConflictMessage")
@@ -83,6 +86,7 @@ def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundar
     assert "All configured-port holders were left running" in resolution
 
 
+###############################################################################
 def test_frontend_build_state_is_deterministic_and_published_after_stable_build() -> None:
     source = _launcher_text()
     input_files = _function_body(source, "Get-FrontendBuildInputFiles")
@@ -103,6 +107,7 @@ def test_frontend_build_state_is_deterministic_and_published_after_stable_build(
     assert "changed while Angular was building" in build
 
 
+###############################################################################
 def test_warm_runtime_repair_does_not_force_frontend_dependency_or_build_work() -> None:
     source = _launcher_text()
     start_application = _function_body(source, "Start-Application")

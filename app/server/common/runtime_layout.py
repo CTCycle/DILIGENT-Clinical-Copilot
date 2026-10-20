@@ -12,7 +12,6 @@ from dotenv import dotenv_values
 
 DATA_PATH_ENV = "DILIGENT_DATA_PATH"
 
-
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class RuntimeLayout:
@@ -28,7 +27,6 @@ class RuntimeLayout:
     cache_root: Path
     client_dist_root: Path
 
-
 ###############################################################################
 def _resolve_required_absolute_environment_path(name: str) -> Path:
     value = os.getenv(name, "").strip()
@@ -38,7 +36,6 @@ def _resolve_required_absolute_environment_path(name: str) -> Path:
     if not path.is_absolute():
         raise RuntimeError(f"{name} must be an absolute path")
     return path.resolve()
-
 
 ###############################################################################
 def _resolve_source_data_root(repository_root: Path, default_root: Path) -> Path:
@@ -54,7 +51,6 @@ def _resolve_source_data_root(repository_root: Path, default_root: Path) -> Path
     if not path.is_absolute():
         path = repository_root / path
     return path.resolve()
-
 
 ###############################################################################
 def _resolve_source_layout() -> RuntimeLayout:
@@ -73,7 +69,6 @@ def _resolve_source_layout() -> RuntimeLayout:
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
 
-
 ###############################################################################
 def _resolve_packaged_layout() -> RuntimeLayout:
     runtime_root = _resolve_required_absolute_environment_path("DILIGENT_RUNTIME_ROOT")
@@ -90,7 +85,6 @@ def _resolve_packaged_layout() -> RuntimeLayout:
         cache_root=data_root / "cache",
         client_dist_root=application_root / "client" / "dist" / "browser",
     )
-
 
 ###############################################################################
 @lru_cache(maxsize=1)

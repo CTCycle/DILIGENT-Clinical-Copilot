@@ -30,6 +30,7 @@ ARCHIVE_PATH = "cc/8d/livertox_NBK547852.tar.gz"
 ARCHIVE_URL = f"https://ftp.ncbi.nlm.nih.gov/pub/litarch/{ARCHIVE_PATH}"
 
 
+###############################################################################
 def _response_json(request: httpx.Request, payload: dict[str, Any]) -> httpx.Response:
     return httpx.Response(
         200,
@@ -39,6 +40,7 @@ def _response_json(request: httpx.Request, payload: dict[str, Any]) -> httpx.Res
     )
 
 
+###############################################################################
 def _master_xlsx_bytes() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
@@ -78,6 +80,7 @@ def _master_xlsx_bytes() -> bytes:
     return output.getvalue()
 
 
+###############################################################################
 def _archive_bytes(*, include_master: bool = False, unsafe_member: bool = False) -> bytes:
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode="w:gz") as archive:
@@ -98,6 +101,7 @@ def _archive_bytes(*, include_master: bool = False, unsafe_member: bool = False)
     return output.getvalue()
 
 
+###############################################################################
 def _updater(tmp_path: Path, *, email: str = DEFAULT_NCBI_CONTACT_EMAIL) -> SimpleNamespace:
     return SimpleNamespace(
         http_headers=build_ncbi_http_headers(email),
@@ -116,6 +120,7 @@ def _updater(tmp_path: Path, *, email: str = DEFAULT_NCBI_CONTACT_EMAIL) -> Simp
     )
 
 
+###############################################################################
 def test_esearch_and_esummary_use_ncbi_identity_and_exact_rid() -> None:
     requests: list[httpx.Request] = []
 
@@ -147,6 +152,7 @@ def test_esearch_and_esummary_use_ncbi_identity_and_exact_rid() -> None:
     assert requests[1].url.params["email"] == "developer@example.org"
 
 
+###############################################################################
 def test_esummary_rejects_missing_or_conflicting_rid() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("esearch.fcgi"):
@@ -170,6 +176,7 @@ def test_esummary_rejects_missing_or_conflicting_rid() -> None:
         asyncio.run(resolve())
 
 
+###############################################################################
 def _oai_handler(
     xlsx: bytes,
     *,
@@ -217,6 +224,7 @@ def _oai_handler(
     return handler
 
 
+###############################################################################
 def test_books_oai_resolves_dynamic_master_list_link_and_identifier() -> None:
     requests: list[httpx.Request] = []
 
@@ -234,6 +242,7 @@ def test_books_oai_resolves_dynamic_master_list_link_and_identifier() -> None:
     assert requests[1].url.params["metadataPrefix"] == "nbk_ftext"
 
 
+###############################################################################
 def test_books_oai_resolves_safe_relative_master_list_link() -> None:
     async def resolve() -> str | None:
         async with httpx.AsyncClient(
@@ -248,6 +257,7 @@ def test_books_oai_resolves_safe_relative_master_list_link() -> None:
     )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "link",
     [
@@ -265,6 +275,7 @@ def test_books_oai_rejects_foreign_or_wrong_book_links(link: str) -> None:
     assert asyncio.run(resolve()) is None
 
 
+###############################################################################
 def test_missing_oai_spreadsheet_uses_litarch_fallback(
     tmp_path: Path, monkeypatch
 ) -> None:  # type: ignore[no-untyped-def]
@@ -329,6 +340,7 @@ def test_missing_oai_spreadsheet_uses_litarch_fallback(
     )
 
 
+###############################################################################
 def test_litarch_file_list_resolves_exact_accession_and_dynamic_directory() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -344,6 +356,7 @@ def test_litarch_file_list_resolves_exact_accession_and_dynamic_directory() -> N
     assert asyncio.run(resolve()) == ARCHIVE_URL
 
 
+###############################################################################
 def test_litarch_file_list_rejects_conflicting_and_unsafe_paths() -> None:
     async def resolve(csv_payload: str) -> str:
         def handler(request: httpx.Request) -> httpx.Response:
@@ -364,6 +377,7 @@ def test_litarch_file_list_rejects_conflicting_and_unsafe_paths() -> None:
         asyncio.run(resolve("../livertox_NBK547852.tar.gz,LiverTox,NBK547852\n"))
 
 
+###############################################################################
 def test_master_list_extraction_rejects_traversal_and_ambiguity(tmp_path: Path) -> None:
     safe_archive = tmp_path / "safe.tar.gz"
     safe_archive.write_bytes(_archive_bytes(include_master=True))
@@ -387,6 +401,7 @@ def test_master_list_extraction_rejects_traversal_and_ambiguity(tmp_path: Path) 
         livertox_download.find_master_list_member(ambiguous)
 
 
+###############################################################################
 def test_archive_download_is_dynamic_and_skips_unchanged_payload(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     archive_payload = _archive_bytes()
     requests: list[httpx.Request] = []
@@ -420,6 +435,7 @@ def test_archive_download_is_dynamic_and_skips_unchanged_payload(tmp_path: Path,
     assert not (tmp_path / "livertox_NBK547852.tar.gz.part").exists()
 
 
+###############################################################################
 def test_partial_archive_download_preserves_last_good_file(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     destination = tmp_path / "livertox_NBK547852.tar.gz"
     original = _archive_bytes()
@@ -446,6 +462,7 @@ def test_partial_archive_download_preserves_last_good_file(tmp_path: Path, monke
     assert not (tmp_path / "livertox_NBK547852.tar.gz.part").exists()
 
 
+###############################################################################
 def test_partial_master_list_download_preserves_last_good_file(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     destination = tmp_path / "LiverTox_Master_List.xlsx"
     original = _master_xlsx_bytes()
@@ -479,6 +496,7 @@ def test_partial_master_list_download_preserves_last_good_file(tmp_path: Path, m
     assert not (tmp_path / "LiverTox_Master_List.xlsx.part").exists()
 
 
+###############################################################################
 def test_ncbi_failures_are_sanitized_and_do_not_return_contact_email() -> None:
     contact = "developer@example.org"
 
@@ -495,6 +513,7 @@ def test_ncbi_failures_are_sanitized_and_do_not_return_contact_email() -> None:
     assert contact in build_ncbi_http_headers(contact)["User-Agent"]
 
 
+###############################################################################
 def test_ncbi_contact_is_not_written_to_discovery_logs(caplog) -> None:  # type: ignore[no-untyped-def]
     contact = "developer@example.org"
     updater = SimpleNamespace(ncbi_contact_email=contact)

@@ -30,6 +30,7 @@ def test_line_metadata_is_propagated() -> None:
     )
 
 
+###############################################################################
 def test_duplicate_metadata_keeps_canonical_citation_path() -> None:
     reference = RagSupportService.build_document_reference(
         {

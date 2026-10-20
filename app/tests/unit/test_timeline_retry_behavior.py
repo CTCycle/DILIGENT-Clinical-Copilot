@@ -11,7 +11,6 @@ from domain.patient_timeline import PatientTimelineEvent, PatientTimelineExtract
 from services.clinical.timeline import PatientTimelineExtractor
 from services.llm.cloud import LLMError
 
-
 ###############################################################################
 class RetryThenSuccessClient:
 

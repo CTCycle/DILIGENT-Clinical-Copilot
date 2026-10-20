@@ -8,7 +8,6 @@ from domain.patient_timeline import PatientTimelineGenerationErrorCode
 from services.inspection.timeline import _timeline_error_code, _timeline_fallback_note
 from services.llm.cloud import LLMError
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("error", "expected"),
@@ -62,7 +61,6 @@ def test_timeline_fallback_note_truncates_long_diagnostics() -> None:
     )
 
     assert len(note) == 500
-
 
 ###############################################################################
 @pytest.mark.parametrize(

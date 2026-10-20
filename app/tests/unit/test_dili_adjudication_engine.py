@@ -17,7 +17,6 @@ from domain.clinical.entities import (
 from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_pattern import DiliPatternEngine
 
-
 ###############################################################################
 def test_r_ratio_boundary_values_follow_livertox_definitions() -> None:
     assert DiliPatternEngine.classify(5.0) == "hepatocellular"

@@ -10,7 +10,6 @@ from fastapi import FastAPI
 
 import app as server_app_module
 
-
 ###############################################################################
 def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ignore[no-untyped-def]
     events: list[str] = []

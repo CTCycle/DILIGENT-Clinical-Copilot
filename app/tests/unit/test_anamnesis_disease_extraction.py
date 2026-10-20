@@ -24,7 +24,6 @@ from services.clinical.disease import DiseaseExtractor
 from services.clinical.job_progress import ClinicalJobCancelled
 from services.session.session_service import ClinicalSessionService
 
-
 ###############################################################################
 class FakeDiseaseClient:
 
@@ -77,11 +76,9 @@ class CancellationAwareDiseaseClient:
         assert cancel_check() is True
         raise CancelledStructuredCallError("LLM request cancelled")
 
-
 ###############################################################################
 class CancelledStructuredCallError(RuntimeError):
     error_code = "cancelled"
-
 
 ###############################################################################
 def test_extract_diseases_propagates_stop_into_cloud_structured_call() -> None:

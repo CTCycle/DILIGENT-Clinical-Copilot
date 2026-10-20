@@ -20,25 +20,32 @@ from configurations.startup import ConfigurationManager
 from services.settings.runtime import RuntimeSettingsService
 
 
+###############################################################################
 class MemoryApplicationConfigurationSerializer:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.payload = build_default_application_configuration_payload(
             environment_snapshot_from_os_env()
         )
         self.updated_at = datetime.now(UTC)
 
+    # -------------------------------------------------------------------------
     def load(self) -> dict[str, Any]:
         return dict(self.payload)
 
+    # -------------------------------------------------------------------------
     def load_with_metadata(self) -> tuple[dict[str, Any], datetime]:
         return dict(self.payload), self.updated_at
 
+    # -------------------------------------------------------------------------
     def save(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.payload = dict(payload)
         self.updated_at = datetime.now(UTC)
         return dict(self.payload)
 
 
+###############################################################################
 def _client(monkeypatch) -> tuple[TestClient, MemoryApplicationConfigurationSerializer]:  # type: ignore[no-untyped-def]
     serializer = MemoryApplicationConfigurationSerializer()
     manager = ConfigurationManager(persisted_payload=serializer.payload)
@@ -55,6 +62,7 @@ def _client(monkeypatch) -> tuple[TestClient, MemoryApplicationConfigurationSeri
     return TestClient(application), serializer
 
 
+###############################################################################
 def test_settings_api_get_patch_and_reset(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     client, serializer = _client(monkeypatch)
 
@@ -86,6 +94,7 @@ def test_settings_api_get_patch_and_reset(monkeypatch) -> None:  # type: ignore[
     assert response.json()["values"]["general"]["polling_interval"] == 1.0
 
 
+###############################################################################
 def test_settings_api_persists_custom_ncbi_contact_and_resets_it(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     client, serializer = _client(monkeypatch)
 
@@ -102,6 +111,7 @@ def test_settings_api_persists_custom_ncbi_contact_and_resets_it(monkeypatch) ->
     assert response.json()["values"]["integrations"]["ncbi_contact_email"] == "clinical-copilot@pharmagent.local"
 
 
+###############################################################################
 def test_settings_api_rejects_malformed_ncbi_contact(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     client, _ = _client(monkeypatch)
 
@@ -113,6 +123,7 @@ def test_settings_api_rejects_malformed_ncbi_contact(monkeypatch) -> None:  # ty
     assert response.status_code == 422
 
 
+###############################################################################
 def test_settings_api_rejects_unknown_or_invalid_fields(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     client, _ = _client(monkeypatch)
 
