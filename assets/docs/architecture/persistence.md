@@ -223,12 +223,12 @@ erDiagram
   Alembic head, and apply pending revisions before repositories or services run.
 - SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
 - Fresh databases are upgraded through the linear Alembic history before the
-  application starts. The current schema is maintained as a single squashed
-  baseline revision. Populated databases without an Alembic revision are
-  rejected before application tables are changed; the runtime never guesses or
-  stamps migration history. Unknown or divergent versioned schemas are also
-  rejected; databases stamped at a removed older revision must be recreated
-  or restored from a current-schema backup.
+  application starts. The v2.4 baseline and revisions through
+  `202609170001` remain available so databases from the v3.5.0 release are
+  recognized at the current head without changing user rows. Populated
+  databases without an Alembic revision and databases with unknown or
+  divergent revisions are rejected before application tables are changed; the
+  runtime never guesses or stamps migration history.
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.

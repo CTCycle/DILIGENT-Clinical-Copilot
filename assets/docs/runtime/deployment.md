@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-10-18
+Last updated: 2026-10-21
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -57,10 +57,11 @@ existing output contract and does not require this source-mode marker.
   `uv run alembic -c alembic.ini upgrade head` and
   `uv run alembic -c alembic.ini current --check-heads`, followed by
   `uv run alembic -c alembic.ini check`.
-- Keep one linear head. Back up production data before upgrades. Populated
-  databases without an Alembic revision are rejected; the runtime does not
-  guess or stamp unversioned migration history. Older or divergent schemas
-  require an explicit administrative conversion plan.
+- Keep one linear head. Back up production data before upgrades. Known
+  revisions from the v2.4 baseline through `202609170001` upgrade through the
+  checked-in history. Populated databases without a revision and databases
+  with unknown or divergent revisions are rejected; the runtime does not
+  guess or stamp unversioned migration history.
 - Use Alembic downgrade commands only for reviewed development or recovery
   procedures. The initializer's `--drop-existing` option is the explicit reset
   workflow and destroys application rows before rebuilding to head.
@@ -76,7 +77,7 @@ existing output contract and does not require this source-mode marker.
 The latest published desktop release is `v3.5.0`. It contains a Tauri portable EXE and MSI built from synchronized source. Current release status, exact artifact hashes, hosted and native validation, unsigned disclosure, and the WebView2 waiver are recorded in the [desktop release document](desktop_release.md).
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.5.0 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.5.1 -DesktopTarget All
 ```
 
 For a later release, use the synchronized version from the source manifests. The build produces a portable EXE, MSI, and matching `.sha256` file under `release/`. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI that must carry an offline WebView2 installer. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied intentionally.
