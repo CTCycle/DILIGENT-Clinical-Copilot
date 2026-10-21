@@ -149,7 +149,6 @@ class ModelConfigSerializer:
     def save_snapshot(
         self,
         *,
-        base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = UNSET,
         text_extraction_model: str | None | object = UNSET,
         revision_model: str | None | object = UNSET,
@@ -161,8 +160,6 @@ class ModelConfigSerializer:
         ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
-        current = asdict(base_snapshot or self.load_snapshot())
-        current.pop("updated_at", None)
         updates = {
             "clinical_model": clinical_model,
             "text_extraction_model": text_extraction_model,
@@ -175,19 +172,25 @@ class ModelConfigSerializer:
             "ollama_seed": ollama_seed,
             "rag_settings": rag_settings,
         }
-        for key, value in updates.items():
-            if value is not UNSET:
-                current[key] = value
-        self._require_required_roles(current)
-        current["reasoning_level"] = self.reasoning_level_from_payload(current)
-        current["ollama_seed"] = self.normalize_optional_seed(
-            current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
-        )
-        current["rag_settings"] = self.normalize_rag_settings(
-            current.get("rag_settings")
-        )
-        saved_payload, updated_at = self.application_configuration.save(
-            current,
+        updates = {key: value for key, value in updates.items() if value is not UNSET}
+
+        def merge_latest_configuration(payload: dict[str, object]) -> None:
+            payload.pop("database", None)
+            current = asdict(self.snapshot_from_payload(payload, updated_at=None))
+            current.pop("updated_at", None)
+            current.update(updates)
+            self._require_required_roles(current)
+            current["reasoning_level"] = self.reasoning_level_from_payload(current)
+            current["ollama_seed"] = self.normalize_optional_seed(
+                current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
+            )
+            current["rag_settings"] = self.normalize_rag_settings(
+                current.get("rag_settings")
+            )
+            payload.update(current)
+
+        saved_payload, updated_at = self.application_configuration.update_payload(
+            merge_latest_configuration,
             return_metadata=True,
         )
         return self.snapshot_from_payload(saved_payload, updated_at=updated_at)

@@ -22,7 +22,7 @@ describe('SettingsPageComponent', () => {
     const links = Array.from(
       fixture.nativeElement.querySelectorAll('.settings-navigation-link') as NodeListOf<HTMLAnchorElement>,
     );
-    expect(links).toHaveLength(6);
+    expect(links).toHaveLength(7);
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       expect.stringContaining('General'),
       expect.stringContaining('Models'),
@@ -30,7 +30,10 @@ describe('SettingsPageComponent', () => {
       expect.stringContaining('Integrations'),
       expect.stringContaining('Drug Matching'),
       expect.stringContaining('Advanced'),
+      expect.stringContaining('Database'),
     ]);
-    expect(fixture.nativeElement.textContent).toContain('.env');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Process and deployment settings are managed at launch; database connections can be changed here.',
+    );
   });
 });

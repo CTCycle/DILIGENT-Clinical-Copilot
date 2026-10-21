@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-09-22
+Last updated: 2026-10-20
 
 ## Recommended Local Startup
 On Windows, use:
@@ -38,16 +38,33 @@ removed, preserved, skipped, and enumeration-error results. Strict staging and
 setup cleanup raises after reporting incomplete removal; user-facing cleanup is
 best effort.
 
+Database connection settings are loaded from `<data-root>/database_config.json`
+before the backend initializes its repository. This file contains only the
+selected backend and connection parameters; no database configuration is
+required in `.env` or process environment variables. Application settings are
+loaded from the selected database after it is ready.
+
 Database startup behavior is migration-driven:
 
 - In SQLite mode, application startup creates the configured `.db` when
-  missing, applies Alembic migrations to head, and seeds catalogs once. An
-  existing file is checked and upgraded without reseeding.
+  missing, applies Alembic migrations to head, and seeds catalogs when the app
+  schema is new or the reference catalog is empty.
 - In PostgreSQL mode, application startup connects to the configured database,
-  creates it when permitted, applies Alembic migrations to head, and seeds only
-  a newly created database. Existing databases do not require `CREATEDB`.
+  creates it when permitted, applies Alembic migrations to head, and seeds when
+  the app schema is new or the reference catalog is empty. Existing databases
+  do not require `CREATEDB`.
   When the target is absent, provision it in advance or grant the configured
   role `CREATEDB`; authentication, network, and permission failures abort startup.
+- The Settings → Database page can switch SQLite/PostgreSQL without restarting.
+  It pauses new API work, waits up to 60 seconds for current API requests, and
+  rejects the switch while background jobs are pending or running. It verifies
+  the target schema before publishing the new connection and reloads settings
+  from that database. Failed activation restores the previous configuration
+  and runtime services.
+- Restart is required after changing the data root, packaged runtime location,
+  access-key-material path, or other process-level startup settings. If an
+  activation failure reports that automatic rollback could not restore
+  services, restart to load the saved working backend.
 - The explicit `InitializeDatabase` action remains the repeatable operator path
   for either backend. It applies pending migrations and seeds idempotently;
   `--drop-existing` is the explicit destructive reset path.

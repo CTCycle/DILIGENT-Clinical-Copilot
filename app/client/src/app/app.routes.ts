@@ -10,6 +10,7 @@ import { ModelConfigPageComponent } from './pages/model-config/model-config-page
 import { PatientTimetablePageComponent } from './pages/patient-timetable/patient-timetable-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { OperationalSettingsPageComponent } from './pages/settings/components/operational-settings-page.component';
+import { DatabaseSettingsComponent } from './pages/settings/components/database-settings.component';
 
 export const routes: Routes = [
   { path: '', component: DiliAgentPageComponent, title: 'DILI Agent | DILIGENT' },
@@ -56,6 +57,11 @@ export const routes: Routes = [
         component: OperationalSettingsPageComponent,
         data: { settingsSection: 'advanced' },
         title: 'Advanced Settings | DILIGENT',
+      },
+      {
+        path: 'database',
+        component: DatabaseSettingsComponent,
+        title: 'Database Settings | DILIGENT',
       },
     ],
   },

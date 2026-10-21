@@ -524,6 +524,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if (this.reasoningSaveTimer !== null) {
       clearTimeout(this.reasoningSaveTimer);
       this.reasoningSaveTimer = null;
+      this.persistReasoningPreference();
     }
   }
 
@@ -901,15 +902,25 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
 
   handleReasoningLevelChange(level: number): void {
     const normalizedLevel = Math.max(0, Math.min(3, Math.round(level)));
-    const reasoningLevel = REASONING_LEVELS[normalizedLevel];
     this.previewReasoningLevel.set(normalizedLevel);
-    if (this.reasoningSaveTimer) {
-      clearTimeout(this.reasoningSaveTimer);
-    }
+    if (this.reasoningSaveTimer !== null) clearTimeout(this.reasoningSaveTimer);
     this.reasoningSaveTimer = setTimeout(() => {
-      void this.persistConfigPatch({ reasoning_level: reasoningLevel }, 'Reasoning preference saved.', false, 'reasoning');
-      this.reasoningSaveTimer = null;
+      this.persistReasoningPreference();
     }, 250);
+  }
+
+  private persistReasoningPreference(): void {
+    if (this.reasoningSaveTimer !== null) {
+      clearTimeout(this.reasoningSaveTimer);
+      this.reasoningSaveTimer = null;
+    }
+    const reasoningLevel = REASONING_LEVELS[this.previewReasoningLevel()] || 'off';
+    void this.persistConfigPatch(
+      { reasoning_level: reasoningLevel },
+      'Reasoning preference saved.',
+      false,
+      'reasoning',
+    );
   }
 
   async handleSaveConfiguration(): Promise<void> {

@@ -197,12 +197,11 @@ if defined MODELCONFIG_KIND (
   set "TIMESTAMP=%DATE:/=-%_%TIME::=-%"
   set "TIMESTAMP=!TIMESTAMP: =0!"
 
-  set "RUN_DB=%PYTEST_CACHE_DIR%\modelconfig-runner.!TIMESTAMP!.db"
+  set "RUN_DATA=%PYTEST_CACHE_DIR%\modelconfig-data.!TIMESTAMP!"
   set "PYTEST_CACHE=%PYTEST_CACHE_DIR%\modelconfig-cache.!TIMESTAMP!"
   set "PYTEST_BASETEMP=%PYTEST_CACHE_DIR%\modelconfig-basetemp.!TIMESTAMP!"
-  set "DILIGENT_SQLITE_PATH=!RUN_DB!"
+  set "DILIGENT_DATA_PATH=!RUN_DATA!"
   set "PYTEST_TEMP_ARGS=--basetemp "!PYTEST_BASETEMP!" -o cache_dir="!PYTEST_CACHE!""
-  if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
   if exist "!PYTEST_BASETEMP!" rmdir /s /q "!PYTEST_BASETEMP!" >nul 2>&1
 )
 

@@ -118,6 +118,25 @@ class JobManager:
             self.accepting_jobs = True
 
     # -------------------------------------------------------------------------
+    def begin_database_switch(self) -> bool:
+        """Atomically stop new jobs unless any job still owns database state."""
+        with self.lock:
+            if any(
+                state.status in ("pending", "running")
+                for state in self.jobs.values()
+            ):
+                return False
+            if not self.accepting_jobs:
+                return False
+            self.accepting_jobs = False
+            return True
+
+    # -------------------------------------------------------------------------
+    def end_database_switch(self) -> None:
+        with self.lock:
+            self.accepting_jobs = True
+
+    # -------------------------------------------------------------------------
     def start_job(
         self,
         job_type: str,

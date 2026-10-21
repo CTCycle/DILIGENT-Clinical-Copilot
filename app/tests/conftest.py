@@ -19,16 +19,18 @@ from typing import Any
 
 import pytest
 from common import paths as common_paths
-from configurations.startup import get_server_settings
+from configurations import database_config
+from configurations.startup import get_server_settings, reset_app_settings_cache
 from repositories.database import sqlite as sqlite_module
 from repositories.database.initializer import initialize_sqlite_database
+from repositories.database.session import get_default_repository
 from services.catalogs.runtime import initialize_reference_catalog_provider
 
 ###############################################################################
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
 PYTEST_CACHE_ROOT = Path(
-    os.getenv("DILIGENT_PYTEST_CACHE_ROOT") or CACHE_ROOT / "pytest"
+    os.getenv("DILIGENT_PYTEST_CACHE_ROOT") or REPO_ROOT / "assets" / "QA" / "pytest"
 ).resolve()
 
 ###############################################################################
@@ -36,8 +38,18 @@ def _configure_test_embedded_database_path() -> None:
     temp_root = PYTEST_CACHE_ROOT / "databases"
     temp_root.mkdir(parents=True, exist_ok=True)
     db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
+    database_config.DATABASE_CONFIG_FILE_PATH = (
+        temp_root / f"database-config-{uuid.uuid4().hex}.json"
+    )
+    database_config.save_database_configuration(
+        database_config.DatabaseConfiguration(
+            backend="sqlite", sqlite_path=str(db_path)
+        )
+    )
     common_paths.DATABASE_FILE_PATH = db_path
     sqlite_module.DATABASE_FILE_PATH = db_path
+    get_default_repository.cache_clear()
+    reset_app_settings_cache()
     settings = get_server_settings().database.model_copy(
         update={
             "backend": "sqlite",

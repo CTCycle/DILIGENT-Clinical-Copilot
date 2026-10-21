@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from threading import RLock
 from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,6 +31,8 @@ from repositories.serialization.application_configuration import (
     ApplicationConfigurationSerializer,
 )
 
+_RUNTIME_SETTINGS_WRITE_LOCK = RLock()
+
 ###############################################################################
 class RuntimeSettingsService:
 
@@ -55,32 +58,35 @@ class RuntimeSettingsService:
         self,
         payload: RuntimeSettingsUpdateRequest,
     ) -> RuntimeSettingsStateResponse:
-        current = self.get_state().values
-        updates = payload.model_dump(exclude_unset=True, exclude_none=True)
-        candidate_payload = current.model_dump(mode="python")
-        for category, category_updates in updates.items():
-            candidate_payload[category].update(category_updates)
+        with _RUNTIME_SETTINGS_WRITE_LOCK:
+            current = self.get_state().values
+            updates = payload.model_dump(exclude_unset=True, exclude_none=True)
+            candidate_payload = current.model_dump(mode="python")
+            for category, category_updates in updates.items():
+                candidate_payload[category].update(category_updates)
 
-        try:
-            candidate = RuntimeSettingsValues.model_validate(candidate_payload)
-        except ValueError as exc:
-            raise ServiceValidationError(str(exc)) from exc
+            try:
+                RuntimeSettingsValues.model_validate(candidate_payload)
+            except ValueError as exc:
+                raise ServiceValidationError(str(exc)) from exc
 
-        self._persist_values(candidate, set(updates))
-        return self.get_state()
+            self._persist_values(updates)
+            return self.get_state()
 
     # -------------------------------------------------------------------------
     def reset_category(
         self,
         category: RuntimeSettingsCategory,
     ) -> RuntimeSettingsStateResponse:
-        current = self.get_state().values.model_dump(mode="python")
-        current[category] = getattr(RUNTIME_SETTINGS_DEFAULTS, category).model_dump(
-            mode="python"
-        )
-        candidate = RuntimeSettingsValues.model_validate(current)
-        self._persist_values(candidate, {category})
-        return self.get_state()
+        with _RUNTIME_SETTINGS_WRITE_LOCK:
+            current = self.get_state().values.model_dump(mode="python")
+            defaults = getattr(RUNTIME_SETTINGS_DEFAULTS, category).model_dump(
+                mode="python"
+            )
+            current[category] = defaults
+            RuntimeSettingsValues.model_validate(current)
+            self._persist_values({category: defaults})
+            return self.get_state()
 
     # -------------------------------------------------------------------------
     def _load_server_settings(self) -> ServerSettings:
@@ -101,62 +107,72 @@ class RuntimeSettingsService:
     # -------------------------------------------------------------------------
     def _persist_values(
         self,
-        values: RuntimeSettingsValues,
-        categories: set[str],
+        updates: dict[str, dict[str, Any]],
     ) -> None:
         serializer = self._serializer_or_create()
         try:
-            persisted_payload = serializer.load() or (
-                build_default_application_configuration_payload(
-                    environment_snapshot_from_os_env()
-                )
-            )
-            payload = dict(persisted_payload)
-            if "general" in categories:
-                payload["jobs"] = values.general.model_dump(mode="python")
-            if "data" in categories:
-                payload["ingestion"] = {
-                    key: getattr(values.data, key)
-                    for key in (
-                        "drug_name_min_length",
-                        "drug_name_max_length",
-                        "drug_name_max_tokens",
+            def update_payload(payload: dict[str, Any]) -> None:
+                if not payload:
+                    payload.update(
+                        build_default_application_configuration_payload(
+                            environment_snapshot_from_os_env()
+                        )
                     )
-                }
-                payload["session_pipeline"] = {
-                    key: getattr(values.data, key)
-                    for key in (
-                        "text_extraction_batch_size",
-                        "text_extraction_max_concurrency",
-                        "retrieval_batch_size",
-                        "retrieval_max_concurrency",
-                        "clinical_assessment_batch_size",
-                        "clinical_assessment_max_concurrency",
-                    )
-                }
-                payload["clinical_language_detection"] = {
-                    key: getattr(values.data, key)
-                    for key in (
-                        "min_best_score",
-                        "high_confidence_min_score",
-                        "high_confidence_min_margin",
-                        "moderate_confidence_min_score",
-                        "moderate_confidence_min_margin",
-                    )
-                }
-            if "integrations" in categories:
-                payload.setdefault("runtime", {}).update(
-                    values.integrations.model_dump(mode="python")
-                )
-            if "advanced" in categories:
-                payload.setdefault("runtime", {}).update(
-                    values.advanced.model_dump(mode="python")
-                )
-            if "matching" in categories:
-                payload["drugs_matcher"] = values.matching.model_dump(mode="python")
+                payload.pop("database", None)
+                if "general" in updates:
+                    jobs = payload.get("jobs")
+                    jobs = dict(jobs) if isinstance(jobs, dict) else {}
+                    jobs.update(updates["general"])
+                    payload["jobs"] = jobs
+                if "data" in updates:
+                    data_blocks = {
+                        "ingestion": {
+                            "drug_name_min_length",
+                            "drug_name_max_length",
+                            "drug_name_max_tokens",
+                        },
+                        "session_pipeline": {
+                            "text_extraction_batch_size",
+                            "text_extraction_max_concurrency",
+                            "retrieval_batch_size",
+                            "retrieval_max_concurrency",
+                            "clinical_assessment_batch_size",
+                            "clinical_assessment_max_concurrency",
+                        },
+                        "clinical_language_detection": {
+                            "min_best_score",
+                            "high_confidence_min_score",
+                            "high_confidence_min_margin",
+                            "moderate_confidence_min_score",
+                            "moderate_confidence_min_margin",
+                        },
+                    }
+                    for block_name, block_fields in data_blocks.items():
+                        block = payload.get(block_name)
+                        block = dict(block) if isinstance(block, dict) else {}
+                        block.update(
+                            {
+                                key: value
+                                for key, value in updates["data"].items()
+                                if key in block_fields
+                            }
+                        )
+                        payload[block_name] = block
+                if "integrations" in updates or "advanced" in updates:
+                    runtime = payload.get("runtime")
+                    runtime = dict(runtime) if isinstance(runtime, dict) else {}
+                    runtime.update(updates.get("integrations", {}))
+                    runtime.update(updates.get("advanced", {}))
+                    payload["runtime"] = runtime
+                if "matching" in updates:
+                    matching = payload.get("drugs_matcher")
+                    matching = dict(matching) if isinstance(matching, dict) else {}
+                    matching.update(updates["matching"])
+                    payload["drugs_matcher"] = matching
 
-            saved_payload = serializer.save(payload)
-            get_configuration_manager().reload(saved_payload)
+            with _RUNTIME_SETTINGS_WRITE_LOCK:
+                saved_payload = serializer.update_payload(update_payload)
+                get_configuration_manager().reload(saved_payload)
         except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
             raise ServiceError(
                 "Runtime settings could not be saved.",
