@@ -11,7 +11,10 @@ to newly created runtime work. In-flight jobs keep the configuration captured
 when they were created.
 
 The UI does not expose process environment variables, deployment configuration,
-data-root selection, Ollama endpoints, or other process-owned values. The
+data-root selection, application API URLs, bind hosts or ports, CORS origins,
+Ollama endpoints, or other process-owned values. These source-mode network
+values are read from `settings/.env` and are not stored in the
+`application_configuration` singleton. The
 Database page exposes database connection credentials and options; a saved
 PostgreSQL password is protected with Windows DPAPI and never returned by the
 API. Immutable reference catalogs under `data/catalogs/` remain

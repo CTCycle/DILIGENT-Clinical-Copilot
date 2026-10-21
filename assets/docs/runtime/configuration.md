@@ -36,6 +36,10 @@ Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together
 
 The Tauri shell sets these desktop-only variables when it starts the frozen backend. Operators should not add them to `settings/.env` or override them manually. Packaged desktop chooses a free localhost port and records it in `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`; the packaged log is `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`.
 
+Packaged desktop builds pin the frontend API base to same-origin `/api` and do
+not apply source-mode `CORS_ALLOW_ORIGINS`; the shell continues to select and
+authorize its dynamic localhost backend port.
+
 ## Default Local Ports
 - Backend: `127.0.0.1:7690`
 - Frontend: `127.0.0.1:9847`
@@ -46,7 +50,15 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `UI_HOST=127.0.0.1`
 - `UI_PORT=9847`
 - `VITE_API_BASE_URL=/api`
+- `CORS_ALLOW_ORIGINS=` (comma-separated exact HTTP(S) origins; blank by default)
 - `RELOAD=false`
+
+In source mode, `VITE_API_BASE_URL` is compiled into the Angular client by the
+frontend build/serve scripts. Relative API paths use the same-origin proxy;
+absolute HTTP(S) URLs call that endpoint directly and require its origin to be
+listed in `CORS_ALLOW_ORIGINS`. Changing the API base URL requires a frontend
+rebuild and application restart. CORS is disabled when the origin list is
+empty.
 
 ## Source-mode Data Location
 
@@ -62,6 +74,7 @@ instead.
 ## Operational Settings By Source
 - `settings/.env`
   - local host and port values
+  - frontend API base URL and source-mode CORS origin allowlist
   - data paths, Ollama endpoints, deployment values, and secrets
 - `<data-root>/database_config.json`
   - selected database backend and its connection parameters only

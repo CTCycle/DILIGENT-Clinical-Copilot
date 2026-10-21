@@ -3,7 +3,13 @@
 
 import { ClinicalFormState } from "./models/types";
 
-export const API_BASE_URL = "/api";
+declare const __DILIGENT_API_BASE_URL__: string | undefined;
+
+export const API_BASE_URL =
+  typeof __DILIGENT_API_BASE_URL__ === "string" &&
+  __DILIGENT_API_BASE_URL__.trim()
+    ? __DILIGENT_API_BASE_URL__.replace(/\/+$/, "")
+    : "/api";
 
 export const APP_LOCALE = "en-GB";
 
