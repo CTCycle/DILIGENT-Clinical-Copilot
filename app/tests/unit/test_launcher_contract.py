@@ -13,7 +13,6 @@ LAUNCHER_PATH = REPO_ROOT / "start_on_windows.ps1"
 def _launcher_text() -> str:
     return LAUNCHER_PATH.read_text(encoding="utf-8")
 
-
 ###############################################################################
 def _function_body(source: str, name: str) -> str:
     marker = f"function {name}"
@@ -45,7 +44,6 @@ def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
     assert "Get-LauncherPortStates" in explicit_cleanup
     assert "Assert-NoForeignPortListeners" in explicit_cleanup
 
-
 ###############################################################################
 def test_launch_resolves_ports_once_immediately_before_process_start() -> None:
     source = _launcher_text()
@@ -60,7 +58,6 @@ def test_launch_resolves_ports_once_immediately_before_process_start() -> None:
     assert "Test-LaunchRuntimeReady" in start_application
     assert "Get-FrontendBuildStatus" in start_application
 
-
 ###############################################################################
 def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> None:
     process_discovery = _function_body(_launcher_text(), "Get-ApplicationProcessRecords")
@@ -70,7 +67,6 @@ def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> No
     assert "(?:run\\s+preview|vite)" in process_discovery
     assert "--port" in process_discovery
     assert "candidateIds.Contains($parentId)" in process_discovery
-
 
 ###############################################################################
 def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundaries() -> None:
@@ -84,7 +80,6 @@ def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundar
     assert "LauncherInteractive" in resolution
     assert "No port holders were terminated" in resolution
     assert "All configured-port holders were left running" in resolution
-
 
 ###############################################################################
 def test_frontend_build_state_is_deterministic_and_published_after_stable_build() -> None:
@@ -105,7 +100,6 @@ def test_frontend_build_state_is_deterministic_and_published_after_stable_build(
     assert "Write-FrontendBuildState" in build
     assert "[IO.File]::Replace" in source
     assert "changed while Angular was building" in build
-
 
 ###############################################################################
 def test_warm_runtime_repair_does_not_force_frontend_dependency_or_build_work() -> None:

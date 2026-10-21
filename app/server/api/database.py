@@ -24,6 +24,7 @@ from services.runtime.database_switch import (
 router = APIRouter(prefix="/database", tags=["database"])
 
 
+###############################################################################
 @router.get("/configuration", response_model=DatabaseConfigurationStateResponse)
 def get_database_configuration() -> DatabaseConfigurationStateResponse:
     try:
@@ -37,6 +38,7 @@ def get_database_configuration() -> DatabaseConfigurationStateResponse:
         ) from exc
 
 
+###############################################################################
 @router.post("/test", response_model=DatabaseConnectionTestResponse)
 def test_database_configuration(
     payload: DatabaseConfigurationRequest = Body(...),
@@ -48,6 +50,7 @@ def test_database_configuration(
     return get_database_runtime_manager().test_configuration(candidate)
 
 
+###############################################################################
 @router.put("/configuration", response_model=DatabaseSwitchResponse)
 def update_database_configuration(
     payload: DatabaseConfigurationRequest = Body(...),

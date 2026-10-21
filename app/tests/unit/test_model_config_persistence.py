@@ -32,7 +32,6 @@ from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from sqlalchemy import create_engine, text
 
-
 ###############################################################################
 class InMemorySerializer:
 
@@ -140,7 +139,6 @@ def test_model_config_update_preserves_other_application_settings(tmp_path) -> N
     assert saved["runtime"]["livertox_archive"] == "custom.tar.gz"
     assert saved["ingestion"] == {"drug_name_min_length": 4}
     assert "database" not in saved
-
 
 ###############################################################################
 def test_application_configuration_concurrent_patches_do_not_drop_updates(
