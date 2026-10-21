@@ -28,7 +28,7 @@ const VALUES: RuntimeSettingsValues = {
     moderate_confidence_min_margin: 1,
   },
   integrations: {
-    ncbi_contact_email: 'clinical-copilot@pharmagent.local',
+    ncbi_contact_email: '',
     livertox_download_timeout: 30,
     livertox_archive: 'livertox_NBK547852.tar.gz',
     livertox_yield_interval: 25,
@@ -121,5 +121,11 @@ describe('operational settings definitions', () => {
       integrations: { ...VALUES.integrations, ncbi_contact_email: 'developer@example.org' },
     };
     expect(validateRuntimeSettingsSection('integrations', validEmail)).toBe('');
+
+    const blankEmail: RuntimeSettingsValues = {
+      ...VALUES,
+      integrations: { ...VALUES.integrations, ncbi_contact_email: '' },
+    };
+    expect(validateRuntimeSettingsSection('integrations', blankEmail)).toBe('');
   });
 });

@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import filecmp
 import os
 import shutil
 from pathlib import Path
 
-from common.runtime_layout import RuntimeLayout, resolve_runtime_layout
+from common.runtime_layout import resolve_runtime_layout
 
 ###############################################################################
 def configure_cache_environment() -> None:
@@ -67,102 +66,9 @@ def create_mutable_data_directories() -> None:
         (mutable_root / relative_path).mkdir(parents=True, exist_ok=True)
 
 ###############################################################################
-def _find_data_migration_conflicts(source: Path, destination: Path) -> list[Path]:
-    if source.is_symlink() or destination.is_symlink():
-        return [source]
-    if not destination.exists():
-        return []
-    if source.is_file() and destination.is_file():
-        return [] if filecmp.cmp(source, destination, shallow=False) else [source]
-    if source.is_dir() and destination.is_dir():
-        conflicts: list[Path] = []
-        for child in source.iterdir():
-            conflicts.extend(
-                _find_data_migration_conflicts(child, destination / child.name)
-            )
-        return conflicts
-    return [source]
-
-###############################################################################
-def _merge_data_path(source: Path, destination: Path) -> None:
-    if source.is_symlink() or destination.is_symlink():
-        raise RuntimeError("Data migration does not follow symbolic links")
-    if not destination.exists():
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        source.replace(destination)
-        return
-    if source.is_file() and destination.is_file():
-        if not filecmp.cmp(source, destination, shallow=False):
-            raise RuntimeError("Data migration encountered a conflicting file")
-        source.unlink()
-        return
-    if source.is_dir() and destination.is_dir():
-        for child in source.iterdir():
-            _merge_data_path(child, destination / child.name)
-        source.rmdir()
-        return
-    raise RuntimeError("Data migration encountered a conflicting path")
-
-###############################################################################
-def migrate_legacy_data_layout(layout: RuntimeLayout | None = None) -> None:
-    """Move persisted files from the previous resources layout without overwriting data."""
-    layout = layout or resolve_runtime_layout()
-    if layout.packaged:
-        legacy_root = layout.mutable_data_root / "resources"
-    else:
-        default_data_root = layout.runtime_root / "data"
-        if layout.mutable_data_root.resolve() != default_data_root.resolve():
-            return
-        legacy_root = layout.runtime_root / "resources"
-
-    if legacy_root.is_symlink():
-        raise RuntimeError("Data migration does not follow symbolic links")
-    if (
-        not legacy_root.is_dir()
-        or legacy_root.resolve() == layout.mutable_data_root.resolve()
-    ):
-        return
-
-    entries = (
-        "database.db",
-        "database.db-journal",
-        "database.db-shm",
-        "database.db-wal",
-        "access-key-material.json",
-        "tools",
-        "sources",
-        "exports",
-        "state",
-    )
-    migrations = [
-        (legacy_root / name, layout.mutable_data_root / name)
-        for name in entries
-        if (legacy_root / name).exists() or (legacy_root / name).is_symlink()
-    ]
-    conflicts = [
-        source
-        for source, destination in migrations
-        if _find_data_migration_conflicts(source, destination)
-    ]
-    if conflicts:
-        raise RuntimeError(
-            "Previous and current data locations contain conflicting files; "
-            "no data was changed. Review both locations and resolve the overlap "
-            "before restarting."
-        )
-
-    for source, destination in migrations:
-        _merge_data_path(source, destination)
-    try:
-        legacy_root.rmdir()
-    except OSError:
-        pass
-
-###############################################################################
 def ensure_runtime_data_layout() -> None:
     layout = resolve_runtime_layout()
     configure_cache_environment()
-    migrate_legacy_data_layout(layout)
     if not layout.packaged:
         return
 
@@ -177,7 +83,6 @@ def ensure_runtime_data_layout() -> None:
 __all__ = [
     "copy_initial_file_if_missing",
     "create_mutable_data_directories",
-    "migrate_legacy_data_layout",
     "configure_cache_environment",
     "ensure_runtime_data_layout",
 ]

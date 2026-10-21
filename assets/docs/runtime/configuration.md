@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -59,14 +59,6 @@ at `<data-root>/database_config.json`; SQLite defaults to
 Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT`
 instead.
 
-At startup, the backend migrates known mutable entries from the former
-`resources` layout into the active `data` root. Packaged mode checks
-`<data-root>/resources`; source mode checks the repository `resources` path
-only when using the default `data` root. An explicit source-mode data-root
-override is left independent. The migration preflights destination conflicts,
-does not follow symbolic links, and stops without moving data if it finds a
-conflict; identical duplicate files are removed from the legacy location.
-
 ## Operational Settings By Source
 - `settings/.env`
   - local host and port values
@@ -107,13 +99,15 @@ does not solve or bypass human-verification challenges.
 - If Books-OAI does not expose a usable spreadsheet, the updater extracts one
   unambiguous safe `masterlist*.xlsx` member from that official archive.
 
-`ncbi_contact_email` defaults to
-`clinical-copilot@pharmagent.local` when it is missing from an older payload or
-blank. Configure a complete developer or organization email registered with
-NCBI for production use. The value is sent only as request identity, is not a
-credential, and is excluded from update results, source metadata, clinical
-artifacts, and ordinary logs. Requests remain sequential and no NCBI API key
-is required for this low-volume workflow.
+`ncbi_contact_email` is blank by default and can be cleared in Settings.
+LiverTox and combined structured-source updates require a real developer or
+organization email registered with NCBI. Blank and `.local` values are rejected
+before a job starts and checked again before NCBI requests. A previously saved
+`.local` value remains unchanged until the user replaces or clears it. The
+value is sent only as request identity, is not a credential, and is excluded
+from update results, source metadata, clinical artifacts, and ordinary logs.
+Requests remain sequential and no NCBI API key is required for this low-volume
+workflow.
 
 ## LLM Time Budgets
 
@@ -159,10 +153,10 @@ atomic replacement. A PostgreSQL password is protected with Windows DPAPI for
 the current user; API responses never return it.
 
 SQLite and PostgreSQL through `postgresql+psycopg` are the supported backends.
-There are no active database environment variables. For a one-time migration,
-when `database_config.json` does not exist, legacy database keys may be read
-from `.env` or the process environment; the resulting file becomes canonical
-and legacy keys are removed from `.env`. Later launches ignore those keys.
+There are no active database environment variables. `.env` and process
+environment variables never configure database access; when
+`database_config.json` does not exist, startup creates it with the default
+embedded SQLite configuration.
 
 Database connection settings are separate from all other settings. The active
 database's `application_configuration` row is the sole persistent source for

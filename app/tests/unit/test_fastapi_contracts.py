@@ -112,6 +112,36 @@ def test_provider_descriptions_match_supported_providers() -> None:
     }
 
 ###############################################################################
+def test_cloud_model_openapi_exposes_only_canonical_capability_fields() -> None:
+    schemas = app.openapi()["components"]["schemas"]
+    descriptor_fields = set(schemas["CloudModelDescriptor"]["properties"])
+    capability_fields = set(schemas["ModelCapabilityMetadata"]["properties"])
+
+    assert descriptor_fields == {
+        "id",
+        "display_name",
+        "endpoint_family",
+        "capabilities",
+        "model_capabilities",
+    }
+    assert {
+        "context_window_tokens",
+        "max_output_tokens",
+        "supports_reasoning",
+        "supports_temperature",
+        "supports_json_mode",
+        "supports_native_json_schema",
+    }.issubset(capability_fields)
+    assert not {
+        "input_token_limit",
+        "output_token_limit",
+        "supports_thinking",
+        "supports_temperature",
+        "supports_json_mode",
+        "supports_native_json_schema",
+    }.intersection(descriptor_fields)
+
+###############################################################################
 def test_access_key_openapi_schema_excludes_openrouter() -> None:
     schema = app.openapi()
     assert "openrouter" not in json.dumps(schema).lower()

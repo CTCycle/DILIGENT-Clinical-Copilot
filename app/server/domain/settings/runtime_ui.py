@@ -8,7 +8,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from common.constants import DEFAULT_NCBI_CONTACT_EMAIL
 from domain.settings.configuration import NCBIContactEmail
 
 RuntimeSettingsCategory = Literal[
@@ -242,7 +241,7 @@ RUNTIME_SETTINGS_DEFAULTS = RuntimeSettingsValues(
         moderate_confidence_min_margin=1.0,
     ),
     integrations=IntegrationRuntimeSettings(
-        ncbi_contact_email=DEFAULT_NCBI_CONTACT_EMAIL,
+        ncbi_contact_email="",
         livertox_download_timeout=30.0,
         livertox_archive="livertox_NBK547852.tar.gz",
         livertox_yield_interval=25,

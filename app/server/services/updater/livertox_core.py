@@ -35,9 +35,6 @@ class LiverToxUpdater:
         settings = get_server_settings()
         self.supported_extensions = livertox_common.SUPPORTED_MONOGRAPH_EXTENSIONS
         self.ncbi_contact_email = settings.runtime.ncbi_contact_email
-        self.http_headers = livertox_common.build_ncbi_http_headers(
-            self.ncbi_contact_email
-        )
         self.delay = 0.5
         self.chunk_size = livertox_common.DOWNLOAD_CHUNK_SIZE
         self.sources_path = str(Path(sources_path).resolve())

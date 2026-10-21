@@ -43,6 +43,12 @@ class MemoryApplicationConfigurationSerializer:
         self.updated_at = datetime.now(UTC)
         return dict(self.payload)
 
+    # -------------------------------------------------------------------------
+    def update_payload(self, update, *, return_metadata: bool = False):  # type: ignore[no-untyped-def]
+        working_payload = dict(self.payload)
+        update(working_payload)
+        return self.save(working_payload)
+
 ###############################################################################
 def _client(monkeypatch) -> tuple[TestClient, MemoryApplicationConfigurationSerializer]:  # type: ignore[no-untyped-def]
     serializer = MemoryApplicationConfigurationSerializer()
@@ -104,7 +110,14 @@ def test_settings_api_persists_custom_ncbi_contact_and_resets_it(monkeypatch) ->
 
     response = client.post("/api/settings/reset/integrations")
     assert response.status_code == 200
-    assert response.json()["values"]["integrations"]["ncbi_contact_email"] == "clinical-copilot@pharmagent.local"
+    assert response.json()["values"]["integrations"]["ncbi_contact_email"] == ""
+
+    response = client.patch(
+        "/api/settings",
+        json={"integrations": {"ncbi_contact_email": "  "}},
+    )
+    assert response.status_code == 200
+    assert response.json()["values"]["integrations"]["ncbi_contact_email"] == ""
 
 ###############################################################################
 def test_settings_api_rejects_malformed_ncbi_contact(monkeypatch) -> None:  # type: ignore[no-untyped-def]

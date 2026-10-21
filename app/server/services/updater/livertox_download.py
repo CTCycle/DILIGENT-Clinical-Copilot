@@ -20,7 +20,6 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from common.constants import (
-    DEFAULT_NCBI_CONTACT_EMAIL,
     LIVERTOX_BOOK_ACCESSION,
     LIVERTOX_MASTER_LIST_ACCESSION,
     NLM_LITARCH_BASE_URL,
@@ -28,6 +27,7 @@ from common.constants import (
 )
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
+from domain.settings.configuration import require_ncbi_contact_email
 from services.updater import livertox_common, livertox_parse
 from services.updater.ncbi_client import (
     NCBIClientError,
@@ -46,11 +46,13 @@ async def download_file(
     total_size: int,
     label: str,
     *,
+    contact_email: str,
     chunk_size: int,
     progress_callback: Callable[[float, str], None] | None = None,
     progress_start: float = 0.0,
     progress_span: float = 0.0,
 ) -> None:
+    require_ncbi_contact_email(contact_email)
     await livertox_common.download_file(
         client,
         url,
@@ -70,6 +72,7 @@ async def download_bulk_data(
     *,
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
+    _contact_email(self)
     async with _http_client(self) as client:
         return await _download_archive(
             self,
@@ -123,6 +126,7 @@ async def download_master_list(
     *,
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
+    _contact_email(self)
     async with _http_client(self) as client:
         master_url = await resolve_master_list_url(self, client)
         if master_url is not None:
@@ -210,6 +214,7 @@ async def resolve_master_list_url(
     try:
         return await resolve_books_oai_master_list_url(
             client,
+            contact_email=contact_email,
             accession=LIVERTOX_MASTER_LIST_ACCESSION,
         )
     except NCBIClientError:
@@ -222,8 +227,10 @@ async def resolve_master_list_url(
 async def resolve_litarch_archive(
     client: httpx.AsyncClient,
     *,
+    contact_email: str,
     accession: str = LIVERTOX_BOOK_ACCESSION,
 ) -> str:
+    require_ncbi_contact_email(contact_email)
     try:
         response = await client.get(NLM_LITARCH_FILE_LIST_URL)
         response.raise_for_status()
@@ -315,13 +322,17 @@ async def _download_archive(
     progress_callback: Callable[[float, str], None] | None,
 ) -> dict[str, Any]:
     archive_url = self.resolved_archive_url
+    contact_email = _contact_email(self)
     if archive_url is None:
         archive_url = await resolve_litarch_archive(
             client,
+            contact_email=contact_email,
             accession=LIVERTOX_BOOK_ACCESSION,
         )
         self.resolved_archive_url = archive_url
-    remote_metadata = await _fetch_remote_metadata(client, archive_url)
+    remote_metadata = await _fetch_remote_metadata(
+        client, archive_url, contact_email=contact_email
+    )
     destination_dir = Path(dest_path).resolve()
     destination_dir.mkdir(parents=True, exist_ok=True)
     file_path = destination_dir / self.file_name
@@ -350,6 +361,7 @@ async def _download_archive(
             str(partial_path),
             int(remote_metadata.get("size", 0)),
             file_path.name,
+            contact_email=contact_email,
             chunk_size=self.chunk_size,
             progress_callback=progress_callback,
             progress_start=20.0,
@@ -379,7 +391,10 @@ async def _download_master_list_url(
     *,
     progress_callback: Callable[[float, str], None] | None,
 ) -> dict[str, Any]:
-    remote_metadata = await _fetch_remote_metadata(client, master_url)
+    contact_email = _contact_email(self)
+    remote_metadata = await _fetch_remote_metadata(
+        client, master_url, contact_email=contact_email
+    )
     destination = Path(self.master_list_path)
     stored_metadata = livertox_common.load_json(self.master_list_metadata_path)
     if self.redownload:
@@ -406,6 +421,7 @@ async def _download_master_list_url(
             str(partial_path),
             int(remote_metadata.get("size", 0)),
             destination.name,
+            contact_email=contact_email,
             chunk_size=self.chunk_size,
             progress_callback=progress_callback,
             progress_start=5.0,
@@ -437,7 +453,10 @@ async def _download_master_list_url(
 async def _fetch_remote_metadata(
     client: httpx.AsyncClient,
     url: str,
+    *,
+    contact_email: str,
 ) -> dict[str, Any]:
+    require_ncbi_contact_email(contact_email)
     try:
         response = await client.head(url)
         if response.status_code in {405, 501}:
@@ -549,13 +568,14 @@ def _build_litarch_archive_url(path: str, *, accession: str) -> str:
 
 ###############################################################################
 def _contact_email(self) -> str:
-    return str(getattr(self, "ncbi_contact_email", DEFAULT_NCBI_CONTACT_EMAIL))
+    return require_ncbi_contact_email(getattr(self, "ncbi_contact_email", None))
 
 ###############################################################################
 def _http_client(self) -> httpx.AsyncClient:
+    contact_email = _contact_email(self)
     return httpx.AsyncClient(
         timeout=get_server_settings().runtime.livertox_download_timeout,
-        headers=self.http_headers,
+        headers=livertox_common.build_ncbi_http_headers(contact_email),
         follow_redirects=True,
     )
 

@@ -116,73 +116,7 @@ class CloudModelDescriptor(BaseModel):
     model_capabilities: ModelCapabilityMetadata = Field(
         default_factory=ModelCapabilityMetadata
     )
-    # These fields remain as a serialization bridge for existing cached catalog
-    # rows and clients.  Runtime code reads model_capabilities instead.
-    input_token_limit: int | None = Field(default=None, ge=1)
-    output_token_limit: int | None = Field(default=None, ge=1)
-    supports_thinking: bool | None = None
-    supports_temperature: bool | None = None
-    supports_json_mode: bool | None = None
-    supports_native_json_schema: bool | None = None
 
-    # -------------------------------------------------------------------------
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_model_capabilities(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        data = dict(value)
-        raw = data.get("model_capabilities")
-        if isinstance(raw, dict):
-            metadata = dict(raw)
-        elif isinstance(raw, ModelCapabilityMetadata):
-            metadata = raw.model_dump(mode="python")
-        else:
-            metadata = {}
-
-        legacy_to_canonical = {
-            "input_token_limit": "context_window_tokens",
-            "output_token_limit": "max_output_tokens",
-            "supports_thinking": "supports_reasoning",
-            "supports_temperature": "supports_temperature",
-            "supports_json_mode": "supports_json_mode",
-            "supports_native_json_schema": "supports_native_json_schema",
-        }
-        for legacy_name, canonical_name in legacy_to_canonical.items():
-            if canonical_name not in metadata and data.get(legacy_name) is not None:
-                metadata[canonical_name] = data[legacy_name]
-        if data.get("endpoint_family") and "endpoint_family" not in metadata:
-            metadata["endpoint_family"] = data["endpoint_family"]
-        provider_capabilities = data.get("capabilities")
-        if isinstance(provider_capabilities, dict):
-            if (
-                "supports_structured_output" not in metadata
-                and provider_capabilities.get("structured_output") is not None
-            ):
-                metadata["supports_structured_output"] = provider_capabilities[
-                    "structured_output"
-                ]
-            if (
-                "supports_reasoning" not in metadata
-                and provider_capabilities.get("reasoning") is not None
-            ):
-                metadata["supports_reasoning"] = provider_capabilities["reasoning"]
-        data["model_capabilities"] = metadata
-
-        # Keep old fields populated when new catalog entries only provide the
-        # canonical object, so the current API can be upgraded atomically.
-        reverse = {
-            "context_window_tokens": "input_token_limit",
-            "max_output_tokens": "output_token_limit",
-            "supports_reasoning": "supports_thinking",
-            "supports_temperature": "supports_temperature",
-            "supports_json_mode": "supports_json_mode",
-            "supports_native_json_schema": "supports_native_json_schema",
-        }
-        for canonical_name, legacy_name in reverse.items():
-            if data.get(legacy_name) is None and metadata.get(canonical_name) is not None:
-                data[legacy_name] = metadata[canonical_name]
-        return data
 
 ###############################################################################
 class CloudProviderDescriptor(BaseModel):

@@ -31,7 +31,7 @@ export function resolvePageIdFromPath(pathname: string): PageId {
   const normalized = normalizePathname(pathname);
   if (normalized === PAGE_PATHS['clinical-sessions'] || normalized.startsWith('/sessions/')) return 'clinical-sessions';
   if (normalized === PAGE_PATHS['data-inspection']) return 'data-inspection';
-  if (normalized === '/model-config' || normalized === '/settings' || normalized.startsWith('/settings/')) return 'settings';
+  if (normalized === '/settings' || normalized.startsWith('/settings/')) return 'settings';
   return DEFAULT_PAGE;
 }
 

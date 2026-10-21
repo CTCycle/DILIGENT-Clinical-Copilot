@@ -6,8 +6,8 @@ from __future__ import annotations
 import pytest
 from services.session.clinical_section_parsers import (
     extract_required_dili_sections,
-    find_dili_section_headings,
     missing_required_section_names,
+    scan_dili_section_headings,
 )
 from services.session.text_section_parser import (
     build_section_extraction_from_initial_text,
@@ -143,7 +143,7 @@ def test_duplicate_competing_headings_raise() -> None:
 ###############################################################################
 def test_blank_lines_do_not_create_markers() -> None:
     text = "line one\n\nline two\n\nline three"
-    assert find_dili_section_headings(text) == []
+    assert scan_dili_section_headings(text).section_headings == []
 
 ###############################################################################
 def test_section_parser_preserves_exact_body_slice_and_metadata() -> None:
