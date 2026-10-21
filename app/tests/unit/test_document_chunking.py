@@ -140,7 +140,6 @@ def test_duplicate_content_is_deduplicated_with_stable_canonical_provenance(
         first_path
     )
 
-
 ###############################################################################
 def test_same_filename_with_different_bytes_remains_two_documents(
     tmp_path: Path,
@@ -160,7 +159,6 @@ def test_same_filename_with_different_bytes_remains_two_documents(
         "second/guide.txt",
     }
 
-
 ###############################################################################
 def test_different_filenames_with_identical_bytes_are_deduplicated(
     tmp_path: Path,
@@ -178,7 +176,6 @@ def test_different_filenames_with_identical_bytes_are_deduplicated(
         "alpha.txt",
         "beta.txt",
     ]
-
 
 ###############################################################################
 def test_modified_content_stops_being_considered_a_duplicate(tmp_path: Path) -> None:

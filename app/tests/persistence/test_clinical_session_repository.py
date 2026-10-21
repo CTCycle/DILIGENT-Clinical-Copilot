@@ -9,7 +9,6 @@ from repositories.schemas.clinical import ClinicalLabObservation
 from repository_fixtures import build_repository_graph
 from sqlalchemy import select
 
-
 ###############################################################################
 def test_persisted_lab_sample_date_populates_observation_at(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     repository = build_repository_graph(

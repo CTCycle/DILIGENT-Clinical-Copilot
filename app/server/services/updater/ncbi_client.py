@@ -17,7 +17,6 @@ from common.constants import (
     NCBI_TOOL_NAME,
 )
 
-
 ###############################################################################
 class NCBIClientError(RuntimeError):
     """Raised when an official NCBI machine-access response is unusable."""

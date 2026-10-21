@@ -128,5 +128,6 @@ model_config_endpoint = ModelConfigEndpoint(router=router, service=ModelConfigSe
 model_config_endpoint.add_routes()
 
 
+###############################################################################
 def rebind_database_services() -> None:
     model_config_endpoint.service = ModelConfigService()

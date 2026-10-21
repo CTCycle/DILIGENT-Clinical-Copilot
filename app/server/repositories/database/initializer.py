@@ -199,7 +199,6 @@ def initialize_sqlite_database(
         repository.engine.dispose()
 
 ###############################################################################
-###############################################################################
 def _create_postgres_database_if_missing(
     settings: DatabaseSettings,
 ) -> tuple[str, bool]:
@@ -338,6 +337,7 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
     return database_was_created or database_schema_was_missing
 
 
+###############################################################################
 def remove_legacy_database_configuration() -> bool:
     """Remove database connection values from the old settings singleton once."""
     from repositories.serialization.application_configuration import (

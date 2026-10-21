@@ -11,7 +11,6 @@ from services.runtime.jobs import JobManager
 from services.runtime.state import JobState
 from services.session.session_service import ClinicalSessionService
 
-
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
     return {"job_id": job_id}
