@@ -91,6 +91,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 |   |   `-- src-tauri/         # Tauri shell, backend lifecycle, and extraction
 |   |-- server/
 |   |   |-- app.py
+|   |   |-- source_entry.py    # source launcher lifecycle and graceful shutdown
 |   |   |-- api/
 |   |   |-- configurations/
 |   |   |-- domain/
@@ -126,8 +127,9 @@ Maintained source-level structure, with build and cache artifacts omitted:
 
 ### Runtime entry points
 
-- Development: `start_on_windows.ps1` starts Uvicorn and the Angular preview server on the configured development ports.
-- Packaged desktop: the Tauri shell in `app/desktop/src-tauri` extracts a verified runtime, starts `DILIGENTBackend.exe` on a random localhost port, and loads the Angular build served by FastAPI. Node.js is not part of the packaged runtime.
+- Source production: `start_on_windows.ps1` owns one FastAPI process started through `app/server/source_entry.py`. FastAPI serves the built Angular SPA and API on `FASTAPI_PORT`; the launcher waits for health and a built asset, opens that origin, and requests authenticated shutdown on Exit or Ctrl+C. Backend logs go to `runtimes/cache/logs/`.
+- Development: run FastAPI with Uvicorn reload and the Angular development server with `npm run dev`. The development server uses `UI_PORT` and proxies `/api` to FastAPI. The preview server is not the production server.
+- Packaged desktop: the Tauri shell in `app/desktop/src-tauri` embeds the Angular build and startup splash as Tauri assets, extracts the API-only `DILIGENTBackend.exe` runtime, and starts it on a random localhost port. The shell passes the API origin and one-time session token to the bundled SPA, authorizes only the exact Tauri origin for CORS, and owns the backend shutdown and process-tree fallback. Node.js is not part of the packaged runtime.
 
 The release pipeline produces a no-install portable EXE, an MSI, and a SHA-256 manifest. The EXE and MSI share the same embedded deterministic runtime archive; the shell keeps mutable user data outside that archive under `%LOCALAPPDATA%\DILIGENT\data`.
 

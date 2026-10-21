@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -18,17 +18,19 @@ Use this documentation if you need to:
 - Choose either the Windows desktop package or source/development startup described in `README.md`.
 - For desktop use, open `DILIGENT-v<version>-windows-x64-portable.exe` for no-install operation or install the matching `.msi`. Verify the matching `.sha256` file before distributing an artifact.
 - The portable desktop app does not require Python, Node.js, Rust, npm, uv, or a source checkout. It stores user data under `%LOCALAPPDATA%\DILIGENT\data`.
-- Source-mode default UI URL:
+- Source production URL (the backend serves the built SPA and API from this origin):
 
 ```text
-http://127.0.0.1:9847
+http://127.0.0.1:7690
 ```
 
-- Source-mode default backend health URL:
+- Source-mode default health URL:
 
 ```text
 http://127.0.0.1:7690/api/health
 ```
+
+For frontend development, `npm run dev` serves the UI at `http://127.0.0.1:9847` and proxies `/api` to FastAPI.
 
 - DILIGENT is designed for desktop browser windows at least `1100px` wide. If the window is narrower, enlarge it to continue.
 - Windows tablets are supported when they behave like a normal desktop browser and can display the desktop interface at that width.
@@ -79,7 +81,7 @@ Help state is stored in browser-local storage. It does not contain clinical inpu
 
 Open the portable EXE, or launch the application installed by the MSI. The Tauri shell verifies and extracts its embedded runtime, starts the packaged backend, waits for health readiness, and then shows the desktop window. Packaged startup does not use the development URLs below.
 
-### Source/development mode
+### Source production mode
 
 On Windows, open PowerShell in the repository root and run:
 
@@ -88,15 +90,18 @@ On Windows, open PowerShell in the repository root and run:
 ```
 
 Expected source-mode result:
-- backend process starts in a visible dedicated terminal
-- frontend process starts
-- browser opens to the DILIGENT UI
+- the visible launcher starts and owns one FastAPI process
+- FastAPI serves the built frontend and API from one origin
+- browser opens to `http://127.0.0.1:7690` after health and asset checks pass
 - application loads without a blank page or connection error
+- backend output is saved under `runtimes/cache/logs/`
+- choose **EXIT** or press Ctrl+C in the launcher to request graceful shutdown; if needed, the launcher stops only its owned process tree
+- `-Action Launch` supervises the backend until Ctrl+C or process exit
 
 If the browser does not open automatically, open:
 
 ```text
-http://127.0.0.1:9847
+http://127.0.0.1:7690
 ```
 
 If the UI shows a backend connection error, check:
@@ -105,6 +110,12 @@ If the UI shows a backend connection error, check:
 http://127.0.0.1:7690/api/health
 ```
 
+### Source development mode
+
+Start FastAPI with Uvicorn reload in one terminal and run `npm run dev` from
+`app/client` in another. Open the Angular development URL, normally
+`http://127.0.0.1:9847`. See [Startup](../runtime/startup.md) for the commands.
+
 ## Confirm Local Configuration
 Open:
 
@@ -112,6 +123,8 @@ Open:
 settings/.env
 ```
 
-Confirm backend and frontend host or port values are correct for the local environment. If they change, restart the application so both processes use the same configuration.
+Confirm `FASTAPI_HOST` and `FASTAPI_PORT` for production source mode. `UI_HOST`
+and `UI_PORT` configure the Angular development server only. If settings change,
+restart the relevant process.
 
 For packaged startup failures, inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log` and `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`. See [runtime troubleshooting](../runtime/troubleshooting.md) for extraction, health, and WebView2 checks.

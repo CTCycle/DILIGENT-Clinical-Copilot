@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Windows desktop app does not open
 
@@ -9,13 +9,13 @@ Last updated: 2026-10-20
 - If the runtime contains stale `.extract-*` directories, close DILIGENT and remove only those temporary directories under `%LOCALAPPDATA%\DILIGENT\runtime\<version>`, then retry.
 - The portable app uses the system WebView2 runtime. An MSI built with the standard bootstrapper may need network access for WebView2; use an offline-WebView2 MSI when network access is unavailable.
 
-Packaged desktop startup uses a random localhost backend port, so the development ports below are not a packaged health check. Read the port from `desktop-backend-ready.json` and request `/api/health` on that port. Source-mode startup uses the values from `settings/.env` (the template defaults are `7690` and `9847`).
+Packaged desktop startup uses a random localhost backend port, so source and development ports are not a packaged health check. Read the port from `desktop-backend-ready.json` and request `/api/health` on that port. Source production serves the SPA and API at the FastAPI origin (default `http://127.0.0.1:7690`). `UI_PORT` (default `9847`) is used only by `npm run dev`.
 
 ## Browser Page Does Not Load
 - Check whether the frontend is available at:
 
 ```text
-http://127.0.0.1:9847
+http://127.0.0.1:7690
 ```
 
 - If not, restart with:
@@ -31,8 +31,8 @@ start_on_windows.ps1
 http://127.0.0.1:7690/api/health
 ```
 
-- If unreachable, restart the application and inspect backend console output.
-- If an earlier launch left stale application processes or a backend terminal,
+- If unreachable, restart the application and inspect `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`.
+- If an earlier launch left stale application processes,
   run `start_on_windows.ps1 -Action KillApplicationProcesses`, confirm the
   cleanup, and launch again.
 
@@ -98,8 +98,10 @@ runtime services.
 Current defaults:
 
 ```text
-Backend: 7690
-Frontend: 9847
+Production FastAPI and SPA: 7690
+Angular development UI: 9847
 ```
 
-Close conflicting processes or update `settings/.env`, then restart the application.
+The production launcher checks the API port only. Close a conflicting process
+or update `FASTAPI_PORT` in `settings/.env`, then restart. `UI_PORT` matters
+only when the Angular development server is running.

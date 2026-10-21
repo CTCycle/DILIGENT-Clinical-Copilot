@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Recommended Local Startup
 On Windows, use:
@@ -10,17 +10,19 @@ On Windows, use:
 
 The launcher:
 - creates `settings/.env` from `settings/.env.example` on first application start when the local environment file is missing
-- ensures portable Python and Node runtimes for a warm launch; `uv` is prepared when backend/runtime repair or an explicit install requires it
+- ensures the backend Python runtime for a warm launch; `uv` is prepared when backend/runtime repair or an explicit install requires it
 - runs `uv sync --locked` against the tracked `app/server/uv.lock` during backend/runtime repair and explicit installation
-- installs frontend dependencies only when an explicit install/rebuild or a stale/missing frontend build requires them
+- prepares Node and installs frontend dependencies only when an explicit frontend install/rebuild or a stale/missing frontend build requires them
 - rebuilds the frontend when the main-menu install option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or stale source-mode build output
 - validates the deterministic frontend build-state marker before reusing an existing production build
-- starts the backend with the synchronized virtual-environment Python and `uvicorn`
-- opens a visible dedicated backend terminal for every source-mode launch
-- starts the frontend preview server
+- starts one FastAPI process with the synchronized virtual-environment Python; FastAPI serves the built Angular SPA and `/api/*` from the same origin
+- waits for `/api/health`, the SPA entry page, and a built JavaScript asset before opening the backend origin in the browser
+- keeps the backend process hidden and writes its output to `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`; the visible launcher owns the process
+- keeps the interactive menu open while the app runs; `EXIT` and Ctrl+C request authenticated graceful shutdown, wait, then stop only the launcher-owned process tree if needed
+- makes `-Action Launch` supervise the server until it stops or Ctrl+C is pressed
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
-- checks both configured source-mode ports immediately before starting application processes; every owning PID is listed, including foreign listeners
+- checks the configured API port immediately before starting the production process; `UI_PORT` is reserved for frontend development
 - prompts once before directly stopping the listed unique port holders; redirected or declined launches fail safely without terminating anything
 
 All source-mode disposable runtime, application, test, and tool state is rooted
@@ -74,7 +76,7 @@ Database startup behavior is migration-driven:
 
 For a deterministic disposable-state reset, run `.\start_on_windows.ps1 -Action ClearCache`; it requires the same interactive `[y/N]` confirmation, preserves only `runtimes/cache/.gitkeep`, and reports locked entries without aborting the cleanup.
 
-If a previous launch left backend, frontend, or launcher wrapper processes running,
+If a previous launch left backend, frontend development, or launcher wrapper processes running,
 run `.\start_on_windows.ps1 -Action KillApplicationProcesses` and confirm the
 cleanup when prompted.
 
@@ -100,9 +102,9 @@ replacement; desktop-release staging output does not require this marker.
 
 ## Source-mode port conflicts
 
-Immediately before application process creation, the launcher performs one listener
-scan for both configured ports. It aggregates listeners by unique PID, resolves a process
-name when permitted, and shows one line per process with all ports it owns. An
+Immediately before production process creation, the launcher scans the configured
+API port. It aggregates listeners by unique PID, resolves a process name when
+permitted, and shows each owning PID. An
 interactive confirmation applies to the displayed set once. A decline, a
 noninteractive invocation, or a failed termination leaves processes untouched or
 causes launch to abort; a final listener scan is authoritative if a process exits
@@ -112,45 +114,43 @@ its narrower repository-qualified process-tree cleanup contract.
 
 ## Packaged desktop startup
 
-The Windows portable executable and MSI use the Tauri shell. Open the verified portable EXE directly, or launch the application installed by the MSI; do not run the source launcher for packaged operation. On first launch the shell verifies the embedded runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend on a random localhost port, waits for its atomic ready file and `/api/health`, and then shows the desktop window. The backend is owned by a Windows Job Object and is terminated when the shell exits.
+The Windows portable executable and MSI use the Tauri shell. Open the verified portable EXE directly, or launch the application installed by the MSI; do not run the source launcher for packaged operation. The Angular build and startup splash are embedded as Tauri assets. On first launch the shell verifies the embedded backend runtime archive, extracts it to a versioned hash directory under `%LOCALAPPDATA%\DILIGENT\runtime`, creates persistent data directories under `%LOCALAPPDATA%\DILIGENT\data`, starts the packaged backend on a random localhost port, waits for its atomic ready file and `/api/health`, then loads the bundled SPA. The SPA connects to the loopback API with the one-time session token in a request header; the backend allows CORS only from the packaged Tauri origin. The backend is owned by a Windows Job Object and is asked to stop gracefully when the shell exits, with a bounded process termination fallback.
 
-The packaged desktop does not use the development ports `7690` and `9847`. If the window does not appear, inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`, confirm that `state\desktop-backend-ready.json` exists, and request `/api/health` on the recorded port. A successful launch leaves `runtime\<version>\<payload-sha256>\extraction.complete` in place.
+The packaged desktop does not use the source or development ports `7690` and `9847`. If the window does not appear, inspect `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`, confirm that `state\desktop-backend-ready.json` exists, and request `/api/health` on the recorded port. A successful launch leaves `runtime\<version>\<payload-sha256>\extraction.complete` in place.
 
-## Manual Backend Startup
-From repository root:
+## Manual Development Startup
+
+Run the backend and Angular development server in separate terminals. This is the development workflow; normal source production startup is handled by the launcher.
+
+### Backend development server
 
 ```powershell
 Set-Location app/server
-./.venv/Scripts/python.exe -m uvicorn app:app --host 127.0.0.1 --port 7690 --log-level info
+./.venv/Scripts/python.exe -m uvicorn app:app --host 127.0.0.1 --port 7690 --reload --log-level info
 ```
 
-Alternative runtime-managed path:
-
-```powershell
-runtimes\uv\uv.exe run --directory app/server python -m uvicorn app:app --host 127.0.0.1 --port 7690
-```
-
-## Manual Frontend Startup
+### Angular development server
 
 ```powershell
 Set-Location app/client
-npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
+npm run dev
 ```
 
-## Quick Startup Checklist
-### Source/development mode
-1. Confirm ports `7690` and `9847` are free, or start the launcher from an interactive PowerShell console so it can display and request termination of any configured-port holders.
-2. Start the backend.
-3. Verify `http://127.0.0.1:7690/docs` responds.
-4. Start the frontend on `9847`.
-5. Open `http://127.0.0.1:9847`.
+The development UI uses `UI_HOST` and `UI_PORT` (default `127.0.0.1:9847`). Its API proxy forwards same-origin `/api` requests to FastAPI.
 
-If any configured port is occupied during an interactive launch, the launcher
-lists the unique owning PIDs and asks once before stopping those PIDs directly.
-A launch from a redirected or noninteractive console cannot confirm that action
-and exits without terminating anything. If the prompt is declined, use the
-explicit `KillApplicationProcesses` action for stale repository-owned process
-trees or stop the listed service yourself, then retry.
+## Quick Startup Checklist
+### Source production mode
+1. Run `.\start_on_windows.ps1` from an interactive PowerShell console.
+2. Select **Launch application**. The launcher checks `FASTAPI_PORT` (default `7690`), starts FastAPI, and opens `http://127.0.0.1:7690` after health and built-asset checks pass.
+3. Select **EXIT** or press Ctrl+C in the launcher to stop the app. `.\start_on_windows.ps1 -Action Launch` keeps the launcher supervising until Ctrl+C.
+
+### Source development mode
+1. Start the backend and Angular development server in separate terminals as described above.
+2. Open `http://127.0.0.1:9847`; the Angular dev server proxies API requests to FastAPI.
+
+Production launch checks only the API port. Development startup uses both the
+API and `UI_PORT` (default `9847`). A redirected production launch with an
+occupied API port cannot confirm termination and exits without stopping it.
 
 ### Packaged desktop mode
 1. Open the portable EXE or launch the installed MSI application.

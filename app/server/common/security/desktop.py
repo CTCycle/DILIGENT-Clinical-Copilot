@@ -12,7 +12,8 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
-DESKTOP_SESSION_COOKIE = "diligent_desktop_session"
+DESKTOP_SESSION_HEADER = "X-DILIGENT-Desktop-Session"
+DESKTOP_FRONTEND_ORIGIN = "http://tauri.localhost"
 _STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _SECURITY_HEADERS = {
     "Cache-Control": "no-store",
@@ -56,7 +57,11 @@ class DesktopSessionSecurity:
 
     # -------------------------------------------------------------------------
     def origin_is_allowed(self, origin: str) -> bool:
-        return origin == self.origin
+        return origin == DESKTOP_FRONTEND_ORIGIN
+
+    # -------------------------------------------------------------------------
+    def session_token_is_valid(self, token: str) -> bool:
+        return bool(self.secret) and hmac.compare_digest(token, self.secret)
 
     # -------------------------------------------------------------------------
     def consume_bootstrap_token(self, token: str) -> bool:
@@ -74,8 +79,8 @@ class DesktopSessionSecurity:
 
     # -------------------------------------------------------------------------
     def request_has_session(self, request: Request) -> bool:
-        cookie = request.cookies.get(DESKTOP_SESSION_COOKIE, "")
-        return bool(self.secret) and hmac.compare_digest(cookie, self.secret)
+        token = request.headers.get(DESKTOP_SESSION_HEADER, "")
+        return self.session_token_is_valid(token)
 
 ###############################################################################
 def _secured(response: Response) -> Response:
@@ -116,10 +121,10 @@ class DesktopSecurityMiddleware(BaseHTTPMiddleware):
         if not self.security.host_is_allowed(request.headers.get("host", "")):
             return _rejected(403)
 
-        if (
-            request.method in _STATE_CHANGING_METHODS
-            and not self.security.origin_is_allowed(request.headers.get("origin", ""))
-        ):
+        origin = request.headers.get("origin", "")
+        if origin and not self.security.origin_is_allowed(origin):
+            return _rejected(403)
+        if request.method in _STATE_CHANGING_METHODS and not origin:
             return _rejected(403)
 
         is_health = request.url.path == "/api/health"
@@ -132,7 +137,8 @@ class DesktopSecurityMiddleware(BaseHTTPMiddleware):
 
 
 __all__ = [
-    "DESKTOP_SESSION_COOKIE",
+    "DESKTOP_FRONTEND_ORIGIN",
+    "DESKTOP_SESSION_HEADER",
     "DesktopSecurityMiddleware",
     "DesktopSessionSecurity",
 ]
