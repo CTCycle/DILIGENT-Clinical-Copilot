@@ -9,6 +9,11 @@ param(
     [ValidateSet('Portable', 'Msi', 'All')]
     [string]$DesktopTarget = 'All',
     [switch]$InstallMsi,
+    [switch]$TestUpgrade,
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string]$UpgradeFromVersion = '3.5.0',
+    [string]$PreviousMsiPath,
+    [string]$PreviousChecksumPath,
     [switch]$RequireUnsigned,
     [switch]$TestDeepPath,
     [string]$ReportDirectory
@@ -27,6 +32,18 @@ New-Item -ItemType Directory -Path $ReportDirectory -Force | Out-Null
 $portablePath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64-portable.exe"
 $msiPath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64.msi"
 $checksumPath = Join-Path $artifactRoot "DILIGENT-v$Version-windows-x64.sha256"
+$previousMsiPath = if ($PreviousMsiPath) {
+    $PreviousMsiPath
+}
+else {
+    Join-Path $artifactRoot "DILIGENT-v$UpgradeFromVersion-windows-x64.msi"
+}
+$previousChecksumPath = if ($PreviousChecksumPath) {
+    $PreviousChecksumPath
+}
+else {
+    Join-Path $artifactRoot "DILIGENT-v$UpgradeFromVersion-windows-x64.sha256"
+}
 $tempParent = if ($env:RUNNER_TEMP) {
     $env:RUNNER_TEMP
 }
@@ -487,6 +504,58 @@ function Invoke-MsiOperation([string]$operation, [string]$package, [string]$labe
     $report[$label] = @{ exit_code = $result.ExitCode; log = Split-Path -Leaf $log }
 }
 
+function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Capture, [switch]$CheckHead) {
+    $dataRoot = Join-Path $upgradeRoot 'DILIGENT/data'
+    # v3.4.0 stores mutable data under resources; v3.5.0 and later use data.
+    $databaseRoot = if ([version]$UpgradeFromVersion -lt [version]'3.5.0') {
+        Join-Path $dataRoot 'resources'
+    }
+    else {
+        $dataRoot
+    }
+    $database = Join-Path $databaseRoot 'database.db'
+    $python = Join-Path $repoRoot 'app/server/.venv/Scripts/python.exe'
+    if ($Seed) {
+        $archive = Join-Path $smokeRoot 'baseline-source.zip'
+        & git -C $repoRoot archive --format=zip "--output=$archive" "v$UpgradeFromVersion" app/server
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to archive the published baseline source.' }
+        $baselineSource = Join-Path $smokeRoot 'baseline-source'
+        Expand-Archive -LiteralPath $archive -DestinationPath $baselineSource
+        $sourceRoot = Join-Path $baselineSource 'app/server'
+        $baselineMarker = Get-ChildItem -LiteralPath (Join-Path $upgradeRoot "DILIGENT/rt/$UpgradeFromVersion") -Filter extraction.complete -File -Recurse | Select-Object -First 1
+        if ($null -eq $baselineMarker) { throw 'The baseline application runtime was not extracted.' }
+        $environment = @{
+            DILIGENT_SQLITE_PATH = $database; DATABASE_SQLITE_PATH = $database
+            DILIGENT_DATA_ROOT = $dataRoot; DATABASE_BACKEND = 'sqlite'; EMBEDDED_DATABASE = 'true'
+            DILIGENT_RUNTIME_ROOT = $baselineMarker.DirectoryName
+            DILIGENT_RELEASE_VERSION = $UpgradeFromVersion
+            PYTHONHOME = Join-Path $repoRoot 'runtimes/python'
+        }
+        $saved = @{}
+        try {
+            foreach ($key in $environment.Keys) {
+                $saved[$key] = [Environment]::GetEnvironmentVariable($key)
+                [Environment]::SetEnvironmentVariable($key, $environment[$key])
+            }
+            & $python (Join-Path $PSScriptRoot 'seed_upgrade_fixture.py') $sourceRoot $UpgradeFromVersion
+            if ($LASTEXITCODE -ne 0) { throw 'Baseline application repository seeding failed.' }
+        }
+        finally {
+            foreach ($key in $saved.Keys) { [Environment]::SetEnvironmentVariable($key, $saved[$key]) }
+        }
+    }
+    $arguments = @((Join-Path $PSScriptRoot 'check_upgrade_fixture.py'), $database, (Join-Path $ReportDirectory 'upgrade-data.json'))
+    if ($Capture) { $arguments += '--capture' }
+    if ($CheckHead) { $arguments += @('--expected-head', '202609170001') }
+    $previousPythonHome = $env:PYTHONHOME
+    try {
+        $env:PYTHONHOME = Join-Path $repoRoot 'runtimes/python'
+        & $python @arguments
+        if ($LASTEXITCODE -ne 0) { throw 'MSI database preservation/integrity check failed.' }
+    }
+    finally { $env:PYTHONHOME = $previousPythonHome }
+}
+
 function Invoke-MsiSmoke {
     if (-not $InstallMsi) {
         throw 'MSI smoke requires the explicit -InstallMsi switch.'
@@ -562,6 +631,106 @@ function Invoke-MsiSmoke {
     }
 }
 
+function Invoke-MsiUpgradeSmoke {
+    if (-not $TestUpgrade) { return }
+    if (-not $InstallMsi) {
+        throw 'MSI upgrade smoke requires the explicit -InstallMsi switch.'
+    }
+    if ($DesktopTarget -notin @('Msi', 'All')) {
+        throw 'MSI upgrade smoke requires -DesktopTarget Msi or All.'
+    }
+    $metadata = Get-MsiMetadata -path $msiPath
+    $previousMsiPath = (Resolve-Path -LiteralPath $previousMsiPath).Path
+    $previousChecksumPath = (Resolve-Path -LiteralPath $previousChecksumPath).Path
+    $previousHash = Assert-Checksum -artifactPath $previousMsiPath -manifestPath $previousChecksumPath
+    $previousMetadata = Get-MsiMetadata -path $previousMsiPath
+    if ($previousMetadata.ProductVersion -ne $UpgradeFromVersion) {
+        throw "Previous MSI ProductVersion $($previousMetadata.ProductVersion) does not match $UpgradeFromVersion."
+    }
+    if ($previousMetadata.UpgradeCode.Trim('{}').ToUpperInvariant() -ne '2CF8EF35-4160-59EB-89D8-01EC7D19A887') {
+        throw "Previous MSI UpgradeCode did not preserve the release identity: $($previousMetadata.UpgradeCode)"
+    }
+    $upgradeRoot = Join-Path $smokeRoot 'msi_upgrade'
+    New-Item -ItemType Directory -Path $upgradeRoot -Force | Out-Null
+    $installedPrevious = $false
+    $uninstallAttempted = $false
+    $installedExecutable = $null
+    $markerPath = if ([version]$UpgradeFromVersion -lt [version]'3.5.0') {
+        Join-Path $upgradeRoot 'DILIGENT/data/resources/state/upgrade-survival-marker.txt'
+    }
+    else {
+        Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
+    }
+    $upgradedMarkerPath = Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
+    try {
+        Invoke-MsiOperation '/i' $previousMsiPath 'msi_baseline_install'
+        $installedPrevious = $true
+        $previousEntry = Find-InstalledProduct -productCode $previousMetadata.ProductCode -productName $previousMetadata.ProductName
+        if ($null -eq $previousEntry) { throw 'Previous MSI product was not found after installation.' }
+        $previousExecutable = Resolve-InstalledExecutable $previousEntry
+        if (-not $previousExecutable) { throw 'Previous MSI executable was not found.' }
+        $installedPrevious = $true
+        Invoke-PortableSmoke -executable $previousExecutable -label 'msi_upgrade_previous' -expectedVersion $UpgradeFromVersion -isolatedRoot $upgradeRoot | Out-Null
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -Seed -Capture
+        Invoke-PortableSmoke -executable $previousExecutable -label 'msi_upgrade_populated_previous' -expectedVersion $UpgradeFromVersion -isolatedRoot $upgradeRoot | Out-Null
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot
+        New-Item -ItemType Directory -Path (Split-Path -Parent $markerPath) -Force | Out-Null
+        Set-Content -LiteralPath $markerPath -Value 'persistent user-data marker' -Encoding UTF8
+
+        Invoke-MsiOperation '/i' $msiPath 'msi_upgrade_install'
+        $currentEntry = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
+        if ($null -eq $currentEntry) { throw 'Current MSI product was not found after upgrade.' }
+        if ([string]$currentEntry.DisplayVersion -ne $Version) {
+            throw "Current MSI metadata does not report version $Version after upgrade."
+        }
+        $installedExecutable = Resolve-InstalledExecutable $currentEntry
+        if (-not $installedExecutable) { throw 'Upgraded MSI executable was not found.' }
+        Invoke-PortableSmoke -executable $installedExecutable -label 'msi_upgrade_current' -expectedVersion $Version -isolatedRoot $upgradeRoot | Out-Null
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -CheckHead
+        if (-not (Test-Path -LiteralPath $upgradedMarkerPath -PathType Leaf)) {
+            throw 'Persistent user-data marker did not survive the MSI upgrade.'
+        }
+        Invoke-MsiOperation '/x' $metadata.ProductCode 'msi_upgrade_uninstall'
+        $uninstallAttempted = $true
+        $remaining = Find-InstalledProduct -productCode $metadata.ProductCode -productName $metadata.ProductName
+        if ($null -ne $remaining -or ($installedExecutable -and (Test-Path -LiteralPath $installedExecutable -PathType Leaf))) {
+            throw 'MSI upgrade uninstall left the product registered or executable on disk.'
+        }
+        if (-not (Test-Path -LiteralPath $upgradedMarkerPath -PathType Leaf)) {
+            throw 'Persistent user data was removed by MSI uninstall.'
+        }
+        Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -CheckHead
+        $report.msi_upgrade = [ordered]@{
+            previous_version = $UpgradeFromVersion
+            previous_msi_sha256 = $previousHash
+            upgraded_version = $Version
+            launched_previous = $true
+            marker_survived_upgrade = $true
+            launched_current = $true
+            uninstalled_current = $true
+            binaries_and_registration_removed = $true
+            user_data_survived_uninstall = $true
+            sessions_versions_settings_preserved = $true
+            database_integrity_verified = $true
+            migration_head_verified = $true
+        }
+    }
+    finally {
+        if ($installedPrevious -and -not $uninstallAttempted) {
+            try {
+                Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $metadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden | Out-Null
+            }
+            catch {
+            }
+            try {
+                Start-Process -FilePath 'msiexec.exe' -ArgumentList '/x', $previousMetadata.ProductCode, '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden | Out-Null
+            }
+            catch {
+            }
+        }
+    }
+}
+
 try {
     New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
     if ($DesktopTarget -in @('Portable', 'All')) {
@@ -586,6 +755,7 @@ try {
         Assert-File -path $msiPath -minimumBytes 1KB
         $msiHash = Assert-Checksum -artifactPath $msiPath -manifestPath $checksumPath
         Invoke-MsiSmoke
+        Invoke-MsiUpgradeSmoke
         $report.msi_sha256 = $msiHash
     }
     $report.success = $true

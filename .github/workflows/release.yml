@@ -13,7 +13,7 @@ on:
       version:
         description: Exact major.minor.patch release version
         type: string
-        default: '3.5.0'
+        default: '3.5.1'
         required: true
       candidate_run_id:
         description: Successful prepare run ID (publish only)
@@ -119,6 +119,9 @@ jobs:
           $ErrorActionPreference = "Stop"
           $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
           New-Item -ItemType Directory -Path $env:DILIGENT_DATA_PATH -Force | Out-Null
+          $catalogs = Join-Path $env:DILIGENT_DATA_PATH "catalogs"
+          New-Item -ItemType Directory -Path $catalogs -Force | Out-Null
+          Copy-Item -Path (Join-Path $env:GITHUB_WORKSPACE "data\catalogs\*") -Destination $catalogs -Recurse -Force
           function Invoke-Checked([string]$label, [string]$executable, [string[]]$arguments) {
             & $executable @arguments
             if ($LASTEXITCODE -ne 0) {
@@ -355,6 +358,8 @@ jobs:
     needs: [source, release-preflight, release-persistence-preflight, release-live-provider-e2e, release-security-preflight]
     runs-on: windows-latest
     timeout-minutes: 120
+    env:
+      RELEASE_BASELINE_VERSION: '3.5.0'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -377,10 +382,22 @@ jobs:
         run: |
           & ../../runtimes/uv/uv.exe sync --locked --all-extras --group desktop-build
           if ($LASTEXITCODE -ne 0) { throw 'Validation dependency installation failed.' }
-      - name: Validate unsigned portable, deep paths, and MSI lifecycle
+      - name: Download the published v3.5.0 upgrade baseline
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $baselineVersion = $env:RELEASE_BASELINE_VERSION
+          $baselineDirectory = 'assets/QA/release-gates/baseline'
+          New-Item -ItemType Directory -Path $baselineDirectory -Force | Out-Null
+          gh release download "v$baselineVersion" --repo $env:GITHUB_REPOSITORY --pattern "DILIGENT-v$baselineVersion-windows-x64.msi" --pattern "DILIGENT-v$baselineVersion-windows-x64.sha256" --dir $baselineDirectory
+          if ($LASTEXITCODE -ne 0) { throw 'Published upgrade baseline download failed.' }
+      - name: Validate unsigned portable, deep paths, MSI lifecycle, and populated upgrade
         shell: pwsh
         run: |
-          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -DesktopTarget All -InstallMsi -RequireUnsigned -TestDeepPath -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
+          $baselineVersion = $env:RELEASE_BASELINE_VERSION
+          $baselineDirectory = 'assets/QA/release-gates/baseline'
+          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -UpgradeFromVersion $baselineVersion -DesktopTarget All -InstallMsi -TestUpgrade -RequireUnsigned -TestDeepPath -PreviousMsiPath "$baselineDirectory/DILIGENT-v$baselineVersion-windows-x64.msi" -PreviousChecksumPath "$baselineDirectory/DILIGENT-v$baselineVersion-windows-x64.sha256" -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
       - name: Record exact source, artifact hashes, and gate provenance
         shell: pwsh
         env:
