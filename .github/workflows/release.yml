@@ -114,12 +114,11 @@ jobs:
       - name: Run backend release gates
         shell: pwsh
         env:
-          EMBEDDED_DATABASE: "true"
-          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\assets\QA\release-gates\backend\preflight.sqlite3
+          DILIGENT_DATA_PATH: ${{ github.workspace }}\assets\QA\release-gates\backend\preflight-data
         run: |
           $ErrorActionPreference = "Stop"
           $python = Join-Path $env:GITHUB_WORKSPACE "app\server\.venv\Scripts\python.exe"
-          New-Item -ItemType Directory -Path (Split-Path -Parent $env:DILIGENT_SQLITE_PATH) -Force | Out-Null
+          New-Item -ItemType Directory -Path $env:DILIGENT_DATA_PATH -Force | Out-Null
           function Invoke-Checked([string]$label, [string]$executable, [string[]]$arguments) {
             & $executable @arguments
             if ($LASTEXITCODE -ne 0) {
@@ -227,8 +226,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     env:
-      DATABASE_BACKEND: sqlite
-      EMBEDDED_DATABASE: 'true'
       APP_TEST_BACKEND_URL: http://127.0.0.1:7690
       APP_TEST_FRONTEND_URL: http://127.0.0.1:9847
       FASTAPI_HOST: 127.0.0.1
@@ -286,8 +283,6 @@ jobs:
       - name: Run release live-provider browser E2E
         shell: pwsh
         env:
-          DATABASE_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-live-provider.sqlite3
-          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\release-live-provider.sqlite3
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
           DILIGENT_BROWSER_E2E_CACHE_ROOT: ${{ github.workspace }}/assets/QA/release-gates/provider-cache
         run: .\app\tests\ci\run_browser_e2e.ps1 -Suite LiveProvider

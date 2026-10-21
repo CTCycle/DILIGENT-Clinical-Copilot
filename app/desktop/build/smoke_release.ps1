@@ -520,8 +520,7 @@ function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Cap
         $baselineMarker = Get-ChildItem -LiteralPath (Join-Path $upgradeRoot "DILIGENT/rt/$UpgradeFromVersion") -Filter extraction.complete -File -Recurse | Select-Object -First 1
         if ($null -eq $baselineMarker) { throw 'The baseline application runtime was not extracted.' }
         $environment = @{
-            DILIGENT_SQLITE_PATH = $database; DATABASE_SQLITE_PATH = $database
-            DILIGENT_DATA_ROOT = $dataRoot; DATABASE_BACKEND = 'sqlite'; EMBEDDED_DATABASE = 'true'
+            DILIGENT_DATA_ROOT = $dataRoot
             DILIGENT_RUNTIME_ROOT = $baselineMarker.DirectoryName
             DILIGENT_RELEASE_VERSION = $UpgradeFromVersion
             PYTHONHOME = Join-Path $repoRoot 'runtimes/python'

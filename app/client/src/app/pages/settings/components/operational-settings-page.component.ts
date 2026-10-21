@@ -253,7 +253,7 @@ export class OperationalSettingsPageComponent implements OnInit, OnDestroy {
     if (!saved || !draft) return false;
     return JSON.stringify(saved[this.section()]) !== JSON.stringify(draft[this.section()]);
   });
-  readonly canSave = computed(
+  readonly canPersist = computed(
     () => this.isDirty() && !this.isSaving() && !this.isResetting() && !this.validationMessage(),
   );
   readonly autoSaveStatus = computed(() => {
@@ -273,9 +273,9 @@ export class OperationalSettingsPageComponent implements OnInit, OnDestroy {
       .subscribe((data) => {
         const nextSection = data['settingsSection'];
         if (!isRuntimeSettingsCategory(nextSection)) return;
-        const shouldSaveCurrentSection = this.canSave();
+        const shouldPersistCurrentSection = this.canPersist();
         this.clearSaveTimer();
-        if (shouldSaveCurrentSection) void this.save();
+        if (shouldPersistCurrentSection) void this.persistChanges();
         this.section.set(nextSection);
         this.statusMessage.set('');
         this.syncDraft();
@@ -287,9 +287,9 @@ export class OperationalSettingsPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    const shouldSaveCurrentSection = this.canSave();
+    const shouldPersistCurrentSection = this.canPersist();
     this.clearSaveTimer();
-    if (shouldSaveCurrentSection) void this.save();
+    if (shouldPersistCurrentSection) void this.persistChanges();
   }
 
   fieldValue(field: SettingFieldDescriptor): number | string | boolean | null {
@@ -324,9 +324,9 @@ export class OperationalSettingsPageComponent implements OnInit, OnDestroy {
     await this.loadSettings(true);
   }
 
-  async save(): Promise<void> {
+  async persistChanges(): Promise<void> {
     const values = this.draft();
-    if (!values || !this.canSave()) return;
+    if (!values || !this.canPersist()) return;
     this.clearSaveTimer();
     const category = this.section();
     const payload = { [category]: { ...values[category] } } as RuntimeSettingsUpdateRequest;
@@ -382,7 +382,7 @@ export class OperationalSettingsPageComponent implements OnInit, OnDestroy {
     if (!this.isDirty() || this.validationMessage()) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
-      void this.save();
+      void this.persistChanges();
     }, SETTINGS_AUTOSAVE_DELAY_MS);
   }
 

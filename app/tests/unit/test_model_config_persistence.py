@@ -8,8 +8,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, text
-
 import services.llm.model_config as model_config_module
 import services.llm.runtime_config as runtime_config_module
 from common.exceptions import ServiceValidationError
@@ -18,6 +16,7 @@ from domain.model_configs import (
     ConnectivityCheckRequest,
     ModelConfigSnapshot,
     ModelConfigUpdateRequest,
+    ReasoningLevel,
 )
 from repositories.schemas.base import Base
 from repositories.serialization.model_configs import ModelConfigSerializer
@@ -31,6 +30,8 @@ from services.llm.ollama_client import OllamaError
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
+from sqlalchemy import create_engine, text
+
 
 ###############################################################################
 class InMemorySerializer:
@@ -107,6 +108,65 @@ def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
 
     assert snapshot.updated_at is not None
     assert snapshot.updated_at.year > 2000
+
+###############################################################################
+def test_model_config_update_preserves_other_application_settings(tmp_path) -> None:
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'settings-merge.db'}")
+    Base.metadata.create_all(engine)
+    serializer = ModelConfigSerializer(engine=engine)
+    serializer.seed_if_missing(
+        {
+            "clinical_model": "clinical-model",
+            "text_extraction_model": "parser-model",
+            "revision_model": "revision-model",
+            "timeline_model": "timeline-model",
+            "use_cloud_models": False,
+            "cloud_provider": "openai",
+            "cloud_model": None,
+            "jobs": {"polling_interval": 2.5},
+            "runtime": {"livertox_archive": "custom.tar.gz"},
+            "ingestion": {"drug_name_min_length": 4},
+            "database": {"backend": "postgresql"},
+        }
+    )
+
+    updated_snapshot = serializer.save_snapshot(reasoning_level=ReasoningLevel.HIGH)
+    saved = serializer.application_configuration.load()
+
+    assert updated_snapshot.reasoning_level is ReasoningLevel.HIGH
+    assert saved is not None
+    assert saved["reasoning_level"] == "high"
+    assert saved["jobs"] == {"polling_interval": 2.5}
+    assert saved["runtime"]["livertox_archive"] == "custom.tar.gz"
+    assert saved["ingestion"] == {"drug_name_min_length": 4}
+    assert "database" not in saved
+
+
+###############################################################################
+def test_application_configuration_concurrent_patches_do_not_drop_updates(
+    tmp_path,
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from repositories.serialization.application_configuration import (
+        ApplicationConfigurationSerializer,
+    )
+
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'settings-concurrent.db'}")
+    Base.metadata.create_all(engine)
+    serializer = ApplicationConfigurationSerializer(engine=engine)
+    serializer.save({"initial": True})
+
+    def update(index: int) -> None:
+        serializer.update_payload(lambda payload: payload.update({f"value_{index}": index}))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(update, range(24)))
+
+    saved = serializer.load()
+    assert saved is not None
+    assert saved["initial"] is True
+    assert {saved[f"value_{index}"] for index in range(24)} == set(range(24))
 
 ###############################################################################
 def test_model_config_serializer_persists_independent_revision_and_timeline_roles(

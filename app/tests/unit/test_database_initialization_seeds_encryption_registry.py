@@ -19,6 +19,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
+
 ###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -240,14 +241,14 @@ def test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing(
     monkeypatch.setattr(
         initializer,
         "initialize_sqlite_database",
-        lambda _settings, **kwargs: calls.append(kwargs),
+        lambda _settings, **kwargs: calls.append(kwargs) or True,
     )
 
     assert initializer.ensure_database_ready(settings) is True
     assert calls == [{"seed_catalogs": True}]
 
 ###############################################################################
-def test_sqlite_startup_migrates_existing_database_without_automatic_reseed(
+def test_sqlite_startup_initializes_existing_empty_database(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     database_path = tmp_path / "existing.db"
@@ -261,11 +262,78 @@ def test_sqlite_startup_migrates_existing_database_without_automatic_reseed(
     monkeypatch.setattr(
         initializer,
         "initialize_sqlite_database",
-        lambda _settings, **kwargs: calls.append(kwargs),
+        lambda _settings, **kwargs: calls.append(kwargs) or True,
     )
 
-    assert initializer.ensure_database_ready(settings) is False
-    assert calls == [{"seed_catalogs": False}]
+    assert initializer.ensure_database_ready(settings) is True
+    assert calls == [{"seed_catalogs": True}]
+
+###############################################################################
+def test_sqlite_initialization_seeds_an_existing_file_without_app_schema(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    database_path = tmp_path / "empty-existing.db"
+    database_path.touch()
+    monkeypatch.setattr(
+        "repositories.database.sqlite.DATABASE_FILE_PATH", database_path
+    )
+    migration_calls: list[dict[str, object]] = []
+    catalog_calls: list[str] = []
+    monkeypatch.setattr(
+        initializer,
+        "migrate_database",
+        lambda _engine, **kwargs: migration_calls.append(kwargs),
+    )
+    monkeypatch.setattr(initializer, "_seed_model_configuration", lambda _repo: None)
+    monkeypatch.setattr(
+        initializer,
+        "_seed_repository_catalogs",
+        lambda _repo, **_kwargs: catalog_calls.append("seeded"),
+    )
+
+    assert initializer.initialize_sqlite_database(make_sqlite_settings()) is True
+    assert migration_calls == [{"database_was_empty": True, "drop_existing": False}]
+    assert catalog_calls == ["seeded"]
+
+###############################################################################
+def test_postgres_startup_seeds_catalogs_for_existing_empty_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = create_engine("sqlite:///:memory:")
+    events: list[tuple[str, object]] = []
+
+    class FakePostgresRepository:
+        def __init__(self, _settings) -> None:
+            self.engine = engine
+
+    monkeypatch.setattr(
+        initializer,
+        "_create_postgres_database_if_missing",
+        lambda _settings: ("diligent", False),
+    )
+    monkeypatch.setattr(initializer, "PostgresRepository", FakePostgresRepository)
+    monkeypatch.setattr(
+        initializer,
+        "migrate_database",
+        lambda _engine, **kwargs: events.append(("migration", kwargs)),
+    )
+    monkeypatch.setattr(
+        initializer,
+        "_seed_model_configuration",
+        lambda _repository: events.append(("model", None)),
+    )
+    monkeypatch.setattr(
+        initializer,
+        "_seed_repository_catalogs",
+        lambda _repository, **kwargs: events.append(("catalogs", kwargs)),
+    )
+
+    assert initializer.ensure_database_ready(_postgres_settings()) is True
+    assert events == [
+        ("migration", {"database_was_empty": True}),
+        ("model", None),
+        ("catalogs", {"backend_label": "PostgreSQL", "force": False}),
+    ]
 
 ###############################################################################
 def test_database_initialization_converts_unavailable_connection_to_exit(
@@ -318,6 +386,82 @@ def _postgres_settings() -> DatabaseSettings:
         insert_commit_interval=100,
         select_page_size=1000,
     )
+
+###############################################################################
+def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    localized_error = SQLAlchemyError(
+        'connection failed: FATALE: il database "diligent" non esiste'
+    )
+
+    class FakeTargetEngine:
+        def connect(self):
+            events.append("target_connect")
+            raise localized_error
+
+        def dispose(self) -> None:
+            events.append("target_dispose")
+
+    class FakePostgresRepository:
+        def __init__(self, _settings) -> None:
+            self.engine = FakeTargetEngine()
+
+    class FakeResult:
+        def scalar(self):
+            return None
+
+    class FakeAdminConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def execute(self, statement, _parameters=None):
+            sql = str(statement)
+            if "pg_advisory_lock" in sql:
+                events.append("lock")
+            elif "FROM pg_database" in sql:
+                events.append("catalog_check")
+                return FakeResult()
+            elif sql.startswith("CREATE DATABASE"):
+                events.append("create")
+            elif "pg_advisory_unlock" in sql:
+                events.append("unlock")
+            return None
+
+    class FakeAdminEngine:
+        def connect(self):
+            events.append("admin_connect")
+            return FakeAdminConnection()
+
+        def dispose(self) -> None:
+            events.append("admin_dispose")
+
+    admin_engine = FakeAdminEngine()
+    monkeypatch.setattr(initializer, "PostgresRepository", FakePostgresRepository)
+    monkeypatch.setattr(
+        initializer.sqlalchemy,
+        "create_engine",
+        lambda *_args, **_kwargs: admin_engine,
+    )
+
+    assert initializer._create_postgres_database_if_missing(_postgres_settings()) == (
+        "diligent",
+        True,
+    )
+    assert events == [
+        "target_connect",
+        "target_dispose",
+        "admin_connect",
+        "lock",
+        "catalog_check",
+        "create",
+        "unlock",
+        "admin_dispose",
+    ]
 
 ###############################################################################
 def test_run_database_initialization_uses_sqlite_path_when_embedded(

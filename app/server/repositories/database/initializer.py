@@ -28,7 +28,6 @@ from repositories.database.migrations import MigrationError, migrate_database
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import (
     SQLiteRepository,
-    resolve_sqlite_database_path,
 )
 from repositories.database.utils import (
     normalize_postgres_engine,
@@ -139,6 +138,13 @@ def _seed_repository_catalogs(
     get_catalog_provider().invalidate()
 
 ###############################################################################
+def _repository_has_reference_catalog_entries(
+    repository: SQLiteRepository | PostgresRepository,
+) -> bool:
+    serializer = ReferenceCatalogSerializer(session_factory=repository.session_factory)
+    return bool(serializer.list_active_entries())
+
+###############################################################################
 def _default_model_configuration_payload() -> dict[str, object]:
     return build_default_application_configuration_payload(
         environment_snapshot_from_os_env()
@@ -166,36 +172,33 @@ def initialize_sqlite_database(
     drop_existing: bool = False,
     seed_catalogs: bool = True,
     force_reseed_catalogs: bool = False,
-) -> None:
-    database_path = resolve_sqlite_database_path(settings)
-    database_was_missing = not database_path.is_file()
+) -> bool:
     repository = SQLiteRepository(settings)
     try:
+        database_schema_was_missing = not sqlalchemy.inspect(
+            repository.engine
+        ).has_table("alembic_version")
         migrate_database(
             repository.engine,
-            database_was_empty=database_was_missing,
+            database_was_empty=database_schema_was_missing,
             drop_existing=drop_existing,
         )
         _seed_model_configuration(repository)
-        if seed_catalogs:
+        if seed_catalogs and (
+            database_schema_was_missing
+            or not _repository_has_reference_catalog_entries(repository)
+        ):
             _seed_repository_catalogs(
                 repository,
                 backend_label="SQLite",
                 force=force_reseed_catalogs,
             )
         logger.info("SQLite database is synchronized at %s", repository.db_path)
+        return database_schema_was_missing
     finally:
         repository.engine.dispose()
 
 ###############################################################################
-def _is_missing_postgres_database(error: SQLAlchemyError) -> bool:
-    original = getattr(error, "orig", error)
-    state = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
-    if state == "3D000":
-        return True
-    message = str(original).lower()
-    return "database" in message and "does not exist" in message
-
 ###############################################################################
 def _create_postgres_database_if_missing(
     settings: DatabaseSettings,
@@ -210,16 +213,16 @@ def _create_postgres_database_if_missing(
     target_database = validate_postgres_database_name(settings.database_name)
     normalized_settings = clone_settings_with_database(settings, target_database)
     target_repository = PostgresRepository(normalized_settings)
+    target_connection_error: SQLAlchemyError | None = None
     try:
         try:
             with target_repository.engine.connect():
                 logger.info("PostgreSQL database %s is reachable", target_database)
                 return target_database, False
         except SQLAlchemyError as exc:
-            if not _is_missing_postgres_database(exc):
-                raise
+            target_connection_error = exc
             logger.info(
-                "PostgreSQL database %s is not available; attempting creation",
+                "PostgreSQL database %s could not be connected; checking the server catalog",
                 target_database,
             )
     finally:
@@ -251,9 +254,11 @@ def _create_postgres_database_if_missing(
                 exists = connection.execute(exists_stmt).scalar()
                 if exists:
                     logger.info(
-                        "PostgreSQL database %s was created by another initializer",
+                        "PostgreSQL database %s exists; preserving the target connection error",
                         target_database,
                     )
+                    if target_connection_error is not None:
+                        raise target_connection_error
                     return target_database, False
                 connection.execute(build_postgres_create_database_sql(target_database))
                 logger.info("Created PostgreSQL database %s", target_database)
@@ -300,13 +305,7 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
     """Synchronize startup schema and seed only a newly created database."""
 
     if settings.backend == "sqlite":
-        database_path = resolve_sqlite_database_path(settings)
-        database_was_missing = not database_path.is_file()
-        initialize_sqlite_database(
-            settings,
-            seed_catalogs=database_was_missing,
-        )
-        return database_was_missing
+        return initialize_sqlite_database(settings, seed_catalogs=True)
 
     if settings.backend != "postgresql":
         raise ValueError(f"Unsupported database backend: {settings.backend}")
@@ -317,9 +316,17 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
     normalized_settings = clone_settings_with_database(settings, target_database)
     repository = PostgresRepository(normalized_settings)
     try:
-        migrate_database(repository.engine, database_was_empty=False)
+        database_schema_was_missing = not sqlalchemy.inspect(
+            repository.engine
+        ).has_table("alembic_version")
+        migrate_database(
+            repository.engine,
+            database_was_empty=database_schema_was_missing,
+        )
         _seed_model_configuration(repository)
-        if database_was_created:
+        if database_was_created or database_schema_was_missing or not (
+            _repository_has_reference_catalog_entries(repository)
+        ):
             _seed_repository_catalogs(
                 repository,
                 backend_label="PostgreSQL",
@@ -328,7 +335,22 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
         logger.info("PostgreSQL database %s is synchronized", target_database)
     finally:
         repository.engine.dispose()
-    return database_was_created
+    return database_was_created or database_schema_was_missing
+
+
+def remove_legacy_database_configuration() -> bool:
+    """Remove database connection values from the old settings singleton once."""
+    from repositories.serialization.application_configuration import (
+        ApplicationConfigurationSerializer,
+    )
+
+    serializer = ApplicationConfigurationSerializer()
+    payload = serializer.load()
+    if not payload or "database" not in payload:
+        return False
+    payload.pop("database", None)
+    serializer.save(payload)
+    return True
 
 ###############################################################################
 def run_database_initialization(

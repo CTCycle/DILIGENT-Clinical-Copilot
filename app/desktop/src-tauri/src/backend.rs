@@ -82,7 +82,6 @@ impl BackendProcess {
             .env("DILIGENT_RELEASE_VERSION", version)
             .env("DILIGENT_RUNTIME_ROOT", &paths.root)
             .env("DILIGENT_DATA_ROOT", &paths.data_root)
-            .env("DILIGENT_SQLITE_PATH", paths.data_root.join("database.db"))
             .env(
                 "DILIGENT_ACCESS_KEY_MATERIAL_FILE",
                 paths.data_root.join("access-key-material.json"),

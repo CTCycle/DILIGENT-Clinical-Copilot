@@ -65,7 +65,6 @@ class ModelConfigSnapshotStore(Protocol):
     def save_snapshot(
         self,
         *,
-        base_snapshot: ModelConfigSnapshot | None = None,
         clinical_model: str | None | object = ...,
         text_extraction_model: str | None | object = ...,
         revision_model: str | None | object = ...,
@@ -158,7 +157,6 @@ class ModelConfigService:
         if updates:
             self.validate_current_snapshot(replace(snapshot, **updates))
             snapshot = self.serializer.save_snapshot(
-                base_snapshot=snapshot,
                 **updates,
             )
 

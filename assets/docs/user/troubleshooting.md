@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-10-18
+Last updated: 2026-10-20
 
 ## Windows desktop app does not open
 
@@ -80,6 +80,19 @@ Check that:
 - database initialization completed successfully
 - embedding or catalog update jobs completed successfully
 - the backend was restarted after maintenance
+
+## Database Connection or Switch Failed
+
+Open **Settings → Database** and use **Test connection** to check the selected
+target. Confirm the SQLite file path or PostgreSQL host, port, database name,
+username, and SSL requirements. The test action requires the PostgreSQL
+database to exist. **Save and switch** can create a missing PostgreSQL database
+only when the configured role has `CREATEDB` permission.
+
+If a switch fails, the app keeps the previous database and its saved connection
+settings. Reopen the Database page to confirm the active backend. Restart the
+application only if the error says automatic recovery could not restore the
+runtime services.
 
 ## Ports Are Already In Use
 Current defaults:

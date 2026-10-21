@@ -271,7 +271,7 @@ describe('ModelConfigPageComponent', () => {
     expect(component.ragSettingsValidationMessage()).toBe('');
   });
 
-  it('cancels pending reasoning persistence when the page is destroyed', () => {
+  it('persists a pending reasoning change immediately when the page is destroyed', () => {
     vi.useFakeTimers();
     const persistSpy = vi
       .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<boolean> }, 'persistConfigPatch')
@@ -281,7 +281,12 @@ describe('ModelConfigPageComponent', () => {
     fixture.destroy();
     vi.advanceTimersByTime(300);
 
-    expect(persistSpy).not.toHaveBeenCalled();
+    expect(persistSpy).toHaveBeenCalledWith(
+      { reasoning_level: 'medium' },
+      'Reasoning preference saved.',
+      false,
+      'reasoning',
+    );
     vi.useRealTimers();
   });
 });

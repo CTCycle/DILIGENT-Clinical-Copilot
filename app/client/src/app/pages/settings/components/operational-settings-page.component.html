@@ -16,7 +16,7 @@
       <button type="button" class="settings-secondary-button" (click)="retryLoad()">Retry</button>
     </div>
   } @else if (draft()) {
-    <form class="operational-settings-form" (ngSubmit)="save()">
+    <section class="operational-settings-form">
       <div class="operational-settings-list">
         @for (field of fields(); track field.key) {
           <label class="operational-setting-row">
@@ -34,7 +34,7 @@
                   [attr.step]="field.step"
                   [ngModel]="fieldValue(field)"
                   (ngModelChange)="updateField(field, $event)"
-                  [name]="field.key"
+                  [attr.name]="field.key"
                   [disabled]="isSaving() || isResetting()"
                   [attr.aria-label]="field.label"
                 />
@@ -43,7 +43,7 @@
                   type="checkbox"
                   [ngModel]="fieldValue(field)"
                   (ngModelChange)="updateField(field, $event)"
-                  [name]="field.key"
+                  [attr.name]="field.key"
                   [disabled]="isSaving() || isResetting()"
                   [attr.aria-label]="field.label"
                 />
@@ -51,7 +51,7 @@
                 <select
                   [ngModel]="fieldValue(field)"
                   (ngModelChange)="updateField(field, $event)"
-                  [name]="field.key"
+                  [attr.name]="field.key"
                   [disabled]="isSaving() || isResetting()"
                   [attr.aria-label]="field.label"
                 >
@@ -65,7 +65,7 @@
                   autocomplete="email"
                   [ngModel]="fieldValue(field)"
                   (ngModelChange)="updateField(field, $event)"
-                  [name]="field.key"
+                  [attr.name]="field.key"
                   [disabled]="isSaving() || isResetting()"
                   [attr.aria-label]="field.label"
                 />
@@ -74,7 +74,7 @@
                   type="text"
                   [ngModel]="fieldValue(field)"
                   (ngModelChange)="updateField(field, $event)"
-                  [name]="field.key"
+                  [attr.name]="field.key"
                   [disabled]="isSaving() || isResetting()"
                   [attr.aria-label]="field.label"
                 />
@@ -92,7 +92,11 @@
       }
 
       @if (statusMessage()) {
-        <app-status-message [message]="statusMessage()" [tone]="statusTone()"></app-status-message>
+        <app-status-message
+          [message]="statusMessage()"
+          [tone]="statusTone()"
+          presentation="inline"
+        ></app-status-message>
       }
 
       <footer class="operational-settings-actions">
@@ -113,6 +117,6 @@
           </button>
         </div>
       </footer>
-    </form>
+    </section>
   }
 </section>

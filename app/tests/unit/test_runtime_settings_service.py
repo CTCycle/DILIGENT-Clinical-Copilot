@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
-
 import services.settings.runtime as runtime_module
 from common.exceptions import ServiceValidationError
 from configurations.management import (
@@ -17,6 +16,7 @@ from configurations.management import (
 )
 from configurations.startup import ConfigurationManager
 from domain.settings.runtime_ui import RuntimeSettingsUpdateRequest
+from pydantic import ValidationError
 from services.settings.runtime import RuntimeSettingsService
 
 
@@ -41,6 +41,15 @@ class MemoryApplicationConfigurationSerializer:
         self.payload = dict(payload)
         self.updated_at = datetime.now(UTC)
         return dict(self.payload)
+
+    # -------------------------------------------------------------------------
+    def update_payload(self, update, *, return_metadata: bool = False):  # type: ignore[no-untyped-def]
+        payload = dict(self.payload)
+        update(payload)
+        saved = self.save(payload)
+        if return_metadata:
+            return saved, self.updated_at
+        return saved
 
 
 ###############################################################################
@@ -109,6 +118,49 @@ def test_runtime_settings_partial_update_persists_all_mapped_blocks(monkeypatch)
     assert serializer.payload["clinical_language_detection"]["min_best_score"] == 3.0
     assert serializer.payload["runtime"]["livertox_archive"] == "custom-livertox.tar.gz"
     assert serializer.payload["drugs_matcher"]["spelling_short_name_length"] == 10
+
+
+###############################################################################
+def test_runtime_settings_rapid_updates_preserve_sibling_fields(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    service, serializer = _service(monkeypatch)
+    updates = [
+        {"integrations": {"ncbi_contact_email": f"settings-{index}@example.org"}}
+        for index in range(8)
+    ]
+    updates.extend(
+        [
+            {"integrations": {"livertox_download_timeout": 91.0}},
+            {"integrations": {"livertox_archive": "autosave-check.tar.gz"}},
+            {"integrations": {"livertox_yield_interval": 111}},
+            {"integrations": {"livertox_skip_deterministic_ratio": 0.4}},
+            {"integrations": {"livertox_monograph_max_workers": 7}},
+            {"integrations": {"rxnav_request_timeout": 13.0}},
+            {"integrations": {"rxnav_max_concurrency": 4}},
+        ]
+    )
+
+    with ThreadPoolExecutor(max_workers=len(updates)) as executor:
+        futures = [
+            executor.submit(
+                service.update_state,
+                RuntimeSettingsUpdateRequest.model_validate(update),
+            )
+            for update in updates
+        ]
+        for future in futures:
+            future.result()
+
+    saved = serializer.payload["runtime"]
+    assert saved["ncbi_contact_email"] in {
+        f"settings-{index}@example.org" for index in range(8)
+    }
+    assert saved["livertox_download_timeout"] == 91.0
+    assert saved["livertox_archive"] == "autosave-check.tar.gz"
+    assert saved["livertox_yield_interval"] == 111
+    assert saved["livertox_skip_deterministic_ratio"] == 0.4
+    assert saved["livertox_monograph_max_workers"] == 7
+    assert saved["rxnav_request_timeout"] == 13.0
+    assert saved["rxnav_max_concurrency"] == 4
 
 
 ###############################################################################
