@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +55,28 @@ from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
 from services.startup_validation import run_startup_validations
 
+_CLIENT_ASSET_SUFFIXES = {
+    ".css",
+    ".eot",
+    ".gif",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".js",
+    ".json",
+    ".map",
+    ".mjs",
+    ".png",
+    ".svg",
+    ".ttf",
+    ".txt",
+    ".wasm",
+    ".webmanifest",
+    ".webp",
+    ".woff",
+    ".woff2",
+}
+
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
@@ -62,9 +84,10 @@ def _client_build_available() -> bool:
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
     client_root = CLIENT_DIST_PATH.resolve()
-    requested_path = (client_root / full_path).resolve()
+    normalized_path = full_path.replace("\\", "/")
+    requested_path = (client_root / normalized_path).resolve()
     if not requested_path.is_relative_to(client_root):
-        return None
+        raise HTTPException(status_code=404, detail="Not found")
     if requested_path.is_file():
         return requested_path
     return None
@@ -75,9 +98,14 @@ def serve_client_root() -> FileResponse:
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
+    normalized_path = full_path.replace("\\", "/")
+    if normalized_path == "api" or normalized_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
     client_file = _resolve_client_file(full_path)
     if client_file is not None:
         return FileResponse(client_file)
+    if Path(normalized_path).suffix.casefold() in _CLIENT_ASSET_SUFFIXES:
+        raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
 ###############################################################################
@@ -122,16 +150,19 @@ def create_app() -> FastAPI:
         security=desktop_runtime.security,
     )
     application.add_middleware(DatabaseSwitchMiddleware)
-    if not desktop_runtime.security.enabled:
-        cors_allow_origins = get_cors_allow_origins()
-        if cors_allow_origins:
-            application.add_middleware(
-                CORSMiddleware,
-                allow_origins=list(cors_allow_origins),
-                allow_credentials=False,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
+    cors_allow_origins = (
+        ("http://tauri.localhost",)
+        if desktop_runtime.security.enabled
+        else get_cors_allow_origins()
+    )
+    if cors_allow_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(cors_allow_origins),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Content-Type", "X-DILIGENT-Desktop-Session"],
+        )
     for router in (
         session_router,
         data_inspection_router,

@@ -3,6 +3,7 @@
 </p>
 
 <h1 align="center">DILIGENT Clinical Copilot</h1>
+<!-- Last updated: 2026-10-21 -->
 
 <p align="center"><strong>A local, single-user decision-support tool for structured review of possible drug-induced liver injury (DILI).</strong></p>
 
@@ -70,7 +71,9 @@ To run from source on Windows, open PowerShell at the repository root and start 
 .\start_on_windows.ps1
 ```
 
-Choose **Install dependencies**, then **Launch application**. The source-mode UI opens at `http://127.0.0.1:9847` by default.
+Choose **Install dependencies**, then **Launch application**. The launcher starts one FastAPI process that serves both the built SPA and API. The browser opens at `http://127.0.0.1:7690` by default. Keep the launcher open; choose **EXIT** or press Ctrl+C there to stop the app. `.\start_on_windows.ps1 -Action Launch` supervises the server until Ctrl+C.
+
+For frontend development, start FastAPI with Uvicorn reload in one terminal and use `npm run dev` in `app/client` in another. The Angular dev server runs at `http://127.0.0.1:9847` by default and proxies `/api` to FastAPI. The production launcher does not use the frontend preview server.
 
 ## Configuration
 

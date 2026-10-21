@@ -44,14 +44,20 @@ def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
     assert "Assert-NoForeignPortListeners" in explicit_cleanup
 
 ###############################################################################
-def test_launch_resolves_ports_once_immediately_before_process_start() -> None:
+def test_launch_resolves_only_api_port_and_starts_one_backend_process() -> None:
     source = _launcher_text()
     start_application = _function_body(source, "Start-Application")
 
     assert start_application.count("Resolve-LaunchPortConflicts") == 1
     assert start_application.index("Resolve-LaunchPortConflicts") < start_application.index(
-        "Start-Process -FilePath 'cmd.exe'"
+        "Start-Process -FilePath $VenvPython"
     )
+    assert "-FrontendPort" not in start_application
+    assert "UI_PORT" not in start_application
+    assert "run preview" not in start_application
+    assert "source_entry" in start_application
+    assert "api/health" in start_application
+    assert "JavaScript asset" in start_application
     assert "Test-DependenciesReady" not in source
     assert start_application.count("Set-LauncherEnvironment") == 1
     assert "Test-LaunchRuntimeReady" in start_application
@@ -63,9 +69,38 @@ def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> No
 
     assert "$repositoryPattern" in process_discovery
     assert "uvicorn.*app:app" in process_discovery
+    assert "-m\\s+source_entry" in process_discovery
     assert "(?:run\\s+preview|vite)" in process_discovery
     assert "--port" in process_discovery
     assert "candidateIds.Contains($parentId)" in process_discovery
+
+###############################################################################
+def test_launch_shutdown_is_graceful_then_limited_to_the_owned_process_tree() -> None:
+    source = _launcher_text()
+    shutdown = _function_body(source, "Stop-OwnedApplication")
+    supervisor = _function_body(source, "Wait-OwnedApplication")
+
+    assert "/api/desktop/shutdown" in shutdown
+    assert "X-DILIGENT-Desktop-Session" in shutdown
+    assert "WaitForExit(15000)" in shutdown
+    assert "taskkill.exe /PID $processId /T /F" in shutdown
+    assert "Wait-ForLauncherPorts" in shutdown
+    assert "Stop-OwnedApplication" in source[source.index("finally {", source.index("function Invoke-RemoveDesktopReleaseMenu")):]
+    assert "while (-not $process.HasExited)" in supervisor
+    assert "Wait-OwnedApplication" in source[source.index("if ($Action)"):]
+
+###############################################################################
+def test_launch_only_prepares_node_for_a_stale_frontend_build() -> None:
+    source = _launcher_text()
+    runtime_check = _function_body(source, "Test-LaunchRuntimeReady")
+    start_application = _function_body(source, "Start-Application")
+
+    assert "$NodeExe" not in runtime_check
+    assert "preview server" not in runtime_check
+    assert "Initialize-PortableNodeRuntime" in start_application
+    assert start_application.index("Get-FrontendBuildStatus") < start_application.index(
+        "Initialize-PortableNodeRuntime"
+    )
 
 ###############################################################################
 def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundaries() -> None:

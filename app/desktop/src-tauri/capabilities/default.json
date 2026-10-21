@@ -3,8 +3,5 @@
   "identifier": "default",
   "description": "Local desktop window can open the native operating-system directory picker.",
   "windows": ["main"],
-  "remote": {
-    "urls": ["http://127.0.0.1:*"]
-  },
   "permissions": ["dialog:allow-open"]
 }

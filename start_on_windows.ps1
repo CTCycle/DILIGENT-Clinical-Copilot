@@ -75,6 +75,11 @@ $script:DesktopTargetTriple = 'x86_64-pc-windows-msvc'
 $script:NextProgressId = 1
 $script:ActiveProgressActivities = [Collections.Generic.Dictionary[int, string]]::new()
 $script:LauncherInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected
+$script:OwnedApplicationProcess = $null
+$script:OwnedApplicationPort = 0
+$script:OwnedApplicationToken = $null
+$script:OwnedApplicationLog = $null
+$script:OwnedApplicationErrorLog = $null
 
 # ============================================================
 # Shared output and process helpers
@@ -325,7 +330,8 @@ function Initialize-PortableNodeRuntime {
 }
 
 function Initialize-PortableRuntimes {
-    Write-Step 'Ensuring portable Python, uv, and Node.js runtimes'
+    param([switch]$SkipNode)
+    Write-Step 'Ensuring portable Python and uv runtimes'
     New-Item -ItemType Directory -Path $PythonDir, $UvDir -Force | Out-Null
 
     $pythonNeedsInstall = -not (Test-Path -LiteralPath $PythonExe)
@@ -402,7 +408,9 @@ function Initialize-PortableRuntimes {
     }
     Write-Ok (& $UvExe --version)
 
-    Initialize-PortableNodeRuntime
+    if (-not $SkipNode) {
+        Initialize-PortableNodeRuntime
+    }
     Write-Ok 'Portable runtimes ready.'
 }
 
@@ -502,7 +510,9 @@ function Install-ApplicationDependencies {
         throw 'BuildFrontend requires InstallFrontendDependencies.'
     }
     if (-not $PortableRuntimesReady) {
-        Initialize-PortableRuntimes
+        $runtimeOptions = @{}
+        if (-not $InstallFrontendDependencies) { $runtimeOptions.SkipNode = $true }
+        Initialize-PortableRuntimes @runtimeOptions
     }
     if (-not $EnvironmentReady) {
         Import-DotEnv
@@ -828,13 +838,9 @@ function Rebuild-Frontend {
 
 function Test-LaunchRuntimeReady {
     $requiredPaths = [ordered]@{
-        'portable Python' = $PythonExe
-        'portable Node' = $NodeExe
-        'npm' = $NpmCmd
         'venv Python' = $VenvPython
         'backend app.py' = (Join-Path $ServerDir 'app.py')
-        'frontend package.json' = (Join-Path $ClientDir 'package.json')
-        'frontend preview server' = (Join-Path $ClientDir 'scripts/preview-server.mjs')
+        'source server entrypoint' = (Join-Path $ServerDir 'source_entry.py')
     }
     $missing = @($requiredPaths.GetEnumerator() | Where-Object {
         -not (Test-Path -LiteralPath $_.Value -PathType Leaf)
@@ -844,13 +850,6 @@ function Test-LaunchRuntimeReady {
         return $false
     }
 
-    $nodeVersionOutput = & $NodeExe --version 2>$null
-    $nodeExitCode = $LASTEXITCODE
-    $installedNodeVersion = ([string]($nodeVersionOutput | Out-String)).Trim()
-    if ($nodeExitCode -ne 0 -or $installedNodeVersion -ne "v$NodeVersion") {
-        Write-Info "Portable Node.js version check failed (found '$installedNodeVersion', expected 'v$NodeVersion')"
-        return $false
-    }
     & $VenvPython -c "import platform, fastapi, uvicorn; raise SystemExit(0 if platform.python_version() == '$PythonVersion' else 1)" *> $null
     $venvExitCode = $LASTEXITCODE
     if ($venvExitCode -ne 0) {
@@ -924,7 +923,7 @@ function Get-ApplicationProcessRecords {
         $processId = [int]$process.ProcessId
         if ($processId -eq $PID) { continue }
         $commandLine = [string]$process.CommandLine
-        $isBackendProcess = $commandLine -match "(?i)$repositoryPattern.*uvicorn.*app:app.*--port[^0-9]*$backendPortPattern\b"
+        $isBackendProcess = $commandLine -match "(?i)$repositoryPattern.*(?:-m\s+source_entry.*|uvicorn.*app:app.*)--port[^0-9]*$backendPortPattern\b"
         $isFrontendProcess = $commandLine -match "(?i)$repositoryPattern.*(?:run\s+preview|vite).*--port[^0-9]*$frontendPortPattern\b"
         if ($isBackendProcess -or $isFrontendProcess) {
             [void]$candidateIds.Add($processId)
@@ -1174,12 +1173,9 @@ function Stop-PortConflictProcesses {
 }
 
 function Resolve-LaunchPortConflicts {
-    param(
-        [Parameter(Mandatory = $true)][int]$BackendPort,
-        [Parameter(Mandatory = $true)][int]$FrontendPort
-    )
+    param([Parameter(Mandatory = $true)][int]$BackendPort)
 
-    $ports = @($BackendPort, $FrontendPort) | Sort-Object -Unique
+    $ports = @($BackendPort)
     $initialRecords = @(Get-ListeningPortRecords -Ports $ports)
     if ($initialRecords.Count -eq 0) { return }
 
@@ -1248,8 +1244,8 @@ function Stop-ApplicationProcesses {
     if (-not (Confirm-DestructiveAction 'stop all application processes')) { return }
 
     Import-DotEnv
-    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 8000 }
-    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
+    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 7690 }
+    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 9847 }
     $processes = @(Get-ApplicationProcessRecords -BackendPort $fastApiPort -FrontendPort $uiPort)
     $portStates = @(Get-LauncherPortStates `
         -BackendPort $fastApiPort `
@@ -1270,12 +1266,21 @@ function Stop-ApplicationProcesses {
 }
 
 function Start-Application {
+    if ($script:OwnedApplicationProcess -and -not $script:OwnedApplicationProcess.HasExited) {
+        Write-Info "DILIGENT is already running at $($script:OwnedApplicationUrl). Choose EXIT to stop it."
+        return
+    }
     Import-DotEnv -CreateIfMissing
     $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
-    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 8000 }
-    $uiHost = if ($env:UI_HOST) { $env:UI_HOST } else { '127.0.0.1' }
-    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 7861 }
-    $reload = $env:RELOAD -eq 'true'
+    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 7690 }
+    if ($fastApiHost -notin @('127.0.0.1', 'localhost')) {
+        throw 'Source-mode launch requires FASTAPI_HOST to be 127.0.0.1 or localhost.'
+    }
+    if ($fastApiPort -lt 1 -or $fastApiPort -gt 65535) {
+        throw 'FASTAPI_PORT must be between 1 and 65535.'
+    }
+    $browserHost = if ($fastApiHost -eq 'localhost') { '127.0.0.1' } else { $fastApiHost }
+    $origin = "http://$browserHost`:$fastApiPort"
 
     Set-LauncherEnvironment
     if (-not (Test-LaunchRuntimeReady)) {
@@ -1296,6 +1301,7 @@ function Start-Application {
     $frontendBuildStatus = Get-FrontendBuildStatus
     if (-not $frontendBuildStatus.IsCurrent) {
         Write-Step "Frontend build is $($frontendBuildStatus.Reason); refreshing production output"
+        Initialize-PortableNodeRuntime
         Install-FrontendDependencies -ForceSync:$frontendBuildStatus.DependencyInputsChanged
         Build-Frontend
     }
@@ -1310,48 +1316,176 @@ function Start-Application {
     if (-not (Test-Path -LiteralPath $VenvPython)) {
         throw "Virtual environment Python is missing: $VenvPython"
     }
-    Resolve-LaunchPortConflicts -BackendPort $fastApiPort -FrontendPort $uiPort
+    Resolve-LaunchPortConflicts -BackendPort $fastApiPort
 
-    $backendArguments = @(
-        '-m', 'uvicorn', 'app:app', '--app-dir', (Join-Path $RepoRoot 'app'),
-        '--host', $fastApiHost, '--port', [string]$fastApiPort, '--log-level', 'info'
-    )
-    if ($reload) {
-        $backendArguments += '--reload'
-    }
-
-    $backendCommandParts = @($VenvPython) + $backendArguments |
-        ForEach-Object { Convert-ToCommandLineArgument -Value ([string]$_) }
-    $backendCommand = '"{0}"' -f ($backendCommandParts -join ' ')
-
-    Write-Step 'Launching backend'
-    $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/k', $backendCommand) `
-        -WorkingDirectory $RepoRoot -WindowStyle Normal -PassThru
-
-    $healthUrl = "http://$fastApiHost`:$fastApiPort/api/health"
-    Write-Info "Waiting up to 60 seconds for $healthUrl"
-    $healthy = Invoke-HealthCheck -Url $healthUrl -Attempts 60 -DelaySeconds 1
-    if (-not $healthy) {
-        if ($backendProcess -and -not $backendProcess.HasExited) {
-            & taskkill.exe /PID $backendProcess.Id /T /F | Out-Null
+    $logRoot = Join-Path $RuntimeCacheDir 'logs'
+    New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+    $backendLog = Join-Path $logRoot 'source-backend.log'
+    $backendErrorLog = Join-Path $logRoot 'source-backend-error.log'
+    foreach ($logPath in @($backendLog, $backendErrorLog)) {
+        if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+            $previousLog = "$logPath.1"
+            Remove-Item -LiteralPath $previousLog -Force -ErrorAction SilentlyContinue
+            Move-Item -LiteralPath $logPath -Destination $previousLog -Force
         }
-        throw "Backend did not become healthy at $healthUrl"
     }
 
-    $backendPid = @(Get-ListeningProcessIds -Port $fastApiPort | Select-Object -First 1)
-    Write-Step 'Launching frontend preview'
-    $previewCommand = '"{0}" run preview -- --host "{1}" --port {2} --strictPort' -f $NpmCmd, $uiHost, $uiPort
-    $previewCommand = '"{0}"' -f $previewCommand
-    $frontendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/c', $previewCommand) `
-        -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
+    $token = [guid]::NewGuid().ToString('N')
+    $environmentNames = @('DILIGENT_DESKTOP', 'DILIGENT_DESKTOP_PORT', 'DILIGENT_DESKTOP_SESSION_SECRET')
+    $previousEnvironment = @{}
+    foreach ($name in $environmentNames) {
+        $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+    }
+    $env:DILIGENT_DESKTOP = 'false'
+    Remove-Item Env:DILIGENT_DESKTOP_PORT -ErrorAction SilentlyContinue
+    $env:DILIGENT_DESKTOP_SESSION_SECRET = $token
+    try {
+        Write-Step 'Starting FastAPI with the built SPA'
+        $backendProcess = Start-Process -FilePath $VenvPython `
+            -ArgumentList @('-u', '-m', 'source_entry', '--host', $fastApiHost, '--port', [string]$fastApiPort) `
+            -WorkingDirectory $ServerDir -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $backendLog -RedirectStandardError $backendErrorLog
+    }
+    finally {
+        foreach ($name in $environmentNames) {
+            if ($null -eq $previousEnvironment[$name]) {
+                Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+            }
+            else {
+                [Environment]::SetEnvironmentVariable($name, [string]$previousEnvironment[$name], 'Process')
+            }
+        }
+    }
 
-    $uiUrl = "http://$uiHost`:$uiPort"
-    Start-Process $uiUrl
+    $script:OwnedApplicationProcess = $backendProcess
+    $script:OwnedApplicationPort = $fastApiPort
+    $script:OwnedApplicationToken = $token
+    $script:OwnedApplicationLog = $backendLog
+    $script:OwnedApplicationErrorLog = $backendErrorLog
+    $script:OwnedApplicationUrl = $origin
 
-    Write-Host ''
-    Write-Ok 'DILIGENT started successfully'
-    Write-Host "Backend: $healthUrl (PID $($backendPid -join ','))"
-    Write-Host "Frontend: $uiUrl (launcher PID $($frontendProcess.Id))"
+    try {
+        $lastReadinessError = 'backend health, SPA entry, or production JavaScript asset was not ready'
+        Write-Info "Waiting up to 60 seconds for health, the SPA entry page, and a built JavaScript asset at $origin"
+        $ready = $false
+        for ($attempt = 1; $attempt -le 60; $attempt++) {
+            $backendProcess.Refresh()
+            if ($backendProcess.HasExited) {
+                throw "Backend exited with code $($backendProcess.ExitCode) before becoming ready. Logs: $backendLog; $backendErrorLog"
+            }
+            try {
+                $health = Invoke-WebRequest -UseBasicParsing -Uri "$origin/api/health" -TimeoutSec 2
+                $page = Invoke-WebRequest -UseBasicParsing -Uri "$origin/" -TimeoutSec 3
+                if ($health.StatusCode -lt 200 -or $health.StatusCode -ge 300 -or
+                    $page.StatusCode -lt 200 -or $page.StatusCode -ge 300) {
+                    throw 'health or SPA entry returned a non-success status'
+                }
+                $assetMatch = [regex]::Match([string]$page.Content, '(?i)\bsrc=["'']([^"'']+\.js(?:\?[^"'']*)?)["'']')
+                if (-not $assetMatch.Success) {
+                    throw 'SPA entry does not reference a JavaScript build asset'
+                }
+                $assetUrl = ([uri]::new([uri]"$origin/", $assetMatch.Groups[1].Value)).AbsoluteUri
+                $asset = Invoke-WebRequest -UseBasicParsing -Uri $assetUrl -TimeoutSec 3
+                if ($asset.StatusCode -ge 200 -and $asset.StatusCode -lt 300) {
+                    $ready = $true
+                    break
+                }
+                throw "built JavaScript asset returned HTTP $($asset.StatusCode)"
+            }
+            catch {
+                $lastReadinessError = $_.Exception.Message
+            }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $ready) {
+            throw "Backend did not become ready at ${origin}: $($lastReadinessError). Logs: $backendLog; $backendErrorLog"
+        }
+
+        Start-Process $origin
+        Write-Host ''
+        Write-Ok 'DILIGENT started successfully'
+        Write-Host "Application: $origin (backend PID $($backendProcess.Id))"
+        Write-Host "Backend logs: $backendLog; $backendErrorLog"
+        Write-Info 'The launcher owns this server. Choose EXIT or press Ctrl+C to stop it.'
+    }
+    catch {
+        $startupError = $_.Exception.Message
+        try { Stop-OwnedApplication } catch { Write-Fatal $_.Exception.Message }
+        throw $startupError
+    }
+}
+
+function Stop-OwnedApplication {
+    $process = $script:OwnedApplicationProcess
+    if ($null -eq $process) { return }
+    $processId = [int]$process.Id
+    $port = [int]$script:OwnedApplicationPort
+    $logDetails = "Logs: $($script:OwnedApplicationLog); $($script:OwnedApplicationErrorLog)"
+    $gracefulError = $null
+    $forced = $false
+    try {
+        $process.Refresh()
+        if (-not $process.HasExited) {
+            try {
+                $response = Invoke-WebRequest -UseBasicParsing `
+                    -Uri "http://127.0.0.1`:$port/api/desktop/shutdown" `
+                    -Method Post -Headers @{ 'X-DILIGENT-Desktop-Session' = $script:OwnedApplicationToken } `
+                    -ContentType 'application/json' -Body '{}' -TimeoutSec 3
+                if ($response.StatusCode -ne 202) {
+                    $gracefulError = "shutdown endpoint returned HTTP $($response.StatusCode)"
+                }
+            }
+            catch {
+                $gracefulError = $_.Exception.Message
+            }
+            if (-not $process.WaitForExit(15000)) {
+                $forced = $true
+                & taskkill.exe /PID $processId /T /F 2>$null | Out-Null
+                $process.WaitForExit(5000) | Out-Null
+            }
+        }
+        $process.Refresh()
+        if (-not $process.HasExited) {
+            throw "Could not stop launcher-owned backend process tree PID $processId. $logDetails"
+        }
+        if ($port -gt 0) {
+            Wait-ForLauncherPorts -Ports @($port) -ExpectedProcessIds @($processId) -Attempts 30 -DelayMilliseconds 200
+        }
+        if ($forced) {
+            Write-Info "Graceful shutdown did not complete; stopped the launcher-owned backend process tree PID $processId. $logDetails"
+        }
+        elseif ($gracefulError) {
+            Write-Info "Backend exited after the shutdown request failed ($gracefulError). $logDetails"
+        }
+        else {
+            Write-Ok "Backend stopped cleanly and port $port is free"
+        }
+    }
+    finally {
+        $process.Refresh()
+        if ($process.HasExited) {
+            $script:OwnedApplicationProcess = $null
+            $script:OwnedApplicationPort = 0
+            $script:OwnedApplicationToken = $null
+            $script:OwnedApplicationLog = $null
+            $script:OwnedApplicationErrorLog = $null
+            $script:OwnedApplicationUrl = $null
+        }
+    }
+}
+
+function Wait-OwnedApplication {
+    $process = $script:OwnedApplicationProcess
+    if ($null -eq $process) { throw 'The backend process was not started.' }
+    while (-not $process.HasExited) {
+        Start-Sleep -Milliseconds 500
+        $process.Refresh()
+    }
+    $exitCode = $process.ExitCode
+    $script:OwnedApplicationProcess = $null
+    $script:OwnedApplicationPort = 0
+    $script:OwnedApplicationToken = $null
+    throw "Backend stopped with exit code $exitCode. Logs: $($script:OwnedApplicationLog); $($script:OwnedApplicationErrorLog)"
 }
 
 # ============================================================
@@ -2066,7 +2200,7 @@ function Test-FrozenBackend {
     foreach ($pair in @{
         DILIGENT_DESKTOP='true'; DILIGENT_DESKTOP_SESSION_SECRET=$sessionSecret; DILIGENT_RELEASE_VERSION=$Version; DILIGENT_RUNTIME_ROOT=(Join-Path $StageRoot 'runtime-stage')
         DILIGENT_DATA_ROOT=$dataRoot
-        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'access-key-material.json'); RELOAD='false'
+        DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'access-key-material.json')
     }.GetEnumerator()) { $psi.Environment[$pair.Key] = [string]$pair.Value }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $psi
@@ -2089,8 +2223,15 @@ function Test-FrozenBackend {
             $exitState = if ($process.HasExited) { "exited with code $($process.ExitCode)" } else { 'still running' }
             throw "Frozen backend health check failed; process was $exitState"
         }
-        if ((Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/" -TimeoutSec 5).StatusCode -ne 200) { throw 'Frozen backend did not serve Angular index' }
-        if ((Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/clinical-sessions" -TimeoutSec 5).StatusCode -ne 200) { throw 'Frozen backend SPA fallback failed' }
+        $preflight = Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" -Method Options `
+            -Headers @{
+                Origin = 'http://tauri.localhost'
+                'Access-Control-Request-Method' = 'GET'
+                'Access-Control-Request-Headers' = 'x-diligent-desktop-session'
+            } -TimeoutSec 5
+        if ($preflight.StatusCode -ne 200 -or $preflight.Headers['Access-Control-Allow-Origin'] -ne 'http://tauri.localhost') {
+            throw 'Frozen backend did not allow the packaged Tauri origin preflight'
+        }
         $unauthorizedStatus = 0
         try {
             Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" -TimeoutSec 5 | Out-Null
@@ -2099,13 +2240,22 @@ function Test-FrozenBackend {
             $unauthorizedStatus = [int]$_.Exception.Response.StatusCode.value__
         }
         if ($unauthorizedStatus -ne 401) { throw "Frozen backend unauthorized API check returned $unauthorizedStatus" }
-        $desktopSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
-        $bootstrapHeaders = @{ Origin = $baseUrl }
+        $bootstrapHeaders = @{ Origin = 'http://tauri.localhost' }
         Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/desktop/bootstrap" -Method Post `
             -Headers $bootstrapHeaders -ContentType 'application/json' -Body (@{ token = $sessionSecret } | ConvertTo-Json) `
-            -WebSession $desktopSession -TimeoutSec 5 | Out-Null
+            -TimeoutSec 5 | Out-Null
+        $invalidHeaders = @{ Origin = 'http://tauri.localhost'; 'X-DILIGENT-Desktop-Session' = 'invalid' }
+        $invalidSessionStatus = 0
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" -Headers $invalidHeaders -TimeoutSec 5 | Out-Null
+        }
+        catch {
+            $invalidSessionStatus = [int]$_.Exception.Response.StatusCode.value__
+        }
+        if ($invalidSessionStatus -ne 401) { throw "Frozen backend invalid session check returned $invalidSessionStatus" }
+        $desktopSessionHeaders = @{ Origin = 'http://tauri.localhost'; 'X-DILIGENT-Desktop-Session' = $sessionSecret }
         $authorizedConfig = Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/model-config" `
-            -WebSession $desktopSession -TimeoutSec 30
+            -Headers $desktopSessionHeaders -TimeoutSec 30
         if ($authorizedConfig.StatusCode -ne 200) { throw 'Frozen backend authorized model-config check failed' }
         $databasePath = Join-Path $dataRoot 'database.db'
         if (-not (Test-Path -LiteralPath $databasePath -PathType Leaf)) {
@@ -2114,7 +2264,11 @@ function Test-FrozenBackend {
         if ((Get-Item -LiteralPath $databasePath).Length -le 0) {
             throw 'Frozen backend created an empty SQLite database during startup'
         }
-        Write-Ok 'Frozen backend smoke test passed, including first-run database initialization'
+        $shutdown = Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/api/desktop/shutdown" -Method Post `
+            -Headers $desktopSessionHeaders -ContentType 'application/json' -Body '{}' -TimeoutSec 5
+        if ($shutdown.StatusCode -ne 202) { throw 'Frozen backend rejected its authenticated shutdown request' }
+        if (-not $process.WaitForExit(10000)) { throw 'Frozen backend did not stop through the graceful shutdown route' }
+        Write-Ok 'Frozen backend smoke passed: exact-origin CORS, header session, API access, first-run database, and graceful shutdown'
     }
     finally {
         if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit(10000) | Out-Null }
@@ -2129,11 +2283,9 @@ function New-DesktopRuntimeArchive {
     $payloadRoot = Join-Path $StageRoot 'runtime-stage'
     New-Item -ItemType Directory -Path $payloadRoot -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $StageRoot 'backend') -Destination (Join-Path $payloadRoot 'backend') -Recurse
-    foreach ($relative in @('app/client/dist/browser', 'data/catalogs', 'settings')) {
+    foreach ($relative in @('data/catalogs', 'settings')) {
         New-Item -ItemType Directory -Path (Join-Path $payloadRoot $relative) -Force | Out-Null
     }
-    $frontendOutputRoot = if ($script:DesktopFrontendOutputDir) { Join-Path $script:DesktopFrontendOutputDir 'browser' } else { Join-Path $ClientDir 'dist/browser' }
-    Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination (Join-Path $payloadRoot 'app/client/dist/browser') -Recurse -Force
     Copy-Item -Path (Join-Path $RepoRoot 'data/catalogs/*') -Destination (Join-Path $payloadRoot 'data/catalogs') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'settings/.env.example') -Destination (Join-Path $payloadRoot 'settings/.env.example')
     $runtimeOutput = Join-Path $StageRoot 'runtime/diligent-runtime.zip'
@@ -2153,10 +2305,27 @@ function New-DesktopRuntimeArchive {
     Write-Info "Runtime archive is ready for OUT_DIR embedding: $runtimeOutput"
 }
 
+function New-TauriFrontendAssets {
+    param([Parameter(Mandatory = $true)][string]$StageRoot)
+    $frontendRoot = Join-Path $StageRoot 'tauri-frontend'
+    $frontendOutputRoot = Join-Path $script:DesktopFrontendOutputDir 'browser'
+    if (-not (Test-Path -LiteralPath (Join-Path $frontendOutputRoot 'index.html') -PathType Leaf)) {
+        throw "Desktop Angular build is missing its entry page: $frontendOutputRoot"
+    }
+    New-Item -ItemType Directory -Path $frontendRoot -Force | Out-Null
+    Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination $frontendRoot -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $DesktopDir 'splash/index.html') -Destination (Join-Path $frontendRoot 'splash.html') -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $frontendRoot 'splash.html') -PathType Leaf)) {
+        throw 'Tauri startup splash was not staged with the Angular assets.'
+    }
+    return $frontendRoot
+}
+
 function New-TauriReleaseConfiguration {
-    param([Parameter(Mandatory = $true)][string]$Version)
+    param([Parameter(Mandatory = $true)][string]$Version, [Parameter(Mandatory = $true)][string]$FrontendOutputDir)
     $configuration = Get-Content -LiteralPath (Join-Path $DesktopTauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json
     $configuration.version = $Version
+    $configuration.build.frontendDist = [IO.Path]::GetFullPath($FrontendOutputDir)
     $configuration.bundle | Add-Member -MemberType NoteProperty -Name 'icon' -Value @(
         (Join-Path $DesktopTauriDir 'icons/icon.ico'),
         (Join-Path $DesktopTauriDir 'icons/32x32.png'),
@@ -2305,10 +2474,11 @@ function Build-DesktopRelease {
     try {
         Initialize-DesktopBuildDependencies
         Build-DesktopFrontend
+        $tauriFrontendRoot = New-TauriFrontendAssets -StageRoot $stageRoot
         Build-DesktopBackend -StageRoot $stageRoot
         New-DesktopRuntimeArchive -StageRoot $stageRoot -Version $resolvedVersion -DirtyTree $dirtyTree
         Test-FrozenBackend -StageRoot $stageRoot -Version $resolvedVersion
-        $configuration = New-TauriReleaseConfiguration -Version $resolvedVersion
+        $configuration = New-TauriReleaseConfiguration -Version $resolvedVersion -FrontendOutputDir $tauriFrontendRoot
         Build-TauriApplication -ConfigurationPath $configuration -Version $resolvedVersion
         Publish-DesktopArtifacts -Version $resolvedVersion
         Write-Ok "Desktop release $resolvedVersion built under $DesktopArtifactsDir"
@@ -2561,72 +2731,80 @@ function Invoke-RemoveDesktopReleaseMenu {
     Remove-DesktopRelease -Interactive
 }
 
-if ($Action) {
-    Invoke-TrackedLauncherAction -Name "action $Action" -Operation {
-        switch ($Action) {
-            'Launch' { Start-Application }
-            'Install' { Install-OrUpdateApplication }
-            'RebuildFrontend' { Rebuild-Frontend }
-            'InitializeDatabase' { Initialize-Database }
-            'Test' { Invoke-TestSuite }
-            'ClearCache' { Clear-ApplicationCache }
-            'Uninstall' { Uninstall-Application }
-            'Update' { Update-Application }
-            'CheckForUpdates' { Check-ForUpdates }
-            'RemoveAllData' { Remove-AllData }
-            'KillApplicationProcesses' { Stop-ApplicationProcesses }
-            'BuildDesktopRelease' { Build-DesktopRelease }
-            'RemoveDesktopRelease' { Remove-DesktopRelease }
-        }
-    }
-    exit 0
-}
-
-while ($true) {
-    $entries = @(Show-MainMenu)
-    $maxOption = $entries.Count
-    $rawSelection = Read-Host "Select an option (1-$maxOption)"
-    if ($null -eq $rawSelection) {
-        exit 0
-    }
-    $selection = $rawSelection.Trim()
-
-    if ($selection -notmatch '^[1-9][0-9]*$' -or [int]$selection -lt 1 -or [int]$selection -gt $maxOption) {
-        Write-Fatal "Select a number from 1 through $maxOption."
-        Wait-ForMenu
-        continue
-    }
-    $entry = $entries[[int]$selection - 1]
-    if ($entry.Key -eq 'Exit') { break }
-
-    try {
-        Invoke-TrackedLauncherAction -Name $entry.Label -Operation {
-            switch ($entry.Key) {
+try {
+    if ($Action) {
+        Invoke-TrackedLauncherAction -Name "action $Action" -Operation {
+            switch ($Action) {
                 'Launch' {
                     Start-Application
-                    exit 0
+                    Wait-OwnedApplication
                 }
                 'Install' { Install-OrUpdateApplication }
-                'Rebuild' { Rebuild-Frontend }
-                'Database' { Initialize-Database }
-                'Tests' { Invoke-TestSuite }
-                'Check' { Check-ForUpdates }
-                'Update' { Update-Application }
-                'CreateRelease' { Invoke-CreateDesktopReleaseMenu }
-                'RemoveRelease' { Invoke-RemoveDesktopReleaseMenu }
-                'Logs' { Remove-ApplicationLogs }
-                'Cache' { Clear-ApplicationCache }
-                'AllData' { Remove-AllData }
+                'RebuildFrontend' { Rebuild-Frontend }
+                'InitializeDatabase' { Initialize-Database }
+                'Test' { Invoke-TestSuite }
+                'ClearCache' { Clear-ApplicationCache }
                 'Uninstall' { Uninstall-Application }
+                'Update' { Update-Application }
+                'CheckForUpdates' { Check-ForUpdates }
+                'RemoveAllData' { Remove-AllData }
                 'KillApplicationProcesses' { Stop-ApplicationProcesses }
+                'BuildDesktopRelease' { Build-DesktopRelease }
+                'RemoveDesktopRelease' { Remove-DesktopRelease }
             }
         }
     }
-    catch {
-        Write-Fatal $_.Exception.Message
-        Clear-LauncherProgress
-    }
+    else {
+        while ($true) {
+            $entries = @(Show-MainMenu)
+            $maxOption = $entries.Count
+            $rawSelection = Read-Host "Select an option (1-$maxOption)"
+            if ($null -eq $rawSelection) { break }
+            $selection = $rawSelection.Trim()
 
-    Wait-ForMenu
+            if ($selection -notmatch '^[1-9][0-9]*$' -or [int]$selection -lt 1 -or [int]$selection -gt $maxOption) {
+                Write-Fatal "Select a number from 1 through $maxOption."
+                Wait-ForMenu
+                continue
+            }
+            $entry = $entries[[int]$selection - 1]
+            if ($entry.Key -eq 'Exit') { break }
+
+            try {
+                Invoke-TrackedLauncherAction -Name $entry.Label -Operation {
+                    switch ($entry.Key) {
+                        'Launch' { Start-Application }
+                        'Install' { Install-OrUpdateApplication }
+                        'Rebuild' { Rebuild-Frontend }
+                        'Database' { Initialize-Database }
+                        'Tests' { Invoke-TestSuite }
+                        'Check' { Check-ForUpdates }
+                        'Update' { Update-Application }
+                        'CreateRelease' { Invoke-CreateDesktopReleaseMenu }
+                        'RemoveRelease' { Invoke-RemoveDesktopReleaseMenu }
+                        'Logs' { Remove-ApplicationLogs }
+                        'Cache' { Clear-ApplicationCache }
+                        'AllData' { Remove-AllData }
+                        'Uninstall' { Uninstall-Application }
+                        'KillApplicationProcesses' { Stop-ApplicationProcesses }
+                    }
+                }
+            }
+            catch {
+                Write-Fatal $_.Exception.Message
+                Clear-LauncherProgress
+            }
+
+            Wait-ForMenu
+        }
+    }
+}
+finally {
+    try {
+        Stop-OwnedApplication
+    }
+    catch {
+        Write-Fatal "Application shutdown failed: $($_.Exception.Message)"
+    }
 }
 Clear-LauncherProgress

@@ -4,6 +4,7 @@
 import { HTTP_TIMEOUT_SECONDS } from "../constants";
 import { ApiResult } from "../models/types";
 import { isRecord } from "../utils";
+import { getDesktopSessionToken } from "./desktop-session";
 
 export const HTTP_TIMEOUT = HTTP_TIMEOUT_SECONDS;
 export const GENERIC_REQUEST_ERROR = "[ERROR] Request could not be completed. Please try again.";
@@ -144,7 +145,12 @@ export async function fetchWithTimeout(
   const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const headers = new Headers(options.headers);
+    const sessionToken = getDesktopSessionToken();
+    if (sessionToken) {
+      headers.set("X-DILIGENT-Desktop-Session", sessionToken);
+    }
+    return await fetch(url, { ...options, headers, signal: controller.signal });
   } catch (error) {
     throw new Error(normalizeThrownError(error, GENERIC_REQUEST_ERROR));
   } finally {

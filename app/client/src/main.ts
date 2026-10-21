@@ -4,6 +4,8 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
+import { API_BASE_URL, configureDesktopApiOrigin } from './app/core/constants';
+import { setDesktopSessionToken } from './app/core/services/desktop-session';
 
 const DESKTOP_BOOTSTRAP_PREFIX = '#desktop-bootstrap=';
 
@@ -18,25 +20,28 @@ async function bootstrapDesktopSession(): Promise<void> {
   }
 
   const bootstrapHash = window.location.hash;
-  window.history.replaceState(
-    null,
-    document.title,
-    window.location.pathname + window.location.search,
-  );
   const token = decodeURIComponent(bootstrapHash.slice(DESKTOP_BOOTSTRAP_PREFIX.length));
   if (!token) {
     throw new Error('Missing desktop bootstrap token');
   }
+  const apiOrigin = new URLSearchParams(window.location.search).get('apiOrigin');
+  if (!apiOrigin) {
+    throw new Error('Missing desktop API origin');
+  }
+  configureDesktopApiOrigin(apiOrigin);
+  window.history.replaceState(null, document.title, window.location.pathname);
 
-  const response = await fetch('/api/desktop/bootstrap', {
+  const response = await fetch(`${API_BASE_URL}/desktop/bootstrap`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
+    mode: 'cors',
+    credentials: 'omit',
     body: JSON.stringify({ token }),
   });
   if (!response.ok) {
     throw new Error('Desktop session bootstrap failed');
   }
+  setDesktopSessionToken(token);
 }
 
 async function startApplication(): Promise<void> {

@@ -34,10 +34,10 @@ FORBIDDEN_PARTS = {
     "testing",
 }
 REQUIRED_FILES = {
-    "app/client/dist/browser/index.html",
     "data/catalogs/llm_model_capabilities.json",
     "b/DILIGENTBackend.exe",
 }
+FORBIDDEN_PREFIXES = ("app/client/dist/browser/",)
 
 
 def _sha256(payload: bytes) -> str:
@@ -105,6 +105,13 @@ def validate_archive(archive_path: str, version: str) -> dict[str, Any]:
             total_size += len(payload)
 
         archive_names = set(names)
+        bundled_frontend = sorted(
+            name for name in archive_names if name.startswith(FORBIDDEN_PREFIXES)
+        )
+        if bundled_frontend:
+            raise RuntimeError(
+                f"frontend assets must be packaged by Tauri, not the runtime archive: {bundled_frontend[:3]}"
+            )
         expected_names = manifest_names | {"runtime-manifest.json"}
         unexpected = sorted(archive_names - expected_names)
         missing = sorted(expected_names - archive_names)

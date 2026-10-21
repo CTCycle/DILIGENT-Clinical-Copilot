@@ -167,7 +167,12 @@ function Wait-Http([string]$uri, [int]$timeoutSeconds = 60) {
     throw "Timed out waiting for $uri. Last error: $lastError"
 }
 
-function Wait-HttpStatus([string]$uri, [int]$expectedStatus, [int]$timeoutSeconds = 60) {
+function Wait-HttpStatus(
+    [string]$uri,
+    [int]$expectedStatus,
+    [int]$timeoutSeconds = 60,
+    [hashtable]$Headers = @{}
+) {
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     $lastStatus = $null
     $lastError = $null
@@ -181,6 +186,7 @@ function Wait-HttpStatus([string]$uri, [int]$expectedStatus, [int]$timeoutSecond
                 Uri = $uri
                 TimeoutSec = 5
             }
+            if ($Headers.Count -gt 0) { $invokeArguments.Headers = $Headers }
             if ((Get-Command Invoke-WebRequest).Parameters.ContainsKey('SkipHttpErrorCheck')) {
                 $invokeArguments.SkipHttpErrorCheck = $true
             }
@@ -244,10 +250,7 @@ function Wait-ReadyPayload(
 }
 
 function Assert-PackagedApiSurface([string]$baseUri) {
-    $publicPaths = @(
-        '/',
-        '/api/health'
-    )
+    $publicPaths = @('/api/health')
     foreach ($path in $publicPaths) {
         $response = Wait-Http ($baseUri.TrimEnd('/') + $path)
         if ($response.StatusCode -ne 200) {
@@ -266,6 +269,28 @@ function Assert-PackagedApiSurface([string]$baseUri) {
         if ($response.StatusCode -ne 401) {
             throw "Packaged API $path returned HTTP $($response.StatusCode), expected the unauthenticated desktop boundary HTTP 401."
         }
+    }
+
+    $preflight = Invoke-WebRequest -UseBasicParsing `
+        -Uri ($baseUri.TrimEnd('/') + '/api/model-config') -Method Options -Headers @{
+            Origin = 'http://tauri.localhost'
+            'Access-Control-Request-Method' = 'GET'
+            'Access-Control-Request-Headers' = 'x-diligent-desktop-session'
+        } -TimeoutSec 5
+    if ($preflight.StatusCode -ne 200 -or
+        $preflight.Headers['Access-Control-Allow-Origin'] -ne 'http://tauri.localhost' -or
+        $preflight.Headers['Access-Control-Allow-Credentials'] -eq 'true') {
+        throw 'Packaged API did not accept an exact-origin Tauri session-header preflight.'
+    }
+    $rejected = Wait-HttpStatus `
+        -uri ($baseUri.TrimEnd('/') + '/api/model-config') -expectedStatus 400 -timeoutSeconds 5 `
+        -Headers @{
+            Origin = $baseUri
+            'Access-Control-Request-Method' = 'GET'
+            'Access-Control-Request-Headers' = 'x-diligent-desktop-session'
+        }
+    if ($rejected.StatusCode -ne 400) {
+        throw 'Packaged API accepted a preflight from a non-Tauri origin.'
     }
 }
 

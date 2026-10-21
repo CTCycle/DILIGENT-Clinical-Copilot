@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-10-18
+Last updated: 2026-10-21
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -39,18 +39,13 @@ The portable executable uses the system WebView2 runtime. The standard MSI uses 
 The canonical runtime uses only the pinned Granite 97M multilingual ONNX artifact at `runtimes/cache/embeddings/<revision>/onnx/model_quint8_avx2.onnx` in source mode, or the equivalent packaged `data/cache/embeddings` path. A missing cache requires network access followed by a RAG rebuild. A dependency error requires reinstalling the synchronized Python environment. For an invalid digest or incomplete snapshot, remove only that revision directory and rebuild. The runtime never substitutes another artifact or backend; disable RAG for the current assessment while repairing the cache.
 
 ## Expected Local Ports
-- Backend: `127.0.0.1:7690`
-- Frontend: `127.0.0.1:9847`
+- Production source SPA and API: `127.0.0.1:7690`
+- Angular development UI: `127.0.0.1:9847`
 
-The source launcher checks both ports immediately before creating application
-processes. It lists one entry per unique owning PID, including foreign
-processes, and includes every configured port held by that PID. An interactive
-launch asks once whether those listed PIDs should be terminated directly. A
-decline or noninteractive launch terminates nothing. If a holder exits before
-the confirmation completes, a fresh scan avoids an unnecessary termination.
-After an accepted termination request, the current listener map is authoritative:
-an access-denied PID, a replacement holder, or any remaining listener aborts
-launch with its current PID/port mapping.
+The production launcher checks only the configured API port before starting
+FastAPI. It lists the owning PID and asks once before attempting to stop it; a
+decline or noninteractive launch leaves the listener untouched and aborts. The
+Angular development server uses `UI_PORT` separately.
 
 For stale repository-owned DILIGENT process trees, the explicit cleanup action
 remains available from an interactive PowerShell console:
@@ -78,31 +73,20 @@ Python, documentation, and QA files do not cause an Angular production rebuild.
 Use `-Action RebuildFrontend` for an unconditional rebuild, or
 `-Action Install` to resynchronize all install dependencies and rebuild.
 
-## Frontend Exits With Backend-unreachable Error
-### Symptom
-Frontend preview reports:
+## Source SPA is blank or a built asset returns 404
 
-```text
-Configured backend is unreachable at http://127.0.0.1:7690
-```
-
-### Cause
-`app/client/scripts/preview-server.mjs` validates backend availability before serving the UI.
-
-### Fix
-1. Start the backend first.
-2. Verify backend health:
+The production FastAPI server serves `index.html`, JavaScript, CSS, and `/assets/*`
+from `app/client/dist/browser`. Check the source backend logs under
+`runtimes/cache/logs/`, then confirm the build is current:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7690/docs
+.\start_on_windows.ps1 -Action RebuildFrontend
 ```
 
-3. Launch frontend preview only after the backend responds:
-
-```powershell
-Set-Location app/client
-npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
-```
+The launcher rebuilds automatically when its build-state marker is missing or
+stale. It prepares Node only for that rebuild. A client-side route should return
+the SPA entry page; a missing `.js`, `.css`, or other static asset is a 404. An
+unknown `/api/*` path remains an API 404.
 
 ## Backend Fails To Bind With WinError 10048
 ### Symptom
@@ -138,31 +122,31 @@ Get-Process -Id <PID>
 .\start_on_windows.ps1 -Action KillApplicationProcesses
 ```
 
-4. If `http://127.0.0.1:7690/api/health` returns `200` and the owning process is the repository backend, reuse the existing server instead of starting a duplicate:
+4. If the health endpoint returns `200` and the service is the one you want to use, decline the launcher stop prompt and open its configured backend origin directly. The launcher does not attach to an existing process:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7690/api/health
 Get-Process -Id <PID> | Select-Object Id,ProcessName,Path
 ```
 
-5. Stop the stale or unrelated process only when the health probe fails or the process is not the intended backend:
+5. If the holder is a stale DILIGENT process tree, use the launcher cleanup action. For a different service, stop it through its own process or service manager.
 
-```powershell
-Stop-Process -Id <PID> -Force
-```
-
-6. Restart the backend.
+6. Restart the source launcher.
 
 ## Backend Startup Is Inconsistent
 ### Symptom
 Backend startup works only from some directories or only with specific commands.
 
-### Reliable Command
-From repository root:
+### Backend development command
+From repository root, start FastAPI with reload:
 
 ```powershell
-app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app --host 127.0.0.1 --port 7690 --log-level info
+Set-Location app/server
+.\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 7690 --reload --log-level info
 ```
+
+In a second terminal, run `npm run dev` from `app/client`. The development UI
+uses `UI_PORT` and proxies `/api` to FastAPI.
 
 ## SQLite Fails With `disk I/O error`
 ### Symptom
@@ -255,7 +239,7 @@ Set-Location app/client
 ..\..\runtimes\nodejs\npm.cmd run dev
 ```
 
-3. Verify the dev server is listening on the configured UI port:
+3. Verify the development UI is listening on the configured UI port:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9847

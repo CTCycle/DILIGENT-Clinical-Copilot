@@ -82,6 +82,7 @@ def run_desktop_backend(*, ready_file: Path, host: str = "127.0.0.1") -> None:
             workers=1,
             log_level="info",
             access_log=False,
+            timeout_graceful_shutdown=5,
         )
         server = uvicorn.Server(config)
         get_desktop_runtime_service().attach_server(server)

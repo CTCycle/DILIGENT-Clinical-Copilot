@@ -10,7 +10,7 @@ mod windows_job;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
+    Mutex,
 };
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use uuid::Uuid;
@@ -43,13 +43,17 @@ fn main() {
         })
         .setup(|app| {
             let version = app.package_info().version.to_string();
-            let backend_origin = Arc::new(Mutex::new(None));
+            let initial_page = if cfg!(debug_assertions) {
+                "index.html"
+            } else {
+                "splash.html"
+            };
             let window =
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App(initial_page.into()))
                     .title("DILIGENT Clinical Copilot")
                     .inner_size(1440.0, 960.0)
                     .visible(true)
-                    .on_navigation(navigation::navigation_handler(backend_origin.clone()))
+                    .on_navigation(navigation::navigation_handler())
                     .build()
                     .map_err(std::io::Error::other)?;
             window.show().map_err(std::io::Error::other)?;
@@ -71,14 +75,12 @@ fn main() {
                             return;
                         }
                         let base_url = process.base_url().to_owned();
-                        if let Ok(mut origin) = backend_origin.lock() {
-                            *origin = Some(base_url.clone());
-                        }
                         if let Ok(mut state) = app_handle.state::<BackendState>().0.lock() {
                             *state = Some(process);
                         }
+                        let encoded_origin = base_url.replace(':', "%3A").replace('/', "%2F");
                         let bootstrap_url = format!(
-                            "{base_url}/#desktop-bootstrap={session_secret}"
+                            "http://tauri.localhost/?apiOrigin={encoded_origin}#desktop-bootstrap={session_secret}"
                         );
                         let navigation_result = bootstrap_url
                             .parse()

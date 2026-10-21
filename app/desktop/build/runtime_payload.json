@@ -1,7 +1,6 @@
 {
   "entries": [
     { "source": "backend", "destination": "b", "required": true },
-    { "source": "app/client/dist/browser", "destination": "app/client/dist/browser", "required": true },
     { "source": "data/catalogs/clinical_extraction.json", "destination": "data/catalogs/clinical_extraction.json", "required": true },
     { "source": "data/catalogs/cloud_providers.json", "destination": "data/catalogs/cloud_providers.json", "required": true },
     { "source": "data/catalogs/dili_assessment.json", "destination": "data/catalogs/dili_assessment.json", "required": true },
