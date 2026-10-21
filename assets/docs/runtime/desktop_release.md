@@ -1,5 +1,5 @@
 # Windows Desktop Release
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Published release: v3.5.0
 
@@ -54,7 +54,7 @@ Clinical-session attachments and patient profile images use normal HTML file inp
 Build on Windows x64 with Rust/Cargo, the Windows C++ build tools, network access for dependencies and the WebView2 bootstrapper, and the repository launcher for pinned runtimes. Set the version to the synchronized source manifest version:
 
 ~~~powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.5.0 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.5.1 -DesktopTarget All
 ~~~
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` to build one artifact. `-OfflineWebView2` applies only to MSI builds. Release builds require a clean worktree unless `-AllowDirtyTree` is supplied intentionally and recorded.
@@ -69,7 +69,7 @@ For a local portable startup check, verify the EXE against its SHA-256 manifest,
 
 The release workflow is .github/workflows/release.yml. It is manually dispatched with mode=prepare or mode=publish; pushing a tag alone does not publish a release.
 
-Preparation runs the required backend quality and migration checks, SQLite/PostgreSQL persistence, frontend tests/build, the Windows Full browser harness, the LiveProvider lane, dependency audits, artifact checks, portable/deep-path smoke, and the MSI install/launch/uninstall/reinstall lifecycle. It produces checksums and an immutable candidate receipt. Candidate workflow artifacts expire after 30 days; an expired candidate must be prepared and accepted again. The current release gate does not exercise migration from databases stamped with removed historical revisions; those databases require deliberate recreation or an administrative conversion before use.
+Preparation runs the required backend quality and migration checks, SQLite/PostgreSQL persistence, frontend tests/build, the Windows Full browser harness, the LiveProvider lane, dependency audits, artifact checks, portable/deep-path smoke, the MSI install/launch/uninstall/reinstall lifecycle, and a populated MSI upgrade from the published v3.5.0 package. The upgrade fixture verifies session, configuration, timeline, and source-catalog data remain intact at the current migration head. It produces checksums and an immutable candidate receipt. Candidate workflow artifacts expire after 30 days; an expired candidate must be prepared and accepted again. Populated databases without a revision and databases with unknown or divergent revisions remain unsupported and are rejected without stamping.
 
 Keep OPENCODE_GO_API_KEY in the GitHub secret store for LiveProvider E2E. Never put it in local evidence or logs.
 
