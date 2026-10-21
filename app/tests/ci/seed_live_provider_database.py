@@ -14,11 +14,11 @@ SERVER_ROOT = Path(__file__).resolve().parents[2] / "server"
 if str(SERVER_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVER_ROOT))
 
-from configurations.startup import get_server_settings
-from repositories.context import RepositoryContext
-from repositories.database.initializer import initialize_sqlite_database
-from repositories.drug_catalog_repository import DrugCatalogRepository
-from repositories.knowledge_repository import KnowledgeRepository
+from configurations.startup import get_server_settings  # noqa: E402
+from repositories.context import RepositoryContext  # noqa: E402
+from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
+from repositories.drug_catalog_repository import DrugCatalogRepository  # noqa: E402
+from repositories.knowledge_repository import KnowledgeRepository  # noqa: E402
 
 
 def seed_live_provider_database() -> tuple[int, int]:
