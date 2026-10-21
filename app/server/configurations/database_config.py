@@ -11,9 +11,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import unquote, urlparse
 
-from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from common import paths
@@ -21,26 +19,6 @@ from domain.settings.configuration import DatabaseSettings
 
 DATABASE_CONFIG_FILE_PATH = paths.DATA_PATH / "database_config.json"
 DATABASE_CONFIG_SCHEMA_VERSION = 1
-LEGACY_DATABASE_ENVIRONMENT_KEYS = frozenset(
-    {
-        "EMBEDDED_DATABASE",
-        "DATABASE_BACKEND",
-        "DATABASE_URL",
-        "DATABASE_SQLITE_PATH",
-        "DILIGENT_SQLITE_PATH",
-        "DATABASE_ENGINE",
-        "DATABASE_HOST",
-        "DATABASE_PORT",
-        "DATABASE_NAME",
-        "DATABASE_USERNAME",
-        "DATABASE_PASSWORD",
-        "DATABASE_SSL",
-        "DATABASE_SSL_CA",
-        "DATABASE_CONNECT_TIMEOUT",
-        "DATABASE_WRITE_BATCH_SIZE",
-        "DATABASE_READ_PAGE_SIZE",
-    }
-)
 
 
 ###############################################################################
@@ -183,98 +161,6 @@ def default_database_configuration() -> DatabaseConfiguration:
 
 
 ###############################################################################
-def _legacy_values() -> dict[str, str]:
-    result: dict[str, str] = {}
-    if paths.ENV_FILE_PATH.is_file():
-        for key, value in dotenv_values(paths.ENV_FILE_PATH).items():
-            if key in LEGACY_DATABASE_ENVIRONMENT_KEYS and value is not None:
-                result[key] = str(value)
-    for key in LEGACY_DATABASE_ENVIRONMENT_KEYS:
-        value = os.environ.get(key)
-        if value is not None:
-            result[key] = value
-    return result
-
-
-###############################################################################
-def _legacy_database_configuration(values: dict[str, str]) -> DatabaseConfiguration:
-    embedded = values.get("EMBEDDED_DATABASE", "").strip().lower()
-    backend = values.get("DATABASE_BACKEND", "").strip().lower()
-    if embedded:
-        if embedded not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
-            raise RuntimeError("Legacy EMBEDDED_DATABASE must be a boolean value.")
-        backend = "sqlite" if embedded in {"true", "1", "yes", "on"} else "postgresql"
-    if not backend:
-        backend = "postgresql" if values.get("DATABASE_URL") else "sqlite"
-    if backend not in {"sqlite", "postgresql"}:
-        raise RuntimeError("Legacy database backend is not supported.")
-
-    url = urlparse(values.get("DATABASE_URL", ""))
-    sqlite_path = (
-        values.get("DILIGENT_SQLITE_PATH")
-        or values.get("DATABASE_SQLITE_PATH")
-        or str(paths.DATA_PATH / "database.db")
-    )
-    if backend == "sqlite":
-        return DatabaseConfiguration(
-            backend="sqlite",
-            sqlite_path=str(Path(sqlite_path).expanduser().resolve()),
-            connect_timeout=_legacy_int(values.get("DATABASE_CONNECT_TIMEOUT"), 10, 1, 300),
-            write_batch_size=_legacy_int(values.get("DATABASE_WRITE_BATCH_SIZE"), 1000, 1, 100000),
-            read_page_size=_legacy_int(values.get("DATABASE_READ_PAGE_SIZE"), 1000, 100, 100000),
-        )
-
-    password = values.get("DATABASE_PASSWORD")
-    if password is None and url.password is not None:
-        password = unquote(url.password)
-    protected = protect_database_password(password) if password else None
-    scheme = values.get("DATABASE_ENGINE") or url.scheme or "postgresql+psycopg"
-    if scheme in {"postgres", "postgresql"}:
-        scheme = "postgresql+psycopg"
-    return DatabaseConfiguration(
-        backend="postgresql",
-        sqlite_path=None,
-        engine=scheme,
-        host=values.get("DATABASE_HOST") or url.hostname,
-        port=_legacy_int(values.get("DATABASE_PORT"), url.port or 5432, 1, 65535),
-        database_name=values.get("DATABASE_NAME") or (url.path.lstrip("/") or None),
-        username=values.get("DATABASE_USERNAME") or (unquote(url.username) if url.username else None),
-        password_protected=protected,
-        ssl=values.get("DATABASE_SSL", "").strip().lower() in {"true", "1", "yes", "on"},
-        ssl_ca=values.get("DATABASE_SSL_CA") or None,
-        connect_timeout=_legacy_int(values.get("DATABASE_CONNECT_TIMEOUT"), 10, 1, 300),
-        write_batch_size=_legacy_int(values.get("DATABASE_WRITE_BATCH_SIZE"), 1000, 1, 100000),
-        read_page_size=_legacy_int(values.get("DATABASE_READ_PAGE_SIZE"), 1000, 100, 100000),
-    )
-
-
-###############################################################################
-def _legacy_int(value: str | None, default: int, minimum: int, maximum: int) -> int:
-    try:
-        resolved = int(value) if value else default
-    except (TypeError, ValueError):
-        resolved = default
-    return min(max(resolved, minimum), maximum)
-
-
-###############################################################################
-def _scrub_legacy_environment_file() -> None:
-    path = paths.ENV_FILE_PATH
-    if not path.is_file():
-        return
-    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-    kept = [
-        line
-        for line in lines
-        if line.split("=", maxsplit=1)[0].strip().removeprefix("export ")
-        not in LEGACY_DATABASE_ENVIRONMENT_KEYS
-    ]
-    if len(kept) == len(lines):
-        return
-    _atomic_write(path, "".join(kept).encode("utf-8"), secure=False)
-
-
-###############################################################################
 def _atomic_write(path: Path, content: bytes, *, secure: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
@@ -303,7 +189,6 @@ def load_database_configuration() -> DatabaseConfiguration:
             stored = DatabaseConfigurationFile.model_validate(parsed)
             # Decryption here fails closed before any database initialization.
             unprotect_database_password(stored.database.password_protected)
-            _scrub_legacy_environment_file()
             return stored.database
         except (OSError, json.JSONDecodeError, ValidationError, RuntimeError) as exc:
             raise RuntimeError(
@@ -311,10 +196,9 @@ def load_database_configuration() -> DatabaseConfiguration:
                 f"Repair {path} before starting the application."
             ) from exc
 
-    legacy = _legacy_database_configuration(_legacy_values())
-    save_database_configuration(legacy)
-    _scrub_legacy_environment_file()
-    return legacy
+    defaults = default_database_configuration()
+    save_database_configuration(defaults)
+    return defaults
 
 
 ###############################################################################

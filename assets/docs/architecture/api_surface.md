@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-10-01
+Last updated: 2026-10-21
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -10,9 +10,8 @@ explicit GET/status operations.
 The persisted role assignments are independent: `clinical_model`,
 `text_extraction_model`, `revision_model`, and `timeline_model`. Revision and
 Timeline job requests do not accept active model overrides; each job resolves
-its configured role when it starts. Older configuration payloads are migrated
-with Revision falling back to the clinical role and Timeline falling back to
-the extraction role (or the shared cloud model in cloud mode).
+its configured role when it starts. Cloud model descriptors expose capability
+data through the canonical `model_capabilities` object only.
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -150,9 +149,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - Timeline deletion is scoped by both session and timeline identifiers and returns 404
   when that exact persisted timeline does not exist.
 - Clinical and inspection workflows rely on job polling for long-running work.
-  Angular feature trackers use the shared `JobPollingService`; the old
-  duplicate polling helper in `clinical-api.ts` is no longer part of the
-  client surface.
+  Angular feature trackers use the shared `JobPollingService`.
 - Revision jobs expose the implemented bounded revision workflow: start and
   status, persisted run/context/plan/step/tool-trace/artifact reads, draft
   report validation, QA, optional `agentic_revision` session creation, and

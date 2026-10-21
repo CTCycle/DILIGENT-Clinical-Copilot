@@ -69,10 +69,9 @@ describe('AppStateService', () => {
     expect(service.state().diliAgent.isRunning).toBe(false);
   });
 
-  it('maps canonical and legacy configuration routes to Settings', () => {
+  it('maps configuration routes to Settings', () => {
     expect(resolvePageIdFromPath('/settings/general')).toBe('settings');
     expect(resolvePageIdFromPath('/settings/models')).toBe('settings');
-    expect(resolvePageIdFromPath('/model-config')).toBe('settings');
     expect(resolvePathFromPage('settings')).toBe('/settings/general');
   });
 });

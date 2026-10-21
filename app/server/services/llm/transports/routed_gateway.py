@@ -12,7 +12,7 @@ import httpx
 
 from common.utils.logger import logger
 from common.version import resolve_application_version
-from domain.llm.providers import CloudModelDescriptor
+from domain.llm.providers import CloudModelDescriptor, ModelCapabilityMetadata
 from domain.llm.transports import (
     ChatMessage,
     ChatRequest,
@@ -30,7 +30,7 @@ from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 from services.llm.model_capabilities import (
     catalog_capability_metadata,
-    resolve_endpoint_family,
+    resolve_model_capabilities,
 )
 
 ###############################################################################
@@ -192,7 +192,9 @@ class RoutedGatewayTransport(StructuredTransportMixin):
                     id=model,
                     display_name=model,
                     endpoint_family=fallback_endpoint,
-                    supports_json_mode=True,
+                    model_capabilities=ModelCapabilityMetadata(
+                        supports_json_mode=True
+                    ),
                 )
                 descriptor = self._annotate_descriptor(descriptor)
                 route_source = (
@@ -355,10 +357,10 @@ class RoutedGatewayTransport(StructuredTransportMixin):
 
     # -------------------------------------------------------------------------
     def _static_route_for_model(self, model: str) -> str:
-        catalog_route = resolve_endpoint_family(
+        catalog_route = resolve_model_capabilities(
             provider=self.provider_id,
             model=model,
-        )
+        ).endpoint_family
         if catalog_route:
             return catalog_route
         normalized = (model or "").strip().casefold()

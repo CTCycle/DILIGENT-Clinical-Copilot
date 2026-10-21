@@ -177,11 +177,11 @@ def test_runtime_settings_persist_reload_and_reset_ncbi_contact(monkeypatch) -> 
     assert reloaded.values.integrations.ncbi_contact_email == "developer@example.org"
 
     reset = reloaded_service.reset_category("integrations")
-    assert reset.values.integrations.ncbi_contact_email == "clinical-copilot@pharmagent.local"
-    assert serializer.payload["runtime"]["ncbi_contact_email"] == "clinical-copilot@pharmagent.local"
+    assert reset.values.integrations.ncbi_contact_email == ""
+    assert serializer.payload["runtime"]["ncbi_contact_email"] == ""
 
 ###############################################################################
-def test_runtime_settings_old_payload_uses_ncbi_default(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_runtime_settings_missing_ncbi_contact_defaults_to_blank(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     service, serializer = _service(monkeypatch)
     serializer.payload["runtime"].pop("ncbi_contact_email", None)
     manager = ConfigurationManager(persisted_payload=serializer.payload)
@@ -189,7 +189,7 @@ def test_runtime_settings_old_payload_uses_ncbi_default(monkeypatch) -> None:  #
 
     state = RuntimeSettingsService(serializer=serializer).get_state()
 
-    assert state.values.integrations.ncbi_contact_email == "clinical-copilot@pharmagent.local"
+    assert state.values.integrations.ncbi_contact_email == ""
 
 ###############################################################################
 def test_runtime_settings_reload_observes_persisted_update(monkeypatch) -> None:  # type: ignore[no-untyped-def]

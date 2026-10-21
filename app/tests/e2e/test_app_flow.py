@@ -354,13 +354,6 @@ def test_model_config_navigation(page: Page, base_url: str):
     expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
 
 ###############################################################################
-def test_legacy_model_config_route_redirects_to_settings(page: Page, base_url: str):
-    page.goto(f"{base_url}/model-config")
-
-    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
-    expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
-
-###############################################################################
 def test_primary_navigation_restores_scroll_position(page: Page, base_url: str):
     page.goto(f"{base_url}/settings/models")
     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")

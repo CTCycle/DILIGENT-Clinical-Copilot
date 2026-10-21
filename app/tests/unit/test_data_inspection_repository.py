@@ -8,9 +8,11 @@ import time
 from datetime import date, datetime, timezone
 from inspect import signature
 from threading import Event
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+import services.inspection.service as inspection_service_module
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
@@ -481,10 +483,20 @@ def test_livertox_catalog_reports_missing_excerpt() -> None:
     assert by_name["Missing Excerpt Drug"]["has_excerpt"] is False
 
 ###############################################################################
-def test_update_job_lifecycle_with_cooperative_cancel() -> None:
+def test_update_job_lifecycle_with_cooperative_cancel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     repository_graph, _ = build_repository_graph_for_test()
     jobs = JobManager()
     service = build_service(repository_graph, jobs=jobs)
+    monkeypatch.setattr(
+        inspection_service_module,
+        "get_server_settings",
+        lambda: SimpleNamespace(
+            runtime=SimpleNamespace(ncbi_contact_email="developer@example.org"),
+            jobs=SimpleNamespace(polling_interval=1.0),
+        ),
+    )
 
     def fast_rxnav_runner(
         job_id: str,

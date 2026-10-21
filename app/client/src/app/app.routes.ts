@@ -65,6 +65,5 @@ export const routes: Routes = [
       },
     ],
   },
-  { path: 'model-config', pathMatch: 'full', redirectTo: 'settings/models' },
   { path: '**', redirectTo: '' },
 ];

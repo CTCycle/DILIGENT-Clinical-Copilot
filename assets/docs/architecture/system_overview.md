@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-10-18
+Last updated: 2026-10-21
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -121,7 +121,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 - Frontend app: `app/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
-- Current routes: `/`, `/clinical-sessions`, `/data`, `/settings` (General, Models, Data Processing, Integrations, Drug Matching, Advanced), `/sessions/:sessionId/timetable`, and `/sessions/:sessionId/timetable/:timelineId`. The legacy `/model-config` route redirects to `/settings/models`.
+- Current routes: `/`, `/clinical-sessions`, `/data`, `/settings` (General, Models, Data Processing, Integrations, Drug Matching, Advanced), `/sessions/:sessionId/timetable`, and `/sessions/:sessionId/timetable/:timelineId`. Model configuration is part of Settings; there is no `/model-config` UI route alias. The backend `/api/model-config` API remains active.
 - Windows launcher and maintenance entry point: `start_on_windows.ps1`.
 
 ### Runtime entry points

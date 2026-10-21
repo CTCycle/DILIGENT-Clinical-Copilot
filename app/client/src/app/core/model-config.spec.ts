@@ -9,7 +9,38 @@ import {
   resolveCloudModel,
   resolveProvider,
 } from './model-config';
-import { ModelConfigStateResponse } from './models/types';
+import { ModelCapabilityMetadata, ModelConfigStateResponse } from './models/types';
+
+function emptyCapabilityMetadata(): ModelCapabilityMetadata {
+  return {
+    semantic_model_id: null,
+    aliases: [],
+    endpoint_family: null,
+    context_window_tokens: null,
+    max_output_tokens: null,
+    supports_chat: null,
+    supports_streaming: null,
+    supports_tools: null,
+    tool_call_mode: 'structured',
+    supports_tool_choice: null,
+    supports_parallel_tool_calls: null,
+    supports_structured_output: null,
+    supports_json_mode: null,
+    supports_native_json_schema: null,
+    supports_reasoning: null,
+    reasoning_levels: [],
+    reasoning_parameter: '',
+    reasoning_counts_toward_output_limit: null,
+    reasoning_unsupported_parameters: [],
+    requires_reasoning_content_for_tool_calls: null,
+    requires_assistant_content_for_tool_calls: null,
+    supports_temperature: null,
+    supports_top_p: null,
+    supports_usage_metadata: null,
+    supports_finish_reason: null,
+    evidence: 'fallback',
+  };
+}
 
 function modelConfigPayload(): ModelConfigStateResponse {
   return {
@@ -36,10 +67,7 @@ function modelConfigPayload(): ModelConfigStateResponse {
             display_name: 'Backend Model',
             endpoint_family: null,
             capabilities: null,
-            input_token_limit: null,
-            output_token_limit: null,
-            supports_thinking: null,
-            supports_temperature: null,
+            model_capabilities: emptyCapabilityMetadata(),
           },
         ],
       },
