@@ -631,6 +631,13 @@ function Get-FrontendInputFingerprint {
     if ($IncludeBuildContract) {
         $entries += '__launcher__/node-version|{0}' -f $NodeVersion
         $entries += '__launcher__/build-command|npm run build'
+        $apiBaseUrl = if ([string]::IsNullOrWhiteSpace($env:VITE_API_BASE_URL)) {
+            '/api'
+        }
+        else {
+            $env:VITE_API_BASE_URL.Trim()
+        }
+        $entries += '__launcher__/api-base-url|{0}' -f $apiBaseUrl
     }
     else {
         $entries += '__launcher__/node-version|{0}' -f $NodeVersion
@@ -775,7 +782,24 @@ function Build-Frontend {
     if ($script:DesktopFrontendOutputDir) {
         $buildArguments += @('--', '--output-path', $script:DesktopFrontendOutputDir)
     }
-    Invoke-Checked -FilePath $NpmCmd -ArgumentList $buildArguments -WorkingDirectory $ClientDir
+    $previousDesktopBuild = $env:DILIGENT_DESKTOP_BUILD
+    try {
+        if ($script:DesktopFrontendOutputDir) {
+            $env:DILIGENT_DESKTOP_BUILD = 'true'
+        }
+        else {
+            Remove-Item Env:DILIGENT_DESKTOP_BUILD -ErrorAction SilentlyContinue
+        }
+        Invoke-Checked -FilePath $NpmCmd -ArgumentList $buildArguments -WorkingDirectory $ClientDir
+    }
+    finally {
+        if ($null -eq $previousDesktopBuild) {
+            Remove-Item Env:DILIGENT_DESKTOP_BUILD -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:DILIGENT_DESKTOP_BUILD = $previousDesktopBuild
+        }
+    }
     $outputRoot = if ($script:DesktopFrontendOutputDir) { $script:DesktopFrontendOutputDir } else { Join-Path $ClientDir 'dist' }
     if (-not (Test-Path -LiteralPath (Join-Path $outputRoot 'browser/index.html') -PathType Leaf)) {
         throw 'Angular production output was not generated'

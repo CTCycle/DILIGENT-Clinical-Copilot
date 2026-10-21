@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -40,6 +41,7 @@ from common.paths import (
 from common.security.desktop import DesktopSecurityMiddleware
 from middleware.database_switch import DatabaseSwitchMiddleware
 from common.version import resolve_application_version
+from configurations.network import get_cors_allow_origins
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
@@ -120,6 +122,16 @@ def create_app() -> FastAPI:
         security=desktop_runtime.security,
     )
     application.add_middleware(DatabaseSwitchMiddleware)
+    if not desktop_runtime.security.enabled:
+        cors_allow_origins = get_cors_allow_origins()
+        if cors_allow_origins:
+            application.add_middleware(
+                CORSMiddleware,
+                allow_origins=list(cors_allow_origins),
+                allow_credentials=False,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
     for router in (
         session_router,
         data_inspection_router,
