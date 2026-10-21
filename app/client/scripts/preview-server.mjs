@@ -1,47 +1,21 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { createServer, request } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  loadEnvFile,
+  resolveRuntimeNetworkSettings,
+  rewriteApiRequestPath,
+} from './runtime-config.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, '..');
 const distDir = path.resolve(rootDir, 'dist/browser');
 const staticRoot = distDir;
 const envPath = path.resolve(rootDir, '../../settings/.env');
-
-const defaults = {
-  FASTAPI_HOST: '127.0.0.1',
-  FASTAPI_PORT: '7690',
-  UI_HOST: '127.0.0.1',
-  UI_PORT: '9847',
-};
-
-function loadEnvFile(filePath) {
-  const env = { ...defaults };
-  try {
-    const content = readFileSync(filePath, 'utf8');
-    for (const rawLine of content.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith('#') || line.startsWith(';')) continue;
-      const idx = line.indexOf('=');
-      if (idx < 0) continue;
-      const key = line.slice(0, idx).trim();
-      let value = line.slice(idx + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      if (key) env[key] = value;
-    }
-  } catch {
-    // keep defaults
-  }
-  return env;
-}
-
-const env = loadEnvFile(envPath);
 const args = process.argv.slice(2);
 
 function resolveArg(flag, fallback) {
@@ -50,21 +24,22 @@ function resolveArg(flag, fallback) {
   return fallback;
 }
 
-const uiHost = resolveArg('--host', process.env.UI_HOST || env.UI_HOST || defaults.UI_HOST);
-const uiPort = Number.parseInt(resolveArg('--port', process.env.UI_PORT || env.UI_PORT || defaults.UI_PORT), 10);
-const apiHost = process.env.FASTAPI_HOST || env.FASTAPI_HOST || defaults.FASTAPI_HOST;
-const apiPort = Number.parseInt(process.env.FASTAPI_PORT || env.FASTAPI_PORT || defaults.FASTAPI_PORT, 10);
+const env = loadEnvFile(envPath);
+const network = resolveRuntimeNetworkSettings(process.env, env);
+const uiHost = resolveArg('--host', network.uiHost);
+const uiPort = Number.parseInt(resolveArg('--port', String(network.uiPort)), 10);
+const { apiHost, apiPort, apiBaseUrl } = network;
 
 if (!existsSync(staticRoot)) {
   throw new Error(`Missing Angular build output: ${staticRoot}`);
 }
 
-function forwardApiRequest({ req, res, port }) {
+function forwardApiRequest({ req, res, port, apiPath }) {
   const upstream = request(
     {
       host: apiHost,
       port,
-      path: req.url,
+      path: apiPath,
       method: req.method,
       headers: req.headers,
     },
@@ -118,11 +93,13 @@ const server = createServer((req, res) => {
     return;
   }
 
-  if (req.url.startsWith('/api')) {
+  const apiPath = rewriteApiRequestPath(req.url, apiBaseUrl);
+  if (apiPath !== null) {
     forwardApiRequest({
       req,
       res,
       port: apiPort,
+      apiPath,
     });
     return;
   }
@@ -153,7 +130,11 @@ const server = createServer((req, res) => {
   createReadStream(chosen).pipe(res);
 });
 
-verifyBackendReachable(apiPort)
+const backendReady = apiBaseUrl.startsWith('/')
+  ? verifyBackendReachable(apiPort)
+  : Promise.resolve();
+
+backendReady
   .then(() => {
     server.listen(uiPort, uiHost, () => {
       // eslint-disable-next-line no-console

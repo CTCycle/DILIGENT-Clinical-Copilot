@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LAUNCHER_PATH = REPO_ROOT / "start_on_windows.ps1"
 
@@ -98,6 +97,9 @@ def test_frontend_build_state_is_deterministic_and_published_after_stable_build(
     assert "dependency_fingerprint" in status
     assert "Get-FrontendBuildFingerprint" in build
     assert "Write-FrontendBuildState" in build
+    assert "VITE_API_BASE_URL" in fingerprint
+    assert "__launcher__/api-base-url" in fingerprint
+    assert "DILIGENT_DESKTOP_BUILD" in build
     assert "[IO.File]::Replace" in source
     assert "changed while Angular was building" in build
 

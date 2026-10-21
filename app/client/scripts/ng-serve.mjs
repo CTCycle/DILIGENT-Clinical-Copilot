@@ -1,60 +1,24 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import {
+  apiBaseUrlDefine,
+  buildApiProxyConfig,
+  loadEnvFile,
+  resolveRuntimeNetworkSettings,
+} from './runtime-config.mjs';
 
 const projectRoot = process.cwd();
 const envPath = path.resolve(projectRoot, '../../settings/.env');
-
-const defaults = {
-  FASTAPI_HOST: '127.0.0.1',
-  FASTAPI_PORT: '7690',
-  UI_HOST: '127.0.0.1',
-  UI_PORT: '9847',
-};
-
-function loadEnvFile(filePath) {
-  const env = { ...defaults };
-  try {
-    const content = readFileSync(filePath, 'utf8');
-    for (const rawLine of content.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith('#') || line.startsWith(';')) continue;
-      const idx = line.indexOf('=');
-      if (idx < 0) continue;
-      const key = line.slice(0, idx).trim();
-      let value = line.slice(idx + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      if (key) env[key] = value;
-    }
-  } catch {
-    // keep defaults
-  }
-  return env;
-}
-
 const env = loadEnvFile(envPath);
-const uiHost = process.env.UI_HOST || env.UI_HOST || defaults.UI_HOST;
-const uiPort = process.env.UI_PORT || env.UI_PORT || defaults.UI_PORT;
-const apiHost = process.env.FASTAPI_HOST || env.FASTAPI_HOST || defaults.FASTAPI_HOST;
-const apiPort = process.env.FASTAPI_PORT || env.FASTAPI_PORT || defaults.FASTAPI_PORT;
+const { apiHost, apiPort, apiBaseUrl, uiHost, uiPort } =
+  resolveRuntimeNetworkSettings(process.env, env);
 
 const proxyConfigPath = path.resolve(projectRoot, 'proxy.conf.json');
-const proxyConfigContent = `${JSON.stringify(
-  {
-    '/api': {
-      target: `http://${apiHost}:${apiPort}`,
-      secure: false,
-      changeOrigin: true,
-    },
-  },
-  null,
-  2,
-)}\n`;
+const proxyConfigContent = `${JSON.stringify(buildApiProxyConfig(apiBaseUrl, apiHost, apiPort), null, 2)}\n`;
 
 let existingProxyConfig = '';
 try {
@@ -77,14 +41,21 @@ if (existingProxyConfig !== proxyConfigContent) {
   }
 }
 
-const isWindows = process.platform === 'win32';
+const angularCli = path.resolve(projectRoot, 'node_modules/@angular/cli/bin/ng.js');
 const child = spawn(
-  'npx',
-  ['ng', 'serve', '--host', uiHost, '--port', uiPort, '--proxy-config', 'proxy.conf.json'],
-  {
-    stdio: 'inherit',
-    shell: isWindows,
-  },
+  process.execPath,
+  [
+    angularCli,
+    'serve',
+    '--host',
+    uiHost,
+    '--port',
+    String(uiPort),
+    '--define',
+    apiBaseUrlDefine(apiBaseUrl),
+    ...(apiBaseUrl.startsWith('/') ? ['--proxy-config', 'proxy.conf.json'] : []),
+  ],
+  { stdio: 'inherit' },
 );
 
 child.on('exit', (code) => {

@@ -6,9 +6,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, FastAPI
-from fastapi.testclient import TestClient
-
 import services.settings.runtime as runtime_module
 from api.error_handling import register_error_handling
 from api.settings import SettingsEndpoint
@@ -17,7 +14,10 @@ from configurations.management import (
     environment_snapshot_from_os_env,
 )
 from configurations.startup import ConfigurationManager
+from fastapi import APIRouter, FastAPI
+from fastapi.testclient import TestClient
 from services.settings.runtime import RuntimeSettingsService
+
 
 ###############################################################################
 class MemoryApplicationConfigurationSerializer:
@@ -76,6 +76,7 @@ def test_settings_api_get_patch_and_reset(monkeypatch) -> None:  # type: ignore[
     assert response.json()["environment_editable"] is False
     assert "matching" in response.json()["values"]
     assert response.json()["values"]["data"]["clinical_assessment_batch_size"] == 2
+    assert "CORS_ALLOW_ORIGINS" not in response.text
 
     response = client.patch(
         "/api/settings",
@@ -151,3 +152,9 @@ def test_settings_api_rejects_unknown_or_invalid_fields(monkeypatch) -> None:  #
         json={"advanced": {"DATABASE_URL": "hidden"}},
     )
     assert environment_field.status_code == 422
+
+    network_field = client.patch(
+        "/api/settings",
+        json={"network": {"cors_allow_origins": "http://localhost:9847"}},
+    )
+    assert network_field.status_code == 422
