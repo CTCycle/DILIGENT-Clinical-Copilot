@@ -19,7 +19,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
-
 ###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -302,7 +301,10 @@ def test_postgres_startup_seeds_catalogs_for_existing_empty_database(
     engine = create_engine("sqlite:///:memory:")
     events: list[tuple[str, object]] = []
 
+    ###############################################################################
     class FakePostgresRepository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, _settings) -> None:
             self.engine = engine
 
@@ -396,29 +398,44 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
         'connection failed: FATALE: il database "diligent" non esiste'
     )
 
+    ###############################################################################
     class FakeTargetEngine:
+
+        # -------------------------------------------------------------------------
         def connect(self):
             events.append("target_connect")
             raise localized_error
 
+        # -------------------------------------------------------------------------
         def dispose(self) -> None:
             events.append("target_dispose")
 
+    ###############################################################################
     class FakePostgresRepository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, _settings) -> None:
             self.engine = FakeTargetEngine()
 
+    ###############################################################################
     class FakeResult:
+
+        # -------------------------------------------------------------------------
         def scalar(self):
             return None
 
+    ###############################################################################
     class FakeAdminConnection:
+
+        # -------------------------------------------------------------------------
         def __enter__(self):
             return self
 
+        # -------------------------------------------------------------------------
         def __exit__(self, *_args) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         def execute(self, statement, _parameters=None):
             sql = str(statement)
             if "pg_advisory_lock" in sql:
@@ -432,11 +449,15 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
                 events.append("unlock")
             return None
 
+    ###############################################################################
     class FakeAdminEngine:
+
+        # -------------------------------------------------------------------------
         def connect(self):
             events.append("admin_connect")
             return FakeAdminConnection()
 
+        # -------------------------------------------------------------------------
         def dispose(self) -> None:
             events.append("admin_dispose")
 

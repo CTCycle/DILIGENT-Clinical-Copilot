@@ -19,7 +19,6 @@ from configurations.management import (
 from configurations.startup import ConfigurationManager
 from services.settings.runtime import RuntimeSettingsService
 
-
 ###############################################################################
 class MemoryApplicationConfigurationSerializer:
 
@@ -44,7 +43,6 @@ class MemoryApplicationConfigurationSerializer:
         self.updated_at = datetime.now(UTC)
         return dict(self.payload)
 
-
 ###############################################################################
 def _client(monkeypatch) -> tuple[TestClient, MemoryApplicationConfigurationSerializer]:  # type: ignore[no-untyped-def]
     serializer = MemoryApplicationConfigurationSerializer()
@@ -60,7 +58,6 @@ def _client(monkeypatch) -> tuple[TestClient, MemoryApplicationConfigurationSeri
     register_error_handling(application)
     application.include_router(router, prefix="/api")
     return TestClient(application), serializer
-
 
 ###############################################################################
 def test_settings_api_get_patch_and_reset(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -93,7 +90,6 @@ def test_settings_api_get_patch_and_reset(monkeypatch) -> None:  # type: ignore[
     assert response.status_code == 200
     assert response.json()["values"]["general"]["polling_interval"] == 1.0
 
-
 ###############################################################################
 def test_settings_api_persists_custom_ncbi_contact_and_resets_it(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     client, serializer = _client(monkeypatch)
@@ -110,7 +106,6 @@ def test_settings_api_persists_custom_ncbi_contact_and_resets_it(monkeypatch) ->
     assert response.status_code == 200
     assert response.json()["values"]["integrations"]["ncbi_contact_email"] == "clinical-copilot@pharmagent.local"
 
-
 ###############################################################################
 def test_settings_api_rejects_malformed_ncbi_contact(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     client, _ = _client(monkeypatch)
@@ -121,7 +116,6 @@ def test_settings_api_rejects_malformed_ncbi_contact(monkeypatch) -> None:  # ty
     )
 
     assert response.status_code == 422
-
 
 ###############################################################################
 def test_settings_api_rejects_unknown_or_invalid_fields(monkeypatch) -> None:  # type: ignore[no-untyped-def]

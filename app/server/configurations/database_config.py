@@ -43,6 +43,7 @@ LEGACY_DATABASE_ENVIRONMENT_KEYS = frozenset(
 )
 
 
+###############################################################################
 class DatabaseConfiguration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -60,6 +61,7 @@ class DatabaseConfiguration(BaseModel):
     write_batch_size: int = Field(default=1000, ge=1, le=100000)
     read_page_size: int = Field(default=1000, ge=100, le=100000)
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_backend_fields(self) -> DatabaseConfiguration:
         if self.backend == "sqlite":
@@ -77,6 +79,7 @@ class DatabaseConfiguration(BaseModel):
         return self
 
 
+###############################################################################
 class DatabaseConfigurationFile(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -84,10 +87,12 @@ class DatabaseConfigurationFile(BaseModel):
     database: DatabaseConfiguration
 
 
+###############################################################################
 def _dpapi_transform(value: bytes, *, protect: bool) -> bytes:
     if os.name != "nt":
         raise RuntimeError("Database credentials require Windows DPAPI.")
 
+    ###############################################################################
     class DataBlob(ctypes.Structure):
         _fields_ = [
             ("cbData", ctypes.wintypes.DWORD),
@@ -151,12 +156,14 @@ def _dpapi_transform(value: bytes, *, protect: bool) -> bytes:
         kernel32.LocalFree(ctypes.cast(destination.pbData, ctypes.c_void_p))
 
 
+###############################################################################
 def protect_database_password(password: str) -> str:
     return base64.b64encode(_dpapi_transform(password.encode("utf-8"), protect=True)).decode(
         "ascii"
     )
 
 
+###############################################################################
 def unprotect_database_password(protected: str | None) -> str | None:
     if not protected:
         return None
@@ -167,6 +174,7 @@ def unprotect_database_password(protected: str | None) -> str | None:
         raise RuntimeError("The saved database credential cannot be decrypted.") from exc
 
 
+###############################################################################
 def default_database_configuration() -> DatabaseConfiguration:
     return DatabaseConfiguration(
         backend="sqlite",
@@ -174,6 +182,7 @@ def default_database_configuration() -> DatabaseConfiguration:
     )
 
 
+###############################################################################
 def _legacy_values() -> dict[str, str]:
     result: dict[str, str] = {}
     if paths.ENV_FILE_PATH.is_file():
@@ -187,6 +196,7 @@ def _legacy_values() -> dict[str, str]:
     return result
 
 
+###############################################################################
 def _legacy_database_configuration(values: dict[str, str]) -> DatabaseConfiguration:
     embedded = values.get("EMBEDDED_DATABASE", "").strip().lower()
     backend = values.get("DATABASE_BACKEND", "").strip().lower()
@@ -238,6 +248,7 @@ def _legacy_database_configuration(values: dict[str, str]) -> DatabaseConfigurat
     )
 
 
+###############################################################################
 def _legacy_int(value: str | None, default: int, minimum: int, maximum: int) -> int:
     try:
         resolved = int(value) if value else default
@@ -246,6 +257,7 @@ def _legacy_int(value: str | None, default: int, minimum: int, maximum: int) -> 
     return min(max(resolved, minimum), maximum)
 
 
+###############################################################################
 def _scrub_legacy_environment_file() -> None:
     path = paths.ENV_FILE_PATH
     if not path.is_file():
@@ -262,6 +274,7 @@ def _scrub_legacy_environment_file() -> None:
     _atomic_write(path, "".join(kept).encode("utf-8"), secure=False)
 
 
+###############################################################################
 def _atomic_write(path: Path, content: bytes, *, secure: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
@@ -281,6 +294,7 @@ def _atomic_write(path: Path, content: bytes, *, secure: bool) -> None:
             temporary_path.unlink(missing_ok=True)
 
 
+###############################################################################
 def load_database_configuration() -> DatabaseConfiguration:
     path = DATABASE_CONFIG_FILE_PATH
     if path.is_file():
@@ -303,12 +317,14 @@ def load_database_configuration() -> DatabaseConfiguration:
     return legacy
 
 
+###############################################################################
 def save_database_configuration(configuration: DatabaseConfiguration) -> None:
     payload = DatabaseConfigurationFile(database=configuration).model_dump(mode="json")
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     _atomic_write(DATABASE_CONFIG_FILE_PATH, serialized, secure=True)
 
 
+###############################################################################
 def database_settings(configuration: DatabaseConfiguration) -> DatabaseSettings:
     password = unprotect_database_password(configuration.password_protected)
     return DatabaseSettings(
@@ -333,6 +349,7 @@ def database_settings(configuration: DatabaseConfiguration) -> DatabaseSettings:
     )
 
 
+###############################################################################
 def configuration_from_request(payload: dict[str, Any], current: DatabaseConfiguration) -> DatabaseConfiguration:
     data = dict(payload)
     password = data.pop("password", None)
@@ -363,6 +380,7 @@ def configuration_from_request(payload: dict[str, Any], current: DatabaseConfigu
     return DatabaseConfiguration.model_validate(data)
 
 
+###############################################################################
 def public_database_configuration(configuration: DatabaseConfiguration) -> dict[str, Any]:
     return {
         "backend": configuration.backend,

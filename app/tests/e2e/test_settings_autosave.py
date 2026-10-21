@@ -84,12 +84,14 @@ RAG_FIELDS = [
 ]
 
 
+###############################################################################
 def _api_state(page: Page, api_base_url: str, endpoint: str) -> dict:
     response = page.request.get(f"{api_base_url}{endpoint}")
     assert response.status == 200
     return response.json()
 
 
+###############################################################################
 def _expect_settings_write(page: Page):
     return page.expect_response(
         lambda response: response.request.method == "PATCH"
@@ -97,6 +99,7 @@ def _expect_settings_write(page: Page):
     )
 
 
+###############################################################################
 def _expect_model_write(page: Page):
     return page.expect_response(
         lambda response: response.request.method == "PUT"
@@ -104,6 +107,7 @@ def _expect_model_write(page: Page):
     )
 
 
+###############################################################################
 def _number_target(
     category: str,
     key: str,
@@ -140,6 +144,7 @@ def _number_target(
     raise AssertionError(f"No valid alternate value found for {category}.{key}")
 
 
+###############################################################################
 def _assert_control_value(control, value) -> None:
     actual = control.input_value()
     if control.get_attribute("type") == "number":
@@ -148,6 +153,7 @@ def _assert_control_value(control, value) -> None:
         assert actual == str(value)
 
 
+###############################################################################
 def test_every_operational_setting_autosaves_and_survives_reload(
     page: Page,
     base_url: str,
@@ -208,6 +214,7 @@ def test_every_operational_setting_autosaves_and_survives_reload(
         assert _api_state(page, api_base_url, "/api/settings")["values"][category] == initial_category
 
 
+###############################################################################
 def test_rapid_edits_merge_and_failed_writes_are_flagged(
     page: Page,
     base_url: str,
@@ -268,6 +275,7 @@ def test_rapid_edits_merge_and_failed_writes_are_flagged(
     assert Decimal(page.locator('[name="polling_interval"]').input_value()) == Decimal(str(original_polling))
 
 
+###############################################################################
 def _rag_candidate(control, key: str, current: dict):
     input_type = control.get_attribute("type")
     if input_type == "checkbox":
@@ -297,6 +305,7 @@ def _rag_candidate(control, key: str, current: dict):
     return f"{current[key]}-autosave"
 
 
+###############################################################################
 def _set_rag_value(control, key: str, value) -> None:
     if control.get_attribute("type") == "checkbox":
         control.set_checked(bool(value))
@@ -306,10 +315,12 @@ def _set_rag_value(control, key: str, value) -> None:
         control.fill(str(value))
 
 
+###############################################################################
 def _rag_control(page: Page, control_id: str):
     return page.locator(f"#{control_id}")
 
 
+###############################################################################
 def _save_rag_value(page: Page, api_base_url: str, control, key: str, value):
     with _expect_model_write(page) as response_info:
         _set_rag_value(control, key, value)
@@ -320,6 +331,7 @@ def _save_rag_value(page: Page, api_base_url: str, control, key: str, value):
     assert saved[key] == value
 
 
+###############################################################################
 def test_model_and_rag_settings_autosave_without_a_save_button(
     page: Page,
     base_url: str,
@@ -446,6 +458,7 @@ def test_model_and_rag_settings_autosave_without_a_save_button(
     assert _api_state(page, api_base_url, "/api/model-config")["reasoning_level"] == original_level
 
 
+###############################################################################
 def test_each_local_model_role_autosaves_and_survives_reload(
     page: Page,
     base_url: str,
@@ -493,6 +506,7 @@ def test_each_local_model_role_autosaves_and_survives_reload(
         assert _api_state(page, api_base_url, "/api/model-config")[field] == original_model
 
 
+###############################################################################
 def test_database_edits_wait_for_confirmation_and_failed_switch_rolls_back(
     page: Page,
     base_url: str,

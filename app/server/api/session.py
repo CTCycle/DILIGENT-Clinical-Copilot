@@ -138,5 +138,6 @@ clinical_session_endpoint = ClinicalSessionEndpoint(
 clinical_session_endpoint.add_routes()
 
 
+###############################################################################
 def rebind_database_services() -> None:
     clinical_session_endpoint.service = build_clinical_session_service(get_job_manager())

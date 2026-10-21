@@ -36,7 +36,6 @@ class _PatchModel(_StrictModel):
 class GeneralRuntimeSettings(_StrictModel):
     polling_interval: float = Field(gt=0.0, le=60.0)
 
-
 ###############################################################################
 class GeneralRuntimeSettingsPatch(_PatchModel):
     polling_interval: float | None = Field(default=None, gt=0.0, le=60.0)
@@ -75,7 +74,6 @@ class DataRuntimeSettings(_StrictModel):
             )
         return self
 
-
 ###############################################################################
 class DataRuntimeSettingsPatch(_PatchModel):
     drug_name_min_length: int | None = Field(default=None, ge=1, le=200)
@@ -103,7 +101,6 @@ class IntegrationRuntimeSettings(_StrictModel):
     livertox_monograph_max_workers: int = Field(ge=1, le=64)
     rxnav_request_timeout: float = Field(gt=0.0, le=120.0)
     rxnav_max_concurrency: int = Field(ge=1, le=64)
-
 
 ###############################################################################
 class IntegrationRuntimeSettingsPatch(_PatchModel):
@@ -134,7 +131,6 @@ class MatchingRuntimeSettings(_StrictModel):
     spelling_short_name_length: int = Field(ge=1, le=128)
     spelling_short_max_distance: int = Field(ge=0, le=16)
     spelling_long_max_distance: int = Field(ge=0, le=16)
-
 
 ###############################################################################
 class MatchingRuntimeSettingsPatch(_PatchModel):
@@ -178,7 +174,6 @@ class AdvancedRuntimeSettings(_StrictModel):
                 "Local LLM timeout cap cannot be smaller than the minimum timeout."
             )
         return self
-
 
 ###############################################################################
 class AdvancedRuntimeSettingsPatch(_PatchModel):

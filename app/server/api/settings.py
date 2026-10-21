@@ -78,5 +78,6 @@ settings_endpoint = SettingsEndpoint(router=router, service=RuntimeSettingsServi
 settings_endpoint.add_routes()
 
 
+###############################################################################
 def rebind_database_services() -> None:
     settings_endpoint.service = RuntimeSettingsService()

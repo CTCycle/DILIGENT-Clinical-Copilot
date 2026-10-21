@@ -45,6 +45,7 @@ _inspection_endpoints = []
 register_inspection_routes(router)
 
 
+###############################################################################
 def rebind_database_services() -> None:
     service = build_data_inspection_service(get_job_manager())
     for endpoint in _inspection_endpoints:

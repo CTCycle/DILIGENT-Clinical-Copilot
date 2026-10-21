@@ -7,7 +7,6 @@ from pathlib import Path
 
 from common.runtime_layout import resolve_runtime_layout
 
-
 ###############################################################################
 def test_source_data_default_and_override(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("DILIGENT_RUNTIME_ROOT", raising=False)
@@ -34,7 +33,6 @@ def test_source_data_default_and_override(monkeypatch, tmp_path: Path) -> None:
         assert relative_layout.mutable_data_root == (repository_root / relative_root)
     finally:
         resolve_runtime_layout.cache_clear()
-
 
 ###############################################################################
 def test_packaged_immutable_data_and_persistent_data_roots(

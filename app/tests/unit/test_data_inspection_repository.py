@@ -317,7 +317,6 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
         == detail["manual_edit_history"]
     )
 
-
 ###############################################################################
 def test_manual_report_edit_missing_session_returns_none() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -842,7 +841,6 @@ def test_timeline_generation_persists_classified_provider_fallback(
     assert history[0]["generation_status"] == "fallback"
     assert history[0]["generation_error_code"] == error_code
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("source_text", "expected_date", "expected_precision"),
@@ -868,7 +866,6 @@ def test_fallback_date_extraction_preserves_source_precision(
     assert interval.value == expected_date
     assert interval.precision == expected_precision
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "source_text",
@@ -884,7 +881,6 @@ def test_fallback_date_extraction_leaves_relative_invalid_or_ambiguous_sources_u
     source_text: str,
 ) -> None:
     assert extract_single_explicit_timeline_date(source_text) is None
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1146,7 +1142,6 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     assert status is not None
     assert status["status"] == "completed"
     assert source_reads == 1
-
 
 ###############################################################################
 def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None:

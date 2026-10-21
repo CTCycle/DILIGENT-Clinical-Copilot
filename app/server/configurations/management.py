@@ -60,7 +60,6 @@ def ensure_mapping(value: Any) -> dict[str, Any]:
         return value
     return {}
 
-
 ###############################################################################
 class ConfigurationManager:
 
@@ -236,7 +235,6 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
         polling_interval = 1.0
     return JobsSettings(polling_interval=polling_interval)
 
-###############################################################################
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     return DrugsMatcherSettings(

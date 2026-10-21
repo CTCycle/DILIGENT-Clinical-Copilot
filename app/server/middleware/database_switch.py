@@ -9,13 +9,17 @@ from common.constants import FASTAPI_API_PREFIX
 from services.runtime.database_switch import get_database_runtime_manager
 
 
+###############################################################################
 class DatabaseSwitchMiddleware:
+
+    # -------------------------------------------------------------------------
     def __init__(self, app) -> None:
         self.app = app
         self._gate = get_database_runtime_manager().request_gate
         self._api_prefix = FASTAPI_API_PREFIX.rstrip("/") + "/"
         self._database_prefix = self._api_prefix + "database/"
 
+    # -------------------------------------------------------------------------
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)

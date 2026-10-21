@@ -27,11 +27,9 @@ from services.inspection.runtime import coerce_optional_str
 ###############################################################################
 T = TypeVar("T")
 
-
 ###############################################################################
 class TimelineGenerationCancelled(Exception):
     """Raised when a timeline job is stopped before its result is persisted."""
-
 
 ###############################################################################
 async def _await_with_stop_check(
@@ -60,7 +58,6 @@ async def _await_with_stop_check(
         with suppress(BaseException):
             await task
         raise
-
 
 ###############################################################################
 def _raise_if_stopped(stop_check: Callable[[], bool] | None) -> None:

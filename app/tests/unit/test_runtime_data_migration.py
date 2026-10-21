@@ -9,7 +9,6 @@ import pytest
 from common.runtime_layout import RuntimeLayout
 from configurations.runtime_bootstrap import migrate_legacy_data_layout
 
-
 ###############################################################################
 def _runtime_layout(
     runtime_root: Path, data_root: Path, *, packaged: bool
@@ -25,7 +24,6 @@ def _runtime_layout(
         cache_root=data_root / "cache",
         client_dist_root=runtime_root / "app" / "client" / "dist" / "browser",
     )
-
 
 ###############################################################################
 def test_packaged_data_migration_merges_without_replacing_existing_state(
@@ -64,7 +62,6 @@ def test_packaged_data_migration_merges_without_replacing_existing_state(
     assert ready_file.read_text(encoding="utf-8") == '{"ready":true}'
     assert not legacy_root.exists()
 
-
 ###############################################################################
 def test_source_data_migration_preserves_catalogs_and_merges_sources(
     tmp_path: Path,
@@ -90,7 +87,6 @@ def test_source_data_migration_preserves_catalogs_and_merges_sources(
         encoding="utf-8"
     ) == "document"
     assert (old_root / "catalogs" / "old.json").is_file()
-
 
 ###############################################################################
 def test_data_migration_stops_before_moving_anything_on_conflict(

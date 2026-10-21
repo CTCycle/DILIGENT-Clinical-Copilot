@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+###############################################################################
 class DatabaseConfigurationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -26,6 +27,7 @@ class DatabaseConfigurationRequest(BaseModel):
     write_batch_size: int = Field(default=1000, ge=1, le=100000)
     read_page_size: int = Field(default=1000, ge=100, le=100000)
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_selected_backend(self) -> DatabaseConfigurationRequest:
         if self.backend == "sqlite":
@@ -40,6 +42,7 @@ class DatabaseConfigurationRequest(BaseModel):
         return self
 
 
+###############################################################################
 class DatabaseConfigurationResponse(BaseModel):
     backend: Literal["sqlite", "postgresql"]
     sqlite_path: str | None = None
@@ -56,6 +59,7 @@ class DatabaseConfigurationResponse(BaseModel):
     read_page_size: int
 
 
+###############################################################################
 class DatabaseConfigurationStateResponse(BaseModel):
     configuration: DatabaseConfigurationResponse
     active_backend: Literal["sqlite", "postgresql"]
@@ -63,12 +67,14 @@ class DatabaseConfigurationStateResponse(BaseModel):
     runtime_switching: bool = True
 
 
+###############################################################################
 class DatabaseConnectionTestResponse(BaseModel):
     reachable: bool
     schema_ready: bool
     message: str
 
 
+###############################################################################
 class DatabaseSwitchResponse(BaseModel):
     active_backend: Literal["sqlite", "postgresql"]
     settings_reloaded: bool = True
