@@ -1,0 +1,129 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<section class="database-settings-page" aria-labelledby="database-settings-title">
+  <header class="database-settings-header">
+    <div>
+      <h2 id="database-settings-title">Database</h2>
+      <p>Choose where this application stores its data and settings.</p>
+    </div>
+    @if (state(); as currentState) {
+      <span class="database-active-badge" role="status">
+        <span class="database-status-dot" aria-hidden="true"></span>
+        Active · {{ activeBackendLabel() }}
+      </span>
+    }
+  </header>
+
+  @if (loading()) {
+    <p class="database-settings-state" role="status">Loading database configuration…</p>
+  } @else if (error() && !configuration()) {
+    <div class="database-settings-state database-settings-error" role="alert">
+      <p>{{ error() }}</p>
+      <button type="button" class="btn" (click)="load()">Retry</button>
+    </div>
+  } @else if (configuration(); as config) {
+    <form class="database-settings-form" (ngSubmit)="save()">
+      <label class="database-setting-row" for="database-backend">
+        <span class="database-setting-copy">
+          <strong>Database backend</strong>
+          <span>Switching reloads settings from the selected database.</span>
+        </span>
+        <select
+          id="database-backend"
+          name="backend"
+          [ngModel]="config.backend"
+          (ngModelChange)="updateBackend($event)"
+          [disabled]="testing() || saving()"
+        >
+          @for (option of backendOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      @if (config.backend === 'sqlite') {
+        <label class="database-setting-row" for="sqlite-path">
+          <span class="database-setting-copy">
+            <strong>Database file</strong>
+            <span>Use an absolute path for a predictable data location.</span>
+          </span>
+          <input
+            id="sqlite-path"
+            type="text"
+            name="sqlitePath"
+            autocomplete="off"
+            [ngModel]="config.sqlite_path || ''"
+            (ngModelChange)="patchConfiguration({ sqlite_path: $event })"
+            [disabled]="testing() || saving()"
+            required
+          />
+        </label>
+      } @else {
+        <div class="database-setting-row">
+          <span class="database-setting-copy">
+            <strong>PostgreSQL connection</strong>
+            <span>Connect through the psycopg driver. Credentials are protected for this Windows user.</span>
+          </span>
+          <div class="database-fields-grid">
+            <label for="postgres-host">Host</label>
+            <input id="postgres-host" type="text" name="host" autocomplete="off" [ngModel]="config.host || ''" (ngModelChange)="patchConfiguration({ host: $event })" [disabled]="testing() || saving()" required />
+            <label for="postgres-port">Port</label>
+            <input id="postgres-port" type="number" name="port" min="1" max="65535" [ngModel]="config.port || 5432" (ngModelChange)="patchConfiguration({ port: $event })" [disabled]="testing() || saving()" required />
+            <label for="postgres-database">Database</label>
+            <input id="postgres-database" type="text" name="database" autocomplete="off" [ngModel]="config.database_name || ''" (ngModelChange)="patchConfiguration({ database_name: $event })" [disabled]="testing() || saving()" required />
+            <label for="postgres-username">Username</label>
+            <input id="postgres-username" type="text" name="username" autocomplete="username" [ngModel]="config.username || ''" (ngModelChange)="patchConfiguration({ username: $event })" [disabled]="testing() || saving()" required />
+            <label for="postgres-password">Password</label>
+            <div class="database-password-control">
+              <input id="postgres-password" type="password" name="password" autocomplete="new-password" [ngModel]="password()" (ngModelChange)="password.set($event)" [placeholder]="config.password_configured ? 'Saved password is protected' : 'Optional'" [disabled]="testing() || saving()" />
+              @if (config.password_configured) {
+                <small>Leave blank to keep the saved password.</small>
+              }
+            </div>
+            <label class="database-checkbox-label" for="postgres-ssl">Require SSL</label>
+            <input id="postgres-ssl" class="database-checkbox" type="checkbox" name="ssl" [ngModel]="config.ssl" (ngModelChange)="patchConfiguration({ ssl: $event })" [disabled]="testing() || saving()" />
+            @if (config.ssl) {
+              <label for="postgres-ssl-ca">SSL CA certificate</label>
+              <input id="postgres-ssl-ca" type="text" name="sslCa" autocomplete="off" [ngModel]="config.ssl_ca || ''" (ngModelChange)="patchConfiguration({ ssl_ca: $event })" [disabled]="testing() || saving()" />
+            }
+          </div>
+        </div>
+      }
+
+      <details class="database-advanced-options">
+        <summary>Advanced database options</summary>
+        <div class="database-fields-grid">
+          @if (config.backend === 'postgresql') {
+            <label for="postgres-timeout">Connection timeout (seconds)</label>
+            <input id="postgres-timeout" type="number" name="connectTimeout" min="1" max="300" [ngModel]="config.connect_timeout" (ngModelChange)="patchConfiguration({ connect_timeout: $event })" [disabled]="testing() || saving()" />
+          }
+          <label for="database-write-batch">Write batch size</label>
+          <input id="database-write-batch" type="number" name="writeBatchSize" min="1" max="100000" [ngModel]="config.write_batch_size" (ngModelChange)="patchConfiguration({ write_batch_size: $event })" [disabled]="testing() || saving()" />
+          <label for="database-read-page">Read page size</label>
+          <input id="database-read-page" type="number" name="readPageSize" min="100" max="100000" [ngModel]="config.read_page_size" (ngModelChange)="patchConfiguration({ read_page_size: $event })" [disabled]="testing() || saving()" />
+        </div>
+      </details>
+
+      @if (error()) {
+        <p class="database-feedback database-feedback-error" role="alert">{{ error() }}</p>
+      }
+      @if (testResult(); as result) {
+        <p class="database-feedback" [class.database-feedback-error]="!result.reachable" [class.database-feedback-success]="result.reachable" role="status">
+          {{ result.message }}
+        </p>
+      }
+
+      <footer class="database-settings-actions">
+        <span class="database-settings-footnote">Other application settings remain with each database.</span>
+        <div class="database-settings-buttons">
+          <button type="button" class="btn" (click)="testConnection()" [disabled]="testing() || saving()">
+            {{ testing() ? 'Testing…' : 'Test connection' }}
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="testing() || saving()">
+            {{ saving() ? 'Switching…' : 'Save and switch' }}
+          </button>
+        </div>
+      </footer>
+    </form>
+  }
+</section>

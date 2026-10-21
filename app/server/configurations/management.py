@@ -6,10 +6,10 @@ from __future__ import annotations
 import os
 from threading import RLock
 from typing import Any
-from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
+from configurations.database_config import database_settings, load_database_configuration
 from common.constants import (
     DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
     DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
@@ -40,7 +40,6 @@ from common.utils.types import (
 )
 from domain.model_configs import ReasoningLevel
 from domain.settings.configuration import (
-    DatabaseSettings,
     ClinicalLanguageDetectionSettings,
     DEFAULT_RAG_SETTINGS,
     DrugsMatcherSettings,
@@ -53,10 +52,7 @@ from domain.settings.configuration import (
     ServerSettings,
     SessionPipelineSettings,
 )
-from domain.settings.environment import (
-    DatabaseEnvironmentSnapshot,
-    EnvironmentSnapshot,
-)
+from domain.settings.environment import EnvironmentSnapshot
 
 ###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
@@ -196,23 +192,6 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ollama_url=coerce_str_or_none(os.getenv("OLLAMA_URL")),
         ollama_host=coerce_str_or_none(os.getenv("OLLAMA_HOST")),
         ollama_port=port,
-        database=DatabaseEnvironmentSnapshot(
-            embedded_database=coerce_str_or_none(os.getenv("EMBEDDED_DATABASE")),
-            backend=coerce_str_or_none(os.getenv("DATABASE_BACKEND")),
-            url=coerce_str_or_none(os.getenv("DATABASE_URL")),
-            sqlite_path=coerce_str_or_none(os.getenv("DATABASE_SQLITE_PATH")),
-            engine=coerce_str_or_none(os.getenv("DATABASE_ENGINE")),
-            host=coerce_str_or_none(os.getenv("DATABASE_HOST")),
-            port=coerce_str_or_none(os.getenv("DATABASE_PORT")),
-            database_name=coerce_str_or_none(os.getenv("DATABASE_NAME")),
-            username=coerce_str_or_none(os.getenv("DATABASE_USERNAME")),
-            password=coerce_str_or_none(os.getenv("DATABASE_PASSWORD")),
-            ssl=coerce_str_or_none(os.getenv("DATABASE_SSL")),
-            ssl_ca=coerce_str_or_none(os.getenv("DATABASE_SSL_CA")),
-            connect_timeout=coerce_str_or_none(os.getenv("DATABASE_CONNECT_TIMEOUT")),
-            write_batch_size=coerce_str_or_none(os.getenv("DATABASE_WRITE_BATCH_SIZE")),
-            read_page_size=coerce_str_or_none(os.getenv("DATABASE_READ_PAGE_SIZE")),
-        ),
     )
 
 ###############################################################################
@@ -258,107 +237,6 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     return JobsSettings(polling_interval=polling_interval)
 
 ###############################################################################
-def _parse_database_url(url: str | None) -> dict[str, Any]:
-    if not url:
-        return {}
-    parsed = urlparse(url)
-    database_name = parsed.path.lstrip("/") or None
-    return {
-        "engine": parsed.scheme or None,
-        "host": parsed.hostname or None,
-        "port": parsed.port,
-        "database_name": database_name,
-        "username": parsed.username or None,
-        "password": parsed.password or None,
-    }
-
-###############################################################################
-def _build_database_settings(
-    environment: DatabaseEnvironmentSnapshot,
-) -> DatabaseSettings:
-    url_payload = _parse_database_url(environment.url)
-    embedded_value = coerce_str_or_none(environment.embedded_database)
-    if embedded_value is not None:
-        backend = "sqlite" if coerce_bool(embedded_value, True) else "postgresql"
-    else:
-        backend = (coerce_str_or_none(environment.backend) or "sqlite").lower()
-    if backend not in {"sqlite", "postgresql"}:
-        raise RuntimeError("EMBEDDED_DATABASE must be a boolean value.")
-    write_batch_size = coerce_int(
-        environment.write_batch_size,
-        1000,
-        minimum=1,
-    )
-    commit_interval = 5
-    read_page_size = coerce_int(
-        environment.read_page_size,
-        1000,
-        minimum=100,
-    )
-    if backend == "sqlite":
-        return DatabaseSettings(
-            backend="sqlite",
-            url=None,
-            sqlite_path=coerce_str_or_none(environment.sqlite_path),
-            write_batch_size=write_batch_size,
-            read_page_size=read_page_size,
-            embedded_database=True,
-            engine=None,
-            host=None,
-            port=None,
-            database_name=None,
-            username=None,
-            password=None,
-            ssl=False,
-            ssl_ca=None,
-            connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
-            insert_batch_size=write_batch_size,
-            insert_commit_interval=commit_interval,
-            select_page_size=read_page_size,
-        )
-    engine_value = coerce_str_or_none(environment.engine) or coerce_str_or_none(
-        url_payload.get("engine")
-    )
-    host_value = coerce_str_or_none(environment.host) or coerce_str_or_none(
-        url_payload.get("host")
-    )
-    port_value = coerce_int(
-        environment.port or url_payload.get("port"),
-        5432,
-        minimum=1,
-        maximum=65535,
-    )
-    database_name = coerce_str_or_none(environment.database_name) or coerce_str_or_none(
-        url_payload.get("database_name")
-    )
-    username = coerce_str_or_none(environment.username) or coerce_str_or_none(
-        url_payload.get("username")
-    )
-    password = coerce_str_or_none(environment.password)
-    if password is None:
-        password = coerce_str_or_none(url_payload.get("password"))
-    ssl_ca = coerce_str_or_none(environment.ssl_ca)
-    return DatabaseSettings(
-        backend="postgresql",
-        url=environment.url,
-        sqlite_path=None,
-        write_batch_size=write_batch_size,
-        read_page_size=read_page_size,
-        embedded_database=False,
-        engine=(engine_value or "postgres").lower(),
-        host=host_value,
-        port=port_value,
-        database_name=database_name,
-        username=username,
-        password=password,
-        ssl=coerce_bool(environment.ssl, False),
-        ssl_ca=ssl_ca,
-        connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
-        insert_batch_size=write_batch_size,
-        insert_commit_interval=commit_interval,
-        select_page_size=read_page_size,
-    )
-
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     return DrugsMatcherSettings(
@@ -618,12 +496,6 @@ def build_settings_payload(
 ) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
-    database_environment = DatabaseEnvironmentSnapshot.model_validate(
-        {
-            key: (None if value is None else str(value))
-            for key, value in env.database.model_dump().items()
-        }
-    )
     jobs_payload = ensure_mapping(payload.get("jobs"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag_settings"))
@@ -634,7 +506,7 @@ def build_settings_payload(
     return {
         "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
-        "database": _build_database_settings(database_environment).model_dump(),
+        "database": database_settings(load_database_configuration()).model_dump(),
         "drugs_matcher": _build_drugs_matcher_settings(
             drugs_matcher_payload
         ).model_dump(),

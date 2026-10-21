@@ -8,7 +8,9 @@ import time
 
 import pytest
 from services.runtime.jobs import JobManager
+from services.runtime.state import JobState
 from services.session.session_service import ClinicalSessionService
+
 
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
@@ -67,6 +69,34 @@ def test_runner_job_id_detection_covers_supported_and_rejected_callables(
     runner, expected: bool
 ) -> None:  # type: ignore[no-untyped-def]
     assert JobManager().runner_accepts_job_id(runner) is expected
+
+###############################################################################
+@pytest.mark.parametrize("status", ["pending", "running"])
+def test_database_switch_rejects_jobs_that_own_database_state(status: str) -> None:
+    manager = JobManager()
+    manager.jobs["active"] = JobState(
+        job_id="active",
+        job_type="runtime_test",
+        status=status,
+    )
+
+    assert manager.begin_database_switch() is False
+    assert manager.accepting_jobs is True
+
+###############################################################################
+def test_database_switch_stops_job_admission_until_activation_finishes() -> None:
+    manager = JobManager()
+
+    assert manager.begin_database_switch() is True
+    assert manager.accepting_jobs is False
+    with pytest.raises(RuntimeError, match="shutting down"):
+        manager.start_job("runtime_test", dict)
+
+    manager.end_database_switch()
+    assert manager.accepting_jobs is True
+    job_id = manager.start_job("runtime_test", dict)
+    assert manager.get_job_status(job_id) is not None
+    assert manager.shutdown(timeout=1) is True
 
 ###############################################################################
 def test_running_cancel_remains_active_until_worker_exits() -> None:

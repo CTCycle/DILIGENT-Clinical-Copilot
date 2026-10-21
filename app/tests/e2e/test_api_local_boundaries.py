@@ -9,13 +9,15 @@ from typing import Any
 
 from playwright.sync_api import APIRequestContext
 
-
 SEED_PATIENT_NAME = "CI Browser Regression Subject"
 
 # Keep this matrix explicit so a newly published operation fails the Full
 # harness until it is assigned a deterministic success/error contract or an
 # already-validated external integration boundary.
 API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
+    ("GET", "/api/database/configuration"): "database.configuration-and-runtime-switch",
+    ("POST", "/api/database/test"): "database.connection-validation",
+    ("PUT", "/api/database/configuration"): "database.configuration-and-runtime-switch",
     ("GET", "/api/access-keys"): "access-keys.synthetic-lifecycle",
     ("POST", "/api/access-keys"): "access-keys.synthetic-lifecycle",
     ("DELETE", "/api/access-keys/{key_id}"): "access-keys.synthetic-lifecycle",

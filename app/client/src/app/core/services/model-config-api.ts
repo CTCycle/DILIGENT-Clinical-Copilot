@@ -22,6 +22,7 @@ import {
   HTTP_TIMEOUT,
   requestJson,
 } from "./http-api";
+import { serializeApplicationConfigurationWrite } from "./application-configuration-write-queue";
 
 const ACCESS_KEYS_TIMEOUT_SECONDS = 15;
 
@@ -39,13 +40,15 @@ export async function fetchModelConfigState(): Promise<ModelConfigStateResponse>
 export async function updateModelConfigState(
   payload: ModelConfigUpdateRequest,
 ): Promise<ModelConfigPersistResponse> {
-  return requestJson<ModelConfigPersistResponse>(`${API_BASE_URL}/model-config`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  return serializeApplicationConfigurationWrite(() =>
+    requestJson<ModelConfigPersistResponse>(`${API_BASE_URL}/model-config`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }),
+  );
 }
 
 export async function loadModelCatalog(

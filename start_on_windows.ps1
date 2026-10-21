@@ -430,6 +430,16 @@ function Import-DotEnv {
             continue
         }
         $key = $line.Substring(0, $separator).Trim()
+        if ($key -in @(
+            'EMBEDDED_DATABASE', 'DATABASE_BACKEND', 'DATABASE_URL',
+            'DATABASE_SQLITE_PATH', 'DILIGENT_SQLITE_PATH', 'DATABASE_ENGINE',
+            'DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_NAME', 'DATABASE_USERNAME',
+            'DATABASE_PASSWORD', 'DATABASE_SSL', 'DATABASE_SSL_CA',
+            'DATABASE_CONNECT_TIMEOUT', 'DATABASE_WRITE_BATCH_SIZE',
+            'DATABASE_READ_PAGE_SIZE'
+        )) {
+            continue
+        }
         $value = $line.Substring($separator + 1).Trim()
         if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
             ($value.StartsWith("'") -and $value.EndsWith("'"))) {
@@ -1790,11 +1800,22 @@ function Remove-AllData {
 
     $dataPathValue = if ($env:DILIGENT_DATA_PATH) { $env:DILIGENT_DATA_PATH } else { 'data' }
     $dataPath = Resolve-LauncherPath -Path $dataPathValue
-    $databasePath = if ($env:DILIGENT_SQLITE_PATH) {
-        Resolve-LauncherPath -Path $env:DILIGENT_SQLITE_PATH
-    }
-    else {
-        Join-Path $dataPath 'database.db'
+    $databaseConfigPath = Join-Path $dataPath 'database_config.json'
+    $databasePath = Join-Path $dataPath 'database.db'
+    if (Test-Path -LiteralPath $databaseConfigPath) {
+        try {
+            $databaseConfig = Get-Content -LiteralPath $databaseConfigPath -Raw | ConvertFrom-Json
+            if ($databaseConfig.database.backend -eq 'sqlite' -and $databaseConfig.database.sqlite_path) {
+                $databasePath = Resolve-LauncherPath -Path $databaseConfig.database.sqlite_path
+            }
+            elseif ($databaseConfig.database.backend -eq 'postgresql') {
+                $databasePath = $null
+            }
+        }
+        catch {
+            Write-Info 'Database configuration could not be read; local data cleanup will preserve the database file.'
+            $databasePath = $null
+        }
     }
     $keyMaterialPath = if ($env:DILIGENT_ACCESS_KEY_MATERIAL_FILE) {
         Resolve-LauncherPath -Path $env:DILIGENT_ACCESS_KEY_MATERIAL_FILE
@@ -1805,9 +1826,7 @@ function Remove-AllData {
 
     $targets = @(
         [pscustomobject]@{ Path = $EnvFile; Label = 'local settings' },
-        [pscustomobject]@{ Path = $databasePath; Label = 'SQLite database' },
-        [pscustomobject]@{ Path = ('{0}-wal' -f $databasePath); Label = 'SQLite write-ahead log' },
-        [pscustomobject]@{ Path = ('{0}-shm' -f $databasePath); Label = 'SQLite shared-memory file' },
+        [pscustomobject]@{ Path = $databaseConfigPath; Label = 'database connection settings' },
         [pscustomobject]@{ Path = $keyMaterialPath; Label = 'access-key material' },
         [pscustomobject]@{ Path = (Join-Path $RuntimeCacheDir 'logs'); Label = 'application logs' },
         [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/archives'); Label = 'downloaded source archives' },
@@ -1816,6 +1835,13 @@ function Remove-AllData {
         [pscustomobject]@{ Path = (Join-Path $dataPath 'exports'); Label = 'user exports' },
         [pscustomobject]@{ Path = (Join-Path $dataPath 'state'); Label = 'runtime state' }
     )
+    if ($databasePath) {
+        $targets += @(
+            [pscustomobject]@{ Path = $databasePath; Label = 'SQLite database' },
+            [pscustomobject]@{ Path = ('{0}-wal' -f $databasePath); Label = 'SQLite write-ahead log' },
+            [pscustomobject]@{ Path = ('{0}-shm' -f $databasePath); Label = 'SQLite shared-memory file' }
+        )
+    }
 
     $removed = 0
     $skipped = 0
@@ -1825,7 +1851,7 @@ function Remove-AllData {
         $skipped += $result.Skipped
     }
 
-    if ($env:EMBEDDED_DATABASE -and $env:EMBEDDED_DATABASE -notmatch '^(?i:true)$') {
+    if ($null -eq $databasePath) {
         Write-Info 'External database mode is configured; no external database was modified.'
     }
     if ($skipped -gt 0) {
@@ -2025,7 +2051,7 @@ function Test-FrozenBackend {
     $sessionSecret = [guid]::NewGuid().ToString('N')
     foreach ($pair in @{
         DILIGENT_DESKTOP='true'; DILIGENT_DESKTOP_SESSION_SECRET=$sessionSecret; DILIGENT_RELEASE_VERSION=$Version; DILIGENT_RUNTIME_ROOT=(Join-Path $StageRoot 'runtime-stage')
-        DILIGENT_DATA_ROOT=$dataRoot; DILIGENT_SQLITE_PATH=(Join-Path $dataRoot 'database.db')
+        DILIGENT_DATA_ROOT=$dataRoot
         DILIGENT_ACCESS_KEY_MATERIAL_FILE=(Join-Path $dataRoot 'access-key-material.json'); RELOAD='false'
     }.GetEnumerator()) { $psi.Environment[$pair.Key] = [string]$pair.Value }
     $process = [Diagnostics.Process]::new()

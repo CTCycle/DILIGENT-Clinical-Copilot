@@ -1,0 +1,67 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host { display: block; min-width: 0; }
+
+.database-settings-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  align-items: flex-start;
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.database-settings-header h2 { margin: 0; font-size: var(--font-xl); line-height: 1.2; }
+.database-settings-header p { margin: var(--space-xs) 0 0; color: var(--color-text-secondary); font-size: var(--font-sm); line-height: 1.5; }
+
+.database-active-badge {
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+}
+
+.database-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-status-success-text); }
+.database-settings-form { margin-top: var(--space-lg); }
+.database-setting-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 400px); gap: var(--space-xl); align-items: center; padding: var(--space-md) 0; border-bottom: 1px solid var(--color-divider); }
+.database-setting-copy { display: grid; gap: var(--space-xs); min-width: 0; }
+.database-setting-copy strong { font-size: var(--font-base); }
+.database-setting-copy span { color: var(--color-text-secondary); font-size: var(--font-sm); line-height: 1.4; }
+.database-setting-row input, .database-setting-row select, .database-fields-grid input { width: 100%; min-width: 0; min-height: var(--control-height-sm); padding: 0 var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-primary); font: inherit; }
+.database-setting-row input:focus-visible, .database-setting-row select:focus-visible, .database-fields-grid input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.database-fields-grid { display: grid; grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1fr); gap: var(--space-sm) var(--space-md); align-items: center; }
+.database-fields-grid label { color: var(--color-text-secondary); font-size: var(--font-sm); }
+.database-password-control { display: grid; gap: 4px; }
+.database-password-control small { color: var(--color-text-muted); font-size: var(--font-xs); }
+.database-checkbox-label { grid-column: 1; }
+.database-fields-grid .database-checkbox { width: 18px; min-height: 18px; justify-self: start; accent-color: var(--color-brand); }
+.database-advanced-options { margin-top: var(--space-md); padding: var(--space-md) 0; border-bottom: 1px solid var(--color-divider); }
+.database-advanced-options summary { width: fit-content; color: var(--color-text-primary); font-size: var(--font-sm); font-weight: 600; cursor: pointer; }
+.database-advanced-options .database-fields-grid { max-width: 620px; margin-top: var(--space-md); }
+.database-feedback { margin: var(--space-md) 0 0; font-size: var(--font-sm); line-height: 1.45; }
+.database-feedback-success { color: var(--color-status-success-text); }
+.database-feedback-error, .database-settings-error { color: var(--color-status-error-text); }
+.database-settings-state { padding: var(--space-xl) 0; color: var(--color-text-secondary); }
+.database-settings-actions { display: flex; justify-content: space-between; gap: var(--space-lg); align-items: center; padding-top: var(--space-lg); }
+.database-settings-footnote { color: var(--color-text-secondary); font-size: var(--font-sm); }
+.database-settings-buttons { display: flex; gap: var(--space-sm); justify-content: flex-end; }
+.database-settings-buttons .btn { min-height: var(--control-height-md); padding: 0 var(--space-md); }
+.database-settings-buttons button:disabled { cursor: not-allowed; opacity: 0.6; }
+
+@media (max-width: 850px) {
+  .database-setting-row { grid-template-columns: 1fr; gap: var(--space-md); }
+  .database-settings-actions { align-items: flex-start; flex-direction: column; }
+  .database-settings-buttons { width: 100%; justify-content: flex-start; }
+}
+
+@media (max-width: 520px) {
+  .database-settings-header { flex-direction: column; }
+  .database-fields-grid { grid-template-columns: 1fr; }
+  .database-checkbox-label { grid-column: auto; }
+}

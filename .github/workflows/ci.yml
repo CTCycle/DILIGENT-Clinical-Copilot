@@ -69,10 +69,9 @@ jobs:
       - name: Validate Alembic migrations and metadata drift
         working-directory: app/server
         env:
-          EMBEDDED_DATABASE: "true"
-          DILIGENT_SQLITE_PATH: ${{ github.workspace }}/runtimes/cache/pytest/ci/alembic-check.sqlite3
+          DILIGENT_DATA_PATH: ${{ github.workspace }}/runtimes/cache/pytest/ci/alembic-check
         run: |
-          mkdir -p "$(dirname "$DILIGENT_SQLITE_PATH")"
+          mkdir -p "$DILIGENT_DATA_PATH"
           python -m alembic -c alembic.ini upgrade head
           python -m alembic -c alembic.ini current --check-heads
           python -m alembic -c alembic.ini check
@@ -198,8 +197,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     env:
-      DATABASE_BACKEND: sqlite
-      EMBEDDED_DATABASE: 'true'
       APP_TEST_BACKEND_URL: http://127.0.0.1:7690
       APP_TEST_FRONTEND_URL: http://127.0.0.1:9847
       FASTAPI_HOST: 127.0.0.1

@@ -8,10 +8,11 @@ import shutil
 from functools import lru_cache
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 from common import paths
 from common.utils.logger import logger
+from configurations.database_config import LEGACY_DATABASE_ENVIRONMENT_KEYS
 from domain.bootstrap import EnvironmentBootstrapState
 from configurations.runtime_bootstrap import ensure_runtime_data_layout
 
@@ -48,9 +49,12 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
             shutil.copyfile(example_path, env_path)
             logger.info("Created %s from %s", env_path, example_path)
         if env_path.exists():
-            # Deployment and CI environment variables must be able to override
-            # machine-local values committed to or supplied by the .env file.
-            load_dotenv(dotenv_path=env_path, override=False)
+            # Database connection values are migrated once into the independent
+            # database config file and never enter the process environment.
+            for key, value in dotenv_values(env_path).items():
+                if key in LEGACY_DATABASE_ENVIRONMENT_KEYS or value is None:
+                    continue
+                os.environ.setdefault(key, str(value))
         state.dotenv_injected_keys.clear()
         state.dotenv_injected_keys.update(set(os.environ.keys()) - previous_keys)
         state.bootstrap.bootstrapped = True

@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from api.access_keys import router as access_keys_router
 from api.data_inspection import router as data_inspection_router
 from api.desktop import router as desktop_router
+from api.database import router as database_router
 from api.error_handling import register_error_handling
 from api.health import router as health_router
 from api.model_config import router as model_config_router
@@ -37,13 +38,17 @@ from common.paths import (
     CLIENT_INDEX_FILE_PATH,
 )
 from common.security.desktop import DesktopSecurityMiddleware
+from middleware.database_switch import DatabaseSwitchMiddleware
 from common.version import resolve_application_version
 from configurations.startup import (
     get_server_settings,
     initialize_settings,
     reload_persisted_settings,
 )
-from repositories.database.initializer import ensure_database_ready
+from repositories.database.initializer import (
+    ensure_database_ready,
+    remove_legacy_database_configuration,
+)
 from services.catalogs.runtime import initialize_reference_catalog_provider
 from services.inspection.revision_recovery import reconcile_interrupted_revision_jobs
 from services.retrieval.embedding_runtime import close_embedding_runtime
@@ -85,6 +90,7 @@ def redirect_root_to_docs() -> RedirectResponse:
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     bootstrap_settings = get_server_settings()
     ensure_database_ready(bootstrap_settings.database)
+    remove_legacy_database_configuration()
     settings = reload_persisted_settings()
     job_manager = get_job_manager()
     job_manager.begin_startup()
@@ -117,6 +123,7 @@ def create_app() -> FastAPI:
         DesktopSecurityMiddleware,
         security=desktop_runtime.security,
     )
+    application.add_middleware(DatabaseSwitchMiddleware)
     for router in (
         session_router,
         data_inspection_router,
@@ -124,6 +131,7 @@ def create_app() -> FastAPI:
         ollama_router,
         model_config_router,
         settings_router,
+        database_router,
         access_keys_router,
         desktop_router,
     ):

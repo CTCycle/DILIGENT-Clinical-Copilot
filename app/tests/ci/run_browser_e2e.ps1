@@ -4,7 +4,9 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Full', 'LiveProvider')]
-    [string]$Suite = 'Full'
+    [string]$Suite = 'Full',
+    [ValidateSet('chrome', 'msedge')]
+    [string]$BrowserChannel
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,26 +79,22 @@ function Stop-ProcessTree($process) {
     if ($null -eq $process) { return }
     $process.Refresh()
     if (-not $process.HasExited) {
-        & taskkill.exe /PID $process.Id /T /F *> $null
+        try {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        catch {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
 New-Item -ItemType Directory -Path @($cacheRoot, $pytestCacheDir, $logDir) -Force | Out-Null
 $runRoot = Join-Path $pytestCacheDir "browser-e2e-$Suite"
 New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
-$databasePath = $env:DILIGENT_SQLITE_PATH
-if ([string]::IsNullOrWhiteSpace($databasePath)) {
-    $databasePath = Join-Path $runRoot 'diligent.sqlite3'
-}
-$databaseParent = Split-Path -Parent $databasePath
-if ([string]::IsNullOrWhiteSpace($databaseParent)) {
-    $databaseParent = $runRoot
-}
-New-Item -ItemType Directory -Path $databaseParent -Force | Out-Null
-$env:DATABASE_BACKEND = 'sqlite'
-$env:EMBEDDED_DATABASE = 'true'
-$env:DATABASE_SQLITE_PATH = $databasePath
-$env:DILIGENT_SQLITE_PATH = $databasePath
+$env:DILIGENT_DATA_PATH = Join-Path $runRoot 'data'
+New-Item -ItemType Directory -Path $env:DILIGENT_DATA_PATH -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repoRoot 'data/catalogs') -Destination $env:DILIGENT_DATA_PATH -Recurse -Force
 $env:DILIGENT_ACCESS_KEY_MATERIAL_FILE = Join-Path $runRoot 'access-key-material.json'
 $env:APP_TEST_FRONTEND_URL = 'http://127.0.0.1:9847'
 $env:APP_TEST_BACKEND_URL = 'http://127.0.0.1:7690'
@@ -178,6 +176,9 @@ try {
             '--junitxml',
             $junitPath
         )
+    }
+    if (-not [string]::IsNullOrWhiteSpace($BrowserChannel)) {
+        $testArguments += @('--browser-channel', $BrowserChannel)
     }
     & $python -m pytest @testArguments
     $pytestExitCode = $LASTEXITCODE

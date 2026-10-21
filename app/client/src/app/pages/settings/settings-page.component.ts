@@ -19,5 +19,6 @@ export class SettingsPageComponent {
     { path: '/settings/integrations', label: 'Integrations' },
     { path: '/settings/matching', label: 'Drug Matching' },
     { path: '/settings/advanced', label: 'Advanced' },
+    { path: '/settings/database', label: 'Database' },
   ] as const;
 }

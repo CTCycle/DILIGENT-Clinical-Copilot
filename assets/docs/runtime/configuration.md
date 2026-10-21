@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -18,8 +18,8 @@ its provider rejects a request; the persisted fallback warning includes the
 operation and sanitized upstream detail when available.
 
 ## Primary Runtime Files
-- Active env file: `settings/.env`
-- Env template: `settings/.env.example`
+- Process and deployment settings: `settings/.env` and `settings/.env.example`
+- Database connection settings only: `<data-root>/database_config.json`
 - Database-backed operational settings: the singleton `application_configuration`
   row, edited through the Settings UI and typed `/api/settings` endpoints
 
@@ -29,7 +29,6 @@ operation and sanitized upstream detail when available.
 - `DILIGENT_RELEASE_VERSION=major.minor.patch`
 - `DILIGENT_RUNTIME_ROOT=<absolute extracted immutable runtime root>`
 - `DILIGENT_DATA_ROOT=<absolute persistent user-data root>`
-- `DILIGENT_SQLITE_PATH=<absolute data database path>`
 - `DILIGENT_ACCESS_KEY_MATERIAL_FILE=<absolute protected key-material path>`
 - `RELOAD=false`
 
@@ -54,10 +53,11 @@ The Tauri shell sets these desktop-only variables when it starts the frozen back
 - `DILIGENT_DATA_PATH=data`
 
 This optional path relocates the source-mode data tree. Relative paths are
-resolved from the repository root. The embedded SQLite database defaults to
-`<data-root>/database.db`; an explicit `DILIGENT_SQLITE_PATH` still takes
-precedence. Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and
-`DILIGENT_DATA_ROOT` instead.
+resolved from the repository root. The database configuration file is stored
+at `<data-root>/database_config.json`; SQLite defaults to
+`<data-root>/database.db` unless a different file path is selected in Settings.
+Packaged desktop mode uses `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT`
+instead.
 
 At startup, the backend migrates known mutable entries from the former
 `resources` layout into the active `data` root. Packaged mode checks
@@ -69,9 +69,11 @@ conflict; identical duplicate files are removed from the legacy location.
 
 ## Operational Settings By Source
 - `settings/.env`
-  - database mode and connection settings
   - local host and port values
   - data paths, Ollama endpoints, deployment values, and secrets
+- `<data-root>/database_config.json`
+  - selected database backend and its connection parameters only
+  - PostgreSQL password protected with Windows DPAPI; no application settings
 - `application_configuration` database singleton
   - job polling interval
   - model/provider selections and access-key references
@@ -134,10 +136,11 @@ authentication, and provider-side errors still fail promptly.
 
 ## Feature Toggles
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.
-- Database mode, embedded SQLite versus PostgreSQL, is controlled by `settings/.env`.
+- Database mode, SQLite versus PostgreSQL, is selected in Settings and stored in
+  `database_config.json`.
 - Alembic migrations run during installation and every application startup.
-  Catalog seeding occurs during explicit initialization, or on the first startup
-  that creates a database. Existing databases are migrated but not reseeded.
+  Catalog seeding occurs during explicit initialization, or when startup finds
+  a new application schema or an empty reference catalog.
 
 ## RAG Defaults
 - RAG uses `ibm-granite/granite-embedding-97m-multilingual-r2` at the pinned revision and AVX2 quantized ONNX artifact declared in `app/server/common/embedding/config.py`.
@@ -147,36 +150,33 @@ authentication, and provider-side errors still fail promptly.
 - RAG manifests report physical supported-file count, unique ingested-document count, and duplicate-file count separately. Embedding and chunking occur once per canonical source.
 ## Database configuration
 
-Use one canonical database contract:
+The Database section in Settings is the only supported editor for database
+connections. The versioned JSON file contains the selected backend, SQLite
+path or PostgreSQL host/port/database/user/SSL settings, timeouts, and batch
+sizes. It contains no unrelated application settings and is independent of the
+database it configures. Writes use a validated temporary file followed by an
+atomic replacement. A PostgreSQL password is protected with Windows DPAPI for
+the current user; API responses never return it.
 
-```text
-###############################################################################
-# Database Mode
-###############################################################################
-EMBEDDED_DATABASE=true
+SQLite and PostgreSQL through `postgresql+psycopg` are the supported backends.
+There are no active database environment variables. For a one-time migration,
+when `database_config.json` does not exist, legacy database keys may be read
+from `.env` or the process environment; the resulting file becomes canonical
+and legacy keys are removed from `.env`. Later launches ignore those keys.
 
-###############################################################################
-# External Database Connection
-###############################################################################
-DATABASE_URL=
-DATABASE_ENGINE=postgresql+psycopg
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=DILIGENT
-DATABASE_USERNAME=postgres
-DATABASE_PASSWORD=
+Database connection settings are separate from all other settings. The active
+database's `application_configuration` row is the sole persistent source for
+operational settings, model configuration, and other UI-managed application
+settings. Switching databases does not copy or merge rows.
 
-###############################################################################
-# External Database Security And Performance
-###############################################################################
-DATABASE_SSL=false
-DATABASE_SSL_CA=
-DATABASE_CONNECT_TIMEOUT=30
-DATABASE_WRITE_BATCH_SIZE=1000
-DATABASE_READ_PAGE_SIZE=1000
-```
-
-Set `EMBEDDED_DATABASE=true` for SQLite or `false` for PostgreSQL.
+Database backend and connection changes can be applied live through Settings.
+New API requests pause while existing API work drains; switching is rejected
+while background jobs are pending or running. The target is initialized and
+verified before its config is saved, and failed activation restores the prior
+connection. Restart the application when changing the data root, packaged
+runtime, access-key-material location, or any startup-only process/deployment
+setting. If automatic service rebinding cannot recover after a failed switch,
+restart to reload the saved working configuration.
 
 Provider access-key encryption material is external to the database. Set
 `DILIGENT_ACCESS_KEY_MATERIAL_FILE` to a protected local file (or inject the

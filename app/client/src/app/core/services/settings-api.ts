@@ -8,6 +8,7 @@ import {
   RuntimeSettingsUpdateRequest,
 } from '../models/settings';
 import { requestJson } from './http-api';
+import { serializeApplicationConfigurationWrite } from './application-configuration-write-queue';
 
 export async function fetchRuntimeSettings(): Promise<RuntimeSettingsStateResponse> {
   return requestJson<RuntimeSettingsStateResponse>(`${API_BASE_URL}/settings`, {
@@ -23,18 +24,22 @@ export async function fetchRuntimeSettings(): Promise<RuntimeSettingsStateRespon
 export async function updateRuntimeSettings(
   payload: RuntimeSettingsUpdateRequest,
 ): Promise<RuntimeSettingsStateResponse> {
-  return requestJson<RuntimeSettingsStateResponse>(`${API_BASE_URL}/settings`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  return serializeApplicationConfigurationWrite(() =>
+    requestJson<RuntimeSettingsStateResponse>(`${API_BASE_URL}/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  );
 }
 
 export async function resetRuntimeSettingsCategory(
   category: RuntimeSettingsCategory,
 ): Promise<RuntimeSettingsStateResponse> {
-  return requestJson<RuntimeSettingsStateResponse>(
-    `${API_BASE_URL}/settings/reset/${encodeURIComponent(category)}`,
-    { method: 'POST' },
+  return serializeApplicationConfigurationWrite(() =>
+    requestJson<RuntimeSettingsStateResponse>(
+      `${API_BASE_URL}/settings/reset/${encodeURIComponent(category)}`,
+      { method: 'POST' },
+    ),
   );
 }

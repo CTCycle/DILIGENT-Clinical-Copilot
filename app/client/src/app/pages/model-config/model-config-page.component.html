@@ -463,7 +463,11 @@
       </aside>
     </div>
 
-  <app-status-message [message]="statusMessage()" [tone]="statusTone()"></app-status-message>
+  <app-status-message
+    [message]="statusMessage()"
+    [tone]="statusTone()"
+    presentation="inline"
+  ></app-status-message>
 
   <app-access-key-modal
     [isOpen]="openProviderModal() !== null"

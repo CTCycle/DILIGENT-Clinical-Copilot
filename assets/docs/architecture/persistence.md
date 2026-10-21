@@ -1,11 +1,21 @@
 # Persistence
-Last updated: 2026-10-18
+Last updated: 2026-10-20
 
 ## Relational Database
 
 - SQLAlchemy-backed storage.
-- Database mode and connection settings are sourced from `settings/.env`.
-- SQLite uses `<data-root>/database.db` when `database.embedded_database=true`; the source-mode data root defaults to `data` and can be overridden with `DILIGENT_DATA_PATH`. PostgreSQL is used in external database mode.
+- The selected backend and database connection settings are read from
+  `<data-root>/database_config.json`, independently of the configured database.
+- Supported backends are SQLite and PostgreSQL through `psycopg`. SQLite uses
+  `<data-root>/database.db` unless a different path is selected in Settings;
+  source-mode data root defaults to `data` and can be overridden with
+  `DILIGENT_DATA_PATH`.
+- The configuration file contains only database connection settings. It is
+  versioned, schema-validated, and atomically replaced. PostgreSQL passwords
+  are protected with Windows DPAPI and excluded from API responses.
+- All other UI-managed application settings, including the
+  `application_configuration` singleton, are stored only in the active database.
+  No JSON fallback or synchronization between databases is used.
 
 ## Relational Model
 
@@ -255,12 +265,14 @@ erDiagram
 - RxNorm persistence uses `drug_rxnorm_codes` as the canonical RxCUI mapping table.
 - Explicit database initialization seeds the canonical manifests after Alembic
   reaches head.
-- SQLite startup creates the configured `.db` when missing, migrates it, and
-  seeds once. Existing SQLite files are migrated but not reseeded.
+- SQLite startup creates the configured `.db` when missing and applies
+  migrations. A new app schema or empty reference catalog is seeded; populated
+  databases are not reset.
 - PostgreSQL startup connects to the configured database, creates it when the
-  configured credentials permit creation, migrates it, and seeds only a newly
-  created database. Existing databases are not reset or reseeded during normal
-  startup.
+  configured credentials permit creation, and applies migrations. A new app
+  schema or empty reference catalog is seeded. Existing application settings
+  and user data are preserved; startup does not copy records from another
+  database.
 - Full reseed or reset remains explicit through `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs`.
 
 ## Vector Persistence

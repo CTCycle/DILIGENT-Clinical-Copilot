@@ -19,14 +19,33 @@ router = APIRouter(prefix="/inspection", tags=["inspection"])
 ###############################################################################
 def register_inspection_routes(router: APIRouter) -> None:
     service = build_data_inspection_service(get_job_manager())
-    InspectionSessionEndpoint(router=router, service=service).add_routes()
-    InspectionRevisionEndpoint(router=router, service=service).add_routes()
-    InspectionTimelineEndpoint(router=router, service=service).add_routes()
+    endpoints = [
+        InspectionSessionEndpoint(router=router, service=service),
+        InspectionRevisionEndpoint(router=router, service=service),
+        InspectionTimelineEndpoint(router=router, service=service),
+    ]
+    for endpoint in endpoints:
+        endpoint.add_routes()
     catalog_endpoint = InspectionCatalogEndpoint(router=router, service=service)
     catalog_endpoint.add_routes()
-    InspectionDiliRankEndpoint(router=router, service=service).add_routes()
-    InspectionRagEndpoint(router=router, service=service).add_routes()
+    endpoints.append(catalog_endpoint)
+    endpoints.extend(
+        [
+            InspectionDiliRankEndpoint(router=router, service=service),
+            InspectionRagEndpoint(router=router, service=service),
+        ]
+    )
+    for endpoint in endpoints[-2:]:
+        endpoint.add_routes()
     catalog_endpoint.add_update_job_discovery_route()
+    _inspection_endpoints.extend(endpoints)
 
 
+_inspection_endpoints = []
 register_inspection_routes(router)
+
+
+def rebind_database_services() -> None:
+    service = build_data_inspection_service(get_job_manager())
+    for endpoint in _inspection_endpoints:
+        endpoint.service = service

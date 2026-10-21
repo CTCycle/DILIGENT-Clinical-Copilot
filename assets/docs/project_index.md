@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -15,10 +15,14 @@ branch-status record.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
 - The latest published desktop release is `v3.4.0` (2026-10-18), tagged at `d4efa5e0bccfa552c80a5edeff2168bfaa718639`. Its unsigned portable EXE and MSI digests, hosted gates, native validation, and publication readback are recorded in the [release-gate report](../QA/release-gates-20261018/report.md) and [desktop release procedure](runtime/desktop_release.md), separately from product validation components.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
-- Runtime-manageable values are persisted in the database `application_configuration`
-  singleton and exposed through the centralized Settings area and typed
-  `/api/settings` endpoints; `.env` and environment-variable configuration
-  remain outside the UI and API.
+- Runtime-managed application settings are persisted in the active database's
+  `application_configuration` singleton. The selected backend and its
+  connection settings live independently in `<data-root>/database_config.json`;
+  `.env` and process environment variables do not configure database access.
+- The Settings area includes a Database section for SQLite and PostgreSQL
+  (`psycopg`) connection setup, testing, and controlled live switching. A
+  switch drains API work, blocks while background jobs are active, reloads
+  database-backed settings, and restores the prior backend on activation failure.
 - The revision workflow is a bounded, persisted agentic workflow with context, planning, allow-listed tool traces, deterministic patch validation, QA, artifacts, and optional `agentic_revision` session finalization.
 - Running job cancellation is cooperative: pending jobs can become terminal immediately, while a running stop-requested worker remains active and occupies its concurrency scope until it exits.
 - The standard CI workflow runs the existing Angular/Vitest suite with `npm run test -- --no-watch` in addition to the frontend build.
@@ -27,7 +31,7 @@ branch-status record.
 - Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> DILIrank; RAG has a separate job and control. RxNav and LiverTox source-owned records are reconciled only after a complete successful snapshot is prepared.
 - Desktop release uses manual `prepare`/`publish` workflow modes. Preparation validates synchronized `main`/`develop`, backend/frontend, browser/provider E2E, security, explicit signing status, and Windows lifecycle gates; publication promotes the exact candidate after protected-environment operator review. Any unavailable host checks are recorded as waivers, not passes. These are release prerequisites, not product validation gates.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, clinical-session preview, and runtime-settings surfaces.
-- The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, Drug Matching, and Advanced pages with persistent left navigation.
+- The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Data Inspection, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, Drug Matching, Advanced, and Database pages with persistent left navigation.
 - FDA DILIrank 2.0 is a structured drug-level hepatotoxicity knowledge source. Its complete source snapshot is persisted separately, only canonical or trusted LiverTox/RxNorm identity links are eligible for clinical use, and unlinked or ambiguous source rows remain inspectable without becoming patient-level causality evidence.
 - The canonical current operational status of these capabilities is maintained in [`project_status_ledger.md`](project_status_ledger.md). This index and the detailed validation documents describe the ontology and evidence that support that status; they do not replace the ledger.
 
