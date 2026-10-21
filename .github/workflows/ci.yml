@@ -72,6 +72,8 @@ jobs:
           DILIGENT_DATA_PATH: ${{ github.workspace }}/runtimes/cache/pytest/ci/alembic-check
         run: |
           mkdir -p "$DILIGENT_DATA_PATH"
+          mkdir -p "$DILIGENT_DATA_PATH/catalogs"
+          cp -R "$GITHUB_WORKSPACE/data/catalogs/." "$DILIGENT_DATA_PATH/catalogs/"
           python -m alembic -c alembic.ini upgrade head
           python -m alembic -c alembic.ini current --check-heads
           python -m alembic -c alembic.ini check

@@ -141,6 +141,14 @@ try {
         $fakeOllamaReady = $true
     }
 
+    if ($Suite -eq 'LiveProvider') {
+        $seedScript = Join-Path $repoRoot 'app/tests/ci/seed_live_provider_database.py'
+        & $python $seedScript
+        if ($LASTEXITCODE -ne 0) {
+            throw "Live-provider browser database seed failed with exit code $LASTEXITCODE."
+        }
+    }
+
     $backend = Start-Process -FilePath $python -ArgumentList '-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7690' -WorkingDirectory $serverDir -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -WindowStyle Hidden -PassThru
     if (-not (Wait-HttpReady 'http://127.0.0.1:7690/api/health') -or -not (Wait-HttpReady 'http://127.0.0.1:7690/api/model-config')) {
         Write-Diagnostics 'backend readiness failure' $backend $backendOut $backendErr

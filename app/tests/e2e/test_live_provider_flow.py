@@ -17,12 +17,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 import pytest
 from playwright.sync_api import APIRequestContext, Page
-from repositories.context import RepositoryContext
-from repositories.drug_catalog_repository import DrugCatalogRepository
-from repositories.knowledge_repository import KnowledgeRepository
 
 LIVE_PROVIDER_ENABLED = os.getenv("DILIGENT_LIVE_PROVIDER_E2E", "").strip().lower() in {
     "1",
@@ -44,38 +40,6 @@ pytestmark = pytest.mark.skipif(
     not LIVE_PROVIDER_ENABLED,
     reason="Set DILIGENT_LIVE_PROVIDER_E2E=1 to run the live provider gate.",
 )
-
-###############################################################################
-def _seed_release_gate_catalogs() -> None:
-    """Provide the minimum public catalog evidence required by clinical preflight."""
-
-    context = RepositoryContext.create()
-    DrugCatalogRepository(context).upsert_drugs_catalog_records(
-        [
-            {
-                "rxcui": "723",
-                "raw_name": "amoxicillin",
-                "term_type": "IN",
-                "name": "amoxicillin",
-                "brand_names": "Amoxil",
-                "synonyms": "amoxicillin",
-            }
-        ]
-    )
-    KnowledgeRepository(context).save_livertox_records(
-        pd.DataFrame(
-            [
-                {
-                    "drug_name": "amoxicillin",
-                    "nbk_id": "NBK548517",
-                    "synonyms": "amoxicillin",
-                    "excerpt": "Synthetic release-gate catalog evidence for amoxicillin.",
-                    "include_in_livertox": True,
-                    "source_url": "https://www.ncbi.nlm.nih.gov/books/NBK548517/",
-                }
-            ]
-        )
-    )
 
 ###############################################################################
 def _clinical_input() -> str:
@@ -288,7 +252,6 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
             "DILIGENT_LIVE_PROVIDER_E2E=1 requires the OPENCODE_GO_API_KEY secret."
         )
 
-    _seed_release_gate_catalogs()
     created_key_id: int | None = None
     job_id: str | None = None
     session_id: int | None = None
