@@ -21,19 +21,19 @@ Release acceptance recorded a manual-edit metadata issue that remains in the cur
 
 ## Packaging architecture
 
-The Windows desktop application uses a Tauri 2 shell under app/desktop/src-tauri. The build creates the Angular production bundle, freezes the FastAPI backend with PyInstaller, verifies the frozen service against an isolated SQLite database, places an allowlisted runtime into a deterministic archive, and embeds that archive in the portable executable and optional MSI.
+The Windows desktop application uses a Tauri 2 shell under `app/desktop/src-tauri`. The build creates the Angular production bundle, stages the SPA and startup splash as Tauri frontend assets, freezes the API backend with PyInstaller, verifies the frozen service against an isolated SQLite database, places the backend and required catalogs into an allowlisted deterministic runtime archive, and embeds that archive in the portable executable and optional MSI. The backend archive excludes `app/client/dist/browser`; Tauri owns the frontend files and resolves client-side routes to its bundled `index.html`.
 
 The packaged runtime excludes source, tests, documentation, credentials, .env files, databases, logs, models, vectors, documents, caches, and development runtimes. The shell uses the system WebView2 runtime. The MSI can include an offline WebView2 installer when built with the offline option.
 
 ## Runtime and user data
 
-At launch, the shell verifies and extracts the embedded runtime beneath:
+At launch, the shell shows the bundled startup splash, verifies and extracts the embedded backend runtime beneath:
 
 ~~~text
 %LOCALAPPDATA%\DILIGENT\rt\<version>\<payload-sha256>
 ~~~
 
-It starts the backend on a random localhost port, waits for the ready file and health response, and then opens the authenticated local interface. The backend is attached to a Windows Job Object and is asked to shut down cooperatively when the shell exits, with a bounded hard-kill fallback.
+It starts the backend on a random localhost port, waits for the ready file and health response, then loads the bundled Angular interface from Tauri's local origin. The shell passes the API origin and one-time session token to the frontend; API requests include `X-DILIGENT-Desktop-Session`. The backend accepts CORS only from `http://tauri.localhost` and keeps the API bound to loopback. The backend is attached to a Windows Job Object and is asked to shut down cooperatively when the shell exits, with a bounded process termination fallback recorded in the backend log.
 
 Mutable settings, the SQLite database, logs, embedding cache, source catalogs, and application state live beneath:
 
@@ -45,7 +45,7 @@ Removing a package or MSI does not remove this user data. Versioned, hash-addres
 
 ## Desktop dialogs
 
-The Tauri surface uses the native operating-system directory picker for path-only RAG folder selection. Its dialog capability is limited to opening a directory for the authenticated localhost backend; it does not grant general filesystem or shell access.
+The bundled Tauri surface uses the native operating-system directory picker for path-only RAG folder selection. Its local-window capability grants the dialog plugin's directory picker and does not grant general filesystem or shell access to remote content.
 
 Clinical-session attachments and patient profile images use normal HTML file inputs because those workflows require browser File objects. In non-Tauri source mode, the local backend provides directory navigation for RAG selection and returns the canonical path used by vectorization.
 
@@ -63,7 +63,7 @@ The portable EXE, MSI, and SHA-256 manifest are written under `release/`. Launch
 
 ### Local packaged smoke
 
-For a local portable startup check, verify the EXE against its SHA-256 manifest, open it, and confirm the window title is DILIGENT Clinical Copilot. Check `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`, request `/api/health` on its recorded port, and confirm the backend log shows successful startup and static-asset requests. This smoke does not replace the hosted MSI lifecycle, provider E2E, native operator acceptance, or publication readback.
+For a local portable startup check, verify the EXE against its SHA-256 manifest, open it, and confirm the DILIGENT interface appears. Reload a client-side route such as `/clinical-sessions`, confirm the bundled CSS/JavaScript load, and check `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` plus `/api/health` on its recorded port. Confirm the frontend can access a protected API after bootstrap, then close the window and verify the backend PID exits and its port closes. The backend log is `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`. This smoke does not replace the hosted MSI lifecycle, provider E2E, native operator acceptance, or publication readback.
 
 ## Prepare and publish
 

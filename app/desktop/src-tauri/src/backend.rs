@@ -86,7 +86,6 @@ impl BackendProcess {
                 "DILIGENT_ACCESS_KEY_MATERIAL_FILE",
                 paths.data_root.join("access-key-material.json"),
             )
-            .env("RELOAD", "false")
             .stdout(Stdio::from(log))
             .stderr(Stdio::from(log_stderr));
         #[cfg(windows)]
@@ -146,15 +145,25 @@ impl BackendProcess {
 
     pub fn stop(&mut self) {
         if self.child.try_wait().ok().flatten().is_none() {
-            let cookie = format!("diligent_desktop_session={}", self.session_secret);
-            let _ = loopback_request(
+            match loopback_request(
                 &self.base_url,
                 "POST",
                 "/api/desktop/shutdown",
                 Some("{}"),
-                Some(&cookie),
-            );
-            let deadline = Instant::now() + Duration::from_secs(8);
+                Some(&self.session_secret),
+            ) {
+                Ok(202) => {}
+                Ok(status) => append_shutdown_log(
+                    &self.ready_file,
+                    &format!("graceful shutdown returned HTTP {status}"),
+                ),
+                Err(error) => append_shutdown_log(
+                    &self.ready_file,
+                    &format!("graceful shutdown request failed: {error}"),
+                ),
+            }
+            let deadline = Instant::now() + Duration::from_secs(15);
+            let mut forced = false;
             loop {
                 match self.child.try_wait() {
                     Ok(Some(_)) => break,
@@ -162,10 +171,17 @@ impl BackendProcess {
                         thread::sleep(Duration::from_millis(100));
                     }
                     _ => {
+                        forced = true;
                         terminate_child(&mut self.child);
                         break;
                     }
                 }
+            }
+            if forced {
+                append_shutdown_log(
+                    &self.ready_file,
+                    "graceful shutdown timed out; terminated the backend process",
+                );
             }
         }
         let _ = fs::remove_file(&self.ready_file);
@@ -183,7 +199,7 @@ fn loopback_request(
     method: &str,
     path: &str,
     body: Option<&str>,
-    cookie: Option<&str>,
+    session_token: Option<&str>,
 ) -> Result<u16, String> {
     let port = base_url
         .strip_prefix("http://127.0.0.1:")
@@ -209,10 +225,10 @@ fn loopback_request(
     let mut request =
         format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n");
     if method != "GET" {
-        request.push_str(&format!("Origin: {base_url}\r\n"));
+        request.push_str("Origin: http://tauri.localhost\r\n");
     }
-    if let Some(cookie) = cookie {
-        request.push_str(&format!("Cookie: {cookie}\r\n"));
+    if let Some(token) = session_token {
+        request.push_str(&format!("X-DILIGENT-Desktop-Session: {token}\r\n"));
     }
     if !payload.is_empty() {
         request.push_str(&format!(
@@ -244,6 +260,15 @@ fn loopback_request(
         .parse::<u16>()
         .map_err(|error| error.to_string())?;
     Ok(status)
+}
+
+fn append_shutdown_log(ready_file: &PathBuf, message: &str) {
+    if let Some(data_root) = ready_file.parent().and_then(|state| state.parent()) {
+        let log_path = data_root.join("cache").join("logs").join("desktop-backend.log");
+        if let Ok(mut log) = OpenOptions::new().create(true).append(true).open(log_path) {
+            let _ = writeln!(log, "desktop shutdown: {message}");
+        }
+    }
 }
 
 fn wait_for_ready(child: &mut Child, path: &PathBuf, version: &str) -> Result<ReadyFile, String> {

@@ -86,4 +86,46 @@ def test_packaged_desktop_ignores_source_mode_cors_configuration(monkeypatch) ->
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "this is invalid")
     application = _create_app(monkeypatch, desktop_enabled=True)
 
-    assert all(middleware.cls is not CORSMiddleware for middleware in application.user_middleware)
+    cors = [middleware for middleware in application.user_middleware if middleware.cls is CORSMiddleware]
+    assert len(cors) == 1
+    assert cors[0].kwargs["allow_origins"] == ["http://tauri.localhost"]
+    assert cors[0].kwargs["allow_headers"] == [
+        "Content-Type",
+        "X-DILIGENT-Desktop-Session",
+    ]
+
+
+def test_packaged_desktop_cors_preflight_is_exactly_tauri_origin(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("DILIGENT_DESKTOP", "true")
+    monkeypatch.setenv("DILIGENT_DESKTOP_SESSION_SECRET", "session-secret")
+    monkeypatch.setenv("DILIGENT_DESKTOP_PORT", "48123")
+    monkeypatch.setattr(server_app_module, "initialize_settings", lambda: None)
+    from common.security.desktop import DesktopSessionSecurity
+    from services.runtime.desktop import DesktopRuntimeService
+
+    runtime = DesktopRuntimeService(DesktopSessionSecurity())
+    monkeypatch.setattr(server_app_module, "get_desktop_runtime_service", lambda: runtime)
+    client = TestClient(server_app_module.create_app())
+
+    allowed = client.options(
+        "/api/model-config",
+        headers={
+            "Origin": "http://tauri.localhost",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-diligent-desktop-session",
+        },
+    )
+    assert allowed.status_code == 200
+    assert allowed.headers["access-control-allow-origin"] == "http://tauri.localhost"
+    assert "x-diligent-desktop-session" in allowed.headers["access-control-allow-headers"].casefold()
+
+    rejected = client.options(
+        "/api/model-config",
+        headers={
+            "Origin": "http://127.0.0.1:48123",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-diligent-desktop-session",
+        },
+    )
+    assert rejected.status_code == 400
+    assert "access-control-allow-origin" not in rejected.headers

@@ -30,35 +30,36 @@ operation and sanitized upstream detail when available.
 - `DILIGENT_RUNTIME_ROOT=<absolute extracted immutable runtime root>`
 - `DILIGENT_DATA_ROOT=<absolute persistent user-data root>`
 - `DILIGENT_ACCESS_KEY_MATERIAL_FILE=<absolute protected key-material path>`
-- `RELOAD=false`
+- `DILIGENT_DESKTOP_SESSION_SECRET=<per-launch random token>`
 
-Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together. Relative or partial desktop roots are rejected; source-mode paths are never used as a fallback.
+Packaged mode requires `DILIGENT_RUNTIME_ROOT` and `DILIGENT_DATA_ROOT` together. Relative or partial desktop roots are rejected; source-mode paths are never used as a fallback. The Tauri shell generates the session secret for each launch. The source launcher also generates a per-launch secret for its authenticated shutdown request. Operators should not set the secret themselves.
 
 The Tauri shell sets these desktop-only variables when it starts the frozen backend. Operators should not add them to `settings/.env` or override them manually. Packaged desktop chooses a free localhost port and records it in `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json`; the packaged log is `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`.
 
-Packaged desktop builds pin the frontend API base to same-origin `/api` and do
-not apply source-mode `CORS_ALLOW_ORIGINS`; the shell continues to select and
-authorize its dynamic localhost backend port.
+Packaged desktop builds compile the frontend with `/api` as its default, then
+the Tauri shell supplies the random loopback API origin at startup. The SPA
+sends its one-time session token in `X-DILIGENT-Desktop-Session`. The packaged
+backend accepts CORS only from `http://tauri.localhost`; it does not apply
+source-mode `CORS_ALLOW_ORIGINS`.
 
 ## Default Local Ports
-- Backend: `127.0.0.1:7690`
-- Frontend: `127.0.0.1:9847`
+- Source API and production SPA: `127.0.0.1:7690`
+- Angular development UI: `127.0.0.1:9847`
 
 ## Main Keys
 - `FASTAPI_HOST=127.0.0.1`
 - `FASTAPI_PORT=7690`
-- `UI_HOST=127.0.0.1`
-- `UI_PORT=9847`
+- `UI_HOST=127.0.0.1` (development only)
+- `UI_PORT=9847` (development only)
 - `VITE_API_BASE_URL=/api`
 - `CORS_ALLOW_ORIGINS=` (comma-separated exact HTTP(S) origins; blank by default)
-- `RELOAD=false`
 
 In source mode, `VITE_API_BASE_URL` is compiled into the Angular client by the
-frontend build/serve scripts. Relative API paths use the same-origin proxy;
-absolute HTTP(S) URLs call that endpoint directly and require its origin to be
-listed in `CORS_ALLOW_ORIGINS`. Changing the API base URL requires a frontend
-rebuild and application restart. CORS is disabled when the origin list is
-empty.
+frontend build/serve scripts. The default `/api` is same-origin in production
+and uses the Angular dev-server proxy during development. Absolute HTTP(S) URLs
+call that endpoint directly and require its origin in `CORS_ALLOW_ORIGINS`.
+Changing the API base URL requires a frontend rebuild and application restart.
+CORS is disabled when the source-mode origin list is empty.
 
 ## Source-mode Data Location
 
@@ -132,12 +133,15 @@ This limit does not make an unreachable provider available: connectivity,
 authentication, and provider-side errors still fail promptly.
 
 ## Local Runtime
-- Local runs serve the frontend from a preview or dev process.
-- The Windows launcher always opens a dedicated backend terminal so backend output remains visible while the application is running.
-- The frontend preview runs without a visible terminal window.
+- Normal source launch serves the built Angular SPA and API from one FastAPI process at `http://127.0.0.1:7690` by default.
+- The visible PowerShell launcher owns the hidden backend process. It waits for health, the SPA entry, and a built JavaScript asset before opening the browser.
+- Backend output is saved under `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`. Choosing **EXIT** or pressing Ctrl+C requests graceful shutdown, then stops only the owned process tree if required.
+- `npm run dev` and the backend's `uvicorn --reload` command are for development. The Angular dev server uses `UI_PORT`; the production launcher never starts the preview server.
 
 ## Packaged Desktop Runtime
 - The packaged Tauri shell does not read the development UI/API port settings for its backend listener.
+- The Angular build and startup splash are Tauri assets; the backend runtime archive contains the API sidecar and data catalogs but no SPA files.
+- Tauri passes the random loopback API origin and session token to the SPA. The API uses an exact Tauri-origin CORS allowlist and the session request header.
 - The immutable runtime is addressed by version and payload digest under `%LOCALAPPDATA%\DILIGENT\runtime`.
 - Mutable settings, database, vectors, exports, state, and access-key material live under `%LOCALAPPDATA%\DILIGENT\data`; disposable logs and embedding caches live under `%LOCALAPPDATA%\DILIGENT\data\cache`.
 

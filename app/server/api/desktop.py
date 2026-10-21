@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Header, HTTPException, Request, status
 
-from common.security.desktop import DESKTOP_SESSION_COOKIE
+from common.security.desktop import DESKTOP_SESSION_HEADER
 from domain.desktop import DesktopBootstrapRequest, DesktopShutdownResponse
 from services.runtime.desktop import DesktopRuntimeService
 
@@ -23,7 +23,6 @@ def _runtime(request: Request) -> DesktopRuntimeService:
 def bootstrap_desktop_session(
     payload: DesktopBootstrapRequest,
     request: Request,
-    response: Response,
 ) -> None:
     runtime = _runtime(request)
     try:
@@ -33,23 +32,22 @@ def bootstrap_desktop_session(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Desktop request is not authorized.",
         ) from exc
-    response.set_cookie(
-        DESKTOP_SESSION_COOKIE,
-        payload.token,
-        httponly=True,
-        samesite="strict",
-        secure=False,
-        path="/",
-    )
-
 ###############################################################################
 @router.post(
     "/shutdown",
     response_model=DesktopShutdownResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def request_desktop_shutdown(request: Request) -> DesktopShutdownResponse:
+def request_desktop_shutdown(
+    request: Request,
+    session_token: str = Header(default="", alias=DESKTOP_SESSION_HEADER),
+) -> DesktopShutdownResponse:
     runtime = _runtime(request)
+    if not runtime.security.session_token_is_valid(session_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Desktop request is not authorized.",
+        )
     if not runtime.request_shutdown():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
