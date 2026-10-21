@@ -15,7 +15,6 @@ import httpx
 import pytest
 from openpyxl import Workbook
 
-from common.constants import DEFAULT_NCBI_CONTACT_EMAIL
 from services.updater import livertox_download
 from services.updater.livertox_common import build_ncbi_http_headers
 from services.updater.ncbi_client import (
@@ -28,6 +27,7 @@ from services.updater.ncbi_client import (
 MASTER_URL = "https://www.ncbi.nlm.nih.gov/books/NBK571102/bin/masterlist99-27.xlsx"
 ARCHIVE_PATH = "cc/8d/livertox_NBK547852.tar.gz"
 ARCHIVE_URL = f"https://ftp.ncbi.nlm.nih.gov/pub/litarch/{ARCHIVE_PATH}"
+NCBI_TEST_EMAIL = "developer@example.org"
 
 ###############################################################################
 def _response_json(request: httpx.Request, payload: dict[str, Any]) -> httpx.Response:
@@ -98,9 +98,8 @@ def _archive_bytes(*, include_master: bool = False, unsafe_member: bool = False)
     return output.getvalue()
 
 ###############################################################################
-def _updater(tmp_path: Path, *, email: str = DEFAULT_NCBI_CONTACT_EMAIL) -> SimpleNamespace:
+def _updater(tmp_path: Path, *, email: str = NCBI_TEST_EMAIL) -> SimpleNamespace:
     return SimpleNamespace(
-        http_headers=build_ncbi_http_headers(email),
         ncbi_contact_email=email,
         sources_path=str(tmp_path),
         redownload=True,
@@ -164,7 +163,7 @@ def test_esummary_rejects_missing_or_conflicting_rid() -> None:
 
     async def resolve() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            await search_bookshelf_record(client, contact_email=DEFAULT_NCBI_CONTACT_EMAIL)
+            await search_bookshelf_record(client, contact_email=NCBI_TEST_EMAIL)
 
     with pytest.raises(NCBIClientError, match="conflicting"):
         asyncio.run(resolve())
@@ -226,7 +225,9 @@ def test_books_oai_resolves_dynamic_master_list_link_and_identifier() -> None:
 
     async def resolve() -> str | None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            return await resolve_books_oai_master_list_url(client)
+            return await resolve_books_oai_master_list_url(
+                client, contact_email=NCBI_TEST_EMAIL
+            )
 
     assert asyncio.run(resolve()) == MASTER_URL
     assert requests[0].url.params["identifier"] == "oai:books.ncbi.nlm.nih.gov:571102"
@@ -241,7 +242,9 @@ def test_books_oai_resolves_safe_relative_master_list_link() -> None:
                 _oai_handler(b"", link="masterlist02-26.xlsx")
             )
         ) as client:
-            return await resolve_books_oai_master_list_url(client)
+            return await resolve_books_oai_master_list_url(
+                client, contact_email=NCBI_TEST_EMAIL
+            )
 
     assert asyncio.run(resolve()) == MASTER_URL.replace(
         "masterlist99-27", "masterlist02-26"
@@ -260,7 +263,9 @@ def test_books_oai_rejects_foreign_or_wrong_book_links(link: str) -> None:
         async with httpx.AsyncClient(
             transport=httpx.MockTransport(_oai_handler(b"", link=link))
         ) as client:
-            return await resolve_books_oai_master_list_url(client)
+            return await resolve_books_oai_master_list_url(
+                client, contact_email=NCBI_TEST_EMAIL
+            )
 
     assert asyncio.run(resolve()) is None
 
@@ -339,7 +344,9 @@ def test_litarch_file_list_resolves_exact_accession_and_dynamic_directory() -> N
 
     async def resolve() -> str:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            return await livertox_download.resolve_litarch_archive(client)
+            return await livertox_download.resolve_litarch_archive(
+                client, contact_email=NCBI_TEST_EMAIL
+            )
 
     assert asyncio.run(resolve()) == ARCHIVE_URL
 
@@ -350,7 +357,9 @@ def test_litarch_file_list_rejects_conflicting_and_unsafe_paths() -> None:
             return httpx.Response(200, text=csv_payload, request=request)
 
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            return await livertox_download.resolve_litarch_archive(client)
+            return await livertox_download.resolve_litarch_archive(
+                client, contact_email=NCBI_TEST_EMAIL
+            )
 
     with pytest.raises(RuntimeError, match="conflicting"):
         asyncio.run(
@@ -493,6 +502,36 @@ def test_ncbi_failures_are_sanitized_and_do_not_return_contact_email() -> None:
         asyncio.run(resolve())
     assert contact not in str(error.value)
     assert contact in build_ncbi_http_headers(contact)["User-Agent"]
+
+###############################################################################
+@pytest.mark.parametrize("contact_email", ["", "legacy@pharmagent.local"])
+@pytest.mark.parametrize("request_kind", ["eutils", "books-oai", "litarch"])
+def test_ncbi_request_rejects_missing_or_local_contact_before_network(
+    contact_email: str,
+    request_kind: str,
+) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _response_json(request, {"esearchresult": {"idlist": ["987"]}})
+
+    async def resolve() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            if request_kind == "eutils":
+                await search_bookshelf_record(client, contact_email=contact_email)
+            elif request_kind == "books-oai":
+                await resolve_books_oai_master_list_url(
+                    client, contact_email=contact_email
+                )
+            else:
+                await livertox_download.resolve_litarch_archive(
+                    client, contact_email=contact_email
+                )
+
+    with pytest.raises(ValueError, match="Settings > Integrations"):
+        asyncio.run(resolve())
+    assert requests == []
 
 ###############################################################################
 def test_ncbi_contact_is_not_written_to_discovery_logs(caplog) -> None:  # type: ignore[no-untyped-def]

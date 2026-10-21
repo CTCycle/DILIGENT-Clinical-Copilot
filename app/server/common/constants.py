@@ -106,7 +106,6 @@ NCBI_BOOKS_OAI_BASE_URL = "https://api.ncbi.nlm.nih.gov/lit/oai/books/"
 NLM_LITARCH_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/"
 NLM_LITARCH_FILE_LIST_URL = f"{NLM_LITARCH_BASE_URL}file_list.csv"
 NCBI_TOOL_NAME = "DILIGENTClinicalCopilot"
-DEFAULT_NCBI_CONTACT_EMAIL = "clinical-copilot@pharmagent.local"
 LIVERTOX_BOOK_ACCESSION = "NBK547852"
 LIVERTOX_MASTER_LIST_ACCESSION = "NBK571102"
 DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx"}

@@ -27,14 +27,13 @@ The Settings routes are:
 - `/settings/advanced`
 - `/settings/database`
 
-The legacy `/model-config` route redirects to `/settings/models`.
-
 ## Source of truth and startup order
 
 1. Process and deployment settings are loaded from `.env` and the process
    environment. Database connection settings are loaded from the independent,
-   versioned `database_config.json` file; legacy database environment keys are
-   imported once only when that file is absent.
+   versioned `database_config.json` file; `.env` and process environment
+   variables never configure database access, and a missing configuration file
+   is created with the default embedded SQLite configuration.
 2. The selected database is connected and migrated. A new application schema
    or empty reference catalog is seeded before startup validation.
 3. Database migrations seed a complete typed default payload when the
@@ -109,13 +108,13 @@ captured configuration. Pending input debounce is flushed when leaving a
 settings section or closing the Models page.
 
 The Integrations category includes `ncbi_contact_email`. The value is trimmed
-and validated as a basic developer email address, then persisted in the
-`application_configuration` payload with the other runtime settings. Older
-payloads and blank values resolve to the compatibility default
-`clinical-copilot@pharmagent.local`, which is also restored by an Integrations
-reset. The UI shows the effective value and recommends a real developer or
-organization address registered with NCBI for production use; this field is a
-contact identity, not an API key or credential.
+and validated as a basic email address, then persisted in the
+`application_configuration` payload with the other runtime settings. It may be
+blank, and an Integrations reset clears it. LiverTox and combined structured
+source updates require a real contact email registered with NCBI; blank and
+`.local` addresses receive an actionable error before a job starts. A saved
+`.local` value remains visible until the user replaces or clears it. The field
+is a contact identity, not an API key or credential.
 
 Every successful update returns the database `updated_at` timestamp. Reset and
 reload use the same singleton, so persistence is observable after navigation

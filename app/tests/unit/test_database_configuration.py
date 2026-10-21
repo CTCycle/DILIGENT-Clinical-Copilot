@@ -23,30 +23,27 @@ def _patch_configuration_paths(monkeypatch, tmp_path: Path) -> Path:  # type: ig
 
 
 ###############################################################################
-def test_legacy_dotenv_is_imported_once_and_scrubbed(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+def test_missing_configuration_file_defaults_to_sqlite_and_writes_file(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
     config_path = _patch_configuration_paths(monkeypatch, tmp_path)
     env_path = database_config.paths.ENV_FILE_PATH
     env_path.write_text(
         "FASTAPI_PORT=7777\n"
-        "DATABASE_BACKEND=sqlite\n"
-        "DATABASE_SQLITE_PATH=legacy-store.sqlite3\n"
-        "DATABASE_WRITE_BATCH_SIZE=250\n"
-        "DATABASE_READ_PAGE_SIZE=500\n",
+        "DATABASE_BACKEND=postgresql\n"
+        "DATABASE_HOST=ignored.invalid\n",
         encoding="utf-8",
     )
-    for key in database_config.LEGACY_DATABASE_ENVIRONMENT_KEYS:
-        monkeypatch.delenv(key, raising=False)
 
     loaded = database_config.load_database_configuration()
 
     assert loaded.backend == "sqlite"
-    assert loaded.sqlite_path == str(Path("legacy-store.sqlite3").resolve())
-    assert loaded.write_batch_size == 250
-    assert loaded.read_page_size == 500
+    assert loaded.sqlite_path == str(database_config.paths.DATA_PATH / "database.db")
     assert config_path.is_file()
+    # Environment variables never configure database access.
     remaining_env = env_path.read_text(encoding="utf-8")
     assert "FASTAPI_PORT=7777" in remaining_env
-    assert "DATABASE_" not in remaining_env
+    assert "DATABASE_HOST=ignored.invalid" in remaining_env
 
 
 ###############################################################################

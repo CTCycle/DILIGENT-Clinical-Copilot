@@ -139,7 +139,6 @@ class ModelConfigSerializer:
         merged["ollama_seed"] = self.normalize_optional_seed(
             current.get("ollama_seed", defaults["ollama_seed"])
         )
-        merged.pop("rag", None)
         if merged == current:
             return False
         self.application_configuration.save(merged)

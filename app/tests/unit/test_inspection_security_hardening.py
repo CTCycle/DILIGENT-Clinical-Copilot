@@ -167,6 +167,125 @@ def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
     assert accepted.json()["job_type"] == "rag_update"
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("path", "request_body"),
+    [
+        ("/livertox/jobs", {}),
+        ("/structured-sources/jobs", {}),
+    ],
+)
+@pytest.mark.parametrize("contact_email", ["", "legacy@pharmagent.local"])
+def test_ncbi_update_routes_require_contact_before_job_creation(
+    path: str,
+    request_body: dict[str, object],
+    contact_email: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class JobsProbe:
+        def __init__(self) -> None:
+            self.created: list[dict[str, object]] = []
+
+        def is_job_running(self, *args: object, **kwargs: object) -> bool:
+            return False
+
+        def start_job(self, **kwargs: object) -> str:
+            self.created.append(kwargs)
+            return "contact-gated-job"
+
+        def get_job_status(self, job_id: str) -> dict[str, object]:
+            job = self.created[0]
+            return {
+                "job_id": job_id,
+                "job_type": job["job_type"],
+                "status": "pending",
+            }
+
+    service = object.__new__(DataInspectionService)
+    jobs = JobsProbe()
+    service.jobs = jobs
+    monkeypatch.setattr(
+        inspection_service_module,
+        "get_server_settings",
+        lambda: SimpleNamespace(
+            runtime=SimpleNamespace(ncbi_contact_email=contact_email),
+            jobs=SimpleNamespace(polling_interval=1.0),
+        ),
+    )
+    owner = get_route_owner(data_inspection.router, path)
+    original_service = owner.service
+    owner.service = service
+    try:
+        test_app = FastAPI()
+        test_app.include_router(data_inspection.router)
+        response = TestClient(test_app).post(
+            f"/inspection{path}", json=request_body
+        )
+    finally:
+        owner.service = original_service
+
+    assert response.status_code == 422
+    assert "Settings > Integrations" in response.json()["detail"]
+    assert jobs.created == []
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("path", "request_body"),
+    [
+        ("/livertox/jobs", {}),
+        ("/structured-sources/jobs", {}),
+    ],
+)
+def test_ncbi_update_routes_start_with_configured_contact(
+    path: str,
+    request_body: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class JobsProbe:
+        def __init__(self) -> None:
+            self.created: list[dict[str, object]] = []
+
+        def is_job_running(self, *args: object, **kwargs: object) -> bool:
+            return False
+
+        def start_job(self, **kwargs: object) -> str:
+            self.created.append(kwargs)
+            return "contact-configured-job"
+
+        def get_job_status(self, job_id: str) -> dict[str, object]:
+            job = self.created[0]
+            return {
+                "job_id": job_id,
+                "job_type": job["job_type"],
+                "status": "pending",
+            }
+
+    service = object.__new__(DataInspectionService)
+    jobs = JobsProbe()
+    service.jobs = jobs
+    monkeypatch.setattr(
+        inspection_service_module,
+        "get_server_settings",
+        lambda: SimpleNamespace(
+            runtime=SimpleNamespace(ncbi_contact_email="developer@example.org"),
+            jobs=SimpleNamespace(polling_interval=1.0),
+        ),
+    )
+    owner = get_route_owner(data_inspection.router, path)
+    original_service = owner.service
+    owner.service = service
+    try:
+        test_app = FastAPI()
+        test_app.include_router(data_inspection.router)
+        response = TestClient(test_app).post(
+            f"/inspection{path}", json=request_body
+        )
+    finally:
+        owner.service = original_service
+
+    assert response.status_code == 202
+    assert len(jobs.created) == 1
+
+###############################################################################
 def test_rag_directory_browse_lists_canonical_child_directories(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

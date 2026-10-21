@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Relational Database
 
@@ -223,10 +223,12 @@ erDiagram
   Alembic head, and apply pending revisions before repositories or services run.
 - SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
 - Fresh databases are upgraded through the linear Alembic history before the
-  application starts. Populated databases without an Alembic revision are
+  application starts. The current schema is maintained as a single squashed
+  baseline revision. Populated databases without an Alembic revision are
   rejected before application tables are changed; the runtime never guesses or
   stamps migration history. Unknown or divergent versioned schemas are also
-  rejected.
+  rejected; databases stamped at a removed older revision must be recreated
+  or restored from a current-schema backup.
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
@@ -283,7 +285,6 @@ erDiagram
 ## Filesystem Data
 
 - In development, `data/sources` contains persistent source catalogs, documents, archives, and vectors. The embedded database and access-key material also live in `data/`. Disposable embeddings and logs are stored under `runtimes/cache`.
-- On default source-mode and packaged startup, existing mutable files from the previous `resources` directory are moved into the new data root. Matching files are merged; if different files already occupy the same destination, startup stops before moving data so the overlap can be resolved safely.
 - The validated FDA DILIrank workbook and its HTTP metadata cache live in the existing source archives location. New downloads are written to a candidate file and promoted only after workbook validation; failed or cancelled candidate refreshes do not replace the last-known-good cache.
 - In packaged desktop mode, immutable catalogs live under the extracted runtime at `data/catalogs`, and Angular assets live in the same runtime. Databases, source documents, vectors, exports, state, and access-key material live directly under `%LOCALAPPDATA%\DILIGENT\data`, while disposable logs and embeddings live under `%LOCALAPPDATA%\DILIGENT\data\cache`.
 - `data/catalogs` contains JSON seed manifests for database-backed reference catalogs and is copied to the immutable packaged runtime.
@@ -305,9 +306,6 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 ## Model Configuration Persistence
 
 - A newly initialized database receives canonical model defaults.
-- The one-time model-role migration fills a missing `revision_model` from the
-  stored clinical assignment and a missing `timeline_model` from the stored
-  text-extraction assignment.
 - Existing provider and model selections are read as stored; unsupported values fail validation and are not silently translated.
 - Provider model catalogs are persisted in `provider_model_catalog_cache`, keyed by provider and a fingerprint of the catalog endpoint plus the active credential (or normalized Ollama endpoint). Secrets are never stored.
 - `GET /api/model-config` reads cached catalog state only. The provider-specific `load` operation contacts a provider only for a cold cache, while `refresh` is the explicit replacement operation.

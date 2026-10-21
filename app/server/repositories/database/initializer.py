@@ -338,21 +338,6 @@ def ensure_database_ready(settings: DatabaseSettings) -> bool:
 
 
 ###############################################################################
-def remove_legacy_database_configuration() -> bool:
-    """Remove database connection values from the old settings singleton once."""
-    from repositories.serialization.application_configuration import (
-        ApplicationConfigurationSerializer,
-    )
-
-    serializer = ApplicationConfigurationSerializer()
-    payload = serializer.load()
-    if not payload or "database" not in payload:
-        return False
-    payload.pop("database", None)
-    serializer.save(payload)
-    return True
-
-###############################################################################
 def run_database_initialization(
     *,
     drop_existing: bool = False,

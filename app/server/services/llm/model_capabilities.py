@@ -631,28 +631,8 @@ def enrich_model_descriptor(
             **descriptor.model_dump(mode="python"),
             "model_capabilities": metadata.model_dump(mode="python"),
             "endpoint_family": descriptor.endpoint_family or metadata.endpoint_family,
-            "input_token_limit": descriptor.input_token_limit or metadata.context_window_tokens,
-            "output_token_limit": descriptor.output_token_limit or metadata.max_output_tokens,
-            "supports_thinking": descriptor.supports_thinking
-            if descriptor.supports_thinking is not None
-            else metadata.supports_reasoning,
-            "supports_temperature": descriptor.supports_temperature
-            if descriptor.supports_temperature is not None
-            else metadata.supports_temperature,
-            "supports_json_mode": descriptor.supports_json_mode
-            if descriptor.supports_json_mode is not None
-            else metadata.supports_json_mode,
-            "supports_native_json_schema": descriptor.supports_native_json_schema
-            if descriptor.supports_native_json_schema is not None
-            else metadata.supports_native_json_schema,
         }
     )
-
-###############################################################################
-def resolve_endpoint_family(*, provider: str, model: str) -> str | None:
-    """Resolve a cataloged transport family without creating a live request."""
-
-    return resolve_model_capabilities(provider=provider, model=model).endpoint_family
 
 ###############################################################################
 def _select_supported_reasoning_level(

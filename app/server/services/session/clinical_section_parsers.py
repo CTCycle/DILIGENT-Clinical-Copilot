@@ -448,10 +448,6 @@ def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
     )
 
 ###############################################################################
-def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
-    return scan_dili_section_headings(raw_text).section_headings
-
-###############################################################################
 def resolve_heading_collisions(
     matches: Sequence[SectionHeadingMatch],
 ) -> list[SectionHeadingMatch]:

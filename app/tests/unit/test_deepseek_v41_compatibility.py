@@ -20,7 +20,6 @@ from domain.llm.transports import (
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.model_capabilities import (
     capability_metadata,
-    resolve_endpoint_family,
     resolve_model_capabilities,
 )
 from services.llm.tool_loop import ToolLoopExecutor
@@ -71,9 +70,9 @@ def test_deepseek_v41_flash_has_one_explicit_contract_per_exposing_provider() ->
         assert capabilities.requires_reasoning_content_for_tool_calls is True
         assert capabilities.requires_assistant_content_for_tool_calls is True
 
-    assert resolve_endpoint_family(
+    assert resolve_model_capabilities(
         provider="opencode_zen", model="deepseek-v4.1-flash"
-    ) is None
+    ).endpoint_family is None
 
 ###############################################################################
 def test_live_catalog_metadata_does_not_erase_exact_deepseek_contract_fields() -> None:

@@ -409,6 +409,23 @@ def test_revision_context_exposes_exact_section_offsets_and_truncation_state() -
     assert truncated["source_length"] == len(truncated_report)
 
 ###############################################################################
+@pytest.mark.parametrize("report", ["Canonical report.", ""])
+def test_revision_context_always_includes_report_editability(report: str) -> None:
+    context = build_revision_context(
+        session={"session_id": 12, "report": report},
+        manual_edits=[],
+        lineage=[],
+        selected_text=None,
+        instruction=None,
+        input_budget=100000,
+    )
+
+    editability = context["review_target"]["official_report"]["editability"]
+    assert editability["available"] is bool(report)
+    assert editability["editable"] is bool(report)
+    assert editability["source_length"] == len(report)
+
+###############################################################################
 @pytest.mark.parametrize("prefix", ["", "Read the session context once, then "])
 def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncated(
     prefix: str,

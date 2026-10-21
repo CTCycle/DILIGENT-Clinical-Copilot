@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Response, status
 
 from common.utils.logger import logger
+from domain.settings.configuration import NCBIContactEmailRequiredError
 from domain.jobs import (
     JobCancelResponse,
     JobListResponse,
@@ -81,6 +82,15 @@ class InspectionJobEndpointMixin(InspectionEndpointBase):
     ) -> JobStartResponse:
         try:
             payload = self.service.start_update_job(job_type, overrides=overrides)
+        except NCBIContactEmailRequiredError as exc:
+            logger.info(
+                "Inspection update job rejected type=%s: NCBI contact missing",
+                job_type,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
         except ValueError as exc:
             detail = str(exc)
             error_status = (

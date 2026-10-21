@@ -45,10 +45,7 @@ from configurations.startup import (
     initialize_settings,
     reload_persisted_settings,
 )
-from repositories.database.initializer import (
-    ensure_database_ready,
-    remove_legacy_database_configuration,
-)
+from repositories.database.initializer import ensure_database_ready
 from services.catalogs.runtime import initialize_reference_catalog_provider
 from services.inspection.revision_recovery import reconcile_interrupted_revision_jobs
 from services.retrieval.embedding_runtime import close_embedding_runtime
@@ -90,7 +87,6 @@ def redirect_root_to_docs() -> RedirectResponse:
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     bootstrap_settings = get_server_settings()
     ensure_database_ready(bootstrap_settings.database)
-    remove_legacy_database_configuration()
     settings = reload_persisted_settings()
     job_manager = get_job_manager()
     job_manager.begin_startup()

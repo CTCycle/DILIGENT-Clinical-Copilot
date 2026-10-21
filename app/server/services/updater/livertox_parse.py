@@ -443,7 +443,7 @@ def extract_title(html_text: str, plain_text: str, default: str) -> str:
     )
     for pattern in patterns:
         for match in re.finditer(pattern, html_text, flags=re.IGNORECASE | re.DOTALL):
-            fragment = clean_fragment(match.group(1))
+            fragment = html_to_text(match.group(1))
             normalized = normalize_extracted_title(fragment)
             if normalized:
                 return normalized
@@ -454,10 +454,6 @@ def extract_title(html_text: str, plain_text: str, default: str) -> str:
             if normalized:
                 return normalized
     return normalize_extracted_title(default) or default
-
-###############################################################################
-def clean_fragment(fragment: str) -> str:
-    return html_to_text(fragment)
 
 ###############################################################################
 def normalize_extracted_title(value: str) -> str:

@@ -17,7 +17,6 @@ from common.constants import (
     DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
     DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
     DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
-    DEFAULT_NCBI_CONTACT_EMAIL,
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
     OLLAMA_DEFAULT_HOST,
@@ -352,13 +351,6 @@ def _build_rag_settings(
     )
 
 ###############################################################################
-def _resolve_ncbi_contact_email(data: dict[str, Any]) -> Any:
-    value = data.get("ncbi_contact_email")
-    if value is None or (isinstance(value, str) and not value.strip()):
-        return DEFAULT_NCBI_CONTACT_EMAIL
-    return value
-
-###############################################################################
 def _build_runtime_settings(
     data: dict[str, Any], *, fallback_timeout: float
 ) -> RuntimeSettings:
@@ -405,7 +397,7 @@ def _build_runtime_settings(
         ollama_server_start_timeout=max(
             coerce_float(data.get("ollama_server_start_timeout"), 15.0), 1.0
         ),
-        ncbi_contact_email=_resolve_ncbi_contact_email(data),
+        ncbi_contact_email=data.get("ncbi_contact_email", ""),
         livertox_download_timeout=max(
             coerce_float(data.get("livertox_download_timeout"), 30.0),
             1.0,

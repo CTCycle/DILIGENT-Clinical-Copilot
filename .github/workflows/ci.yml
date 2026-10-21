@@ -247,8 +247,6 @@ jobs:
       - name: Run live provider browser E2E
         shell: pwsh
         env:
-          DATABASE_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\live-provider.sqlite3
-          DILIGENT_SQLITE_PATH: ${{ github.workspace }}\runtimes\cache\pytest\live-provider.sqlite3
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\runtimes\cache\playwright
         run: .\app\tests\ci\run_browser_e2e.ps1 -Suite LiveProvider
 

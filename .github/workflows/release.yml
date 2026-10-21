@@ -355,8 +355,6 @@ jobs:
     needs: [source, release-preflight, release-persistence-preflight, release-live-provider-e2e, release-security-preflight]
     runs-on: windows-latest
     timeout-minutes: 120
-    env:
-      RELEASE_BASELINE_VERSION: '3.4.0'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -379,20 +377,10 @@ jobs:
         run: |
           & ../../runtimes/uv/uv.exe sync --locked --all-extras --group desktop-build
           if ($LASTEXITCODE -ne 0) { throw 'Validation dependency installation failed.' }
-      - name: Download the published v3.4.0 upgrade baseline
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          New-Item -ItemType Directory -Path assets/QA/release-gates/baseline -Force | Out-Null
-          $baselineVersion = $env:RELEASE_BASELINE_VERSION
-          gh release download "v$baselineVersion" --repo $env:GITHUB_REPOSITORY --pattern "DILIGENT-v$baselineVersion-windows-x64.msi" --pattern "DILIGENT-v$baselineVersion-windows-x64.sha256" --dir assets/QA/release-gates/baseline
-          if ($LASTEXITCODE -ne 0) { throw 'Published upgrade baseline download failed.' }
-      - name: Validate unsigned portable, deep paths, MSI lifecycle, and populated upgrade
+      - name: Validate unsigned portable, deep paths, and MSI lifecycle
         shell: pwsh
         run: |
-          $baselineVersion = $env:RELEASE_BASELINE_VERSION
-          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -UpgradeFromVersion $baselineVersion -DesktopTarget All -InstallMsi -TestUpgrade -RequireUnsigned -TestDeepPath -PreviousMsiPath "assets/QA/release-gates/baseline/DILIGENT-v$baselineVersion-windows-x64.msi" -PreviousChecksumPath "assets/QA/release-gates/baseline/DILIGENT-v$baselineVersion-windows-x64.sha256" -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
+          .\app\desktop\build\smoke_release.ps1 -Version $env:RELEASE_VERSION -DesktopTarget All -InstallMsi -RequireUnsigned -TestDeepPath -ReportDirectory "$env:GITHUB_WORKSPACE/assets/QA/release-gates/msi"
       - name: Record exact source, artifact hashes, and gate provenance
         shell: pwsh
         env:

@@ -3,18 +3,15 @@
 
 from __future__ import annotations
 
-import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
 
 import pytest
 import repositories.database.migrations as migration_coordinator
-from alembic import command
 from repositories.database.migrations import (
     HEAD_REVISION,
     MigrationError,
-    build_alembic_config,
     migrate_database,
 )
 from sqlalchemy import create_engine, event, inspect, text
@@ -39,13 +36,6 @@ def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:  # type:
     finally:
         if previous_autocommit is not None:
             dbapi_connection.autocommit = previous_autocommit
-
-###############################################################################
-def _upgrade_to(engine, revision: str) -> None:  # type: ignore[no-untyped-def]
-    config = build_alembic_config()
-    with engine.connect() as connection, connection.begin():
-        config.attributes["connection"] = connection
-        command.upgrade(config, revision)
 
 ###############################################################################
 def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) -> None:
@@ -77,7 +67,7 @@ def test_populated_unversioned_schema_is_rejected_without_stamping(
     database_path = tmp_path / "legacy.db"
     engine = _engine(database_path)
     try:
-        _upgrade_to(engine, "202608200002")
+        migrate_database(engine, database_was_empty=True)
         with engine.begin() as connection:
             connection.execute(
                 text(
@@ -153,157 +143,6 @@ def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
 
         with engine.connect() as connection:
             assert not inspect(connection).has_table("alembic_version")
-    finally:
-        engine.dispose()
-
-###############################################################################
-def test_model_role_data_migration_populates_only_missing_roles(tmp_path: Path) -> None:
-    database_path = tmp_path / "model-role-migration.db"
-    engine = _engine(database_path)
-    try:
-        _upgrade_to(engine, "202608200002")
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "insert into application_configuration "
-                    "(id, revision, payload) values (1, 0, :payload)"
-                ),
-                {
-                    "payload": json.dumps(
-                        {
-                            "clinical_model": "clinical-model",
-                            "text_extraction_model": "parser-model",
-                            "revision_model": "saved-revision-model",
-                        }
-                    )
-                },
-            )
-
-        migrate_database(engine, database_was_empty=False)
-
-        with engine.connect() as connection:
-            payload = json.loads(
-                connection.execute(
-                    text("select payload from application_configuration where id = 1")
-                ).scalar_one()
-            )
-        assert payload == {
-            "clinical_model": "clinical-model",
-            "text_extraction_model": "parser-model",
-            "revision_model": "saved-revision-model",
-            "timeline_model": "parser-model",
-        }
-    finally:
-        engine.dispose()
-
-###############################################################################
-def test_cancelled_revision_runs_reconcile_pending_versions(tmp_path: Path) -> None:
-    database_path = tmp_path / "cancelled-revision-migration.db"
-    engine = _engine(database_path)
-    try:
-        _upgrade_to(engine, "202609100001")
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "insert into clinical_sessions "
-                    "(id, patient_name, session_status, session_kind) "
-                    "values (1, 'Migration fixture', 'successful', 'original')"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into clinical_session_versions "
-                    "(id, root_session_id, version_number, version_status, "
-                    "revision_kind, llm_qa_status, clinical_review_status, "
-                    "pipeline_run_id) values "
-                    "(1, 1, 1, 'current', 'original', 'not_run', 'not_reviewed', null), "
-                    "(2, 1, 2, 'draft_revision', 'llm_assisted_revision', "
-                    "'pending', 'not_reviewed', 'cancelled-draft'), "
-                    "(3, 1, 3, 'pending_qa', 'llm_assisted_revision', "
-                    "'pending', 'not_reviewed', 'cancelled-pending')"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into clinical_session_revision_runs "
-                    "(pipeline_run_id, session_id, root_session_id, source_version_id, "
-                    "target_revision_version_id, revision_mode, revision_kind, "
-                    "actor_source, actor_confidence, started_at, completed_at, status) "
-                    "values "
-                    "('cancelled-draft', 1, 1, 1, 2, 'agentic_revision', "
-                    "'llm_assisted_revision', 'system', 'system', "
-                    "'2026-09-17 10:00:00', '2026-09-17 10:01:00', 'cancelled'), "
-                    "('cancelled-pending', 1, 1, 1, 3, 'agentic_revision', "
-                    "'llm_assisted_revision', 'system', 'system', "
-                    "'2026-09-17 10:02:00', null, 'cancelled')"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into clinical_session_revision_steps "
-                    "(pipeline_run_id, step_name, step_index, step_count, "
-                    "attempt_number, status) values "
-                    "('cancelled-draft', 'revision_agent_task_1', 1, 1, 1, 'running'), "
-                    "('cancelled-pending', 'revision_agent_task_1', 1, 1, 1, 'running')"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into clinical_session_revision_reviews "
-                    "(revision_version_id, session_id, clinical_review_status, "
-                    "actor_source, actor_confidence) values "
-                    "(2, 1, 'under_review', 'system', 'system')"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into clinical_session_revision_artifacts "
-                    "(revision_version_id, pipeline_run_id, artifact_kind, "
-                    "artifact_key) values "
-                    "(2, 'cancelled-draft', 'pipeline_artifact', 'fixture-artifact')"
-                )
-            )
-
-        result = migrate_database(engine, database_was_empty=False)
-
-        assert result.target_heads == (HEAD_REVISION,)
-        with engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    "select id, version_status, llm_qa_status, session_id, "
-                    "completed_at from clinical_session_versions "
-                    "where id in (2, 3) order by id"
-                )
-            ).mappings().all()
-            assert [row["version_status"] for row in rows] == ["cancelled", "cancelled"]
-            assert [row["llm_qa_status"] for row in rows] == ["not_run", "not_run"]
-            assert [row["session_id"] for row in rows] == [None, None]
-            assert all(row["completed_at"] is not None for row in rows)
-            steps = connection.execute(
-                text(
-                    "select status, error_json, completed_at "
-                    "from clinical_session_revision_steps "
-                    "order by pipeline_run_id"
-                )
-            ).mappings().all()
-            assert [row["status"] for row in steps] == ["cancelled", "cancelled"]
-            assert all(row["error_json"] for row in steps)
-            assert all(row["completed_at"] is not None for row in steps)
-            runs = connection.execute(
-                text(
-                    "select completed_at from clinical_session_revision_runs "
-                    "where status = 'cancelled' order by pipeline_run_id"
-                )
-            ).scalars().all()
-            assert all(value is not None for value in runs)
-            assert connection.execute(
-                text("select count(*) from clinical_session_revision_reviews")
-            ).scalar_one() == 1
-            assert connection.execute(
-                text("select count(*) from clinical_session_revision_artifacts")
-            ).scalar_one() == 1
-            assert connection.execute(text("pragma foreign_keys")).scalar_one() == 1
-            assert connection.execute(text("pragma foreign_key_check")).all() == []
     finally:
         engine.dispose()
 

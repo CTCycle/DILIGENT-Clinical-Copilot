@@ -16,6 +16,7 @@ from common.constants import (
     NCBI_EUTILS_BASE_URL,
     NCBI_TOOL_NAME,
 )
+from domain.settings.configuration import require_ncbi_contact_email
 
 ###############################################################################
 class NCBIClientError(RuntimeError):
@@ -28,6 +29,7 @@ async def search_bookshelf_record(
     contact_email: str,
     accession: str = LIVERTOX_MASTER_LIST_ACCESSION,
 ) -> dict[str, Any]:
+    contact_email = require_ncbi_contact_email(contact_email)
     params = {
         "db": "books",
         "term": accession,
@@ -35,7 +37,9 @@ async def search_bookshelf_record(
         "tool": NCBI_TOOL_NAME,
         "email": contact_email,
     }
-    payload = await _get_json(client, "esearch.fcgi", params)
+    payload = await _get_json(
+        client, "esearch.fcgi", params, contact_email=contact_email
+    )
     id_list = _extract_id_list(payload)
     if not id_list:
         raise NCBIClientError("NCBI Bookshelf returned no matching record.")
@@ -54,6 +58,7 @@ async def summarize_bookshelf_record(
     contact_email: str,
     accession: str = LIVERTOX_MASTER_LIST_ACCESSION,
 ) -> dict[str, Any]:
+    contact_email = require_ncbi_contact_email(contact_email)
     normalized_uids = [str(uid).strip() for uid in uids if str(uid).strip()]
     if not normalized_uids:
         raise NCBIClientError("NCBI Bookshelf returned no record identifiers.")
@@ -67,6 +72,7 @@ async def summarize_bookshelf_record(
             "tool": NCBI_TOOL_NAME,
             "email": contact_email,
         },
+        contact_email=contact_email,
     )
     result = payload.get("result")
     if not isinstance(result, dict):
@@ -90,16 +96,21 @@ async def summarize_bookshelf_record(
 async def resolve_books_oai_master_list_url(
     client: httpx.AsyncClient,
     *,
+    contact_email: str,
     accession: str = LIVERTOX_MASTER_LIST_ACCESSION,
 ) -> str | None:
+    contact_email = require_ncbi_contact_email(contact_email)
     identifier = f"oai:books.ncbi.nlm.nih.gov:{_numeric_accession(accession)}"
-    formats = await list_metadata_formats(client, identifier=identifier)
+    formats = await list_metadata_formats(
+        client, identifier=identifier, contact_email=contact_email
+    )
     if "nbk_ftext" not in formats:
         return None
     xml_payload = await get_books_oai_record(
         client,
         identifier=identifier,
         metadata_prefix="nbk_ftext",
+        contact_email=contact_email,
     )
     candidates = _extract_master_list_candidates(xml_payload, accession=accession)
     if len(candidates) > 1:
@@ -111,11 +122,14 @@ async def list_metadata_formats(
     client: httpx.AsyncClient,
     *,
     identifier: str,
+    contact_email: str,
 ) -> set[str]:
+    contact_email = require_ncbi_contact_email(contact_email)
     xml_payload = await _get_text(
         client,
         NCBI_BOOKS_OAI_BASE_URL,
         {"verb": "ListMetadataFormats", "identifier": identifier},
+        contact_email=contact_email,
     )
     root = _parse_xml(xml_payload, "Books-OAI metadata formats")
     return {
@@ -130,7 +144,9 @@ async def get_books_oai_record(
     *,
     identifier: str,
     metadata_prefix: str,
+    contact_email: str,
 ) -> str:
+    contact_email = require_ncbi_contact_email(contact_email)
     return await _get_text(
         client,
         NCBI_BOOKS_OAI_BASE_URL,
@@ -139,6 +155,7 @@ async def get_books_oai_record(
             "identifier": identifier,
             "metadataPrefix": metadata_prefix,
         },
+        contact_email=contact_email,
     )
 
 ###############################################################################
@@ -198,7 +215,10 @@ async def _get_json(
     client: httpx.AsyncClient,
     endpoint: str,
     params: dict[str, str],
+    *,
+    contact_email: str,
 ) -> dict[str, Any]:
+    require_ncbi_contact_email(contact_email)
     try:
         response = await client.get(f"{NCBI_EUTILS_BASE_URL}/{endpoint}", params=params)
         response.raise_for_status()
@@ -216,7 +236,10 @@ async def _get_text(
     client: httpx.AsyncClient,
     url: str,
     params: dict[str, str],
+    *,
+    contact_email: str,
 ) -> str:
+    require_ncbi_contact_email(contact_email)
     try:
         response = await client.get(url, params=params)
         response.raise_for_status()

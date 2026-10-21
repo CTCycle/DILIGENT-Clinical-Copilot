@@ -118,7 +118,6 @@ class RuntimeSettingsService:
                             environment_snapshot_from_os_env()
                         )
                     )
-                payload.pop("database", None)
                 if "general" in updates:
                     jobs = payload.get("jobs")
                     jobs = dict(jobs) if isinstance(jobs, dict) else {}

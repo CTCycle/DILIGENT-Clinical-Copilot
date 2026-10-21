@@ -686,24 +686,9 @@ class RevisionAgentRunner:
         source_report = str(
             session.get("official_report_text") or session.get("report") or ""
         )
-        review_target = context.get("review_target")
-        official_report_target = (
-            review_target.get("official_report")
-            if isinstance(review_target, dict)
-            else None
-        )
-        canonical_report_editability = (
-            official_report_target.get("editability")
-            if isinstance(official_report_target, dict)
-            else None
-        )
-        if not isinstance(canonical_report_editability, dict):
-            canonical_report_editability = {
-                "available": bool(source_report),
-                "editable": bool(source_report),
-                "reason": "legacy_context_shape",
-                "source_length": len(source_report),
-            }
+        canonical_report_editability = context["review_target"]["official_report"][
+            "editability"
+        ]
         registry = RevisionToolRegistry(
             clinical_session_repository=self.clinical_session_repository,
             session_revision_repository=self.session_revision_repository,

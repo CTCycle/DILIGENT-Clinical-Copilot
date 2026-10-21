@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from domain.llm.providers import CloudModelDescriptor
+from domain.llm.providers import CloudModelDescriptor, ModelCapabilityMetadata
 from domain.model_configs import ReasoningLevel
 from services.llm.generation_policy import (
     GenerationPurpose,
@@ -50,12 +50,15 @@ def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
         descriptor=CloudModelDescriptor(
             id="gemini-live-model",
             display_name="Gemini live",
-            input_token_limit=32768,
-            output_token_limit=4096,
-            supports_thinking=False,
-            supports_temperature=False,
-            supports_json_mode=True,
-            supports_native_json_schema=True,
+            model_capabilities=ModelCapabilityMetadata(
+                endpoint_family=None,
+                context_window_tokens=32768,
+                max_output_tokens=4096,
+                supports_reasoning=False,
+                supports_temperature=False,
+                supports_json_mode=True,
+                supports_native_json_schema=True,
+            ),
         ),
     )
 

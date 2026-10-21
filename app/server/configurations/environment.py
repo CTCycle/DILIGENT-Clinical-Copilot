@@ -12,7 +12,6 @@ from dotenv import dotenv_values
 
 from common import paths
 from common.utils.logger import logger
-from configurations.database_config import LEGACY_DATABASE_ENVIRONMENT_KEYS
 from domain.bootstrap import EnvironmentBootstrapState
 from configurations.runtime_bootstrap import ensure_runtime_data_layout
 
@@ -49,10 +48,8 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
             shutil.copyfile(example_path, env_path)
             logger.info("Created %s from %s", env_path, example_path)
         if env_path.exists():
-            # Database connection values are migrated once into the independent
-            # database config file and never enter the process environment.
             for key, value in dotenv_values(env_path).items():
-                if key in LEGACY_DATABASE_ENVIRONMENT_KEYS or value is None:
+                if value is None:
                     continue
                 os.environ.setdefault(key, str(value))
         state.dotenv_injected_keys.clear()

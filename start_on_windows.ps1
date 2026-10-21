@@ -430,16 +430,6 @@ function Import-DotEnv {
             continue
         }
         $key = $line.Substring(0, $separator).Trim()
-        if ($key -in @(
-            'EMBEDDED_DATABASE', 'DATABASE_BACKEND', 'DATABASE_URL',
-            'DATABASE_SQLITE_PATH', 'DILIGENT_SQLITE_PATH', 'DATABASE_ENGINE',
-            'DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_NAME', 'DATABASE_USERNAME',
-            'DATABASE_PASSWORD', 'DATABASE_SSL', 'DATABASE_SSL_CA',
-            'DATABASE_CONNECT_TIMEOUT', 'DATABASE_WRITE_BATCH_SIZE',
-            'DATABASE_READ_PAGE_SIZE'
-        )) {
-            continue
-        }
         $value = $line.Substring($separator + 1).Trim()
         if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
             ($value.StartsWith("'") -and $value.EndsWith("'"))) {

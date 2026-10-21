@@ -14,6 +14,7 @@ from configurations.database_config import (
     DatabaseConfiguration,
     database_settings,
     load_database_configuration,
+    public_database_configuration,
     save_database_configuration,
 )
 from configurations.startup import (
@@ -25,10 +26,7 @@ from domain.settings.database import (
     DatabaseConnectionTestResponse,
     DatabaseSwitchResponse,
 )
-from repositories.database.initializer import (
-    ensure_database_ready,
-    remove_legacy_database_configuration,
-)
+from repositories.database.initializer import ensure_database_ready
 from repositories.database.postgres import PostgresRepository
 from repositories.database.session import get_default_repository
 from repositories.database.sqlite import SQLiteRepository
@@ -93,7 +91,7 @@ class DatabaseRuntimeManager:
         configuration = load_database_configuration()
         return {
             "configuration": DatabaseConfigurationResponse.model_validate(
-                _public_configuration(configuration)
+                public_database_configuration(configuration)
             ),
             "active_backend": configuration.backend,
         }
@@ -154,7 +152,6 @@ class DatabaseRuntimeManager:
                 # missing PostgreSQL database when permitted, applies migrations,
                 # and seeds defaults without copying current application data.
                 ensure_database_ready(candidate_settings)
-                remove_legacy_database_configuration()
                 probe = self.test_configuration(configuration)
                 if not probe.reachable or not probe.schema_ready:
                     raise DatabaseActivationError(
@@ -167,7 +164,6 @@ class DatabaseRuntimeManager:
                 get_default_repository.cache_clear()
                 reset_app_settings_cache()
                 candidate_repository = get_default_repository()
-                remove_legacy_database_configuration()
                 reload_persisted_settings()
                 _rebind_database_services()
                 _invalidate_database_snapshots()
@@ -212,12 +208,6 @@ class DatabaseRuntimeManager:
             finally:
                 self.request_gate.end_switch()
                 job_manager.end_database_switch()
-
-
-def _public_configuration(configuration: DatabaseConfiguration) -> dict[str, object]:
-    from configurations.database_config import public_database_configuration
-
-    return public_database_configuration(configuration)
 
 
 def _create_repository(configuration: DatabaseConfiguration):

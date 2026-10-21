@@ -16,6 +16,7 @@ from common.paths import VECTOR_DB_PATH
 from common.embedding.manifest import read_active_collection_name
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.utils.logger import logger
+from domain.settings.configuration import require_ncbi_contact_email
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
 from repositories.clinical_session_repository import ClinicalSessionRepository
@@ -740,6 +741,10 @@ class DataInspectionService(
     def start_update_job(
         self, job_type: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        if job_type in {self.LIVERTOX_JOB_TYPE, self.STRUCTURED_SOURCES_JOB_TYPE}:
+            require_ncbi_contact_email(
+                get_server_settings().runtime.ncbi_contact_email
+            )
         scope_key = (
             self.STRUCTURED_SOURCES_SCOPE_KEY
             if job_type == self.STRUCTURED_SOURCES_JOB_TYPE

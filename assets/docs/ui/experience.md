@@ -1,12 +1,12 @@
 # Experience
-Last updated: 2026-10-01
+Last updated: 2026-10-21
 
 ## Page Structure
 - Routes:
   - `/` for DILI analysis
   - `/clinical-sessions` for Clinical Sessions
   - `/data` for Data Inspection
-  - `/settings` (and `/settings/models` for model configuration; the legacy `/model-config` route redirects there)
+  - `/settings` (and `/settings/models` for model configuration)
   - `/sessions/:sessionId/timetable` for Patient Timeline
   - `/sessions/:sessionId/timetable/:timelineId` for a saved timeline
 - App shell uses the root shell plus shared navigation through `NavSidebarComponent`.

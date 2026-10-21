@@ -7,7 +7,6 @@ from configurations.management import (
     EnvironmentSnapshot,
     build_settings_payload,
 )
-from common.constants import DEFAULT_NCBI_CONTACT_EMAIL
 
 ###############################################################################
 def _env() -> EnvironmentSnapshot:
@@ -116,13 +115,13 @@ def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
     assert settings["local_llm_timeout_cap"] == 8.0
 
 ###############################################################################
-def test_runtime_settings_use_default_ncbi_contact_when_missing_or_blank() -> None:
-    for value in (None, "", "   "):
+def test_runtime_settings_allow_missing_or_blank_ncbi_contact() -> None:
+    for config in ({}, {"ncbi_contact_email": ""}, {"ncbi_contact_email": "   "}):
         runtime = build_settings_payload(
-            {"runtime": {"ncbi_contact_email": value}},
+            {"runtime": config},
             _env(),
         )["runtime"]
-        assert runtime["ncbi_contact_email"] == DEFAULT_NCBI_CONTACT_EMAIL
+        assert runtime["ncbi_contact_email"] == ""
 
 ###############################################################################
 def test_runtime_settings_normalize_custom_ncbi_contact() -> None:
