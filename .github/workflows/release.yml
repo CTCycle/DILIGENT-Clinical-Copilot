@@ -13,7 +13,7 @@ on:
       version:
         description: Exact major.minor.patch release version
         type: string
-        default: '3.5.1'
+        default: '3.6.0'
         required: true
       candidate_run_id:
         description: Successful prepare run ID (publish only)
