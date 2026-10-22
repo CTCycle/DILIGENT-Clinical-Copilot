@@ -1,16 +1,14 @@
-<p align="center">
-  <img src="app/client/public/diligent-logo.png" alt="DILIGENT logo" width="88">
-</p>
+<p align="center"><img src="app/client/public/diligent-logo.png" alt="DILIGENT logo" width="96"></p>
 
 <h1 align="center">DILIGENT Clinical Copilot</h1>
-<!-- Last updated: 2026-10-21 -->
 
-<p align="center"><strong>A local, single-user decision-support tool for structured review of possible drug-induced liver injury (DILI).</strong></p>
+<p align="center">A local, single-user decision-support tool for structured review of possible drug-induced liver injury (DILI).</p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat-square"></a>
+  <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
+  <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/commits"><img alt="Last commit" src="https://img.shields.io/github/last-commit/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases"><img alt="Release" src="https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag&style=flat-square"></a>
-  <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml?query=branch%3Adevelop"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CTCycle/DILIGENT-Clinical-Copilot/ci.yml?branch=develop&label=CI&style=flat-square"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat-square"></a>
 </p>
 
 <p align="center">
@@ -21,45 +19,42 @@
 
 ## Overview
 
-DILIGENT brings clinical history, medication exposure, symptoms, laboratory results, and timing information together for a reviewable DILI assessment. It supports local or cloud model providers, optional retrieval from prepared reference data, saved clinical sessions, timeline review, and report export.
+DILIGENT brings clinical history, medication exposure, symptoms, laboratory results, and timing information together for a reviewable drug-induced liver injury assessment. It supports local or cloud model providers, optional retrieval from prepared reference data, saved clinical sessions, timeline review, and report export. The application stores its data in a local SQLite database and can run as a Windows desktop app or a local web app from source. Assessments are guided by preflight checks, structured extraction, and deterministic clinical safety audits before a report is finalized. DILIGENT is decision support only; it does not diagnose or replace clinical judgment, and cloud-backed assessments may send case text to the configured provider.
 
 > **Decision support only.** DILIGENT does not diagnose or replace clinical judgment. Verify the source information and generated statements before use. Cloud-backed assessments may send case text to the configured provider; confirm local policy before entering protected health information.
 
 ## Key Features
 
 - Enter case context and resolve preflight feedback before running an assessment.
-- Review the generated narrative alongside structured findings, medication matches, and uncertainty signals.
+- Review the generated narrative alongside structured findings, medication matches, uncertainty signals, and evidence.
 - Save sessions, compare revisions, review timelines, and export reports.
 - Inspect local drug catalogs and reference resources, and configure model providers, roles, access keys, and retrieval options.
-
-## Typical Workflow
-
-1. In **Settings → Models**, choose a local or cloud provider and assign the model roles. Configure retrieval when you want to include prepared reference evidence.
-2. In **DILI Agent**, enter the clinical history, suspected medication and exposure dates, symptoms, and available laboratory results. Baseline values and laboratory-specific upper limits of normal help provide context.
-3. Review preflight feedback and address blocking issues before running the assessment. Read warnings and their stated limitations before deciding whether to continue.
-4. Review the generated narrative alongside structured findings, medication matches, evidence, and uncertainty. Verify statements against the supplied records.
-5. Save the session to revisit the report, compare revisions, review its timeline, or copy and export the output.
+- Run assessments with optional retrieval from prepared reference data using local or cloud model providers.
+- Review drug matching statuses, competing-cause states, and timeline events in the structured dossier.
+- Revisit saved sessions and track assessment progress through Clinical Sessions.
 
 ## Screenshots
 
-Enter a fictional case in the DILI Agent. The analysis has not been run.
+<p align="center">
+  <kbd><img src="assets/figures/01-dili-agent.png" alt="DILI Agent case entry" width="49%"></kbd>
+  <kbd><img src="assets/figures/02-clinical-session-synthetic-report.png" alt="Synthetic clinical session report" width="49%"></kbd>
+</p>
+<p align="center"><em>DILI Agent case entry (fictional case, analysis not run) and a saved synthetic documentation example. The example does not represent a real patient, clinical assessment, or model output.</em></p>
 
-![DILI Agent case entry](assets/figures/01-dili-agent.png)
-
-Review a saved, synthetic documentation example. It does not represent a real patient, clinical assessment, or model output.
-
-![Synthetic clinical session report](assets/figures/02-clinical-session-synthetic-report.png)
-
-Review retrieval and ranking options in Settings; the autosave status is visible in the dialog.
-
-![RAG settings with autosave status](assets/figures/03-rag-settings-autosave.png)
+<p align="center">
+  <kbd><img src="assets/figures/03-rag-settings-autosave.png" alt="RAG settings with autosave status" width="49%"></kbd>
+</p>
+<p align="center"><em>Retrieval and ranking options in Settings; the autosave status is visible in the dialog.</em></p>
 
 ## Technology Stack
 
-- Python 3.14+ and FastAPI for the local backend.
-- Angular 21 with Node.js 22 for the web client.
-- SQLite for local application data.
-- Tauri 2 for the Windows desktop package.
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.14+, FastAPI 0.141.1 |
+| Web client | Angular 21 (TypeScript 5.9) |
+| Database | SQLite |
+| Desktop package | Tauri 2 (WebView2 required) |
+| Minimum platform | Windows desktop |
 
 ## Installation and Usage
 
@@ -75,7 +70,29 @@ Choose **Install dependencies**, then **Launch application**. The launcher start
 
 For frontend development, start FastAPI with Uvicorn reload in one terminal and use `npm run dev` in `app/client` in another. The Angular dev server runs at `http://127.0.0.1:9847` by default and proxies `/api` to FastAPI. The production launcher does not use the frontend preview server.
 
+Manual (from source):
+
+```powershell
+cd app/server
+uv sync
+cd ../client
+npm install
+```
+
+Then follow [Runtime startup](assets/docs/runtime/startup.md).
+
 ## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FASTAPI_HOST` | `127.0.0.1` | Backend host |
+| `FASTAPI_PORT` | `7690` | Backend port |
+| `UI_HOST` | `127.0.0.1` | Frontend host |
+| `UI_PORT` | `9847` | Frontend port |
+| `VITE_API_BASE_URL` | `/api` | Browser API base |
+| `CORS_ALLOW_ORIGINS` | blank | Comma-separated allowed origins |
+| `DILIGENT_DATA_PATH` | `data` | Source-mode data root |
+| `DILIGENT_ACCESS_KEY_MATERIAL_FILE` | blank | Optional external key-material file |
 
 Choose a local or cloud model provider and assign model roles in **Settings**. Source-mode environment settings are stored in `settings/.env`; the launcher creates it from `settings/.env.example` when needed. Keep provider credentials private.
 
@@ -92,6 +109,16 @@ DILIGENT runs as a Windows desktop app or as a local web app in source mode, wit
 - [DILI assessment workflow](assets/docs/user/dili_assessment_workflow.md)
 - [Sessions, timeline, and data](assets/docs/user/sessions_timeline_and_data.md)
 - [Troubleshooting](assets/docs/user/troubleshooting.md)
+
+## Limitations
+
+- Decision support only. DILIGENT does not diagnose or replace clinical judgment.
+- Cloud-backed assessments may send case text to the configured provider; confirm local policy before entering protected health information.
+- Windows desktop or local source-mode use; no mobile layout is provided.
+
+## Contributing
+
+Contributions are welcome. Open an issue or pull request with a clear description of the change and its motivation.
 
 ## License
 
