@@ -8,7 +8,7 @@
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/commits"><img alt="Last commit" src="https://img.shields.io/github/last-commit/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases"><img alt="Release" src="https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag&style=flat-square"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat-square"></a>
 </p>
 
 <p align="center">
