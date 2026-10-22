@@ -170,7 +170,7 @@ def test_root_runtime_contracts_are_reachable(
     bootstrap = api_context.post("/api/desktop/bootstrap", data={"token": "invalid"})
     assert bootstrap.status in {401, 422}
     shutdown = api_context.post("/api/desktop/shutdown")
-    assert shutdown.status in {404, 503}
+    assert shutdown.status == 401
 
 ###############################################################################
 def test_catalog_rag_and_runtime_observation_boundaries(
