@@ -19,16 +19,19 @@
 
 ## Overview
 
-DILIGENT brings clinical history, medication exposure, symptoms, laboratory results, and timing information together for a reviewable DILI assessment. It supports local or cloud model providers, optional retrieval from prepared reference data, saved clinical sessions, timeline review, and report export.
+DILIGENT brings clinical history, medication exposure, symptoms, laboratory results, and timing information together for a reviewable drug-induced liver injury assessment. It supports local or cloud model providers, optional retrieval from prepared reference data, saved clinical sessions, timeline review, and report export. The application stores its data in a local SQLite database and can run as a Windows desktop app or a local web app from source. Assessments are guided by preflight checks, structured extraction, and deterministic clinical safety audits before a report is finalized. DILIGENT is decision support only; it does not diagnose or replace clinical judgment, and cloud-backed assessments may send case text to the configured provider.
 
 > **Decision support only.** DILIGENT does not diagnose or replace clinical judgment. Verify the source information and generated statements before use. Cloud-backed assessments may send case text to the configured provider; confirm local policy before entering protected health information.
 
 ## Key Features
 
 - Enter case context and resolve preflight feedback before running an assessment.
-- Review the generated narrative alongside structured findings, medication matches, and uncertainty signals.
+- Review the generated narrative alongside structured findings, medication matches, uncertainty signals, and evidence.
 - Save sessions, compare revisions, review timelines, and export reports.
 - Inspect local drug catalogs and reference resources, and configure model providers, roles, access keys, and retrieval options.
+- Run assessments with optional retrieval from prepared reference data using local or cloud model providers.
+- Review drug matching statuses, competing-cause states, and timeline events in the structured dossier.
+- Revisit saved sessions and track assessment progress through Clinical Sessions.
 
 ## Screenshots
 
