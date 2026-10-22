@@ -1,7 +1,7 @@
 {
   "name": "diligent-desktop-build",
   "private": true,
-  "version": "3.6.0",
+  "version": "3.5.1",
   "scripts": {
     "tauri": "tauri"
   },
