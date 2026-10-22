@@ -109,7 +109,7 @@ class ManualReportEditRequest(BaseModel):
     edited_fields: list[str] = Field(default_factory=lambda: ["report_text"])
     reviewer_note: str | None = Field(default=None, max_length=2000)
     edited_by: str | None = Field(default=None, max_length=200)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] | None = None
 
 ###############################################################################
 class ManualReportEditAudit(BaseModel):
