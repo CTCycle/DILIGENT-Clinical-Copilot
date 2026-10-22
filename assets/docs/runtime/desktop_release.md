@@ -19,9 +19,17 @@ The release owner explicitly waived a candidate-specific populated native analys
 
 Release acceptance recorded a manual-edit metadata issue that remains in the current source. Its current behavior and user workaround are in the [status ledger](../project_status_ledger.md) and [session guide](../user/sessions_timeline_and_data.md); it was not changed in v3.4.0.
 
-## Candidate: v3.5.1 (patch)
+## Published release: v3.5.1 (patch)
 
-v3.5.1 is the patch release prepared from `develop`/`main` after v3.5.0; it supersedes the unreleased 3.6.0 candidate versioning. Local pre-release checks on 2026-10-22: 892 backend unit tests, 112 frontend tests, the frontend build, and the 57-test Windows Full browser suite passed. Local artifacts built with Rust 1.95.0 (set `RUSTUP_TOOLCHAIN` when a newer default toolchain is installed) matched their SHA-256 manifest: portable EXE `671a09ac821dd2560b4fc70f05381be287e7830232ad71059eab06fe25de036c`, MSI `74cb4cfbaf2547f98221de93fb8115bae0868ef6cc5ff4a01ea9c3b0ee142858`. The portable EXE, launched from a scratch directory on a host with no prior DILIGENT data, reported release_version 3.5.1, returned `{"status":"ok"}` from `/api/health`, and on window close the backend exited with no listener left on its port. The MSI is per-machine and needs elevation, so local silent install was not possible; MSI install, upgrade-from-v3.5.0 and uninstall are covered only by the hosted prepare gates. Publication still requires the protected-environment approval described below; this section is not a published-release claim.
+The public [v3.5.1 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.1) is the latest release. Tag v3.5.1 resolves to source commit `49f3a7f4a14b808586288ffd59befc680f8d88bd` (`main` and `develop`). Prepare run [39827941660](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39827941660) and the approved publish run [39832496262](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39832496262) succeeded; published asset digests match the candidate receipt.
+
+| Published artifact | SHA-256 |
+|---|---|
+| DILIGENT-v3.5.1-windows-x64-portable.exe | 13daabd0ad2ca7f14998c66ef9980ef12bf85d810ee6d1e6d60c4075555b1074 |
+| DILIGENT-v3.5.1-windows-x64.msi | 11a5a90297a365bf24ca6dc155ae490671c354e7b74cc3cf1487b7efbd0a2810 |
+| DILIGENT-v3.5.1-windows-x64.sha256 | 01f508ca8f475bdcfb46eadd68e4b1068fc49e3f29f6ed1bbedae6c2c53ddfcd |
+
+Binaries are unsigned. Before preparation, local checks passed (892 backend unit tests, 112 frontend tests, 57-test Windows Full browser suite). Local inspection of the first candidate build found the packaged window showing `asset not found`: the staged Tauri config set `frontendDist` to an absolute drive-letter path, which Tauri does not embed. The build now writes a path relative to `src-tauri`, and the smoke script no longer applies the current API-boundary assertions to the v3.5.0 upgrade baseline. The exact published portable EXE was launched natively (WebView2 inspection showed the bundled DILI Agent UI, `/api/health` ok, clean close, no orphan processes). The existing smoke checks only window title and health, so UI rendering is not automated; the owner-approved waivers were populated native analysis, clean-host WebView2, and local MSI install (needs elevation; hosted MSI lifecycle and v3.5.0 upgrade gates passed). The [v3.5.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.0) remains documented below.
 
 ## Packaging architecture
 
