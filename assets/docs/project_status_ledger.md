@@ -5,7 +5,7 @@ Last updated: 2026-10-22
 
 This ledger is the canonical current status of project components. Product behavior is defined in the concept documents linked in each row. The [validation ledger](runtime/validation_ledger.md) preserves cross-cutting evidence boundaries; it does not duplicate component statuses or maintain a dated run diary.
 
-The latest published release is v3.5.0. Its tag, artifact hashes, hosted release gates, unsigned status, owner-approved waivers, and local portable smoke are recorded in the [desktop release document](runtime/desktop_release.md) and the [release evidence report](../QA/release-gates-20261020/report.md).
+The latest published release is v3.5.1. Its tag, artifact hashes, hosted release gates, unsigned status, owner-approved waivers, and local portable smoke are recorded in the [desktop release document](runtime/desktop_release.md) and the [release evidence report](../QA/release-gates-20261020/report.md).
 
 Update a component status only when evidence supports the stated scope. Keep limitations with the affected concept, link to the narrowest relevant documentation, and remove stale status entries when they no longer affect current work.
 
@@ -53,7 +53,7 @@ A status applies only to its stated scope. In particular, PUBLISHED is not a gen
 | revision.accepted-session-finalization | VALIDATED for tested acceptance flow | Accepted child session, persisted version, and subsequent lineage selection. | 2026-09-27 | [DILI pipeline](architecture/dili_assessment_pipeline.md); [background jobs](architecture/background_jobs.md) |
 | test.automated-regression | VALIDATED | Mandatory backend, persistence, frontend, Windows Full browser, provider, and security gates passed for the published candidate. | 2026-10-18 | [Testing and quality](coding/testing_and_quality.md); [release evidence](../QA/release-gates-20261018/report.md) |
 | release.desktop.v3-4-0 | PUBLISHED | Tag and downloaded artifact bytes verified; unsigned distribution disclosed; clean-host WebView2 check waived on the single available Windows machine. | 2026-10-18 | [Desktop release](runtime/desktop_release.md); [release evidence](../QA/release-gates-20261018/report.md) |
-| release.desktop.v3-5-1 | CANDIDATE | Patch candidate: local unit, frontend, and Full browser suites passed; local portable launch, health, version, and clean shutdown passed. Local MSI install was blocked by elevation and relies on hosted gates; nothing here is a published-release claim. | 2026-10-22 | [Desktop release](runtime/desktop_release.md) |
+| release.desktop.v3-5-1 | PUBLISHED | Tag v3.5.1 at 49f3a7f4; hosted prepare and approved publish passed; published asset digests match the candidate. Native launch of the exact portable EXE rendered the bundled UI and closed cleanly. Populated analysis, clean-host WebView2, and local MSI install were waived; UI rendering is not covered by automated smoke. | 2026-10-22 | [Desktop release](runtime/desktop_release.md) |
 | release.desktop.v3-5-0 | PUBLISHED | Exact candidate tag and published asset digests verified; hosted prepare/publish passed; local portable launch and health smoke passed. Candidate-specific populated analysis and clean-host checks were explicitly waived, relying on existing validation-ledger coverage; neither is claimed as a v3.5.0 execution. | 2026-10-20 | [Desktop release](runtime/desktop_release.md); [release evidence](../QA/release-gates-20261020/report.md) |
 | runtime.containerized | NOT_IMPLEMENTED | No supported container deployment target. | — | [Runtime modes](runtime/modes.md) |
 
