@@ -21,10 +21,6 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 open = "5"
 uuid = { version = "1", features = ["v4"] }
 
-[features]
-# Required for release builds: without it tauri-build compiles in dev mode and embeds no frontend assets.
-custom-protocol = ["tauri/custom-protocol"]
-
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
 

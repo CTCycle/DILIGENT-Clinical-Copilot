@@ -2325,7 +2325,8 @@ function New-TauriReleaseConfiguration {
     param([Parameter(Mandatory = $true)][string]$Version, [Parameter(Mandatory = $true)][string]$FrontendOutputDir)
     $configuration = Get-Content -LiteralPath (Join-Path $DesktopTauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json
     $configuration.version = $Version
-    $configuration.build.frontendDist = [IO.Path]::GetFullPath($FrontendOutputDir)
+    # Tauri parses an absolute Windows path (drive letter) as a URL and embeds nothing, so use a path relative to src-tauri.
+    $configuration.build.frontendDist = [IO.Path]::GetRelativePath($DesktopTauriDir, [IO.Path]::GetFullPath($FrontendOutputDir)).Replace('\', '/')
     $configuration.bundle | Add-Member -MemberType NoteProperty -Name 'icon' -Value @(
         (Join-Path $DesktopTauriDir 'icons/icon.ico'),
         (Join-Path $DesktopTauriDir 'icons/32x32.png'),
