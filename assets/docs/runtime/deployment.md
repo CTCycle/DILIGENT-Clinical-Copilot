@@ -77,7 +77,7 @@ existing output contract and does not require this source-mode marker.
 The latest published desktop release is `v3.5.0`. It contains a Tauri portable EXE and MSI built from synchronized source. Current release status, exact artifact hashes, hosted and native validation, unsigned disclosure, and the WebView2 waiver are recorded in the [desktop release document](desktop_release.md).
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.5.1 -DesktopTarget All
+.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.6.0 -DesktopTarget All
 ```
 
 For a later release, use the synchronized version from the source manifests. The build produces a portable EXE, MSI, and matching `.sha256` file under `release/`. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI that must carry an offline WebView2 installer. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied intentionally.
