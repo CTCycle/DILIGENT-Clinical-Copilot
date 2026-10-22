@@ -428,7 +428,8 @@ function Invoke-PortableSmoke(
             $port = [int]$ready.port
             $backendPid = [int]$ready.pid
             Wait-Http "http://127.0.0.1:$port/api/health" | Out-Null
-            Assert-PackagedApiSurface -baseUri "http://127.0.0.1:$port"
+            # The published upgrade baseline predates the current API boundary; only the candidate is held to it.
+            if ($expectedVersion -eq $Version) { Assert-PackagedApiSurface -baseUri "http://127.0.0.1:$port" }
             $windowTitle = ''
             $titleDeadline = (Get-Date).AddSeconds(30)
             while ((Get-Date) -lt $titleDeadline) {
