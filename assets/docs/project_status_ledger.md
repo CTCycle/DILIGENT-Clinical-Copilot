@@ -1,5 +1,5 @@
 # Project Status Ledger
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Purpose and authority
 
@@ -47,7 +47,7 @@ A status applies only to its stated scope. In particular, PUBLISHED is not a gen
 | data.inspection.catalogs | VALIDATED | Populated RxNav, LiverTox, DILIrank, and RAG inspection surfaces. | 2026-10-18 | [API surface](architecture/api_surface.md); [sessions and data](user/sessions_timeline_and_data.md) |
 | data.sources.refresh | VALIDATED for ordered refresh and preservation | RxNav → LiverTox → DILIrank refresh and last-good preservation on cancellation; injected live upstream outage is unvalidated. | 2026-09-29 | [Background jobs](architecture/background_jobs.md); [persistence](architecture/persistence.md) |
 | rag.ingestion-retrieval | VALIDATED for required byte-identical policy | Ingestion, retrieval, citation, and raw-byte SHA-256 deduplication with visible aliases. Semantic deduplication is not claimed. | 2026-10-18 | [DILI pipeline](architecture/dili_assessment_pipeline.md); [validation boundaries](runtime/validation_ledger.md) |
-| sessions.crud-persistence | PARTIAL | Session and revision persistence works for tested flows; manual report edits currently clear saved metadata. See Open issues. | 2026-10-18 | [Persistence](architecture/persistence.md); [sessions and data](user/sessions_timeline_and_data.md) |
+| sessions.crud-persistence | VALIDATED for tested flows | Session and revision persistence for tested flows. A manual report edit that omits `metadata` now preserves saved session metadata (client no longer sends `{}`; the API field defaults to null). Verified 2026-10-22 by the Full browser/API suite (57 passed) and a persistence unit test. | 2026-10-22 | [Persistence](architecture/persistence.md); [sessions and data](user/sessions_timeline_and_data.md) |
 | sessions.timeline | VALIDATED for supported synthetic boundary | Source-backed fallback, grounded qwen3.5:9b events, event evidence, and reload persistence. Broader providers and event families are not certified. | 2026-10-18 | [Background jobs](architecture/background_jobs.md); [sessions and data](user/sessions_timeline_and_data.md) |
 | revision.agentic-lifecycle | PARTIAL | Exact-provider execution and selected recovery/failure paths are covered; provider/model variance and broader accepted-versus-QA-blocked branches remain incomplete. | 2026-09-29 | [Background jobs](architecture/background_jobs.md); [generation policy](runtime/generation_policy.md) |
 | revision.accepted-session-finalization | VALIDATED for tested acceptance flow | Accepted child session, persisted version, and subsequent lineage selection. | 2026-09-27 | [DILI pipeline](architecture/dili_assessment_pipeline.md); [background jobs](architecture/background_jobs.md) |
@@ -58,9 +58,7 @@ A status applies only to its stated scope. In particular, PUBLISHED is not a gen
 
 ## Open issues
 
-| Component | Current behavior | User impact and follow-up |
-|---|---|---|
-| sessions.crud-persistence | The manual report editor sends an empty metadata object. The persistence layer replaces the session metadata with that object. See [client editor](../../app/client/src/app/pages/clinical-sessions/clinical-sessions-page.component.ts) and [repository update](../../app/server/repositories/session_revision_repository.py). | A manual report edit can silently remove saved attachment and session metadata. Re-enter and save metadata after an edit if needed; fix the request/repository contract and revalidate manual-edit persistence. This issue was present in the v3.4.0 release. |
+No open issues are recorded.
 
 ## Deferred validation
 
