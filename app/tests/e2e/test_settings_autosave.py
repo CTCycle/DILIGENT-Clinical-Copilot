@@ -436,6 +436,8 @@ def test_model_and_rag_settings_autosave_without_a_save_button(
         assert response.status == 200, response.text()
     assert _api_state(page, api_base_url, "/api/model-config")["rag_settings"] == original
     page.get_by_role("button", name="Done").click()
+    # The modal dialog keeps the page inert until it closes, so key presses would be lost.
+    expect(page.get_by_role("dialog", name="RAG settings")).to_be_hidden()
 
     # Reasoning is a continuous input; the latest value autosaves and is restored after reload.
     original_level = initial_model["reasoning_level"]
