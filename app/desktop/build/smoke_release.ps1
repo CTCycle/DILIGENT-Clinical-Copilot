@@ -283,13 +283,13 @@ function Assert-PackagedApiSurface([string]$baseUri) {
         throw 'Packaged API did not accept an exact-origin Tauri session-header preflight.'
     }
     $rejected = Wait-HttpStatus `
-        -uri ($baseUri.TrimEnd('/') + '/api/model-config') -expectedStatus 400 -timeoutSeconds 5 `
+        -uri ($baseUri.TrimEnd('/') + '/api/model-config') -expectedStatus 403 -timeoutSeconds 5 `
         -Headers @{
             Origin = $baseUri
             'Access-Control-Request-Method' = 'GET'
             'Access-Control-Request-Headers' = 'x-diligent-desktop-session'
         }
-    if ($rejected.StatusCode -ne 400) {
+    if ($rejected.StatusCode -ne 403) {
         throw 'Packaged API accepted a preflight from a non-Tauri origin.'
     }
 }
