@@ -11,7 +11,7 @@ The exact source commit is intentionally read from git (`git rev-parse
 develop`) rather than duplicated here, so this index does not become a stale
 branch-status record.
 
-- Backend, frontend, and desktop source manifests report synchronized version `3.6.0`.
+- Backend, frontend, and desktop source manifests report synchronized version `3.5.1`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
 - The latest published desktop release is `v3.5.0` (2026-10-20). Its unsigned portable EXE and MSI digests, hosted gates, native validation, and publication readback are recorded in the [release-gate report](../QA/release-gates-20261020/report.md) and [desktop release procedure](runtime/desktop_release.md), separately from product validation components.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.

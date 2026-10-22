@@ -3,7 +3,7 @@
   "info": {
     "title": "DILI Backend",
     "description": "FastAPI backend",
-    "version": "3.6.0"
+    "version": "3.5.1"
   },
   "paths": {
     "/api/clinical/section-template": {
