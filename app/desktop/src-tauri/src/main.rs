@@ -43,13 +43,19 @@ fn main() {
         })
         .setup(|app| {
             let version = app.package_info().version.to_string();
+            // WebviewUrl::App joins onto frontendDist, which is an absolute path in
+            // staged release builds and panics, so release builds load the splash by URL.
             let initial_page = if cfg!(debug_assertions) {
-                "index.html"
+                WebviewUrl::App("index.html".into())
             } else {
-                "splash.html"
+                WebviewUrl::External(
+                    "http://tauri.localhost/splash.html"
+                        .parse()
+                        .map_err(std::io::Error::other)?,
+                )
             };
             let window =
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::App(initial_page.into()))
+                WebviewWindowBuilder::new(app, "main", initial_page)
                     .title("DILIGENT Clinical Copilot")
                     .inner_size(1440.0, 960.0)
                     .visible(true)
