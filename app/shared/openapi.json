@@ -6760,8 +6760,15 @@
             "title": "Edited By"
           },
           "metadata": {
-            "additionalProperties": true,
-            "type": "object",
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Metadata"
           }
         },

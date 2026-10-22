@@ -400,6 +400,8 @@ def test_session_inspection_mutations_and_timeline_errors(
             },
         )
         assert restore.status == 200, restore.text()
+        # A manual edit that omits metadata must not clear stored session metadata.
+        assert restore.json()["session"]["metadata"] == {"scope": "api-local-boundaries"}
 
     for response in (
         api_context.get("/api/inspection/sessions/999999"),

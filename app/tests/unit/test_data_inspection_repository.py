@@ -320,6 +320,36 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
     )
 
 ###############################################################################
+def test_manual_report_edit_without_metadata_preserves_session_metadata() -> None:
+    repository_graph, _ = build_repository_graph_for_test()
+    session_id = repository_graph.clinical_session_repository.save_clinical_session(
+        {
+            "patient_name": "Metadata Patient",
+            "session_timestamp": datetime(2025, 1, 4, 8, 30, tzinfo=timezone.utc),
+            "session_status": "successful",
+            "anamnesis": "Original anamnesis",
+            "drugs": "acetaminophen",
+            "final_report": "Original report",
+            "session_result_payload": {"report": "Original report"},
+            "metadata": {"reviewer": "Dr. Keep"},
+        }
+    )
+    assert session_id is not None
+
+    service = build_service(repository_graph, jobs=JobManager())
+    result = service.manual_edit_report(
+        int(session_id),
+        report_text="Corrected report",
+        edited_fields=["report_text"],
+        reviewer_note=None,
+        edited_by="Reviewer",
+        metadata=None,
+    )
+
+    assert result is not None
+    assert result["session"]["metadata"] == {"reviewer": "Dr. Keep"}
+
+###############################################################################
 def test_manual_report_edit_missing_session_returns_none() -> None:
     repository_graph, _ = build_repository_graph_for_test()
 

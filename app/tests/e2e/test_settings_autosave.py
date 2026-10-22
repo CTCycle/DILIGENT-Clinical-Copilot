@@ -434,6 +434,8 @@ def test_model_and_rag_settings_autosave_without_a_save_button(
                 _set_rag_value(_rag_control(page, control_id), key, original[key])
         response = response_info.value
         assert response.status == 200, response.text()
+    # Multi-field restores save in sequence; wait for the last write before reading state.
+    expect(page.locator(".model-config-rag-modal-footer")).to_contain_text("All changes saved")
     assert _api_state(page, api_base_url, "/api/model-config")["rag_settings"] == original
     page.get_by_role("button", name="Done").click()
     # The modal dialog keeps the page inert until it closes, so key presses would be lost.

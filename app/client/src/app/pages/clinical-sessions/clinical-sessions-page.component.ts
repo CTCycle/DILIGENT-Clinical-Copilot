@@ -785,7 +785,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         edited_fields: ['report_text'],
         reviewer_note: this.manualEditReviewerNote().trim() || null,
         edited_by: this.manualEditEditedBy().trim() || null,
-        metadata: {},
       });
       this.selected.set(response.session);
       this.sessions.update((items) => items.map((item) => (
