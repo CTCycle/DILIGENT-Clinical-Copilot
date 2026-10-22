@@ -1,5 +1,5 @@
 # Windows Desktop Release
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Published release: v3.5.0
 
@@ -18,6 +18,10 @@ The binaries are unsigned. The public release notes disclose the missing publish
 The release owner explicitly waived a candidate-specific populated native analysis and clean-host Windows 11/WebView2 run, relying on the existing [project validation ledger](../project_status_ledger.md) for tested feature coverage. The v3.5.0 local smoke verifies package launch and health only; it is not a populated analysis or clean-host compatibility result. The approval comment records these waivers. Detailed release evidence is in the [v3.5.0 report](../../QA/release-gates-20261020/report.md). The previous [v3.4.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0) and its evidence remain documented in the [v3.4.0 report](../../QA/release-gates-20261018/report.md).
 
 Release acceptance recorded a manual-edit metadata issue that remains in the current source. Its current behavior and user workaround are in the [status ledger](../project_status_ledger.md) and [session guide](../user/sessions_timeline_and_data.md); it was not changed in v3.4.0.
+
+## Candidate: v3.5.1 (patch)
+
+v3.5.1 is the patch release prepared from `develop`/`main` after v3.5.0; it supersedes the unreleased 3.6.0 candidate versioning. Local pre-release checks on 2026-10-22: 892 backend unit tests, 112 frontend tests, the frontend build, and the 57-test Windows Full browser suite passed. Local artifacts built with Rust 1.95.0 (set `RUSTUP_TOOLCHAIN` when a newer default toolchain is installed) matched their SHA-256 manifest: portable EXE `671a09ac821dd2560b4fc70f05381be287e7830232ad71059eab06fe25de036c`, MSI `74cb4cfbaf2547f98221de93fb8115bae0868ef6cc5ff4a01ea9c3b0ee142858`. The portable EXE, launched from a scratch directory on a host with no prior DILIGENT data, reported release_version 3.5.1, returned `{"status":"ok"}` from `/api/health`, and on window close the backend exited with no listener left on its port. The MSI is per-machine and needs elevation, so local silent install was not possible; MSI install, upgrade-from-v3.5.0 and uninstall are covered only by the hosted prepare gates. Publication still requires the protected-environment approval described below; this section is not a published-release claim.
 
 ## Packaging architecture
 
