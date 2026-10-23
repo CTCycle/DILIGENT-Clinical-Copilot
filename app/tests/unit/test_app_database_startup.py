@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-
 from fastapi import FastAPI
-
 import app as server_app_module
+import pytest
+from configurations.startup import get_server_settings
+from services import startup_validation
 
-###############################################################################
 def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ignore[no-untyped-def]
     events: list[str] = []
     settings = SimpleNamespace(database=SimpleNamespace(backend=database_backend))
@@ -61,7 +61,6 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     asyncio.run(exercise())
     return events
 
-###############################################################################
 def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("sqlite", monkeypatch) == [
         "database",
@@ -74,7 +73,6 @@ def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) 
         "close",
     ]
 
-###############################################################################
 def test_application_startup_synchronizes_postgresql_before_validation(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
@@ -88,3 +86,38 @@ def test_application_startup_synchronizes_postgresql_before_validation(
         "running",
         "close",
     ]
+
+class _FakeModelConfigService:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, *, clinical_model: str, text_extraction_model: str) -> None:
+        self._snapshot = SimpleNamespace(
+            clinical_model=clinical_model,
+            text_extraction_model=text_extraction_model,
+            revision_model=clinical_model,
+            timeline_model=text_extraction_model,
+        )
+
+    # -------------------------------------------------------------------------
+    def load_current_snapshot(self) -> SimpleNamespace:
+        return self._snapshot
+
+def test_run_startup_validations_requires_reference_catalogs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        startup_validation,
+        "get_reference_catalog_snapshot",
+        lambda: SimpleNamespace(entries_by_scope={}),
+    )
+    monkeypatch.setattr(
+        startup_validation,
+        "ModelConfigService",
+        lambda: _FakeModelConfigService(
+            clinical_model="clinical-model",
+            text_extraction_model="parser-model",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="Reference catalogs"):
+        startup_validation.run_startup_validations(get_server_settings())

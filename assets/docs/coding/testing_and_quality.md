@@ -1,11 +1,12 @@
 # Testing and Quality
-Last updated: 2026-10-18
+Last updated: 2026-10-22
 
 ## Testing standards
 
 - Add unit tests for backend service and repository changes.
 - Add API and rendered-browser coverage for user-visible behavior and workflows.
 - Use deterministic assertions and isolate external integrations in explicitly named lanes.
+- Group related backend and frontend behaviors into subsystem suites; keep provider-backed validation in explicit integration lanes.
 - Keep evidence claims scoped to the code, environment, and workflows actually exercised.
 - Put durable behavior and limitations in their existing product-concept documents. Local logs, caches, and screenshots belong in ignored scratch space; do not add a tracked report for every run.
 
@@ -15,7 +16,7 @@ The Windows CI workflow is the required source-regression gate. It covers:
 
 - backend compilation, Alembic upgrade/head and metadata-drift checks, Ruff, Pyright, and backend unit tests;
 - SQLite and PostgreSQL persistence contracts;
-- Angular/Vitest and the Angular production build;
+- the consolidated Angular/Vitest suite, including runtime network configuration contracts, and the Angular production build;
 - deterministic Windows browser E2E and the synthetic access-key lifecycle;
 - Python, frontend, and desktop dependency/security audits.
 
@@ -26,6 +27,8 @@ The canonical browser command, from the repository root, is:
 ~~~
 
 The Full harness seeds an isolated SQLite database through repositories, starts a controlled Ollama protocol fixture and the application services, runs the browser suite, validates JUnit results, emits diagnostics, and cleans up its process trees. It fails when a mandatory test is skipped. It excludes the live-provider test and heavyweight real-embedding integration; those are explicit lanes.
+
+Run backend unit tests from `app/server` with `.\.venv\Scripts\python.exe -m pytest ..\tests\unit -q`. Run frontend unit tests from the repository root with `npm.cmd --prefix app/client run test -- --no-watch`. Runtime network configuration tests are part of the Vitest suite; there is no separate Node test command.
 
 The deterministic fixture supplies the model API responses needed by mandatory browser coverage. It does not prove compatibility with an installed Ollama model or real embedding execution.
 

@@ -112,7 +112,6 @@ $env:HF_ASSETS_CACHE = Join-Path $env:HF_HOME 'assets'
 $env:HUGGINGFACE_HUB_CACHE = $env:HF_HUB_CACHE
 $env:RUFF_CACHE_DIR = Join-Path $cacheRoot 'ruff'
 $env:MYPY_CACHE_DIR = Join-Path $cacheRoot 'mypy'
-$env:COVERAGE_FILE = Join-Path $cacheRoot 'coverage/.coverage'
 $env:PYTHONPYCACHEPREFIX = Join-Path $cacheRoot 'python'
 $env:CARGO_TARGET_DIR = Join-Path $cacheRoot 'cargo/target'
 $env:DILIGENT_LIVE_PROVIDER_LOG_DIR = $logDir

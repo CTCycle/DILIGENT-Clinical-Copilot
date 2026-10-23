@@ -24,7 +24,6 @@ permissions:
 
 env:
   CARGO_TARGET_DIR: ${{ github.workspace }}/runtimes/cache/cargo/target
-  COVERAGE_FILE: ${{ github.workspace }}/runtimes/cache/coverage/.coverage
   HF_ASSETS_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/assets
   HF_HOME: ${{ github.workspace }}/runtimes/cache/huggingface
   HF_HUB_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/hub

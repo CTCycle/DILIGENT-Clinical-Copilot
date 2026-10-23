@@ -37,7 +37,6 @@ $script:VenvDir = Join-Path $ServerDir '.venv'
 $script:VenvPython = Join-Path $VenvDir 'Scripts/python.exe'
 $script:RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
 $script:AngularCacheDir = Join-Path $RuntimeCacheDir 'angular'
-$script:CoverageDir = Join-Path $RuntimeCacheDir 'coverage'
 $script:CargoTargetDir = Join-Path $RuntimeCacheDir 'cargo/target'
 $script:EmbeddingCacheDir = Join-Path $RuntimeCacheDir 'embeddings'
 $script:HuggingFaceHomeDir = Join-Path $RuntimeCacheDir 'huggingface'
@@ -452,7 +451,6 @@ function Set-LauncherEnvironment {
         $RuntimeCacheDir,
         $AngularCacheDir,
         $EmbeddingCacheDir,
-        $CoverageDir,
         $CargoTargetDir,
         $MypyCacheDir,
         $NpmCacheDir,
@@ -478,7 +476,6 @@ function Set-LauncherEnvironment {
     $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightCacheDir
     $env:RUFF_CACHE_DIR = $RuffCacheDir
     $env:MYPY_CACHE_DIR = $MypyCacheDir
-    $env:COVERAGE_FILE = Join-Path $CoverageDir '.coverage'
     $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
     $env:CARGO_TARGET_DIR = $CargoTargetDir
     $env:PYTEST_ADDOPTS = "--basetemp=`"$PytestBaseTempDir`" -o cache_dir=`"$PytestCacheDir`""

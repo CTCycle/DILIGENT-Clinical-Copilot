@@ -39,7 +39,6 @@
       "envFile": "${workspaceFolder}/settings/.env",
       "env": {
         "CARGO_TARGET_DIR": "${workspaceFolder}/runtimes/cache/cargo/target",
-        "COVERAGE_FILE": "${workspaceFolder}/runtimes/cache/coverage/.coverage",
         "HF_ASSETS_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/assets",
         "HF_HOME": "${workspaceFolder}/runtimes/cache/huggingface",
         "HF_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",

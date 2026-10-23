@@ -17,7 +17,6 @@ set "RUFF_CACHE_DIR=%CACHE_DIR%\ruff"
 set "NPM_CONFIG_CACHE=%CACHE_DIR%\npm"
 set "PLAYWRIGHT_BROWSERS_PATH=%CACHE_DIR%\playwright"
 set "MYPY_CACHE_DIR=%CACHE_DIR%\mypy"
-set "COVERAGE_FILE=%CACHE_DIR%\coverage\.coverage"
 set "PIP_CACHE_DIR=%CACHE_DIR%\pip"
 set "PYTHONPYCACHEPREFIX=%CACHE_DIR%\python"
 set "CARGO_TARGET_DIR=%CACHE_DIR%\cargo\target"
@@ -103,21 +102,19 @@ echo 1. Unit tests
 echo 2. Integration tests
 echo 3. End-to-end tests
 echo 4. Regression tests
-echo 5. Stress tests
-echo 6. All tests
-echo 7. Model-config regression slice
-echo 8. Model-config full pass
+echo 5. All tests
+echo 6. Model-config regression slice
+echo 7. Model-config full pass
 echo.
-set /p SUITE="Select an option (1-8): "
+set /p SUITE="Select an option (1-7): "
 
 if "%SUITE%"=="1" set "SUITE=unit"
 if "%SUITE%"=="2" set "SUITE=integration"
 if "%SUITE%"=="3" set "SUITE=e2e"
 if "%SUITE%"=="4" set "SUITE=regression"
-if "%SUITE%"=="5" set "SUITE=stress"
-if "%SUITE%"=="6" set "SUITE=all"
-if "%SUITE%"=="7" set "SUITE=modelconfig"
-if "%SUITE%"=="8" set "SUITE=modelconfigfull"
+if "%SUITE%"=="5" set "SUITE=all"
+if "%SUITE%"=="6" set "SUITE=modelconfig"
+if "%SUITE%"=="7" set "SUITE=modelconfigfull"
 
 :suite_selected
 set "PYTEST_TARGET=%TESTS_DIR%\unit"
@@ -141,11 +138,6 @@ if /i "%SUITE%"=="e2e" (
 if /i "%SUITE%"=="regression" (
   set "PYTEST_TARGET=%TESTS_DIR%\unit"
   set "EXTRA_PYTEST_ARGS=-k cloud_llm_native or native_embeddings or ollama_native"
-  goto :suite_done
-)
-if /i "%SUITE%"=="stress" (
-  set "PYTEST_TARGET=%TESTS_DIR%\e2e\test_rxnav_concurrency_diagnostic.py"
-  set "NEED_BACKEND=1"
   goto :suite_done
 )
 if /i "%SUITE%"=="all" (
