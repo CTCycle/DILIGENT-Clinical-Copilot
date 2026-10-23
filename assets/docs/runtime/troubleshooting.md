@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -67,7 +67,7 @@ or configuration, changed dependency manifest, changed pinned Node version, or
 changed build contract causes a rebuild. Dependency-manifest changes and an
 unknown prior marker also run `npm ci` from `package-lock.json` first.
 
-Changes to `*.spec.ts`, `tsconfig.spec.json`, `vitest.config.ts`,
+Changes to `*.spec.ts`, `tsconfig.spec.json`,
 `scripts/preview-server.mjs`, `scripts/ng-serve.mjs`, `settings/.env`, backend
 Python, documentation, and QA files do not cause an Angular production rebuild.
 Use `-Action RebuildFrontend` for an unconditional rebuild, or

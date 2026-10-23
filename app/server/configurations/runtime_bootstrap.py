@@ -16,7 +16,6 @@ def configure_cache_environment() -> None:
     pytest_root = cache_root / "pytest"
     environment_paths = {
         "CARGO_TARGET_DIR": cache_root / "cargo" / "target",
-        "COVERAGE_FILE": cache_root / "coverage" / ".coverage",
         "HF_HOME": cache_root / "huggingface",
         "HF_HUB_CACHE": cache_root / "huggingface" / "hub",
         "HF_ASSETS_CACHE": cache_root / "huggingface" / "assets",

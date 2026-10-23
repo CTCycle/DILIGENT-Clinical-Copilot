@@ -9,8 +9,7 @@
     "build": "node ./scripts/build.mjs",
     "watch": "node ./scripts/build.mjs --watch --configuration development",
     "preview": "node ./scripts/preview-server.mjs",
-    "test": "ng test",
-    "test:runtime-config": "node --test ./scripts/runtime-config.test.mjs"
+    "test": "ng test"
   },
   "dependencies": {
     "@angular/common": "21.2.25",

@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -29,7 +29,7 @@ The build fingerprint covers production files under `app/client/src/` except
 `*.spec.ts`, `app/client/public/**`, `package.json`, `package-lock.json`,
 `angular.json`, `tsconfig.json`, `tsconfig.app.json`, the pinned launcher Node
 version, and the build command. Changes to spec files, `tsconfig.spec.json`,
-`vitest.config.ts`, preview/dev-server scripts, `settings/.env`, backend
+preview/dev-server scripts, `settings/.env`, backend
 Python, documentation, and QA files do not invalidate the production build.
 
 Automatic source-mode behavior is:
