@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-10-21
+Last updated: 2026-10-24
 
 ## Relational Database
 
@@ -32,6 +32,17 @@ erDiagram
         datetime session_timestamp
         string session_status
         string session_kind
+    }
+    CLINICAL_INPUT_DRAFTS {
+        int id PK
+        string draft_key
+        int revision
+        boolean is_active
+        string patient_name
+        date visit_date
+        text clinical_input
+        boolean use_rag
+        datetime updated_at
     }
     CLINICAL_SESSION_RESULTS {
         int id PK
@@ -224,7 +235,7 @@ erDiagram
 - SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
 - Fresh databases are upgraded through the linear Alembic history before the
   application starts. The v2.4 baseline and revisions through
-  `202609170001` remain available so databases from the v3.5.0 release are
+  `202610240001` remain available so databases from the v3.5.0 release are
   recognized at the current head without changing user rows. Populated
   databases without an Alembic revision and databases with unknown or
   divergent revisions are rejected before application tables are changed; the
@@ -238,6 +249,26 @@ erDiagram
 - FDA DILIrank 2.0 rows are stored in `dilirank_records` as a source-complete snapshot. `ltkb_id` is unique. `drug_id` is nullable so unmatched or ambiguous FDA rows remain inspectable without inventing a canonical drug mapping. A linked row also receives a `drug_identifiers` entry using identifier system `dilirank_ltkb`.
 - Complete RxNav and LiverTox refreshes reconcile their source-owned aliases, mappings, monographs, and source metadata after successful preparation in one database transaction. Shared `Drug` entities and records owned by other sources are preserved when obsolete source rows are removed.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
+
+## Resumable Clinical Input Draft
+
+- `clinical_input_drafts` is a fixed-ID singleton for the DILI Agent's one
+  explicitly saved working draft. It is separate from clinical sessions,
+  reports, revisions, and job records.
+- The draft contains only patient name, visit date, exact clinical input text,
+  and the per-run RAG choice. Patient images are excluded.
+- Draft reads and writes use the active configured SQLite or PostgreSQL
+  database. The database can be remote when PostgreSQL is configured.
+- The browser does not store draft contents in `localStorage` or
+  `sessionStorage`. A read presents a recovery choice without automatically
+  replacing the in-memory form.
+- Saves use the server-issued UUID and monotonic revision as conditional-write
+  tokens. A token mismatch rejects the write, including when the active
+  database changed. Discard clears all patient fields and advances a
+  tombstone revision so delayed writes cannot restore deleted content.
+- Draft endpoints do not run preflight, call a model, create a job, or create a
+  clinical session. Submitting an assessment continues through the existing
+  clinical pipeline.
 
 ## Focused Repository Ownership
 

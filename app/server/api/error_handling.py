@@ -70,6 +70,8 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         request.state.request_id = uuid.uuid4().hex[:12]
         response = await call_next(request)
         response.headers.setdefault(REQUEST_ID_HEADER, resolve_request_id(request))
+        if request.url.path == "/api/clinical/draft":
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 ###############################################################################
@@ -84,8 +86,13 @@ def request_validation_error_handler(
         request.method,
         request.url.path,
     )
+    is_clinical_draft = request.url.path == "/api/clinical/draft"
     payload = build_error_payload(
-        detail=make_json_safe(exc.errors()),
+        detail=(
+            "Invalid draft request."
+            if is_clinical_draft
+            else make_json_safe(exc.errors())
+        ),
         request_id=request_id,
         retryable=False,
     )
@@ -94,6 +101,8 @@ def request_validation_error_handler(
         content=payload,
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
+    if is_clinical_draft:
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 ###############################################################################

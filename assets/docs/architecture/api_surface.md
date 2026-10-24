@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-10-21
+Last updated: 2026-10-24
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -25,12 +25,27 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 ## Session And Clinical Routes
 - `GET /api/health`
 - `GET /api/clinical/section-template`
+- `GET /api/clinical/draft`
+- `PUT /api/clinical/draft`
+- `DELETE /api/clinical/draft?expected_revision={n}&expected_draft_key={uuid}`
 - `POST /api/clinical/validate-input`
 - `POST /api/clinical/jobs`
 - `GET /api/clinical/jobs/{job_id}`
 - `DELETE /api/clinical/jobs/{job_id}`
 
 `POST /api/clinical/validate-input` includes optional `rag_readiness` metadata when evaluating a submission. It reports whether RAG was requested, whether the configured embedding backend is available, the backend and model names, and a user-safe reason when retrieval cannot start.
+
+The draft routes persist one opt-in DILI Agent working draft in the active
+configured database. `PUT` requires `expected_revision`, `expected_draft_key`,
+and a form containing only `patient_name`, `visit_date`, `clinical_input`, and
+`use_rag`. The text is preserved as submitted and is limited to 100,000
+characters. `GET` and successful writes return a snapshot with the UUID,
+revision, update time, and form (null when no recoverable draft exists).
+`DELETE` uses the revision and optional UUID as compare-and-swap tokens, clears
+patient fields, and returns a tombstone. Stale tokens return `409`; validation
+failures return a generic `422`; unavailable persistence returns `503`. Every
+draft response uses `Cache-Control: no-store`, and draft validation errors do
+not echo submitted data.
 
 ## Model Catalog And Pull Routes
 - `GET /api/models/list`
