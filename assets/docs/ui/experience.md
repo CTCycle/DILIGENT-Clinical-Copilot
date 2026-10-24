@@ -1,5 +1,5 @@
 # Experience
-Last updated: 2026-10-21
+Last updated: 2026-10-24
 
 ## Page Structure
 - Routes:
@@ -32,6 +32,23 @@ Last updated: 2026-10-21
 - Revision Mode should keep full-session reprocessing as the default while still allowing a selected excerpt and free-text revision instruction.
 - Model catalog reads reuse persisted state; **Refresh** is the explicit provider-contact action, and valid cached catalogs remain visible when a later refresh fails.
 - Access-key dialogs keep new keys inactive until explicit activation and expose only masked fingerprints after storage.
+
+## DILI Agent Draft Recovery
+- Saving is explicit the first time. Only after a successful Save draft, or an
+  explicit Resume, do later form changes autosave after a short debounce.
+- A saved draft appears in a non-modal recovery banner and is never applied
+  automatically. Resume restores patient name, visit date, clinical text, and
+  RAG choice; it clears the image and tells the user to select it again.
+- Resuming over different current input requires confirmation. Resume is
+  disabled while an analysis job is active and does not start or replace a job.
+- Save state is announced through a polite live region. Unsaved changes,
+  failures, and stale-draft/database conflicts remain visible; conflicts pause
+  autosave until the user reloads the saved version.
+- Discard and Clear all confirm before deleting a saved draft. A failed delete
+  leaves the current input intact. Keep the recovery and confirmation controls
+  keyboard reachable with the shared visible focus treatment.
+- Draft contents live in the configured database and are not written to
+  browser storage. Patient images are not part of a draft.
 
 ## Desktop viewport
 - DILIGENT is a desktop application delivered through web technologies.

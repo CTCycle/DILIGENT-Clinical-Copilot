@@ -26,6 +26,7 @@ DILIGENT brings clinical history, medication exposure, symptoms, laboratory resu
 ## Key Features
 
 - Enter case context and resolve preflight feedback before running an assessment.
+- Explicitly save an unfinished DILI Agent draft and resume it later from the active configured database; PostgreSQL may be remote, and patient images are not included.
 - Review the generated narrative alongside structured findings, medication matches, uncertainty signals, and evidence.
 - Save sessions, compare revisions, review timelines, and export reports.
 - Inspect local drug catalogs and reference resources, and configure model providers, roles, access keys, and retrieval options.

@@ -6,6 +6,7 @@
 from repositories.schemas.base import Base
 from repositories.schemas.clinical import (
     ClinicalDrugMention,
+    ClinicalInputDraft,
     ClinicalLabObservation,
     ClinicalSession,
     ClinicalSessionResult,
@@ -37,6 +38,7 @@ from repositories.schemas.security import AccessKey
 __all__ = [
     "Base",
     "ClinicalDrugMention",
+    "ClinicalInputDraft",
     "ClinicalLabObservation",
     "ClinicalSession",
     "ClinicalSessionResult",

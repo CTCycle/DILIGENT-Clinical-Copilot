@@ -12,6 +12,16 @@ export const TIMEOUT_REQUEST_ERROR = "[ERROR] Request timed out. Please retry.";
 export const NETWORK_REQUEST_ERROR =
   "[ERROR] Network is unavailable. Check your connection and retry.";
 
+export class ApiHttpError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "ApiHttpError";
+  }
+}
+
 const SENSITIVE_ERROR_FRAGMENTS = [
   "traceback",
   "stack",
@@ -213,7 +223,7 @@ export async function requestJson<T>(
   const response = await fetchWithTimeout(url, options, timeoutSeconds);
   const result = await parseApiResponse(response);
   if (!response.ok) {
-    throw new Error(result.message || GENERIC_REQUEST_ERROR);
+    throw new ApiHttpError(result.message || GENERIC_REQUEST_ERROR, response.status);
   }
   if (!result.json) {
     throw new Error("[ERROR] Service returned an invalid response. Please retry.");

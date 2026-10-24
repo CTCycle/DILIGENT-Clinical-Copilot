@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-10-18
+Last updated: 2026-10-24
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -55,10 +55,24 @@ When available, include the laboratory-specific upper limits of normal, pretreat
    job.
 9. You may navigate to another page and return to the DILI Agent during the
    same browser session; the in-memory page state remains available. A full
-   refresh or closing and reopening the browser intentionally resets unsaved
-   clinical input and does not reattach the DILI page to an active job. The
-   backend job may continue independently, but use **Clinical Sessions** to
-   review work after it has been persisted.
+   refresh resets input that was never saved as a draft. If an analysis is
+   active, the existing job tracker may reconnect to it after refresh; draft
+   recovery remains a separate action and does not start or reconnect a job.
+
+## Save And Resume A Working Draft
+
+Use **Save draft** when you want to keep an unfinished DILI Agent input. The
+first save is explicit; after it succeeds, later edits autosave. On a later
+visit, choose **Resume** to restore the saved patient name, visit date, exact
+clinical text, and RAG choice. The draft is not an assessment, clinical
+session, report, or approval, and Resume does not run preflight or start a job.
+
+Drafts are stored in the currently configured SQLite or PostgreSQL database.
+PostgreSQL may be on another machine. Draft content is not stored in browser
+storage. Patient images are excluded, so select the optional image again after
+resuming. **Discard** removes the saved draft; **Clear all** also clears the
+current form. Both ask for confirmation. An unsaved initial form still resets
+on refresh by design.
 
 Expected result:
 - the application submits structured clinical input to the backend

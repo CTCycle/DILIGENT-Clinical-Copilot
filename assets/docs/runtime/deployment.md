@@ -58,7 +58,7 @@ existing output contract and does not require this source-mode marker.
   `uv run alembic -c alembic.ini current --check-heads`, followed by
   `uv run alembic -c alembic.ini check`.
 - Keep one linear head. Back up production data before upgrades. Known
-  revisions from the v2.4 baseline through `202609170001` upgrade through the
+  revisions from the v2.4 baseline through `202610240001` upgrade through the
   checked-in history. Populated databases without a revision and databases
   with unknown or divergent revisions are rejected; the runtime does not
   guess or stamp unversioned migration history.

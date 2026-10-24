@@ -549,4 +549,7 @@ def test_database_edits_wait_for_confirmation_and_failed_switch_rolls_back(
     failed_switch = switch_info.value
     assert failed_switch.status == 503
     assert _api_state(page, api_base_url, "/api/database/configuration") == initial
+    draft_read = page.request.get(f"{api_base_url}/api/clinical/draft")
+    assert draft_read.status == 200, draft_read.text()
+    assert draft_read.headers.get("cache-control") == "no-store"
     expect(page.get_by_role("alert")).to_contain_text("A required service is unavailable")

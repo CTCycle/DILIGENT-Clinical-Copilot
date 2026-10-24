@@ -226,6 +226,26 @@ export type ClinicalFormState = {
   useRag: boolean;
 };
 
+export type ClinicalDraftForm = {
+  patient_name: string;
+  visit_date: string | null;
+  clinical_input: string;
+  use_rag: boolean;
+};
+
+export type ClinicalDraftSnapshot = {
+  draft_key: string | null;
+  revision: number;
+  updated_at: string | null;
+  form: ClinicalDraftForm | null;
+};
+
+export type ClinicalDraftWrite = {
+  expected_revision: number;
+  expected_draft_key: string | null;
+  form: ClinicalDraftForm;
+};
+
 export type ClinicalRequestPayload = {
   name: string | null;
   visit_date: { day: number; month: number; year: number } | null;

@@ -175,7 +175,7 @@ def test_v350_database_is_accepted_at_current_head_without_losing_data(
         result = migrate_database(previous_database, database_was_empty=False)
 
         assert result.target_heads == (CURRENT_RELEASE_HEAD,)
-        assert result.upgraded is False
+        assert result.upgraded is True
         with previous_database.connect() as connection:
             assert (
                 connection.execute(text("select version_num from alembic_version"))
@@ -202,6 +202,11 @@ def test_v350_database_is_accepted_at_current_head_without_losing_data(
             ).scalar_one() == "Legacy LiverTox excerpt"
 
         upgraded_inspector = inspect(previous_database)
+        assert upgraded_inspector.has_table("clinical_input_drafts")
+        with previous_database.connect() as connection:
+            assert connection.execute(
+                text("select count(*) from clinical_input_drafts")
+            ).scalar_one() == 0
         assert upgraded_inspector.has_table("dilirank_records")
         assert {
             index["name"] for index in upgraded_inspector.get_indexes("dilirank_records")
