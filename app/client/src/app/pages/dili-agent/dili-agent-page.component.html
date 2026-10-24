@@ -10,6 +10,7 @@
             data-guidance-target="dili-clinical-input"
             aria-label="Clinical Input"
             class="stitch-dili-input-unified"
+            maxlength="100000"
             [placeholder]="clinicalInputTemplate()"
             [ngModel]="vm.form.clinicalInput"
             (ngModelChange)="handleFormChange('clinicalInput', $event)"
@@ -51,6 +52,7 @@
             <input
               id="patient-name"
               type="text"
+              maxlength="200"
               placeholder="e.g., Marco Rossi"
               [ngModel]="vm.form.patientName"
               (ngModelChange)="handleFormChange('patientName', $event)"
@@ -95,10 +97,76 @@
           >
             {{ runActionLabel }}
           </button>
-          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
+          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="isActiveJob">
             Clear all
           </button>
         </div>
+
+        <section class="clinical-draft-panel" aria-label="Clinical draft">
+          @if (clinicalDraft.pendingRecovery()) {
+            <div class="clinical-draft-banner" role="region" aria-labelledby="clinical-draft-title">
+              <div>
+                <h4 id="clinical-draft-title">Saved draft available</h4>
+                <p>Resume to restore the saved form. The patient image must be selected again.</p>
+              </div>
+              <div class="clinical-draft-actions">
+                <button
+                  class="btn btn-primary"
+                  type="button"
+                  (click)="resumeDraft()"
+                  [disabled]="isActiveJob"
+                >
+                  Resume
+                </button>
+                <button class="btn btn-secondary" type="button" (click)="discardDraft()">
+                  Discard
+                </button>
+              </div>
+            </div>
+          } @else if (!clinicalDraft.autosaveEnabled() && !clinicalDraft.hasPersistedDraft()) {
+            <button
+              class="btn btn-secondary clinical-draft-save"
+              type="button"
+              (click)="saveDraft()"
+              [disabled]="clinicalDraft.loading() || clinicalDraft.saveStatus() === 'saving'"
+            >
+              Save draft
+            </button>
+            <p class="clinical-draft-note">
+              Saved in the configured database; patient image is not included.
+            </p>
+          }
+
+          @if (clinicalDraft.autosaveEnabled() || clinicalDraft.saveStatus() === 'error' || clinicalDraft.saveStatus() === 'conflict') {
+            <div class="clinical-draft-status-row">
+              <p class="clinical-draft-status" role="status" aria-live="polite">
+                {{ draftStatusText }}
+              </p>
+              @if (clinicalDraft.saveStatus() === 'error' && clinicalDraft.autosaveEnabled()) {
+                <button
+                  class="clinical-draft-link"
+                  type="button"
+                  (click)="clinicalDraft.retrySave(vm.form)"
+                >
+                  Retry save
+                </button>
+              }
+              @if (clinicalDraft.saveStatus() === 'conflict' || (clinicalDraft.saveStatus() === 'error' && clinicalDraft.hasPersistedDraft())) {
+                <button class="clinical-draft-link" type="button" (click)="reloadDraft()">
+                  Reload draft
+                </button>
+              }
+              @if (clinicalDraft.autosaveEnabled() && clinicalDraft.hasPersistedDraft()) {
+                <button class="clinical-draft-link" type="button" (click)="discardDraft()">
+                  Discard draft
+                </button>
+              }
+            </div>
+          }
+          @if (clinicalDraft.errorMessage(); as draftError) {
+            <p class="clinical-draft-error" role="status">{{ draftError }}</p>
+          }
+        </section>
       </section>
 
     </aside>
@@ -238,5 +306,40 @@
         {{ preflightContinuationInFlight() ? 'Starting...' : 'Continue with limitations' }}
       </button>
     }
+  </div>
+</app-modal-shell>
+
+<app-modal-shell
+  [isOpen]="draftConfirmation() !== null"
+  [title]="draftConfirmationTitle"
+  titleId="clinical-draft-confirmation-title"
+  ariaLabelledBy="clinical-draft-confirmation-title"
+  ariaDescribedBy="clinical-draft-confirmation-description"
+  [footer]="true"
+  closeLabel="Cancel draft action"
+  (close)="closeDraftConfirmation()"
+  (closed)="closeDraftConfirmation()"
+>
+  <p id="clinical-draft-confirmation-description" class="clinical-draft-confirmation-copy">
+    {{ draftConfirmationDescription }}
+  </p>
+  <div modal-footer class="clinical-draft-confirmation-actions">
+    <button
+      class="btn btn-secondary"
+      type="button"
+      data-modal-initial-focus
+      (click)="closeDraftConfirmation()"
+    >
+      Cancel
+    </button>
+    <button class="btn btn-primary" type="button" (click)="confirmDraftAction()">
+      @if (draftConfirmation() === 'resume') {
+        Replace input and resume
+      } @else if (draftConfirmation() === 'clear') {
+        Discard and clear
+      } @else {
+        Discard draft
+      }
+    </button>
   </div>
 </app-modal-shell>

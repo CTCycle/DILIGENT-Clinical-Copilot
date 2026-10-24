@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
 import {
@@ -10,6 +11,7 @@ import {
   ClinicalRequestPayload,
 } from '../../core/models/types';
 import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
+import { ClinicalDraftService } from '../../core/services/clinical-draft.service';
 import { DiliAgentPageComponent } from './dili-agent-page.component';
 
 function issue(
@@ -49,11 +51,31 @@ describe('DiliAgentPageComponent', () => {
   let fixture: ComponentFixture<DiliAgentPageComponent>;
   let component: DiliAgentPageComponent;
   let tracker: DiliJobTrackerService;
+  let draftService: ClinicalDraftService;
 
   beforeEach(async () => {
     localStorage.clear();
+    draftService = {
+      loading: signal(false),
+      pendingRecovery: signal(false),
+      autosaveEnabled: signal(false),
+      saveStatus: signal('idle'),
+      lastSavedAt: signal(null),
+      hasPersistedDraft: signal(false),
+      hasUnsavedChanges: signal(false),
+      errorMessage: signal(null),
+      loadOnOpen: vi.fn().mockResolvedValue(true),
+      getRestorableForm: vi.fn().mockReturnValue(null),
+      resume: vi.fn(),
+      saveAndEnable: vi.fn().mockResolvedValue(true),
+      scheduleSave: vi.fn(),
+      retrySave: vi.fn().mockResolvedValue(true),
+      discard: vi.fn().mockResolvedValue(true),
+      reloadDraft: vi.fn().mockResolvedValue(true),
+    } as unknown as ClinicalDraftService;
     await TestBed.configureTestingModule({
       imports: [DiliAgentPageComponent],
+      providers: [{ provide: ClinicalDraftService, useValue: draftService }],
     }).compileComponents();
     fixture = TestBed.createComponent(DiliAgentPageComponent);
     component = fixture.componentInstance;
@@ -249,6 +271,103 @@ describe('DiliAgentPageComponent', () => {
       null,
     );
     expect(component.vm.form.useRag).toBe(true);
+  });
+
+  it('keeps the initial recovery read separate from the in-memory form and active job', () => {
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, patientName: 'Unsaved local name' },
+      jobId: 'job-still-running',
+      jobStatus: 'running',
+      isRunning: true,
+    });
+
+    expect(draftService.loadOnOpen).toHaveBeenCalledOnce();
+    expect(component.vm.form.patientName).toBe('Unsaved local name');
+    expect(component.vm.jobId).toBe('job-still-running');
+  });
+
+  it('schedules form changes only after the clinician opts in or resumes', () => {
+    component.handleFormChange('clinicalInput', 'unsaved text');
+    expect(draftService.scheduleSave).not.toHaveBeenCalled();
+
+    draftService.autosaveEnabled.set(true);
+    component.handleFormChange('clinicalInput', 'opted-in text');
+    expect(draftService.scheduleSave).toHaveBeenCalledOnce();
+    expect(draftService.scheduleSave).toHaveBeenCalledWith(component.vm.form);
+  });
+
+  it('restores only the approved fields, leaves image out, and starts no assessment', () => {
+    vi.mocked(draftService.getRestorableForm).mockReturnValue({
+      patient_name: 'Recovered synthetic patient',
+      visit_date: '2026-10-23',
+      clinical_input: 'Exact\nclinical text  ',
+      use_rag: true,
+    });
+    const startSpy = vi.spyOn(tracker, 'startSession');
+
+    component.resumeDraft();
+
+    expect(component.vm.form).toEqual({
+      patientName: 'Recovered synthetic patient',
+      visitDate: '2026-10-23',
+      patientImageDataUrl: null,
+      clinicalInput: 'Exact\nclinical text  ',
+      useRag: true,
+    });
+    expect(draftService.resume).toHaveBeenCalledOnce();
+    expect(startSpy).not.toHaveBeenCalled();
+  });
+
+  it('requires confirmation before replacing different current input with a saved draft', () => {
+    vi.mocked(draftService.getRestorableForm).mockReturnValue({
+      patient_name: 'Saved patient',
+      visit_date: null,
+      clinical_input: 'Saved text',
+      use_rag: false,
+    });
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, patientName: 'Current patient' },
+    });
+
+    component.resumeDraft();
+
+    expect(component.draftConfirmation()).toBe('resume');
+    expect(component.vm.form.patientName).toBe('Current patient');
+    expect(draftService.resume).not.toHaveBeenCalled();
+  });
+
+  it('does not resume over an active job', () => {
+    vi.mocked(draftService.getRestorableForm).mockReturnValue({
+      patient_name: 'Saved patient',
+      visit_date: null,
+      clinical_input: 'Saved text',
+      use_rag: false,
+    });
+    component.stateService.updateDiliAgent({
+      jobId: 'active-job',
+      jobStatus: 'running',
+      isRunning: true,
+    });
+
+    component.resumeDraft();
+
+    expect(draftService.resume).not.toHaveBeenCalled();
+    expect(component.vm.jobId).toBe('active-job');
+  });
+
+  it('clears a saved draft only after conditional discard succeeds', async () => {
+    draftService.hasPersistedDraft.set(true);
+    component.stateService.updateDiliAgent({
+      form: { ...component.vm.form, patientName: 'Keep this until deletion succeeds' },
+    });
+    vi.mocked(draftService.discard).mockResolvedValue(false);
+
+    component.clearAll();
+    expect(component.draftConfirmation()).toBe('clear');
+    await component.confirmDraftAction();
+
+    expect(component.vm.form.patientName).toBe('Keep this until deletion succeeds');
+    expect(draftService.discard).toHaveBeenCalledOnce();
   });
 
   it('renders a bounded issue-list scroll region for long validation results', () => {

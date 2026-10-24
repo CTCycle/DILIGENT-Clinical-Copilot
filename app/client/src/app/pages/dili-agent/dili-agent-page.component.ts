@@ -14,11 +14,13 @@ import { GuidanceTourService } from '../../core/guidance/guidance-tour.service';
 import {
   ClinicalInputPreflightIssue,
   ClinicalInputPreflightResponse,
+  ClinicalDraftForm,
   ClinicalRequestPayload,
   JobStatus,
 } from '../../core/models/types';
 import { validateClinicalInput, fetchClinicalSectionTemplate } from '../../core/services/clinical-api';
 import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
+import { ClinicalDraftService } from '../../core/services/clinical-draft.service';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { AppStateService } from '../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
@@ -49,6 +51,8 @@ Comorbidities / liver risk factors:
 Timeline of symptoms and treatment changes:
 Working clinical question:`;
 
+type DraftConfirmationAction = 'resume' | 'discard' | 'clear';
+
 function isTerminalJobStatus(status: JobStatus | null): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
@@ -70,6 +74,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   private readonly guidanceTour = inject(GuidanceTourService);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly diliJobTracker = inject(DiliJobTrackerService);
+  readonly clinicalDraft = inject(ClinicalDraftService);
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
@@ -95,6 +100,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message || this.reportBody);
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
   readonly clinicalInputTemplate = signal('');
+  readonly draftConfirmation = signal<DraftConfirmationAction | null>(null);
 
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -104,6 +110,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   private preflightAttempt = 0;
 
   constructor() {
+    void this.clinicalDraft.loadOnOpen();
     void this.loadClinicalSectionTemplate();
     void this.modelConfigState.load().catch(() => undefined);
     effect(() => {
@@ -157,11 +164,9 @@ export class DiliAgentPageComponent implements OnDestroy {
     if (shouldClearStaleOutput && this.vm.exportUrl) {
       this.diliJobTracker.revokeCurrentExportUrl();
     }
+    const updatedForm = { ...this.vm.form, [key]: value };
     this.stateService.updateDiliAgent({
-      form: {
-        ...this.vm.form,
-        [key]: value,
-      },
+      form: updatedForm,
       ...(shouldClearStaleOutput || shouldClearValidationMessage
         ? {
             message: '',
@@ -177,6 +182,9 @@ export class DiliAgentPageComponent implements OnDestroy {
           }
         : {}),
     });
+    if (this.clinicalDraft.autosaveEnabled()) {
+      this.clinicalDraft.scheduleSave(updatedForm);
+    }
   }
 
   private async loadClinicalSectionTemplate(): Promise<void> {
@@ -411,7 +419,157 @@ export class DiliAgentPageComponent implements OnDestroy {
     }
   }
 
+  async saveDraft(): Promise<void> {
+    const saved = await this.clinicalDraft.saveAndEnable(this.vm.form);
+    if (saved) {
+      this.clinicalDraft.scheduleSave(this.vm.form);
+    }
+  }
+
+  resumeDraft(): void {
+    if (this.isActiveJob) {
+      return;
+    }
+    const draft = this.clinicalDraft.getRestorableForm();
+    if (!draft) {
+      return;
+    }
+    const current = this.vm.form;
+    const hasCurrentInput = Boolean(
+      current.patientName || current.visitDate || current.clinicalInput ||
+      current.useRag || current.patientImageDataUrl,
+    );
+    const differs = current.patientName !== draft.patient_name ||
+      current.visitDate !== (draft.visit_date ?? '') ||
+      current.clinicalInput !== draft.clinical_input ||
+      current.useRag !== draft.use_rag ||
+      current.patientImageDataUrl !== null;
+    if (hasCurrentInput && differs) {
+      this.draftConfirmation.set('resume');
+      return;
+    }
+    this.applyResumedDraft(draft);
+  }
+
+  discardDraft(): void {
+    if (this.clinicalDraft.hasPersistedDraft()) {
+      this.draftConfirmation.set('discard');
+    }
+  }
+
   clearAll(): void {
+    if (this.isActiveJob) {
+      return;
+    }
+    if (this.clinicalDraft.hasPersistedDraft()) {
+      this.draftConfirmation.set('clear');
+      return;
+    }
+    this.performClearAll();
+  }
+
+  async confirmDraftAction(): Promise<void> {
+    const action = this.draftConfirmation();
+    this.draftConfirmation.set(null);
+    if (action === 'resume') {
+      const draft = this.clinicalDraft.getRestorableForm();
+      if (draft) {
+        this.applyResumedDraft(draft);
+      }
+      return;
+    }
+    if (action !== 'discard' && action !== 'clear') {
+      return;
+    }
+    if (!(await this.clinicalDraft.discard())) {
+      return;
+    }
+    this.invalidatePreflightState();
+    this.stateService.updateDiliAgent({ form: { ...DEFAULT_FORM_STATE } });
+    if (action === 'clear') {
+      this.performClearAll();
+    }
+  }
+
+  closeDraftConfirmation(): void {
+    this.draftConfirmation.set(null);
+  }
+
+  async reloadDraft(): Promise<void> {
+    await this.clinicalDraft.reloadDraft();
+  }
+
+  get isActiveJob(): boolean {
+    return this.vm.isRunning || this.vm.isStarting ||
+      this.vm.jobStatus === 'pending' || this.vm.jobStatus === 'running';
+  }
+
+  get draftStatusText(): string {
+    switch (this.clinicalDraft.saveStatus()) {
+      case 'saving':
+        return 'Saving';
+      case 'conflict':
+        return 'Draft changed or database switched. Reload before saving.';
+      case 'error':
+        return 'Unsaved changes. Draft could not be saved.';
+      case 'saved': {
+        if (this.clinicalDraft.hasUnsavedChanges()) {
+          return 'Unsaved changes';
+        }
+        const savedAt = this.clinicalDraft.lastSavedAt();
+        return savedAt
+          ? `Saved at ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : 'Saved';
+      }
+      default:
+        return this.clinicalDraft.hasUnsavedChanges() ? 'Unsaved changes' : '';
+    }
+  }
+
+  get draftConfirmationTitle(): string {
+    return this.draftConfirmation() === 'resume'
+      ? 'Replace current input?'
+      : this.draftConfirmation() === 'clear'
+        ? 'Discard saved draft and clear all?'
+        : 'Discard saved draft?';
+  }
+
+  get draftConfirmationDescription(): string {
+    if (this.draftConfirmation() === 'resume') {
+      return 'Resuming replaces the current form with the saved draft. The selected patient image is not part of the draft and must be chosen again.';
+    }
+    return 'This permanently removes the saved draft from the configured database and clears the current form. This does not change an assessment already in progress.';
+  }
+
+  private applyResumedDraft(draft: ClinicalDraftForm): void {
+    if (this.isActiveJob) {
+      return;
+    }
+    this.invalidatePreflightState();
+    this.diliJobTracker.clearJobState();
+    this.stateService.updateDiliAgent({
+      form: {
+        patientName: draft.patient_name,
+        visitDate: draft.visit_date ?? '',
+        patientImageDataUrl: null,
+        clinicalInput: draft.clinical_input,
+        useRag: draft.use_rag,
+      },
+      message: '',
+      exportUrl: null,
+      jobId: null,
+      jobProgress: 0,
+      jobStatus: null,
+      jobStage: null,
+      jobStageMessage: null,
+      jobStartedAtMs: null,
+      jobLastProgressAtMs: null,
+      pollIntervalMs: null,
+    });
+    this.clinicalDraft.resume();
+  }
+
+  private performClearAll(): void {
     this.invalidatePreflightState();
     this.diliJobTracker.clearJobState();
     this.stateService.updateDiliAgent({

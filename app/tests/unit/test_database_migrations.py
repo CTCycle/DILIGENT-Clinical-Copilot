@@ -49,6 +49,7 @@ def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) ->
         assert second.current_heads == (HEAD_REVISION,)
         assert second.upgraded is False
         assert inspect(engine).has_table("clinical_sessions")
+        assert inspect(engine).has_table("clinical_input_drafts")
         assert inspect(engine).has_table("alembic_version")
         with engine.connect() as connection:
             assert (

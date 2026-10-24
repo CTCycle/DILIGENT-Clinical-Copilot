@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from configurations.startup import get_server_settings
 from repositories.context import RepositoryContext
+from repositories.clinical_draft_repository import ClinicalDraftRepository
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
@@ -22,6 +23,7 @@ from repositories.serialization.model_configs import ModelConfigSerializer
 from services.runtime.jobs import JobManager
 from services.session.payload import PayloadSanitizationService
 from services.session.session_service import ClinicalSessionService
+from services.session.clinical_draft_service import ClinicalDraftService
 
 ###############################################################################
 def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionService:
@@ -48,4 +50,10 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
         hepatox_consultation_cls=HepatoxConsultation,
         job_manager=job_manager,
         model_config_service=ModelConfigService(serializer=ModelConfigSerializer()),
+    )
+
+###############################################################################
+def build_clinical_draft_service() -> ClinicalDraftService:
+    return ClinicalDraftService(
+        repository=ClinicalDraftRepository(RepositoryContext.create())
     )

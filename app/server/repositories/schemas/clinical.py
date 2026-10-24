@@ -7,6 +7,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -23,12 +24,32 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from repositories.schemas.base import Base
+from repositories.schemas.base import Base, UtcDateTime
 
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
+
+###############################################################################
+class ClinicalInputDraft(Base):
+    __tablename__ = "clinical_input_drafts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    draft_key: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    patient_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    visit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    clinical_input: Mapped[str | None] = mapped_column(Text, nullable=True)
+    use_rag: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 ###############################################################################
 class ClinicalSession(Base):
