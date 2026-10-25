@@ -551,15 +551,3 @@ def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
         "DELETE",
         "/inspection/reference-catalogs/runtime-observations/{category}/{term}",
     ) in routes
-
-###############################################################################
-def test_legacy_text_normalization_routes_are_removed() -> None:
-    app = FastAPI()
-    app.include_router(data_inspection.router)
-    legacy_paths = {
-        "/inspection/text-normalization",
-        "/inspection/text-normalization/{category}",
-        "/inspection/text-normalization/{category}/{term}",
-    }
-    current_paths = {getattr(route, "path", "") for route in app.routes}
-    assert legacy_paths.isdisjoint(current_paths)

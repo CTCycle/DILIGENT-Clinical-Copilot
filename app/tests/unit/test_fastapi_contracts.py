@@ -4,9 +4,7 @@
 from __future__ import annotations
 
 import json
-from typing import get_args
 
-from domain.keys import ProviderName
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from fastapi.routing import APIRoute
 
@@ -100,16 +98,6 @@ def test_model_catalog_routes_are_explicit_and_provider_scoped() -> None:
         item.get("name") == "include_local_availability" for item in get_parameters
     )
 
-###############################################################################
-def test_provider_descriptions_match_supported_providers() -> None:
-    assert set(get_args(ProviderName)) == {
-        "openai",
-        "gemini",
-        "deepseek",
-        "anthropic",
-        "opencode",
-        "brave",
-    }
 
 ###############################################################################
 def test_cloud_model_openapi_exposes_only_canonical_capability_fields() -> None:

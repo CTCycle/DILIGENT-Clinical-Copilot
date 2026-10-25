@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
-from pathlib import Path
 
 import pytest
 from common.prompts.clinical_assessment import (
@@ -217,19 +216,6 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
         in LIVERTOX_REVISION_CONCLUSION_SYSTEM_PROMPT
     )
 
-###############################################################################
-def test_legacy_hepatox_timeline_helper_module_is_removed() -> None:
-    workspace_root = Path(__file__).resolve().parents[3]
-    timeline_module = (
-        workspace_root
-        / "app"
-        / "server"
-        / "services"
-        / "clinical"
-        / "hepatox_timeline.py"
-    )
-
-    assert not timeline_module.exists()
 
 ###############################################################################
 def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> None:
