@@ -119,15 +119,26 @@ def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundar
 def test_frontend_build_state_is_deterministic_and_published_after_stable_build() -> None:
     source = _launcher_text()
     input_files = _function_body(source, "Get-FrontendBuildInputFiles")
+    artifact_inventory = _function_body(source, "Get-FrontendBuildArtifactInventory")
     fingerprint = _function_body(source, "Get-FrontendInputFingerprint")
     status = _function_body(source, "Get-FrontendBuildStatus")
+    read_state = _function_body(source, "Read-FrontendBuildState")
     build = _function_body(source, "Build-Frontend")
 
     assert "dist/.diligent-build-state.json" in source
     assert "Get-FileHash" in fingerprint
     assert "Sort-Object -Unique" in input_files
     assert r"\.spec\.ts$" in input_files
-    assert "schema_version" in source
+    assert "app/client/scripts/build.mjs" in input_files
+    assert "app/client/scripts/runtime-config.mjs" in input_files
+    assert "ng-serve.mjs" not in input_files
+    assert "preview-server.mjs" not in input_files
+    assert "browser_artifacts" in source
+    assert "schema_version = 2" in source
+    assert "Get-ChildItem" in artifact_inventory
+    assert "BuildArtifactsMissing" in status
+    assert "BuildStateOutdated" in status
+    assert "browser_artifacts" in read_state
     assert "build_fingerprint" in status
     assert "dependency_fingerprint" in status
     assert "Get-FrontendBuildFingerprint" in build
@@ -137,6 +148,19 @@ def test_frontend_build_state_is_deterministic_and_published_after_stable_build(
     assert "DILIGENT_DESKTOP_BUILD" in build
     assert "[IO.File]::Replace" in source
     assert "changed while Angular was building" in build
+
+###############################################################################
+def test_frontend_dependency_sync_requires_detected_input_change_or_missing_install() -> None:
+    source = _launcher_text()
+    status = _function_body(source, "Get-FrontendBuildStatus")
+    install_dependencies = _function_body(source, "Install-FrontendDependencies")
+    start_application = _function_body(source, "Start-Application")
+
+    assert "$dependencyInputsChanged = $false" in status
+    assert "state.dependency_fingerprint" in status
+    assert "state.node_version" in status
+    assert "Test-Path -LiteralPath $angularCli" in install_dependencies
+    assert "Install-FrontendDependencies -ForceSync:$frontendBuildStatus.DependencyInputsChanged" in start_application
 
 ###############################################################################
 def test_warm_runtime_repair_does_not_force_frontend_dependency_or_build_work() -> None:

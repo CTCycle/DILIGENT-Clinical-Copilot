@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-10-22
+Last updated: 2026-10-26
 
 ## Recommended Local Startup
 On Windows, use:
@@ -17,6 +17,7 @@ The launcher:
 - validates the deterministic frontend build-state marker before reusing an existing production build
 - starts one FastAPI process with the synchronized virtual-environment Python; FastAPI serves the built Angular SPA and `/api/*` from the same origin
 - waits for `/api/health`, the SPA entry page, and a built JavaScript asset before opening the backend origin in the browser
+- reports each major launch phase and total time to application readiness in milliseconds
 - keeps the backend process hidden and writes its output to `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`; the visible launcher owns the process
 - keeps the interactive menu open while the app runs; `EXIT` and Ctrl+C request authenticated graceful shutdown, wait, then stop only the launcher-owned process tree if needed
 - makes `-Action Launch` supervise the server until it stops or Ctrl+C is pressed
@@ -85,20 +86,24 @@ cleanup when prompted.
 Source-mode production output is accompanied by
 `app/client/dist/.diligent-build-state.json`. The marker contains a schema
 version, source/build fingerprint, dependency fingerprint, pinned Node version,
-and the canonical `npm run build` command. The launcher reuses the output only
-when the marker and `dist/browser/index.html` are present and all fingerprints
-still match.
+the canonical `npm run build` command, and the inventory of files emitted under
+`dist/browser`. The launcher reuses the output only when the marker and
+`dist/browser/index.html` are present, all fingerprints still match, and every
+recorded output file still exists.
 
 The build fingerprint includes sorted, normalized paths and content digests for
 production files under `app/client/src/` (excluding `*.spec.ts`),
-`app/client/public/**`, the frontend manifests/configuration files, the pinned
-Node version, and the build command. It does not include test configuration,
-preview/dev-server scripts, `settings/.env`, backend Python, QA files, or
-documentation. A missing, corrupt, stale, or absent output marker triggers one
-source-mode rebuild. Dependency-manifest or pinned-Node changes additionally
-run `npm ci` from the tracked lockfile before that build. The marker is written
-only after a successful build whose inputs are unchanged, using an atomic
-replacement; desktop-release staging output does not require this marker.
+`app/client/public/**`, the frontend manifests/configuration files,
+`app/client/scripts/build.mjs`, `app/client/scripts/runtime-config.mjs`, the
+pinned Node version, the build command, and the effective
+`VITE_API_BASE_URL`. It excludes preview/dev-server scripts, other
+`settings/.env` values, backend Python, QA files, and documentation. A missing,
+corrupt, old-schema, or stale output marker, or a missing recorded output file,
+triggers one source-mode rebuild. Dependency-manifest or pinned-Node changes
+run `npm ci` from the tracked lockfile before that build; source or build-script
+changes reuse installed dependencies. The marker is written only after a
+successful build whose inputs are unchanged, using an atomic replacement.
+Desktop-release staging output does not require this marker.
 
 ## Source-mode port conflicts
 

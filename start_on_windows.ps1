@@ -103,6 +103,14 @@ function Write-Fatal([string]$Message) {
     Write-Host "[FATAL] $Message" -ForegroundColor Red
 }
 
+function Write-LaunchTiming {
+    param(
+        [Parameter(Mandatory = $true)][string]$Phase,
+        [Parameter(Mandatory = $true)][long]$ElapsedMilliseconds
+    )
+    Write-Host ('[TIME] {0,-42} {1,8} ms' -f "$($Phase):", $ElapsedMilliseconds) -ForegroundColor Gray
+}
+
 function Start-LauncherProgress {
     param([Parameter(Mandatory = $true)][string]$Activity, [Parameter(Mandatory = $true)][string]$Status)
     $id = $script:NextProgressId++
@@ -609,12 +617,27 @@ function Get-FrontendBuildInputFiles {
         'app/client/package-lock.json',
         'app/client/angular.json',
         'app/client/tsconfig.json',
-        'app/client/tsconfig.app.json'
+        'app/client/tsconfig.app.json',
+        'app/client/scripts/build.mjs',
+        'app/client/scripts/runtime-config.mjs'
     )) {
         [void]$paths.Add($relativePath)
     }
 
     return @($paths | Sort-Object -Unique)
+}
+
+function Get-FrontendBuildArtifactInventory {
+    param([string]$BrowserOutputRoot = (Join-Path $ClientDir 'dist/browser'))
+
+    if (-not (Test-Path -LiteralPath $BrowserOutputRoot -PathType Container)) {
+        return @()
+    }
+
+    $inventory = Get-ChildItem -LiteralPath $BrowserOutputRoot -Recurse -File | ForEach-Object {
+        [IO.Path]::GetRelativePath($BrowserOutputRoot, $_.FullName).Replace('\', '/')
+    }
+    return @($inventory | Sort-Object -Unique)
 }
 
 function Get-FrontendInputFingerprint {
@@ -685,8 +708,29 @@ function Read-FrontendBuildState {
                 throw "missing property $property"
             }
         }
-        if ([int]$state.schema_version -ne 1) {
+        $schemaVersion = [int]$state.schema_version
+        if ($schemaVersion -notin @(1, 2)) {
             throw "unsupported schema version $($state.schema_version)"
+        }
+        if ($schemaVersion -eq 2) {
+            if (-not $state.PSObject.Properties.Name.Contains('browser_artifacts')) {
+                throw 'missing property browser_artifacts'
+            }
+            $artifacts = @($state.browser_artifacts)
+            if ($artifacts.Count -eq 0 -or $artifacts -notcontains 'index.html') {
+                throw 'browser artifact inventory is empty or missing index.html'
+            }
+            foreach ($artifact in $artifacts) {
+                if (
+                    $artifact -isnot [string] -or
+                    [string]::IsNullOrWhiteSpace($artifact) -or
+                    $artifact.Contains('\') -or
+                    [IO.Path]::IsPathRooted($artifact) -or
+                    @($artifact.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0
+                ) {
+                    throw 'browser artifact inventory contains an invalid path'
+                }
+            }
         }
         return $state
     }
@@ -703,7 +747,7 @@ function Get-FrontendBuildStatus {
     $currentDependencyFingerprint = Get-FrontendDependencyFingerprint
     $state = Read-FrontendBuildState
     $stateExists = Test-Path -LiteralPath $statePath -PathType Leaf
-    $dependencyInputsChanged = $true
+    $dependencyInputsChanged = $false
 
     if ($null -ne $state) {
         $dependencyInputsChanged = (
@@ -722,6 +766,10 @@ function Get-FrontendBuildStatus {
         $isCurrent = $false
         $reason = if ($stateExists) { 'BuildStateInvalid' } else { 'BuildStateMissing' }
     }
+    elseif ([int]$state.schema_version -ne 2) {
+        $isCurrent = $false
+        $reason = 'BuildStateOutdated'
+    }
     elseif ([string]$state.node_version -ne $NodeVersion -or [string]$state.build_command -ne 'npm run build') {
         $isCurrent = $false
         $reason = 'BuildContractChanged'
@@ -733,6 +781,14 @@ function Get-FrontendBuildStatus {
     elseif ([string]$state.build_fingerprint -ne $currentFingerprint) {
         $isCurrent = $false
         $reason = 'BuildInputsChanged'
+    }
+    else {
+        $actualArtifacts = @(Get-FrontendBuildArtifactInventory)
+        $missingArtifacts = @($state.browser_artifacts | Where-Object { $_ -notin $actualArtifacts })
+        if ($missingArtifacts.Count -gt 0) {
+            $isCurrent = $false
+            $reason = 'BuildArtifactsMissing'
+        }
     }
 
     [pscustomobject]@{
@@ -747,18 +803,20 @@ function Get-FrontendBuildStatus {
 function Write-FrontendBuildState {
     param(
         [Parameter(Mandatory = $true)][string]$BuildFingerprint,
-        [Parameter(Mandatory = $true)][string]$DependencyFingerprint
+        [Parameter(Mandatory = $true)][string]$DependencyFingerprint,
+        [Parameter(Mandatory = $true)][string[]]$BrowserArtifacts
     )
 
     $statePath = Join-Path $ClientDir 'dist/.diligent-build-state.json'
     $stateDirectory = Split-Path -Parent $statePath
     New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
     $state = [ordered]@{
-        schema_version = 1
+        schema_version = 2
         build_fingerprint = $BuildFingerprint
         dependency_fingerprint = $DependencyFingerprint
         node_version = $NodeVersion
         build_command = 'npm run build'
+        browser_artifacts = @($BrowserArtifacts | Sort-Object -Unique)
     }
     $temporaryPath = '{0}.{1}.tmp' -f $statePath, $PID
     try {
@@ -816,9 +874,14 @@ function Build-Frontend {
         if ($buildFingerprintBefore -ne $buildFingerprintAfter) {
             throw 'Frontend production inputs changed while Angular was building; no valid build-state marker was written. Retry the frontend build.'
         }
+        $browserArtifacts = @(Get-FrontendBuildArtifactInventory -BrowserOutputRoot (Join-Path $outputRoot 'browser'))
+        if ($browserArtifacts.Count -eq 0 -or $browserArtifacts -notcontains 'index.html') {
+            throw 'Frontend production artifact inventory is incomplete; no valid build-state marker was written.'
+        }
         Write-FrontendBuildState `
             -BuildFingerprint $buildFingerprintAfter `
-            -DependencyFingerprint (Get-FrontendDependencyFingerprint)
+            -DependencyFingerprint (Get-FrontendDependencyFingerprint) `
+            -BrowserArtifacts $browserArtifacts
     }
 }
 
@@ -1267,91 +1330,129 @@ function Start-Application {
         Write-Info "DILIGENT is already running at $($script:OwnedApplicationUrl). Choose EXIT to stop it."
         return
     }
-    Import-DotEnv -CreateIfMissing
-    $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
-    $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 7690 }
-    if ($fastApiHost -notin @('127.0.0.1', 'localhost')) {
-        throw 'Source-mode launch requires FASTAPI_HOST to be 127.0.0.1 or localhost.'
-    }
-    if ($fastApiPort -lt 1 -or $fastApiPort -gt 65535) {
-        throw 'FASTAPI_PORT must be between 1 and 65535.'
-    }
-    $browserHost = if ($fastApiHost -eq 'localhost') { '127.0.0.1' } else { $fastApiHost }
-    $origin = "http://$browserHost`:$fastApiPort"
+    $launchStopwatch = [Diagnostics.Stopwatch]::StartNew()
 
-    Set-LauncherEnvironment
-    if (-not (Test-LaunchRuntimeReady)) {
-        Write-Step 'Launch runtime is missing or unusable; repairing backend/runtime dependencies'
-        Install-ApplicationDependencies `
-            -BuildFrontend $false `
-            -InstallFrontendDependencies $false `
-            -InstallationType 'Standard' `
-            -EnvironmentReady
-        if (-not (Test-LaunchRuntimeReady)) {
-            throw 'Launch runtime is still not ready after backend/runtime repair.'
-        }
-    }
-    else {
-        Write-Ok 'Launch runtime is ready; skipped backend dependency synchronization'
-    }
-
-    $frontendBuildStatus = Get-FrontendBuildStatus
-    if (-not $frontendBuildStatus.IsCurrent) {
-        Write-Step "Frontend build is $($frontendBuildStatus.Reason); refreshing production output"
-        Initialize-PortableNodeRuntime
-        Install-FrontendDependencies -ForceSync:$frontendBuildStatus.DependencyInputsChanged
-        Build-Frontend
-    }
-    else {
-        Write-Ok 'Frontend build is current; skipped frontend dependency synchronization and Angular build'
-    }
-    $frontendIndex = Join-Path $ClientDir 'dist/browser/index.html'
-    if (-not (Test-Path -LiteralPath $frontendIndex)) {
-        throw 'Frontend build output is still missing after the build attempt. Use -Action Install or -Action RebuildFrontend to retry.'
-    }
-
-    if (-not (Test-Path -LiteralPath $VenvPython)) {
-        throw "Virtual environment Python is missing: $VenvPython"
-    }
-    Resolve-LaunchPortConflicts -BackendPort $fastApiPort
-
-    $logRoot = Join-Path $RuntimeCacheDir 'logs'
-    New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
-    $backendLog = Join-Path $logRoot 'source-backend.log'
-    $backendErrorLog = Join-Path $logRoot 'source-backend-error.log'
-    foreach ($logPath in @($backendLog, $backendErrorLog)) {
-        if (Test-Path -LiteralPath $logPath -PathType Leaf) {
-            $previousLog = "$logPath.1"
-            Remove-Item -LiteralPath $previousLog -Force -ErrorAction SilentlyContinue
-            Move-Item -LiteralPath $logPath -Destination $previousLog -Force
-        }
-    }
-
-    $token = [guid]::NewGuid().ToString('N')
-    $environmentNames = @('DILIGENT_DESKTOP', 'DILIGENT_DESKTOP_PORT', 'DILIGENT_DESKTOP_SESSION_SECRET')
-    $previousEnvironment = @{}
-    foreach ($name in $environmentNames) {
-        $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
-    }
-    $env:DILIGENT_DESKTOP = 'false'
-    Remove-Item Env:DILIGENT_DESKTOP_PORT -ErrorAction SilentlyContinue
-    $env:DILIGENT_DESKTOP_SESSION_SECRET = $token
+    $environmentStarted = $launchStopwatch.ElapsedMilliseconds
     try {
-        Write-Step 'Starting FastAPI with the built SPA'
-        $backendProcess = Start-Process -FilePath $VenvPython `
-            -ArgumentList @('-u', '-m', 'source_entry', '--host', $fastApiHost, '--port', [string]$fastApiPort) `
-            -WorkingDirectory $ServerDir -WindowStyle Hidden -PassThru `
-            -RedirectStandardOutput $backendLog -RedirectStandardError $backendErrorLog
+        Import-DotEnv -CreateIfMissing
+        $fastApiHost = if ($env:FASTAPI_HOST) { $env:FASTAPI_HOST } else { '127.0.0.1' }
+        $fastApiPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 7690 }
+        if ($fastApiHost -notin @('127.0.0.1', 'localhost')) {
+            throw 'Source-mode launch requires FASTAPI_HOST to be 127.0.0.1 or localhost.'
+        }
+        if ($fastApiPort -lt 1 -or $fastApiPort -gt 65535) {
+            throw 'FASTAPI_PORT must be between 1 and 65535.'
+        }
+        $browserHost = if ($fastApiHost -eq 'localhost') { '127.0.0.1' } else { $fastApiHost }
+        $origin = "http://$browserHost`:$fastApiPort"
+
+        Set-LauncherEnvironment
+        if (-not (Test-LaunchRuntimeReady)) {
+            Write-Step 'Launch runtime is missing or unusable; repairing backend/runtime dependencies'
+            Install-ApplicationDependencies `
+                -BuildFrontend $false `
+                -InstallFrontendDependencies $false `
+                -InstallationType 'Standard' `
+                -EnvironmentReady
+            if (-not (Test-LaunchRuntimeReady)) {
+                throw 'Launch runtime is still not ready after backend/runtime repair.'
+            }
+        }
+        else {
+            Write-Ok 'Launch runtime is ready; skipped backend dependency synchronization'
+        }
     }
     finally {
-        foreach ($name in $environmentNames) {
-            if ($null -eq $previousEnvironment[$name]) {
-                Remove-Item "Env:$name" -ErrorAction SilentlyContinue
-            }
-            else {
-                [Environment]::SetEnvironmentVariable($name, [string]$previousEnvironment[$name], 'Process')
+        Write-LaunchTiming -Phase 'Environment and runtime preparation' `
+            -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $environmentStarted)
+    }
+
+    $frontendBuildStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        $frontendBuildStatus = Get-FrontendBuildStatus
+        if (-not $frontendBuildStatus.IsCurrent) {
+            Write-Step "Frontend build is $($frontendBuildStatus.Reason); refreshing production output"
+            Initialize-PortableNodeRuntime
+            Install-FrontendDependencies -ForceSync:$frontendBuildStatus.DependencyInputsChanged
+            Build-Frontend
+        }
+        else {
+            Write-Ok 'Frontend build is current; skipped frontend dependency synchronization and Angular build'
+        }
+        $frontendIndex = Join-Path $ClientDir 'dist/browser/index.html'
+        if (-not (Test-Path -LiteralPath $frontendIndex)) {
+            throw 'Frontend build output is still missing after the build attempt. Use -Action Install or -Action RebuildFrontend to retry.'
+        }
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Frontend production build check' `
+            -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $frontendBuildStarted)
+    }
+
+    $finalPortCheckStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        if (-not (Test-Path -LiteralPath $VenvPython)) {
+            throw "Virtual environment Python is missing: $VenvPython"
+        }
+        Resolve-LaunchPortConflicts -BackendPort $fastApiPort
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Final port check' `
+            -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $finalPortCheckStarted)
+    }
+
+    $backendPreparationStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        $logRoot = Join-Path $RuntimeCacheDir 'logs'
+        New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+        $backendLog = Join-Path $logRoot 'source-backend.log'
+        $backendErrorLog = Join-Path $logRoot 'source-backend-error.log'
+        foreach ($logPath in @($backendLog, $backendErrorLog)) {
+            if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+                $previousLog = "$logPath.1"
+                Remove-Item -LiteralPath $previousLog -Force -ErrorAction SilentlyContinue
+                Move-Item -LiteralPath $logPath -Destination $previousLog -Force
             }
         }
+
+        $token = [guid]::NewGuid().ToString('N')
+        $environmentNames = @('DILIGENT_DESKTOP', 'DILIGENT_DESKTOP_PORT', 'DILIGENT_DESKTOP_SESSION_SECRET')
+        $previousEnvironment = @{}
+        foreach ($name in $environmentNames) {
+            $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+        }
+        $env:DILIGENT_DESKTOP = 'false'
+        Remove-Item Env:DILIGENT_DESKTOP_PORT -ErrorAction SilentlyContinue
+        $env:DILIGENT_DESKTOP_SESSION_SECRET = $token
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Backend launch preparation' `
+            -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendPreparationStarted)
+    }
+
+    $backendProcessStartStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        try {
+            Write-Step 'Starting FastAPI with the built SPA'
+            $backendProcess = Start-Process -FilePath $VenvPython `
+                -ArgumentList @('-u', '-m', 'source_entry', '--host', $fastApiHost, '--port', [string]$fastApiPort) `
+                -WorkingDirectory $ServerDir -WindowStyle Hidden -PassThru `
+                -RedirectStandardOutput $backendLog -RedirectStandardError $backendErrorLog
+        }
+        finally {
+            foreach ($name in $environmentNames) {
+                if ($null -eq $previousEnvironment[$name]) {
+                    Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+                }
+                else {
+                    [Environment]::SetEnvironmentVariable($name, [string]$previousEnvironment[$name], 'Process')
+                }
+            }
+        }
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Backend process start' `
+            -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendProcessStartStarted)
     }
 
     $script:OwnedApplicationProcess = $backendProcess
@@ -1362,42 +1463,52 @@ function Start-Application {
     $script:OwnedApplicationUrl = $origin
 
     try {
-        $lastReadinessError = 'backend health, SPA entry, or production JavaScript asset was not ready'
-        Write-Info "Waiting up to 60 seconds for health, the SPA entry page, and a built JavaScript asset at $origin"
-        $ready = $false
-        for ($attempt = 1; $attempt -le 60; $attempt++) {
-            $backendProcess.Refresh()
-            if ($backendProcess.HasExited) {
-                throw "Backend exited with code $($backendProcess.ExitCode) before becoming ready. Logs: $backendLog; $backendErrorLog"
-            }
-            try {
-                $health = Invoke-WebRequest -UseBasicParsing -Uri "$origin/api/health" -TimeoutSec 2
-                $page = Invoke-WebRequest -UseBasicParsing -Uri "$origin/" -TimeoutSec 3
-                if ($health.StatusCode -lt 200 -or $health.StatusCode -ge 300 -or
-                    $page.StatusCode -lt 200 -or $page.StatusCode -ge 300) {
-                    throw 'health or SPA entry returned a non-success status'
+        $backendReadinessStarted = $launchStopwatch.ElapsedMilliseconds
+        try {
+            $lastReadinessError = 'backend health, SPA entry, or production JavaScript asset was not ready'
+            Write-Info "Waiting up to 60 seconds for health, the SPA entry page, and a built JavaScript asset at $origin"
+            $ready = $false
+            for ($attempt = 1; $attempt -le 60; $attempt++) {
+                $backendProcess.Refresh()
+                if ($backendProcess.HasExited) {
+                    throw "Backend exited with code $($backendProcess.ExitCode) before becoming ready. Logs: $backendLog; $backendErrorLog"
                 }
-                $assetMatch = [regex]::Match([string]$page.Content, '(?i)\bsrc=["'']([^"'']+\.js(?:\?[^"'']*)?)["'']')
-                if (-not $assetMatch.Success) {
-                    throw 'SPA entry does not reference a JavaScript build asset'
+                try {
+                    $health = Invoke-WebRequest -UseBasicParsing -Uri "$origin/api/health" -TimeoutSec 2
+                    $page = Invoke-WebRequest -UseBasicParsing -Uri "$origin/" -TimeoutSec 3
+                    if ($health.StatusCode -lt 200 -or $health.StatusCode -ge 300 -or
+                        $page.StatusCode -lt 200 -or $page.StatusCode -ge 300) {
+                        throw 'health or SPA entry returned a non-success status'
+                    }
+                    $assetMatch = [regex]::Match([string]$page.Content, '(?i)\bsrc=["'']([^"'']+\.js(?:\?[^"'']*)?)["'']')
+                    if (-not $assetMatch.Success) {
+                        throw 'SPA entry does not reference a JavaScript build asset'
+                    }
+                    $assetUrl = ([uri]::new([uri]"$origin/", $assetMatch.Groups[1].Value)).AbsoluteUri
+                    $asset = Invoke-WebRequest -UseBasicParsing -Uri $assetUrl -TimeoutSec 3
+                    if ($asset.StatusCode -ge 200 -and $asset.StatusCode -lt 300) {
+                        $ready = $true
+                        break
+                    }
+                    throw "built JavaScript asset returned HTTP $($asset.StatusCode)"
                 }
-                $assetUrl = ([uri]::new([uri]"$origin/", $assetMatch.Groups[1].Value)).AbsoluteUri
-                $asset = Invoke-WebRequest -UseBasicParsing -Uri $assetUrl -TimeoutSec 3
-                if ($asset.StatusCode -ge 200 -and $asset.StatusCode -lt 300) {
-                    $ready = $true
-                    break
+                catch {
+                    $lastReadinessError = $_.Exception.Message
                 }
-                throw "built JavaScript asset returned HTTP $($asset.StatusCode)"
+                Start-Sleep -Seconds 1
             }
-            catch {
-                $lastReadinessError = $_.Exception.Message
+            if (-not $ready) {
+                throw "Backend did not become ready at ${origin}: $($lastReadinessError). Logs: $backendLog; $backendErrorLog"
             }
-            Start-Sleep -Seconds 1
         }
-        if (-not $ready) {
-            throw "Backend did not become ready at ${origin}: $($lastReadinessError). Logs: $backendLog; $backendErrorLog"
+        finally {
+            Write-LaunchTiming -Phase 'API and frontend readiness checks' `
+                -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendReadinessStarted)
         }
 
+        $launchStopwatch.Stop()
+        Write-LaunchTiming -Phase 'Total time to application readiness' `
+            -ElapsedMilliseconds $launchStopwatch.ElapsedMilliseconds
         Start-Process $origin
         Write-Host ''
         Write-Ok 'DILIGENT started successfully'
