@@ -62,10 +62,10 @@ type TimelineLaneSummary = {
 };
 
 const EVENT_COLORS: Record<InspectionTimelineEventType, string> = {
-  therapy: '#0f8f83',
-  disease: '#dc2626',
-  lab: '#1266c3',
-  other: '#6b7280',
+  therapy: 'var(--color-chart-therapy)',
+  disease: 'var(--color-chart-disease)',
+  lab: 'var(--color-chart-lab)',
+  other: 'var(--color-chart-other)',
 };
 
 const EVENT_TYPE_LABELS: Record<InspectionTimelineEventType, string> = {

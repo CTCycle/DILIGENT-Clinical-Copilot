@@ -425,17 +425,17 @@ button:disabled {
 
 .legend-swatch.is-clinical,
 .lane-toggle-dot.is-clinical {
-  background: #dc2626;
+  background: var(--color-chart-disease);
 }
 
 .legend-swatch.is-therapy,
 .lane-toggle-dot.is-therapy {
-  background: #0f8f83;
+  background: var(--color-chart-therapy);
 }
 
 .legend-swatch.is-lab,
 .lane-toggle-dot.is-labs {
-  background: #1266c3;
+  background: var(--color-chart-lab);
 }
 
 .legend-swatch.is-uncertain,
