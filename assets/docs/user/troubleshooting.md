@@ -31,7 +31,7 @@ start_on_windows.ps1
 http://127.0.0.1:7690/api/health
 ```
 
-- If unreachable, restart the application and inspect `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`.
+- If unreachable, restart the application and inspect the backend output in the launcher console.
 - If an earlier launch left stale application processes,
   run `start_on_windows.ps1 -Action KillApplicationProcesses`, confirm the
   cleanup, and launch again.

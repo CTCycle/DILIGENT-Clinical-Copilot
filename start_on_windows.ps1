@@ -77,8 +77,6 @@ $script:LauncherInteractive = -not [Console]::IsInputRedirected -and -not [Conso
 $script:OwnedApplicationProcess = $null
 $script:OwnedApplicationPort = 0
 $script:OwnedApplicationToken = $null
-$script:OwnedApplicationLog = $null
-$script:OwnedApplicationErrorLog = $null
 
 # ============================================================
 # Shared output and process helpers
@@ -1338,7 +1336,7 @@ function Stop-ApplicationProcesses {
 
 function Start-Application {
     if ($script:OwnedApplicationProcess -and -not $script:OwnedApplicationProcess.HasExited) {
-        Write-Info "DILIGENT is already running at $($script:OwnedApplicationUrl). Choose EXIT to stop it."
+        Write-Info "DILIGENT is already running at $($script:OwnedApplicationUrl). Press Ctrl+C in the launcher to stop it."
         return
     }
     $launchStopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1414,18 +1412,8 @@ function Start-Application {
 
     $backendPreparationStarted = $launchStopwatch.ElapsedMilliseconds
     try {
-        $logRoot = Join-Path $RuntimeCacheDir 'logs'
-        New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
-        $backendLog = Join-Path $logRoot 'source-backend.log'
-        $backendErrorLog = Join-Path $logRoot 'source-backend-error.log'
-        foreach ($logPath in @($backendLog, $backendErrorLog)) {
-            if (Test-Path -LiteralPath $logPath -PathType Leaf) {
-                $previousLog = "$logPath.1"
-                Remove-Item -LiteralPath $previousLog -Force -ErrorAction SilentlyContinue
-                Move-Item -LiteralPath $logPath -Destination $previousLog -Force
-            }
-        }
-
+        # Backend output stays in this console, so hide the live progress display.
+        Clear-LauncherProgress
         $token = [guid]::NewGuid().ToString('N')
         $environmentNames = @('DILIGENT_DESKTOP', 'DILIGENT_DESKTOP_PORT', 'DILIGENT_DESKTOP_SESSION_SECRET')
         $previousEnvironment = @{}
@@ -1447,8 +1435,7 @@ function Start-Application {
             Write-Step 'Starting FastAPI with the built SPA'
             $backendProcess = Start-Process -FilePath $VenvPython `
                 -ArgumentList @('-u', '-m', 'source_entry', '--host', $fastApiHost, '--port', [string]$fastApiPort) `
-                -WorkingDirectory $ServerDir -WindowStyle Hidden -PassThru `
-                -RedirectStandardOutput $backendLog -RedirectStandardError $backendErrorLog
+                -WorkingDirectory $ServerDir -NoNewWindow -PassThru
         }
         finally {
             foreach ($name in $environmentNames) {
@@ -1469,8 +1456,6 @@ function Start-Application {
     $script:OwnedApplicationProcess = $backendProcess
     $script:OwnedApplicationPort = $fastApiPort
     $script:OwnedApplicationToken = $token
-    $script:OwnedApplicationLog = $backendLog
-    $script:OwnedApplicationErrorLog = $backendErrorLog
     $script:OwnedApplicationUrl = $origin
 
     try {
@@ -1482,7 +1467,7 @@ function Start-Application {
             for ($attempt = 1; $attempt -le 60; $attempt++) {
                 $backendProcess.Refresh()
                 if ($backendProcess.HasExited) {
-                    throw "Backend exited with code $($backendProcess.ExitCode) before becoming ready. Logs: $backendLog; $backendErrorLog"
+                    throw "Backend exited with code $($backendProcess.ExitCode) before becoming ready."
                 }
                 try {
                     $health = Invoke-WebRequest -UseBasicParsing -Uri "$origin/api/health" -TimeoutSec 2
@@ -1509,7 +1494,7 @@ function Start-Application {
                 Start-Sleep -Seconds 1
             }
             if (-not $ready) {
-                throw "Backend did not become ready at ${origin}: $($lastReadinessError). Logs: $backendLog; $backendErrorLog"
+                throw "Backend did not become ready at ${origin}: $($lastReadinessError)."
             }
         }
         finally {
@@ -1522,10 +1507,9 @@ function Start-Application {
             -ElapsedMilliseconds $launchStopwatch.ElapsedMilliseconds
         Start-Process $origin
         Write-Host ''
-        Write-Ok 'DILIGENT started successfully'
+        Write-Ok 'DILIGENT is running from FastAPI.'
         Write-Host "Application: $origin (backend PID $($backendProcess.Id))"
-        Write-Host "Backend logs: $backendLog; $backendErrorLog"
-        Write-Info 'The launcher owns this server. Choose EXIT or press Ctrl+C to stop it.'
+        Write-Host 'This launcher owns the backend lifecycle. Press Ctrl+C to stop DILIGENT.'
     }
     catch {
         $startupError = $_.Exception.Message
@@ -1539,7 +1523,6 @@ function Stop-OwnedApplication {
     if ($null -eq $process) { return }
     $processId = [int]$process.Id
     $port = [int]$script:OwnedApplicationPort
-    $logDetails = "Logs: $($script:OwnedApplicationLog); $($script:OwnedApplicationErrorLog)"
     $gracefulError = $null
     $forced = $false
     try {
@@ -1565,16 +1548,16 @@ function Stop-OwnedApplication {
         }
         $process.Refresh()
         if (-not $process.HasExited) {
-            throw "Could not stop launcher-owned backend process tree PID $processId. $logDetails"
+            throw "Could not stop launcher-owned backend process tree PID $processId."
         }
         if ($port -gt 0) {
             Wait-ForLauncherPorts -Ports @($port) -ExpectedProcessIds @($processId) -Attempts 30 -DelayMilliseconds 200
         }
         if ($forced) {
-            Write-Info "Graceful shutdown did not complete; stopped the launcher-owned backend process tree PID $processId. $logDetails"
+            Write-Info "Graceful shutdown did not complete; stopped the launcher-owned backend process tree PID $processId."
         }
         elseif ($gracefulError) {
-            Write-Info "Backend exited after the shutdown request failed ($gracefulError). $logDetails"
+            Write-Info "Backend exited after the shutdown request failed ($gracefulError)."
         }
         else {
             Write-Ok "Backend stopped cleanly and port $port is free"
@@ -1586,8 +1569,6 @@ function Stop-OwnedApplication {
             $script:OwnedApplicationProcess = $null
             $script:OwnedApplicationPort = 0
             $script:OwnedApplicationToken = $null
-            $script:OwnedApplicationLog = $null
-            $script:OwnedApplicationErrorLog = $null
             $script:OwnedApplicationUrl = $null
         }
     }
@@ -1604,7 +1585,7 @@ function Wait-OwnedApplication {
     $script:OwnedApplicationProcess = $null
     $script:OwnedApplicationPort = 0
     $script:OwnedApplicationToken = $null
-    throw "Backend stopped with exit code $exitCode. Logs: $($script:OwnedApplicationLog); $($script:OwnedApplicationErrorLog)"
+    throw "Backend stopped with exit code $exitCode."
 }
 
 # ============================================================
@@ -2893,7 +2874,10 @@ try {
             try {
                 Invoke-TrackedLauncherAction -Name $entry.Label -Operation {
                     switch ($entry.Key) {
-                        'Launch' { Start-Application }
+                        'Launch' {
+                            Start-Application
+                            Wait-OwnedApplication
+                        }
                         'Install' { Install-OrUpdateApplication }
                         'Rebuild' { Rebuild-Frontend }
                         'Database' { Initialize-Database }

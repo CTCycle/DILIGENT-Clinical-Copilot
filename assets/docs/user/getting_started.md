@@ -95,7 +95,7 @@ Expected source-mode result:
 - browser opens to `http://127.0.0.1:7690` after health and asset checks pass
 - application loads without a blank page or connection error
 - backend output is saved under `runtimes/cache/logs/`
-- choose **EXIT** or press Ctrl+C in the launcher to request graceful shutdown; if needed, the launcher stops only its owned process tree
+- press Ctrl+C in the launcher to request graceful shutdown; if needed, the launcher stops only its owned process tree
 - `-Action Launch` supervises the backend until Ctrl+C or process exit
 
 If the browser does not open automatically, open:

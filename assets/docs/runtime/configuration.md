@@ -141,8 +141,8 @@ authentication, and provider-side errors still fail promptly.
 
 ## Local Runtime
 - Normal source launch serves the built Angular SPA and API from one FastAPI process at `http://127.0.0.1:7690` by default.
-- The visible PowerShell launcher owns the hidden backend process. It waits for health, the SPA entry, and a built JavaScript asset before opening the browser.
-- Backend output is saved under `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`. Choosing **EXIT** or pressing Ctrl+C requests graceful shutdown, then stops only the owned process tree if required.
+- The visible PowerShell launcher owns the backend process and shows its output. It waits for health, the SPA entry, and a built JavaScript asset before opening the browser.
+- Backend output streams to the launcher console. Pressing Ctrl+C requests graceful shutdown, then stops only the owned process tree if required.
 - `npm run dev` and the backend's `uvicorn --reload` command are for development. The Angular dev server uses `UI_PORT`; the production launcher never starts the preview server.
 
 ## Packaged Desktop Runtime
