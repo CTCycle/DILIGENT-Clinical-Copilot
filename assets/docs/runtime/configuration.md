@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-10-21
+Last updated: 2026-10-27
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -22,6 +22,13 @@ operation and sanitized upstream detail when available.
 - Database connection settings only: `<data-root>/database_config.json`
 - Database-backed operational settings: the singleton `application_configuration`
   row, edited through the Settings UI and typed `/api/settings` endpoints
+
+Backend logging defaults to INFO. Set `DILIGENT_LOG_LEVEL=DEBUG` in the
+backend process environment for detailed request and application diagnostics.
+Successful HTTP requests are logged at DEBUG; failed incoming requests and
+unsuccessful HTTPX responses remain visible at WARNING or ERROR. Avoid enabling
+debug logging longer than needed because diagnostic logs can contain sensitive
+operational details.
 
 ## Desktop-only environment variables
 
