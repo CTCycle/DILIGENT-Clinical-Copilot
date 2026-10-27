@@ -15,7 +15,7 @@ import { DatabaseSettingsComponent } from './pages/settings/components/database-
 export const routes: Routes = [
   { path: '', component: DiliAgentPageComponent, title: 'DILI Agent | DILIGENT' },
   { path: 'clinical-sessions', component: ClinicalSessionsPageComponent, title: 'Clinical Sessions | DILIGENT' },
-  { path: 'data', component: DataInspectionPageComponent, title: 'Knowledge Base | DILIGENT' },
+  { path: 'data', component: DataInspectionPageComponent, title: 'Knowledge | DILIGENT' },
   { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
   { path: 'sessions/:sessionId/timetable', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
   {

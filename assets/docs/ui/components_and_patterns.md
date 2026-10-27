@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-10-19
+Last updated: 2026-10-27
 
 ## Page Layout Patterns
 - Primary route pages render inside the shared `.page-container` frame under the root shell. Keep the 59px navigation header and shared content origin stable; route components should not add duplicate outer gutters or independent page-width limits.
@@ -8,7 +8,7 @@ Last updated: 2026-10-19
 - Model configuration uses a desktop multi-column layout through `.model-config-layout`.
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
 - The editor keeps Save outside its horizontally scrollable formatting controls. At narrow supported widths, metadata attachment actions sit below their explanatory copy.
-- Data Inspection uses tabbed sections with scroll-aware tables and lists for reference data and RAG datasets.
+- Knowledge uses tabbed sections with scroll-aware tables and lists for reference data and RAG datasets.
 - Clinical Sessions keeps preview rendering and related view state in focused preview components; page-level orchestration should not reabsorb that logic.
 - Model Configurations and access-key dialogs use signal-backed local state, explicit loading/saving states, and provider-response sequencing.
 
@@ -40,7 +40,7 @@ Last updated: 2026-10-19
 - Use `GuidedTourComponent` only for a genuinely multi-step workflow. Definitions belong in `core/guidance/guidance-content.ts` and should remain short, target stable `data-guidance-target` attributes, and provide a useful fallback when a target is unavailable.
 - Use `TipsAndTricksComponent` for manually reopened, concise workflow reminders. It is hosted by the existing `ModalShellComponent` and must remain optional.
 - Persist guidance with `GuidanceStateService`; do not add backend tables or couple tutorial state to clinical session state.
-- Do not add automatic guidance to routine navigation, common controls, or Data Inspection, which already explains its page-level actions.
+- Do not add automatic guidance to routine navigation, common controls, or Knowledge, which already explains its page-level actions.
 
 ### Tables And Scroll Areas
 - Keep fixed action-column sizing where needed.

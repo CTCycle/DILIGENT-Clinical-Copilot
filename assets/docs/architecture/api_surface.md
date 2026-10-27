@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-10-24
+Last updated: 2026-10-27
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -24,6 +24,8 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 
 ## Session And Clinical Routes
 - `GET /api/health`
+- `GET /api/jobs` (non-cacheable summary of active and recent jobs for the global Jobs monitor)
+- `DELETE /api/jobs/{job_id}` (cooperative cancel; refused for `session_revision` and `session_timeline`, which are cancelled from their own pages)
 - `GET /api/clinical/section-template`
 - `GET /api/clinical/draft`
 - `PUT /api/clinical/draft`

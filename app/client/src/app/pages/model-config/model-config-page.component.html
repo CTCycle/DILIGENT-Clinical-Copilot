@@ -410,11 +410,11 @@
 
       <aside class="model-config-summary-panel">
         <h2>Current Configuration</h2>
-        <dl class="model-config-summary-list">
-          <div>
+        <dl class="mc-config-grid">
+          <div class="mc-config-item">
             <dt>Runtime Source</dt>
             <dd>
-              <svg class="model-config-summary-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="mc-config-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="7" y="5.5" width="10" height="13" rx="1.75" />
                 <path d="M4.75 8.75H7M4.75 15.25H7M17 8.75h2.25M17 15.25h2.25" />
                 <path d="M9.75 9.25h4.5M9.75 12h4.5M9.75 14.75h2.75" />
@@ -422,38 +422,33 @@
               <span>{{ runtimeLabel() }}</span>
             </dd>
           </div>
-          <div>
-            <dt>Primary Model (Clinical)</dt>
+          <div class="mc-config-item">
+            <dt>Primary (Clinical)</dt>
             <dd>{{ selectedClinicalModel() }}</dd>
           </div>
-          <div>
-            <dt>Extraction Model</dt>
+          <div class="mc-config-item">
+            <dt>Extraction</dt>
             <dd>{{ selectedExtractionModel() }}</dd>
           </div>
-          <div>
-            <dt>Revision Model</dt>
+          <div class="mc-config-item">
+            <dt>Revision</dt>
             <dd>{{ selectedRevisionModel() }}</dd>
           </div>
-          <div>
-            <dt>Timeline Model</dt>
+          <div class="mc-config-item">
+            <dt>Timeline</dt>
             <dd>{{ selectedTimelineModel() }}</dd>
           </div>
-          <div>
-            <dt>RAG Model</dt>
+          <div class="mc-config-item">
+            <dt>RAG</dt>
             <dd>{{ currentRagModelLabel() }}</dd>
           </div>
         </dl>
 
-        <section class="model-config-description-panel">
-          <h3>Generation behavior</h3>
-          <p>Automatically optimized for clinical reliability</p>
-          <span class="field-help-text">Sampling settings are selected automatically according to the provider, model family and operation being performed.</span>
-        </section>
-
-        <section class="model-config-description-panel">
-          <h3>Model Details</h3>
-          <p>{{ selectedModelDescription() }}</p>
-        </section>
+        <p class="mc-config-note">{{ selectedModelDescription() }}</p>
+        <details class="mc-config-note">
+          <summary>Generation behavior: automatic, tuned for clinical reliability</summary>
+          <p>Sampling settings are selected automatically according to the provider, model family and operation being performed.</p>
+        </details>
 
         <div class="model-config-summary-actions">
           <small class="model-config-saved-note" role="status" aria-live="polite">

@@ -110,8 +110,8 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
   {
     id: 'data-maintenance',
     title: 'Refresh local evidence only when needed',
-    body: 'Data Inspection exposes explicit catalog and index maintenance actions. Review the current status before starting another update.',
-    actionLabel: 'Open Data Inspection',
+    body: 'Knowledge exposes explicit catalog and index maintenance actions. Review the current status before starting another update.',
+    actionLabel: 'Open Knowledge',
     action: 'data',
   },
 ];

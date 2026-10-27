@@ -476,7 +476,7 @@ def _validate_knowledge_bases(
                 code="livertox_catalog_empty",
                 message=(
                     "LiverTox catalog is empty. Run the LiverTox update job from "
-                    "Data Inspection before clinical analysis."
+                    "Knowledge before clinical analysis."
                 ),
                 field="knowledge_base",
             )

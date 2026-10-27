@@ -1,0 +1,232 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: inline-flex;
+}
+
+.jobs-monitor {
+  position: relative;
+  display: inline-flex;
+}
+
+.jobs-monitor-button {
+  position: relative;
+}
+
+.jobs-monitor-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.jobs-monitor-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 12px;
+  text-align: center;
+}
+
+.jobs-monitor-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1300;
+  width: min(400px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.jobs-monitor-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.jobs-monitor-header strong {
+  font-size: var(--font-base);
+}
+
+.jobs-monitor-header span,
+.jobs-monitor-item-title span,
+.jobs-monitor-item-foot {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+}
+
+.jobs-monitor-warning {
+  margin: 0;
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-text);
+  font-size: var(--font-xs);
+}
+
+.jobs-monitor-list {
+  max-height: min(460px, 66vh);
+  overflow-y: auto;
+}
+
+.jobs-monitor-section {
+  margin: 0;
+  padding: var(--space-sm) var(--space-lg) 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jobs-monitor-empty {
+  margin: 0;
+  padding: var(--space-xl);
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+  text-align: center;
+}
+
+.jobs-monitor-item {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.jobs-monitor-item:last-child {
+  border-bottom: 0;
+}
+
+.jobs-monitor-item:not(.is-active) {
+  opacity: 0.88;
+}
+
+.jobs-monitor-item-head,
+.jobs-monitor-item-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.jobs-monitor-item-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-sm);
+  min-width: 0;
+}
+
+.jobs-monitor-item-title strong {
+  font-size: var(--font-sm);
+}
+
+.jobs-monitor-status {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.jobs-monitor-status[data-status="completed"] {
+  background: var(--color-status-success-bg);
+  color: var(--color-status-success-text);
+}
+
+.jobs-monitor-status[data-status="failed"] {
+  background: var(--color-status-error-bg);
+  color: var(--color-status-error-text);
+}
+
+.jobs-monitor-status[data-status="cancelled"] {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+}
+
+.jobs-monitor-bar {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border-subtle);
+}
+
+.jobs-monitor-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-brand);
+  transition: width 0.3s ease;
+}
+
+.jobs-monitor-bar.is-indeterminate span {
+  position: absolute;
+  width: 35%;
+  animation: jobs-monitor-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes jobs-monitor-slide {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobs-monitor-bar.is-indeterminate span {
+    left: 0;
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+.jobs-monitor-detail {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.jobs-monitor-detail.is-error {
+  color: var(--color-status-error-text);
+}
+
+.jobs-monitor-cancel {
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  font: inherit;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.jobs-monitor-cancel:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

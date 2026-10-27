@@ -407,7 +407,7 @@ class ClinicalSessionService(
         )
         if not rxnav_rows:
             raise ServiceValidationError(
-                "RxNav catalog is empty. Run the RxNav update job from Data Inspection "
+                "RxNav catalog is empty. Run the RxNav update job from Knowledge "
                 "before clinical analysis."
             )
 

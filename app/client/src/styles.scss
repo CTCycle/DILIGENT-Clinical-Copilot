@@ -326,6 +326,34 @@ app-root {
 
 .stitch-dili-input-group--wide {
   grid-column: 1 / -1;
+  position: relative;
+}
+
+.stitch-dili-draft-save {
+  position: absolute;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.stitch-dili-draft-save:hover:not(:disabled),
+.stitch-dili-draft-save:focus-visible {
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+}
+
+.stitch-dili-draft-save:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .stitch-dili-card textarea,
@@ -346,6 +374,7 @@ app-root {
 
 .stitch-dili-input-unified {
   --clinical-input-default-height: min(72vh, 760px);
+  padding-right: calc(var(--space-lg) + 32px);
   height: var(--clinical-input-default-height);
   min-height: 280px;
   max-height: calc(var(--clinical-input-default-height) * 2);
@@ -2734,42 +2763,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   padding-left: clamp(16px, 2vw, 24px);
 }
 
-.model-config-summary-list {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.model-config-summary-list div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-md);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
-  padding-bottom: var(--space-xs);
-}
-
-.model-config-summary-list div:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.model-config-summary-list dt {
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-.model-config-summary-list dd {
-  margin: 0;
-  text-align: right;
-  font-size: var(--font-sm);
-  color: var(--color-text-primary);
-  font-weight: 700;
-  word-break: break-word;
-}
-
 .model-config-summary-subtitle {
   margin: 0;
   font-size: var(--font-sm);
@@ -2791,7 +2784,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* ============================================
-   Data Inspection
+   Knowledge
    ============================================ */
 .inspection-page {
   display: flex;
@@ -4724,7 +4717,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #d9e8ec;
 }
 
-/* Data inspection: show denser index column + more visible rows across views */
+/* Knowledge: show denser index column + more visible rows across views */
 .inspection-table-sessions th:first-child,
 .inspection-table-sessions td:first-child {
   width: 52px;
@@ -4966,7 +4959,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root[data-theme="dark"] .model-config-page .model-config-filter-pill,
 :root[data-theme="dark"] .model-config-page .model-config-model-item,
 :root[data-theme="dark"] .model-config-page .model-config-list-shell,
-:root[data-theme="dark"] .model-config-page .model-config-summary-list,
 :root[data-theme="dark"] .model-config-page .model-config-missing,
 :root[data-theme="dark"] .model-config-page .model-config-extra-row--side,
 :root[data-theme="dark"] .model-config-page .model-config-summary-table,
@@ -4996,12 +4988,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-color: rgba(108, 135, 152, 0.34);
 }
 
-:root[data-theme="dark"] .model-config-page .model-config-summary-list dt,
 :root[data-theme="dark"] .model-config-page .model-config-summary-table th {
   color: #aebfc6;
 }
 
-:root[data-theme="dark"] .model-config-page .model-config-summary-list dd,
 :root[data-theme="dark"] .model-config-page .model-config-summary-table td,
 :root[data-theme="dark"] .model-config-page .model-config-summary-ok {
   color: #f1fbfb;
@@ -5606,53 +5596,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-weight: 700;
 }
 
-.model-config-page .model-config-preview-a-layout .model-config-summary-list > div {
-  display: block;
-  padding: 15px 0;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-summary-list dt {
-  display: block;
-  margin: 0 0 9px;
-  font-weight: 720;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-summary-list dd {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  font-weight: 620;
-  text-align: left;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-summary-list dd:has(.model-config-summary-icon) {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-description-panel {
-  display: block;
-  border-top: 1px solid color-mix(in srgb, #9fcbbd 36%, transparent);
-  padding: 15px 0;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-description-panel h3 {
-  margin: 0 0 8px;
-  color: inherit;
-  font-family: "Manrope", "Inter", sans-serif;
-  font-size: 12px;
-  font-weight: 760;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-description-panel p {
-  margin: 0;
-  color: #a9c8bd;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
 .model-config-page .model-config-preview-a-layout .model-config-search input,
 .model-config-page .model-config-preview-a-layout .model-config-tag-select,
 .model-config-page .model-config-preview-a-layout .model-config-cloud-row select {
@@ -5779,7 +5722,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-color: #58e0ad;
 }
 
-:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-badge,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-model-cell small {
   background: rgba(115, 232, 184, 0.17);
   color: #c8f7e4;
@@ -5791,14 +5733,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-table th,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-table td,
-:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-list > div,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .mc-config-item,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-parameters,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-actions {
   border-color: rgba(82, 134, 118, 0.36);
 }
 
-:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-list > div,
-:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-list,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-parameters,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-actions,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-empty-note {
@@ -6080,12 +6020,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
   .app-main .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
     position: static;
-  }
-
-  .app-main .model-config-page .model-config-summary-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--space-xl);
   }
 }
 

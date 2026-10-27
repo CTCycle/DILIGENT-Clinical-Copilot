@@ -15,6 +15,16 @@
             [ngModel]="vm.form.clinicalInput"
             (ngModelChange)="handleFormChange('clinicalInput', $event)"
           ></textarea>
+          <button
+            class="stitch-dili-draft-save"
+            type="button"
+            title="Save draft"
+            aria-label="Save draft"
+            (click)="saveDraft()"
+            [disabled]="clinicalDraft.loading() || clinicalDraft.saveStatus() === 'saving'"
+          >
+            <svg lucideSave size="18" aria-hidden="true"></svg>
+          </button>
         </div>
       </div>
     </section>
@@ -124,14 +134,6 @@
               </div>
             </div>
           } @else if (!clinicalDraft.autosaveEnabled() && !clinicalDraft.hasPersistedDraft()) {
-            <button
-              class="btn btn-secondary clinical-draft-save"
-              type="button"
-              (click)="saveDraft()"
-              [disabled]="clinicalDraft.loading() || clinicalDraft.saveStatus() === 'saving'"
-            >
-              Save draft
-            </button>
             <p class="clinical-draft-note">
               Saved in the configured database; patient image is not included.
             </p>

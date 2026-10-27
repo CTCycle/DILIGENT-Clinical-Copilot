@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-09-16
+Last updated: 2026-10-27
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -110,6 +110,9 @@ route navigation, page refresh, or browser close/reopen while the backend
 worker is still running. Clinical status requests use the global one-hour HTTP
 timeout; the request timeout is independent from the worker duration because
 polling does not execute the clinical job inline.
+
+## Global Jobs Monitor
+`GET /api/jobs` (`api/jobs.py`) returns every active job plus the 20 most recent terminal jobs as `JobSummary` rows: wall-clock `started_at`/`finished_at` (derived from the manager's monotonic timestamps), `phase` and `message` taken from the job `result` (`phase`/`stage`, `progress_message`), and `cancellable`. `progress` is `null` until a worker reports a positive value, so clients render an indeterminate bar rather than a fabricated percentage. The Angular `JobMonitorService` polls it every 2 s while jobs are active or the header panel is open, every 10 s otherwise, pauses while the tab is hidden, and backs off after failures. Job state is in memory, so the list is empty after a backend restart. There is no retry action: a retry is a fresh start request from the owning page.
 
 ## Cancellation Rules
 - Pending jobs can be marked `cancelled` immediately.

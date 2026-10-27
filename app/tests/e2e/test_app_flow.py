@@ -281,7 +281,7 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
         if focused_role == "tab" and focused_text in (
             "DILI Agent",
             "Clinical Sessions",
-            "Data Inspection",
+            "Knowledge",
             "Settings",
         ):
             return
@@ -367,7 +367,7 @@ def test_primary_navigation_restores_scroll_position(page: Page, base_url: str):
 def test_data_inspection_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
-    data_button = page.get_by_role("tab", name="Data Inspection")
+    data_button = page.get_by_role("tab", name="Knowledge")
     expect(data_button).to_be_visible()
     data_button.click()
     expect(page).to_have_url(re.compile(r"/data/?$"))

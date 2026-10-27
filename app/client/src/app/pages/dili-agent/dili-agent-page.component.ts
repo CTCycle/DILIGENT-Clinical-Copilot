@@ -20,7 +20,9 @@ import {
 } from '../../core/models/types';
 import { validateClinicalInput, fetchClinicalSectionTemplate } from '../../core/services/clinical-api';
 import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
+import { LucideSave } from '@lucide/angular';
 import { ClinicalDraftService } from '../../core/services/clinical-draft.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { AppStateService } from '../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
@@ -59,7 +61,7 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 
 @Component({
   selector: 'app-dili-agent-page',
-  imports: [CommonModule, FormsModule, ModalShellComponent, FeatureTipComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, FeatureTipComponent, LucideSave],
   templateUrl: './dili-agent-page.component.html',
   styleUrl: './dili-agent-page.component.scss',
 })
@@ -75,6 +77,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly diliJobTracker = inject(DiliJobTrackerService);
   readonly clinicalDraft = inject(ClinicalDraftService);
+  private readonly notifications = inject(NotificationService);
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
@@ -423,6 +426,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     const saved = await this.clinicalDraft.saveAndEnable(this.vm.form);
     if (saved) {
       this.clinicalDraft.scheduleSave(this.vm.form);
+      this.notifications.notify('Draft saved', 'success', 2500);
     }
   }
 

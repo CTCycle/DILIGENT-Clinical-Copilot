@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-10-21
+Last updated: 2026-10-27
 
 ## Windows desktop app does not open
 
@@ -74,7 +74,7 @@ Check that:
 - the application was not interrupted during save
 - you are reviewing the correct local repository and database
 
-## Data Inspection Is Empty
+## Knowledge Is Empty
 Check that:
 - local data exists under the expected data directories
 - database initialization completed successfully

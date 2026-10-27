@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Recommended Local Startup
 On Windows, use:
@@ -110,7 +110,9 @@ Desktop-release staging output does not require this marker.
 Immediately before production process creation, the launcher scans the configured
 API port. It aggregates listeners by unique PID, resolves a process name when
 permitted, and shows each owning PID. An
-interactive confirmation applies to the displayed set once. A decline, a
+interactive confirmation applies to the displayed set once, and only holders
+identified as DILIGENT by repository-qualified command line are eligible:
+an unknown owner is reported and left running, and launch aborts. A decline, a
 noninteractive invocation, or a failed termination leaves processes untouched or
 causes launch to abort; a final listener scan is authoritative if a process exits
 concurrently. A replacement holder or any remaining listener is reported with

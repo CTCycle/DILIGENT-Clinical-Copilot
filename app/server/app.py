@@ -18,6 +18,7 @@ from api.desktop import router as desktop_router
 from api.database import router as database_router
 from api.error_handling import register_error_handling
 from api.health import router as health_router
+from api.jobs import router as jobs_router
 from api.model_config import router as model_config_router
 from api.ollama import router as ollama_router
 from api.session import router as session_router
@@ -167,6 +168,7 @@ def create_app() -> FastAPI:
         session_router,
         data_inspection_router,
         health_router,
+        jobs_router,
         ollama_router,
         model_config_router,
         settings_router,
