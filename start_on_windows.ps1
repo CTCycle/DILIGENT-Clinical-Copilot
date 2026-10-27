@@ -77,6 +77,10 @@ $script:LauncherInteractive = -not [Console]::IsInputRedirected -and -not [Conso
 $script:OwnedApplicationProcess = $null
 $script:OwnedApplicationPort = 0
 $script:OwnedApplicationToken = $null
+$script:OwnedApplicationUrl = $null
+$script:StoppingOwnedApplication = $false
+# STATUS_CONTROL_C_EXIT: exit code of a console child terminated by Ctrl+C.
+$script:CtrlCExitCode = -1073741510
 
 # ============================================================
 # Shared output and process helpers
@@ -188,6 +192,9 @@ function Invoke-Checked {
         Pop-Location
     }
     $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    if ($exitCode -eq $script:CtrlCExitCode) {
+        throw [OperationCanceledException]::new("Interrupted by Ctrl+C: $display")
+    }
     if ($exitCode -ne 0) {
         throw "Command failed with exit code $exitCode`: $display"
     }
@@ -534,6 +541,8 @@ function Install-ApplicationDependencies {
         Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
     }
     catch {
+        # An interrupted sync must never trigger the destructive environment recreation.
+        if ($_.Exception -is [OperationCanceledException]) { throw }
         Write-Info 'Recreating a virtual environment that may reference an older repository location'
         if (Test-Path -LiteralPath $VenvDir) {
             [void](Remove-LauncherPath -Path $VenvDir -Activity 'DILIGENT: recreate Python environment' -Strict)
@@ -1436,6 +1445,12 @@ function Start-Application {
             $backendProcess = Start-Process -FilePath $VenvPython `
                 -ArgumentList @('-u', '-m', 'source_entry', '--host', $fastApiHost, '--port', [string]$fastApiPort) `
                 -WorkingDirectory $ServerDir -NoNewWindow -PassThru
+            # Own the process before anything else can be interrupted, and cache its handle so ExitCode stays readable.
+            $script:OwnedApplicationProcess = $backendProcess
+            $script:OwnedApplicationPort = $fastApiPort
+            $script:OwnedApplicationToken = $token
+            $script:OwnedApplicationUrl = $origin
+            $null = $backendProcess.Handle
         }
         finally {
             foreach ($name in $environmentNames) {
@@ -1452,11 +1467,6 @@ function Start-Application {
         Write-LaunchTiming -Phase 'Backend process start' `
             -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendProcessStartStarted)
     }
-
-    $script:OwnedApplicationProcess = $backendProcess
-    $script:OwnedApplicationPort = $fastApiPort
-    $script:OwnedApplicationToken = $token
-    $script:OwnedApplicationUrl = $origin
 
     try {
         $backendReadinessStarted = $launchStopwatch.ElapsedMilliseconds
@@ -1520,7 +1530,17 @@ function Start-Application {
 
 function Stop-OwnedApplication {
     $process = $script:OwnedApplicationProcess
-    if ($null -eq $process) { return }
+    if ($null -eq $process -or $script:StoppingOwnedApplication) { return }
+    $script:StoppingOwnedApplication = $true
+    # While stopping, a repeated Ctrl+C must not interrupt cleanup or force-exit the backend mid-shutdown.
+    $ctrlCDeferred = $false
+    if ($script:LauncherInteractive) {
+        try {
+            [Console]::TreatControlCAsInput = $true
+            $ctrlCDeferred = $true
+        }
+        catch { }
+    }
     $processId = [int]$process.Id
     $port = [int]$script:OwnedApplicationPort
     $gracefulError = $null
@@ -1538,7 +1558,7 @@ function Stop-OwnedApplication {
                 }
             }
             catch {
-                $gracefulError = $_.Exception.Message
+                # A refused connection means the backend already began stopping (for example from the same Ctrl+C).
             }
             if (-not $process.WaitForExit(15000)) {
                 $forced = $true
@@ -1571,6 +1591,14 @@ function Stop-OwnedApplication {
             $script:OwnedApplicationToken = $null
             $script:OwnedApplicationUrl = $null
         }
+        $script:StoppingOwnedApplication = $false
+        if ($ctrlCDeferred) {
+            try {
+                while ([Console]::KeyAvailable) { [void][Console]::ReadKey($true) }
+                [Console]::TreatControlCAsInput = $false
+            }
+            catch { }
+        }
     }
 }
 
@@ -1582,10 +1610,11 @@ function Wait-OwnedApplication {
         $process.Refresh()
     }
     $exitCode = $process.ExitCode
-    $script:OwnedApplicationProcess = $null
-    $script:OwnedApplicationPort = 0
-    $script:OwnedApplicationToken = $null
-    throw "Backend stopped with exit code $exitCode."
+    # The backend is gone; confirm its port is released and clear the ownership state.
+    Stop-OwnedApplication
+    if ($exitCode -ne 0 -and $exitCode -ne $script:CtrlCExitCode) {
+        throw "Backend stopped with exit code $exitCode."
+    }
 }
 
 # ============================================================

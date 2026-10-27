@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -23,6 +24,7 @@ from api.model_config import router as model_config_router
 from api.ollama import router as ollama_router
 from api.session import router as session_router
 from api.settings import router as settings_router
+from api.system_status import router as system_status_router
 from common.constants import (
     FASTAPI_API_PREFIX,
     FASTAPI_ASSETS_ENDPOINT,
@@ -48,9 +50,14 @@ from configurations.startup import (
     initialize_settings,
     reload_persisted_settings,
 )
+from common.utils.logger import logger
+from repositories.context import RepositoryContext
 from repositories.database.initializer import ensure_database_ready
 from services.catalogs.runtime import initialize_reference_catalog_provider
-from services.inspection.revision_recovery import reconcile_interrupted_revision_jobs
+from services.inspection.revision_recovery import (
+    fail_revision_runs_interrupted_by_shutdown,
+    reconcile_interrupted_revision_jobs,
+)
 from services.retrieval.embedding_runtime import close_embedding_runtime
 from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
@@ -114,6 +121,21 @@ def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_URL)
 
 ###############################################################################
+async def _release_application_resources() -> None:
+    jobs_finished = await asyncio.to_thread(get_job_manager().shutdown, 5.0)
+    if not jobs_finished:
+        logger.warning("Background jobs did not stop before shutdown; failing interrupted runs")
+        try:
+            await asyncio.to_thread(fail_revision_runs_interrupted_by_shutdown)
+        except Exception:
+            logger.exception("Could not mark interrupted revision runs during shutdown")
+    close_embedding_runtime()
+    try:
+        RepositoryContext.create().engine.dispose()
+    except Exception:
+        logger.exception("Could not dispose the database engine during shutdown")
+
+###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     bootstrap_settings = get_server_settings()
@@ -128,8 +150,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        get_job_manager().shutdown(timeout=5.0)
-        close_embedding_runtime()
+        await _release_application_resources()
 
 ###############################################################################
 def create_app() -> FastAPI:
@@ -174,6 +195,7 @@ def create_app() -> FastAPI:
         settings_router,
         database_router,
         access_keys_router,
+        system_status_router,
         desktop_router,
     ):
         application.include_router(router, prefix=FASTAPI_API_PREFIX)

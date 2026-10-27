@@ -1,0 +1,42 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<footer class="status-bar" role="status" aria-label="System status">
+  <div class="status-group">
+    <span class="status-item" title="Application backend connection">
+      <span class="status-label">Backend</span>
+      <span class="status-led" [class]="'status-led is-' + backend().led" aria-hidden="true"></span>
+      <span class="status-value">{{ backend().label }}</span>
+    </span>
+    <span class="status-item" [title]="providersTitle()">
+      <span class="status-label">Providers</span>
+      <span class="status-value">{{ providers() }}</span>
+    </span>
+    <span class="status-item" title="Ollama server at the endpoint configured in Settings">
+      <span class="status-label">Local</span>
+      <span class="status-led" [class]="'status-led is-' + local().led" aria-hidden="true"></span>
+      <span class="status-value">{{ local().label }}</span>
+    </span>
+  </div>
+  <div class="status-group status-metrics" title="System-wide hardware usage, not limited to this application">
+    <span class="status-item">
+      <span class="status-label">CPU</span>
+      <span class="status-value">{{ cpu() }}</span>
+    </span>
+    <span class="status-item">
+      <span class="status-label">RAM</span>
+      @if (ram(); as reading) {
+        <span class="status-value"><span class="status-detail">{{ reading.detail }} · </span>{{ reading.percent }}</span>
+      } @else {
+        <span class="status-value">{{ notAvailable }}</span>
+      }
+    </span>
+    <span class="status-item">
+      <span class="status-label">GPU VRAM</span>
+      @if (vram(); as reading) {
+        <span class="status-value"><span class="status-detail">{{ reading.detail }} · </span>{{ reading.percent }}</span>
+      } @else {
+        <span class="status-value">{{ notAvailable }}</span>
+      }
+    </span>
+  </div>
+</footer>

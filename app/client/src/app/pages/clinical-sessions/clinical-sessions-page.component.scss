@@ -26,8 +26,8 @@
   --cs-info-border: var(--color-status-info-border);
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - var(--app-top-nav-height));
-  max-height: calc(100dvh - var(--app-top-nav-height));
+  height: calc(100dvh - var(--app-chrome-height));
+  max-height: calc(100dvh - var(--app-chrome-height));
   min-height: 0;
   padding: var(--space-2xl);
   background: var(--app-background);

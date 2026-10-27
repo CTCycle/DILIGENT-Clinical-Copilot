@@ -3,7 +3,6 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <section class="inspection-layout">
     <aside class="inspection-toolbar" aria-label="Knowledge sources">
-      <h1 class="inspection-page-title">Knowledge</h1>
       <p class="inspection-toolbar-eyebrow">Sources</p>
       <div class="inspection-toolbar-list" role="tablist" aria-label="Inspection datasets" aria-orientation="vertical">
         @for (view of inspectionViews; track view.id) {
@@ -27,7 +26,6 @@
         }
       </div>
       <div class="inspection-toolbar-maintenance" aria-label="Data source maintenance">
-        <p class="inspection-toolbar-eyebrow">Maintenance</p>
         <app-inspection-progress-button
           [buttonLabel]="'Update all'"
           [inProgress]="updateAllRunning()"

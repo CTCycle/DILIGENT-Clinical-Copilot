@@ -24,6 +24,7 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 
 ## Session And Clinical Routes
 - `GET /api/health`
+- `GET /api/system/status` (non-cacheable, always HTTP 200: provider availability, Ollama reachability at the configured endpoint, and system-wide CPU, RAM and GPU VRAM; unavailable readings are `null`)
 - `GET /api/jobs` (non-cacheable summary of active and recent jobs for the global Jobs monitor)
 - `DELETE /api/jobs/{job_id}` (cooperative cancel; refused for `session_revision` and `session_timeline`, which are cancelled from their own pages)
 - `GET /api/clinical/section-template`

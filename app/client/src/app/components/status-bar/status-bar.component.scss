@@ -1,0 +1,82 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  height: var(--app-status-bar-height);
+  padding: 0 var(--space-md);
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.status-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--space-sm);
+  border-left: 1px solid var(--color-divider);
+}
+
+.status-group .status-item:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.status-label {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.status-value {
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+}
+
+.status-led.is-ok {
+  background: var(--color-status-success-text);
+}
+
+.status-led.is-error {
+  background: var(--color-status-error-text);
+}
+
+.status-led.is-pending {
+  border-color: var(--color-text-muted);
+}
+
+.status-led.is-unknown {
+  background: var(--color-text-subtle);
+}
+
+@media (max-width: 1279.99px) {
+  .status-detail {
+    display: none;
+  }
+}

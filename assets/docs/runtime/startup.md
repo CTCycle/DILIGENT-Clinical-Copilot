@@ -20,7 +20,7 @@ The launcher:
 - reports each major launch phase and total time to application readiness in milliseconds
 - runs the backend in the launcher console, which stays attached and streams backend output; the launcher owns the process
 - keeps the interactive menu open while the app runs; `EXIT` and Ctrl+C request authenticated graceful shutdown, wait, then stop only the launcher-owned process tree if needed
-- makes `-Action Launch` supervise the server until it stops or Ctrl+C is pressed
+- makes `-Action Launch` supervise the server until it stops or Ctrl+C is pressed; Ctrl+C unwinds into a single, re-entrant stop sequence that defers further Ctrl+C presses (so the backend's lifespan cleanup is not force-exited), requests graceful shutdown, waits up to 15 s, then runs `taskkill /T /F` on the launcher-owned PID only and verifies the port is released. The backend PID is recorded immediately after `Start-Process`. Ctrl+C during a dependency step (`uv sync`, `npm`) is reported as an interruption and never triggers virtual-environment recreation. A clean backend exit leaves the launcher with exit code 0
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
 - checks the configured API port immediately before starting the production process; `UI_PORT` is reserved for frontend development

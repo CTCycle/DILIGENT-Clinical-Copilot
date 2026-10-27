@@ -6,6 +6,7 @@
     <div class="app-main">
       <router-outlet></router-outlet>
     </div>
+    <app-status-bar></app-status-bar>
   </div>
   <app-notification-toast></app-notification-toast>
   <app-tips-and-tricks [isOpen]="tipsOpen()" (closed)="tipsOpen.set(false)"></app-tips-and-tricks>

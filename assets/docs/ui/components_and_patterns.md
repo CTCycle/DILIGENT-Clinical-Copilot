@@ -8,7 +8,8 @@ Last updated: 2026-10-27
 - Model configuration uses a desktop multi-column layout through `.model-config-layout`.
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
 - The editor keeps Save outside its horizontally scrollable formatting controls. At narrow supported widths, metadata attachment actions sit below their explanatory copy.
-- Knowledge uses tabbed sections with scroll-aware tables and lists for reference data and RAG datasets.
+- Knowledge uses tabbed sections with scroll-aware tables and lists for reference data and RAG datasets. The sidebar has no page heading; a divider separates the source tabs from the Update all action. Virtualized tables must keep CSS row height (`--inspection-row-height`) equal to `InspectionPagedResource`'s row height, otherwise spacer rows change `scrollHeight` mid-scroll and wheel scrolling stalls.
+- A global status bar (`app-status-bar`) is fixed below `.app-main` on every page and shows backend and Ollama connection LEDs, the count of operational cloud providers (active access key plus usable cached catalog), and system-wide CPU, RAM and GPU VRAM. It polls `GET /api/system/status` every 5 s through `SystemStatusStateService`, pauses while the tab is hidden, shows `N/A` for unavailable readings, and never renders an unknown state as healthy. Page heights subtract `--app-chrome-height` (header plus status bar).
 - Clinical Sessions keeps preview rendering and related view state in focused preview components; page-level orchestration should not reabsorb that logic.
 - Model Configurations and access-key dialogs use signal-backed local state, explicit loading/saving states, and provider-response sequencing.
 

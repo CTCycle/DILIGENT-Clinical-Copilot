@@ -5,7 +5,8 @@ import { computed, signal } from '@angular/core';
 
 const DEFAULT_BATCH_SIZE = 50;
 const LOAD_MORE_THRESHOLD_PX = 180;
-const DEFAULT_ROW_HEIGHT_PX = 44;
+// Must match --inspection-row-height in styles.scss.
+const DEFAULT_ROW_HEIGHT_PX = 54;
 const DEFAULT_OVERSCAN_ROWS = 8;
 
 export type InspectionPagedResponse<TItem> = {

@@ -14,6 +14,11 @@ REVISION_JOB_MISSING_STATUS_MESSAGE = (
     "and retry if needed."
 )
 
+REVISION_JOB_SHUTDOWN_MESSAGE = (
+    "The application shut down before this revision run finished. "
+    "Start a new revision run if needed."
+)
+
 ###############################################################################
 def reconcile_interrupted_revision_jobs(
     jobs: JobManager,
@@ -33,4 +38,19 @@ def reconcile_interrupted_revision_jobs(
     return revision_repository.reconcile_running_revision_runs(
         active_job_ids=active_job_ids,
         error={"message": REVISION_JOB_MISSING_STATUS_MESSAGE},
+    )
+
+###############################################################################
+def fail_revision_runs_interrupted_by_shutdown(
+    *,
+    repository: SessionRevisionRepository | None = None,
+) -> list[dict[str, Any]]:
+    """Fail runs whose workers did not stop before the application exited."""
+
+    revision_repository = repository or SessionRevisionRepository(
+        RepositoryContext.create()
+    )
+    return revision_repository.reconcile_running_revision_runs(
+        active_job_ids=set(),
+        error={"message": REVISION_JOB_SHUTDOWN_MESSAGE},
     )

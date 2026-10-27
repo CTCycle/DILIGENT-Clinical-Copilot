@@ -86,6 +86,8 @@
   --drawer-width: 360px;
   --report-max-height: 480px;
   --app-top-nav-height: 59px;
+  --app-status-bar-height: 26px;
+  --app-chrome-height: calc(var(--app-top-nav-height) + var(--app-status-bar-height));
 
   /* Background */
   --app-background:
@@ -260,7 +262,7 @@ app-root {
   gap: 0;
   align-items: stretch;
   background: var(--color-surface-alt);
-  min-height: calc(100dvh - var(--app-top-nav-height) - (2 * var(--space-2xl)));
+  min-height: calc(100dvh - var(--app-chrome-height) - (2 * var(--space-2xl)));
 }
 
 .stitch-dili-main,
@@ -2792,19 +2794,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: var(--space-sm);
   --inspection-control-height: var(--control-height-sm);
   --inspection-icon-action-size: 38px;
+  --inspection-row-height: 54px;
 }
 
 .inspection-page-workbench {
-  min-height: calc(100dvh - var(--app-top-nav-height));
-  height: calc(100dvh - var(--app-top-nav-height));
-  max-height: calc(100dvh - var(--app-top-nav-height));
+  min-height: calc(100dvh - var(--app-chrome-height));
+  height: calc(100dvh - var(--app-chrome-height));
+  max-height: calc(100dvh - var(--app-chrome-height));
   overflow: hidden;
   scrollbar-gutter: stable;
   padding: var(--space-2xl);
 }
 
 .inspection-page-report {
-  min-height: calc(100dvh - var(--app-top-nav-height));
+  min-height: calc(100dvh - var(--app-chrome-height));
   height: auto;
   max-height: none;
   overflow: auto;
@@ -3113,6 +3116,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex: 1 1 auto;
   overflow-x: hidden;
   overflow-y: auto;
+  overflow-anchor: none;
+  overscroll-behavior: contain;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-surface) 94%, transparent);
@@ -3136,11 +3141,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   vertical-align: middle;
 }
 
-.inspection-virtual-spacer-row td {
-  padding: 0;
-  border: 0;
-}
-
 .inspection-table th {
   position: sticky;
   top: 0;
@@ -3155,6 +3155,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .inspection-table-dense td {
   padding-top: 7px;
   padding-bottom: 7px;
+}
+
+/* Virtualized rows must match InspectionPagedResource's row height exactly. */
+.inspection-table-dense tbody tr:not(.inspection-virtual-spacer-row) {
+  height: var(--inspection-row-height);
+}
+
+.inspection-table .inspection-virtual-spacer-row td {
+  padding: 0;
+  border: 0;
 }
 
 .inspection-table tbody tr:hover {
