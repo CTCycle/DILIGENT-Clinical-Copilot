@@ -18,7 +18,7 @@ The launcher:
 - starts one FastAPI process with the synchronized virtual-environment Python; FastAPI serves the built Angular SPA and `/api/*` from the same origin
 - waits for `/api/health`, the SPA entry page, and a built JavaScript asset before opening the backend origin in the browser
 - reports each major launch phase and total time to application readiness in milliseconds
-- keeps the backend process hidden and writes its output to `runtimes/cache/logs/source-backend.log` and `source-backend-error.log`; the visible launcher owns the process
+- runs the backend in the launcher console, which stays attached and streams backend output; the launcher owns the process
 - keeps the interactive menu open while the app runs; `EXIT` and Ctrl+C request authenticated graceful shutdown, wait, then stop only the launcher-owned process tree if needed
 - makes `-Action Launch` supervise the server until it stops or Ctrl+C is pressed
 - recreates a stale backend virtual environment when the repository has moved
@@ -149,7 +149,7 @@ The development UI uses `UI_HOST` and `UI_PORT` (default `127.0.0.1:9847`). Its 
 ### Source production mode
 1. Run `.\start_on_windows.ps1` from an interactive PowerShell console.
 2. Select **Launch application**. The launcher checks `FASTAPI_PORT` (default `7690`), starts FastAPI, and opens `http://127.0.0.1:7690` after health and built-asset checks pass.
-3. Select **EXIT** or press Ctrl+C in the launcher to stop the app. `.\start_on_windows.ps1 -Action Launch` keeps the launcher supervising until Ctrl+C.
+3. Press Ctrl+C in the launcher to stop the app. Both the menu's Launch option and `.\start_on_windows.ps1 -Action Launch` keep the launcher supervising the backend until Ctrl+C.
 
 ### Source development mode
 1. Start the backend and Angular development server in separate terminals as described above.
