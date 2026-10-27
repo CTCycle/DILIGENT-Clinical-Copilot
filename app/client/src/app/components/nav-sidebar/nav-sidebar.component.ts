@@ -5,11 +5,12 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, EventEmitter, Output, QueryList, ViewChildren, inject } from '@angular/core';
 
 import { AppStateService, PageId } from '../../core/state/app-state.service';
+import { JobsMonitorComponent } from '../jobs-monitor/jobs-monitor.component';
 import { NotificationCenterComponent } from '../notification-center/notification-center.component';
 
 @Component({
   selector: 'app-nav-sidebar',
-  imports: [CommonModule, NotificationCenterComponent],
+  imports: [CommonModule, JobsMonitorComponent, NotificationCenterComponent],
   templateUrl: './nav-sidebar.component.html',
   styleUrl: './nav-sidebar.component.scss',
 })
@@ -24,7 +25,7 @@ export class NavSidebarComponent {
   readonly navItems: Array<{ pageId: PageId; label: string }> = [
     { pageId: 'dili-agent', label: 'DILI Agent' },
     { pageId: 'clinical-sessions', label: 'Clinical Sessions' },
-    { pageId: 'data-inspection', label: 'Data Inspection' },
+    { pageId: 'data-inspection', label: 'Knowledge' },
     { pageId: 'settings', label: 'Settings' },
   ];
 

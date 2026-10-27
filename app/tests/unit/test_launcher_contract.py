@@ -37,7 +37,8 @@ def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
     assert "taskkill.exe" not in port_wait
     assert "taskkill.exe /PID $process.ProcessId /T /F" in owned_stop
     assert "Stop-Process -Id $processId -Force" in port_stop
-    assert "Get-ApplicationProcessRecords" not in launch_resolution
+    assert "Get-ApplicationProcessRecords" in launch_resolution
+    assert "Unknown port owner" in launch_resolution
     assert "Assert-NoForeignPortListeners" not in launch_resolution
     assert "Get-PortConflictProcesses -PortRecord" in launch_resolution
     assert "Get-LauncherPortStates" in explicit_cleanup

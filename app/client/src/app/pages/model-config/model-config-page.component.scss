@@ -231,7 +231,7 @@
 }
 
 .model-config-option-icon,
-.model-config-summary-icon {
+.mc-config-icon {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -810,22 +810,67 @@
   padding: 20px;
 }
 
-.model-config-summary-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 18px 0 0;
+.mc-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px 20px;
+  margin: 10px 0 0;
 }
 
-.model-config-summary-list > div,
-.model-config-parameters,
-.model-config-description-panel {
+.mc-config-item {
+  min-width: 0;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--mc-border) 66%, transparent);
+}
+
+.mc-config-item dt {
+  margin: 0 0 2px;
+  color: var(--mc-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.mc-config-item dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--mc-text);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.mc-config-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--mc-brand);
+}
+
+.mc-config-note {
+  margin: 8px 0 0;
+  color: var(--mc-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mc-config-note summary {
+  cursor: pointer;
+}
+
+.mc-config-note p {
+  margin: 4px 0 0;
+}
+
+.model-config-parameters {
   display: block;
   border-top: 1px solid color-mix(in srgb, var(--mc-border) 66%, transparent);
   padding: 15px 0;
 }
 
-.model-config-summary-list dt,
 .model-config-parameters .field-label {
   display: block;
   margin: 0 0 9px;
@@ -835,44 +880,6 @@
   line-height: 1.25;
 }
 
-.model-config-summary-list dd {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  color: var(--mc-text);
-  font-size: 12px;
-  font-weight: 620;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  text-align: left;
-}
-
-.model-config-summary-list dd:has(.model-config-summary-icon) {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  justify-content: start;
-}
-
-.model-config-summary-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--mc-brand);
-}
-
-.model-config-summary-badge {
-  align-self: flex-start;
-  border-radius: 999px;
-  background: var(--color-status-success-bg);
-  color: var(--color-status-success-text);
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.model-config-summary-list small,
 .model-config-saved-note {
   color: var(--mc-muted);
   font-size: 11px;
@@ -881,29 +888,6 @@
 
 .model-config-parameters h3 {
   margin-bottom: 14px;
-}
-
-.model-config-description-panel h3 {
-  margin: 0 0 8px;
-  color: var(--mc-text);
-  font-family: "Manrope", "Inter", sans-serif;
-  font-size: 12px;
-  font-weight: 760;
-}
-
-.model-config-description-panel p {
-  margin: 0;
-  color: var(--mc-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.model-config-description-panel .field-help-text {
-  display: block;
-  margin-top: 6px;
-  color: var(--mc-muted);
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 .model-config-temperature-row {

@@ -1,5 +1,5 @@
 # User Checklists
-Last updated: 2026-10-01
+Last updated: 2026-10-27
 
 ## Windows desktop launch checklist
 
@@ -24,7 +24,7 @@ Last updated: 2026-10-01
 12. Re-run if needed.
 13. Copy the final reviewed output.
 14. Open **Clinical Sessions** to confirm the session was saved.
-15. Open the selected session's **Timeline** tab, or use **Data Inspection**, for supporting review when needed.
+15. Open the selected session's **Timeline** tab, or use **Knowledge**, for supporting review when needed.
 
 ## Good Input Checklist
 - patient age or relevant demographic context

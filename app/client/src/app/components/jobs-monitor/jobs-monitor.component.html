@@ -1,0 +1,104 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<div class="jobs-monitor">
+  <button
+    type="button"
+    class="app-header-icon-btn jobs-monitor-button"
+    (click)="toggle()"
+    [attr.aria-expanded]="open()"
+    aria-haspopup="dialog"
+    [attr.aria-label]="monitor.activeJobs().length > 0 ? 'Background jobs, ' + monitor.activeJobs().length + ' active' : 'Background jobs'"
+    title="Background jobs"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+    @if (monitor.activeJobs().length > 0) {
+      <span class="jobs-monitor-badge" aria-hidden="true">{{ badge() }}</span>
+    }
+  </button>
+
+  @if (open()) {
+    <section class="jobs-monitor-panel" role="dialog" aria-label="Background jobs">
+      <header class="jobs-monitor-header">
+        <strong>Background jobs</strong>
+        <span>{{ monitor.activeJobs().length }} active</span>
+      </header>
+
+      @if (monitor.unavailable()) {
+        <p class="jobs-monitor-warning" role="status">Connection lost. Retrying; the list may be out of date.</p>
+      }
+
+      <div class="jobs-monitor-list">
+        @if (monitor.jobs().length === 0) {
+          <p class="jobs-monitor-empty">No background jobs yet. Analyses, indexing and updates appear here.</p>
+        }
+
+        @if (monitor.activeJobs().length > 0) {
+          <h3 class="jobs-monitor-section">Active</h3>
+          @for (job of monitor.activeJobs(); track job.job_id) {
+            <ng-container *ngTemplateOutlet="row; context: { $implicit: job }" />
+          }
+        }
+
+        @if (monitor.recentJobs().length > 0) {
+          <h3 class="jobs-monitor-section">Recent</h3>
+          @for (job of monitor.recentJobs(); track job.job_id) {
+            <ng-container *ngTemplateOutlet="row; context: { $implicit: job }" />
+          }
+        }
+      </div>
+    </section>
+  }
+</div>
+
+<ng-template #row let-job>
+  <article class="jobs-monitor-item" [class.is-active]="isActive(job)" [attr.data-status]="job.status">
+    <div class="jobs-monitor-item-head">
+      <div class="jobs-monitor-item-title">
+        <strong>{{ name(job) }}</strong>
+        <span>{{ kind(job) }}</span>
+      </div>
+      <span class="jobs-monitor-status" [attr.data-status]="job.status">{{ statusLabel(job) }}</span>
+    </div>
+
+    @if (job.status === 'running' || job.status === 'pending') {
+      @if (job.progress !== null) {
+        <div
+          class="jobs-monitor-bar"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="job.progress | number: '1.0-0'"
+        >
+          <span [style.width.%]="job.progress"></span>
+        </div>
+      } @else {
+        <div class="jobs-monitor-bar is-indeterminate" role="progressbar" aria-label="In progress"><span></span></div>
+      }
+    }
+
+    @if (detail(job)) {
+      <p class="jobs-monitor-detail" [class.is-error]="job.status === 'failed'">{{ detail(job) }}</p>
+    }
+
+    <div class="jobs-monitor-item-foot">
+      <span>
+        @if (job.progress !== null && isActive(job)) {
+          {{ job.progress | number: '1.0-0' }}% ·
+        }
+        {{ timing(job) }}
+      </span>
+      @if (job.cancellable) {
+        <button
+          type="button"
+          class="jobs-monitor-cancel"
+          (click)="cancel(job)"
+          [disabled]="cancelling().has(job.job_id)"
+        >
+          Cancel
+        </button>
+      }
+    </div>
+  </article>
+</ng-template>

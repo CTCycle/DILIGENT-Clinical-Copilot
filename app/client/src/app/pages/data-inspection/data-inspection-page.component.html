@@ -2,8 +2,9 @@
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
 <main class="page-container inspection-page inspection-page-workbench">
   <section class="inspection-layout">
-    <aside class="inspection-toolbar" aria-label="Data inspection views">
-      <p class="inspection-toolbar-eyebrow">Views</p>
+    <aside class="inspection-toolbar" aria-label="Knowledge sources">
+      <h1 class="inspection-page-title">Knowledge</h1>
+      <p class="inspection-toolbar-eyebrow">Sources</p>
       <div class="inspection-toolbar-list" role="tablist" aria-label="Inspection datasets" aria-orientation="vertical">
         @for (view of inspectionViews; track view.id) {
           <button
@@ -35,6 +36,13 @@
           [disabled]="updateAllButtonDisabled()"
           (activated)="openUpdateAllModal()"
         />
+        <p class="inspection-maintenance-hint" role="status" aria-live="polite">
+          @if (updateAllRunning()) {
+            {{ updateAllState().message || 'Updating sources...' }}
+          } @else {
+            Refreshes RxNav, LiverTox and DILIrank in order. RAG is updated from its own view.
+          }
+        </p>
       </div>
     </aside>
 
@@ -276,6 +284,23 @@
               </div>
             </app-inspection-catalog-toolbar>
 
+            @if (ragDocuments().length === 0 && !ragLoading() && !ragError()) {
+              <div class="inspection-empty-state" role="status">
+                <svg class="inspection-empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z" />
+                </svg>
+                @if (ragSearchInput().trim()) {
+                  <h2>No matching documents</h2>
+                  <p>No indexed RAG document matches "{{ ragSearchInput().trim() }}".</p>
+                } @else {
+                  <h2>No RAG documents yet</h2>
+                  <p>Choose a folder with source documents, then select Update Embeddings to index them.</p>
+                  <button class="btn btn-secondary" type="button" (click)="openRagFolderPicker()">
+                    Choose folder
+                  </button>
+                }
+              </div>
+            } @else {
             <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onRagScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead>
@@ -315,9 +340,6 @@
                   @if (ragDocuments().length > 0) {
                     <tr class="inspection-virtual-spacer-row"><td colspan="7" [style.height.px]="ragBottomPaddingPx()"></td></tr>
                   }
-                  @if (!ragLoading() && ragDocuments().length === 0) {
-                    <tr><td colspan="7" class="inspection-empty-row">No RAG documents found.</td></tr>
-                  }
                 </tbody>
               </table>
               <app-inspection-catalog-status
@@ -329,6 +351,7 @@
                 [error]="ragError()"
               />
             </div>
+            }
           </div>
         </section>
       }

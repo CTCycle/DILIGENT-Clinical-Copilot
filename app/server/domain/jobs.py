@@ -33,6 +33,24 @@ class JobListResponse(BaseModel):
     jobs: list[JobStatusResponse]
 
 ###############################################################################
+class JobSummary(BaseModel):
+    job_id: str
+    job_type: str
+    status: str
+    progress: float | None = None
+    phase: str | None = None
+    message: str | None = None
+    error: str | None = None
+    started_at: float
+    finished_at: float | None = None
+    stop_requested: bool = False
+    cancellable: bool = False
+
+###############################################################################
+class JobSummaryListResponse(BaseModel):
+    jobs: list[JobSummary]
+
+###############################################################################
 class JobCancelResponse(BaseModel):
     job_id: str
     success: bool

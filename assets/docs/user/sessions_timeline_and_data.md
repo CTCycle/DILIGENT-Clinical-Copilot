@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-10-18
+Last updated: 2026-10-27
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -78,7 +78,7 @@ Fallback events are built deterministically from persisted session fields. A sou
 For LLM-generated timelines, events without preserved source evidence are not part of the persisted clinical chronology contract. In the UI, missing source evidence should be treated as a warning rather than as clinically grounded support.
 
 ## Inspect Local Data
-Open **Data Inspection** from the sidebar.
+Open **Knowledge** from the sidebar.
 
 Expected capabilities:
 - data-source or table selection for RxNav, LiverTox, FDA DILIrank 2.0, and RAG
@@ -91,7 +91,7 @@ Expected capabilities:
 The **DILIrank** view is read-only. It shows FDA compound name, linked canonical drug when a safe deterministic link exists, LTKB ID, DILI concern class, severity class, labeling section, and source comment. `Unlinked` is an intentional state: it means the FDA row is preserved but is not eligible to contribute to clinical consultation. Do not infer a missing mapping manually from display similarity.
 
 Recommended workflow:
-1. Open **Data Inspection**.
+1. Open **Knowledge**.
 2. Select the data source or dataset.
 3. Refresh the view.
 4. Confirm expected records are present.
@@ -101,7 +101,7 @@ Recommended workflow:
 Do not edit local database files manually while the application is running.
 
 ## Update Local Data Sources
-Some data sources or embeddings may require initialization or refresh through the Data Inspection update controls or through:
+Some data sources or embeddings may require initialization or refresh through the Knowledge update controls or through:
 
 ```text
 start_on_windows.ps1

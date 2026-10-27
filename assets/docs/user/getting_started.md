@@ -1,5 +1,5 @@
 # Getting Started
-Last updated: 2026-10-21
+Last updated: 2026-10-27
 
 ## Purpose
 DILIGENT is a local clinical copilot interface for Drug-Induced Liver Injury review workflows. It helps users enter clinical context, configure model providers, inspect local data, run DILI-oriented analysis, and review saved sessions.
@@ -50,7 +50,7 @@ DILIGENT uses desktop-style navigation and information-dense workspaces designed
 Main navigation sections:
 - **DILI Agent**
 - **Clinical Sessions**, including the contextual **Timeline** tab
-- **Data Inspection**
+- **Knowledge**
 - **Settings**
 
 Typical journey:

@@ -1246,6 +1246,17 @@ function Resolve-LaunchPortConflicts {
         Write-Host "  PID $($process.ProcessId) [$($process.Name)] -> port(s) $processPorts" -ForegroundColor Yellow
     }
 
+    $uiPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 9847 }
+    $identifiedProcessIds = @(Get-ApplicationProcessRecords -BackendPort $BackendPort -FrontendPort $uiPort |
+        ForEach-Object { [int]$_.ProcessId })
+    $unknownProcesses = @($initialProcesses | Where-Object { $identifiedProcessIds -notcontains [int]$_.ProcessId })
+    if ($unknownProcesses.Count -gt 0) {
+        Write-Host 'Unknown port owner(s) were left running:' -ForegroundColor Yellow
+        foreach ($process in $unknownProcesses) {
+            Write-Host "  PID $($process.ProcessId) [$($process.Name)]" -ForegroundColor Yellow
+        }
+        throw 'An unknown process owns the configured source-mode port. It was left running; no DILIGENT process was started.'
+    }
     if (-not $script:LauncherInteractive) {
         throw 'Configured source-mode ports are occupied, but launch is noninteractive and cannot request termination. No port holders were terminated.'
     }

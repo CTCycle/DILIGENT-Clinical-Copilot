@@ -170,7 +170,7 @@ export class InspectionUpdateJobTrackerService {
         }
       }
     } catch {
-      // Discovery is best effort; a later Data Inspection open retries it.
+      // Discovery is best effort; a later Knowledge open retries it.
     }
   }
 
