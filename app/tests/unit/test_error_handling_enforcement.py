@@ -31,6 +31,7 @@ EXCLUDED_DIRS = {
 APP_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SERVER_ROOT = APP_ROOT / "server"
 
+
 ###############################################################################
 def get_route_service(router: Any, route_path: str) -> Any:
     for route in router.routes:
@@ -39,6 +40,7 @@ def get_route_service(router: Any, route_path: str) -> Any:
             if endpoint_owner is not None:
                 return endpoint_owner.service
     raise AssertionError(f"Route not found: {route_path}")
+
 
 ###############################################################################
 def test_backend_httpx_asyncclient_calls_require_explicit_timeout() -> None:
@@ -71,6 +73,7 @@ def test_backend_httpx_asyncclient_calls_require_explicit_timeout() -> None:
         "All httpx.AsyncClient calls must include timeout:\n" + "\n".join(violations)
     )
 
+
 ###############################################################################
 def wait_for_terminal_job_state(
     manager: JobManager,
@@ -86,6 +89,7 @@ def wait_for_terminal_job_state(
             return payload
         time.sleep(0.02)
     raise AssertionError("Timed out waiting for terminal job state.")
+
 
 ###############################################################################
 def test_unhandled_exception_is_masked_and_has_request_id() -> None:
@@ -106,6 +110,7 @@ def test_unhandled_exception_is_masked_and_has_request_id() -> None:
     assert payload["retryable"] is True
     assert response.headers.get(REQUEST_ID_HEADER) == payload["request_id"]
 
+
 ###############################################################################
 def test_validation_error_keeps_detail_and_request_id() -> None:
     app = FastAPI()
@@ -124,6 +129,7 @@ def test_validation_error_keeps_detail_and_request_id() -> None:
     assert payload.get("request_id")
     assert payload.get("retryable") is False
 
+
 ###############################################################################
 def test_validation_error_with_value_error_context_is_json_safe() -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
@@ -135,6 +141,7 @@ def test_validation_error_with_value_error_context_is_json_safe() -> None:
     assert response.status_code == 422
     payload = response.json()
     assert payload["detail"][0]["ctx"]["error"] == "access_key is too short"
+
 
 ###############################################################################
 def test_job_manager_masks_sensitive_error_details() -> None:
@@ -149,6 +156,7 @@ def test_job_manager_masks_sensitive_error_details() -> None:
     assert payload["status"] == "failed"
     assert payload["error"] == "Operation failed unexpectedly. Please retry."
 
+
 ###############################################################################
 def test_job_manager_reports_timeout_message() -> None:
     manager = JobManager()
@@ -161,6 +169,7 @@ def test_job_manager_reports_timeout_message() -> None:
 
     assert payload["status"] == "failed"
     assert payload["error"] == "Operation timed out. Please retry."
+
 
 ###############################################################################
 def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
@@ -182,6 +191,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
         payload["detail"] == "Access key service is unavailable. Please retry shortly."
     )
 
+
 ###############################################################################
 def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None:
     def fake_start_update_job(job_type: str, overrides: dict[str, Any] | None = None):
@@ -197,12 +207,12 @@ def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None
     payload = response.json()
     assert payload["detail"] == "Update job could not start. Please retry."
 
+
 ###############################################################################
 def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
 
     ###############################################################################
     class FakeOllamaClient:
-
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -227,3 +237,49 @@ def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
         payload["detail"]
         == "Ollama service is unavailable. Verify Ollama is running and retry."
     )
+
+
+###############################################################################
+def test_request_logging_keeps_failures_and_debug_successes(caplog: Any) -> None:
+    import logging
+
+    app = FastAPI()
+    register_error_handling(app)
+
+    @app.get("/ok")
+    def ok() -> dict[str, bool]:
+        return {"ok": True}
+
+    caplog.set_level(logging.DEBUG)
+    with TestClient(app) as client:
+        client.get("/ok")
+        client.get("/missing")
+
+    assert any(
+        r.levelno == logging.DEBUG and "Request completed" in r.message
+        for r in caplog.records
+    )
+    assert any(
+        r.levelno == logging.WARNING and "status=404" in r.message
+        for r in caplog.records
+    )
+
+
+def test_httpx_request_filter_keeps_failed_responses_visible() -> None:
+    import logging
+
+    from common.utils.logger import HttpxRequestFilter
+
+    request_filter = HttpxRequestFilter()
+    for status_code, expected_level in [(200, logging.DEBUG), (503, logging.WARNING)]:
+        record = logging.LogRecord(
+            "httpx",
+            logging.INFO,
+            "",
+            0,
+            'HTTP Request: %s %s "%s %d %s"',
+            ("GET", "http://localhost", "HTTP/1.1", status_code, "status"),
+            None,
+        )
+        assert request_filter.filter(record)
+        assert record.levelno == expected_level

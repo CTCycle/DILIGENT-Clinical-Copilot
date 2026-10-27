@@ -26,12 +26,14 @@ from common.exceptions import ServiceError
 from common.utils.logger import logger
 from domain.errors import ApiErrorResponse
 
+
 ###############################################################################
 def resolve_request_id(request: Request) -> str:
     candidate = getattr(request.state, "request_id", "")
     if isinstance(candidate, str) and candidate.strip():
         return candidate.strip()
     return "n/a"
+
 
 ###############################################################################
 def build_error_payload(
@@ -46,6 +48,7 @@ def build_error_payload(
         retryable=retryable,
     ).model_dump()
 
+
 ###############################################################################
 def make_json_safe(value: object) -> object:
     if isinstance(value, dict):
@@ -58,9 +61,9 @@ def make_json_safe(value: object) -> object:
         return value
     return str(value)
 
+
 ###############################################################################
 class RequestIdMiddleware(BaseHTTPMiddleware):
-
     # -------------------------------------------------------------------------
     async def dispatch(
         self,
@@ -70,9 +73,28 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         request.state.request_id = uuid.uuid4().hex[:12]
         response = await call_next(request)
         response.headers.setdefault(REQUEST_ID_HEADER, resolve_request_id(request))
+        if response.status_code >= 400 and not getattr(
+            request.state, "error_logged", False
+        ):
+            logger.log(
+                40 if response.status_code >= 500 else 30,
+                "Request failed request_id=%s method=%s path=%s status=%s",
+                resolve_request_id(request),
+                request.method,
+                request.url.path,
+                response.status_code,
+            )
+        elif response.status_code < 400:
+            logger.debug(
+                "Request completed method=%s path=%s status=%s",
+                request.method,
+                request.url.path,
+                response.status_code,
+            )
         if request.url.path == "/api/clinical/draft":
             response.headers["Cache-Control"] = "no-store"
         return response
+
 
 ###############################################################################
 def request_validation_error_handler(
@@ -80,7 +102,8 @@ def request_validation_error_handler(
     exc: RequestValidationError,
 ) -> JSONResponse:
     request_id = resolve_request_id(request)
-    logger.info(
+    request.state.error_logged = True
+    logger.warning(
         "Request validation failed request_id=%s method=%s path=%s",
         request_id,
         request.method,
@@ -105,12 +128,14 @@ def request_validation_error_handler(
         response.headers["Cache-Control"] = "no-store"
     return response
 
+
 ###############################################################################
 def timeout_error_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
     request_id = resolve_request_id(request)
+    request.state.error_logged = True
     logger.warning(
         "Timeout request_id=%s method=%s path=%s type=%s",
         request_id,
@@ -129,12 +154,14 @@ def timeout_error_handler(
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
 
+
 ###############################################################################
 def dependency_error_handler(
     request: Request,
     exc: httpx.RequestError,
 ) -> JSONResponse:
     request_id = resolve_request_id(request)
+    request.state.error_logged = True
     logger.warning(
         "Dependency failure request_id=%s method=%s path=%s type=%s",
         request_id,
@@ -153,12 +180,14 @@ def dependency_error_handler(
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
 
+
 ###############################################################################
 def missing_resource_error_handler(
     request: Request,
     exc: FileNotFoundError,
 ) -> JSONResponse:
     request_id = resolve_request_id(request)
+    request.state.error_logged = True
     logger.warning(
         "Missing resource request_id=%s method=%s path=%s type=%s",
         request_id,
@@ -177,12 +206,14 @@ def missing_resource_error_handler(
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
 
+
 ###############################################################################
 def service_error_handler(
     request: Request,
     exc: ServiceError,
 ) -> JSONResponse:
     request_id = resolve_request_id(request)
+    request.state.error_logged = True
     logger.warning(
         "Service error request_id=%s method=%s path=%s type=%s",
         request_id,
@@ -203,6 +234,7 @@ def service_error_handler(
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
+
 
 ###############################################################################
 def unhandled_error_handler(
@@ -227,6 +259,7 @@ def unhandled_error_handler(
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
     return response
+
 
 ###############################################################################
 def register_error_handling(app: FastAPI) -> None:
