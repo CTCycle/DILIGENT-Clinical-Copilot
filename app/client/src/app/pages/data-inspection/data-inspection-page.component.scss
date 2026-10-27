@@ -12,20 +12,8 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.inspection-toolbar-maintenance .inspection-toolbar-eyebrow {
-  margin-bottom: 0;
-}
-
 .inspection-toolbar-maintenance app-inspection-progress-button {
   min-width: 0;
-}
-
-.inspection-page-title {
-  margin: 0 0 var(--space-sm);
-  color: var(--color-text-primary);
-  font-size: var(--font-xl);
-  font-weight: 750;
-  line-height: 1.15;
 }
 
 .inspection-maintenance-hint {
