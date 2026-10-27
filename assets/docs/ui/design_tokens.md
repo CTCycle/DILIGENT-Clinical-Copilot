@@ -1,5 +1,5 @@
 # Design Tokens
-Last updated: 2026-09-25
+Last updated: 2026-10-27
 
 ## Scope
 Frontend styling guidance applies to `app/client/src`.
@@ -25,9 +25,9 @@ Frontend styling guidance applies to `app/client/src`.
 - Spacing tokens:
   - `--space-xs: 4px` through `--space-3xl: 32px`
 - Control heights:
-  - `--control-height-sm: 36px`
-  - `--control-height-md: 40px`
-  - `--control-height-lg: 44px`
+  - `--control-height-sm: 28px`
+  - `--control-height-md: 32px`
+  - `--control-height-lg: 36px`
 - Shared desktop layout:
   - `--app-top-nav-height: 59px`
   - `--app-min-viewport-width: 1100px`
@@ -53,5 +53,8 @@ Frontend styling guidance applies to `app/client/src`.
   - `--color-border`
   - `--color-border-subtle`
   - `--color-divider`
+  - `--color-surface-overlay`
+  - `--color-chart-therapy`, `--color-chart-disease`, `--color-chart-lab`, `--color-chart-other`
+- Contrast targets: text tokens >= 4.5:1 on surface, alt surface, and page background in both themes; `--color-border` >= 3:1 on surface; chart tokens >= 3:1 on surface.
 - `--color-overlay` and warning-state tokens are also defined for modal backdrops and non-blocking limitations.
 - Semantic status tokens exist for info, success, and error text, background, and border states.

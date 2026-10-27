@@ -315,7 +315,7 @@ type InspectionUpdateAllConfigChange = {
     }
 
     .inspection-update-all-source.is-failed .inspection-update-all-source-heading {
-      color: var(--color-danger, #b91c1c);
+      color: var(--color-status-error-text);
     }
 
     .inspection-update-all-status .inspection-job-message {
