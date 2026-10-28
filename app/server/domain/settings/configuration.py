@@ -10,16 +10,6 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from domain.model_configs import ReasoningLevel
 
 ###############################################################################
-NCBI_CONTACT_EMAIL_REQUIRED_DETAIL = (
-    "Set a real contact email in Settings > Integrations before starting a "
-    "LiverTox or structured-source update."
-)
-
-
-class NCBIContactEmailRequiredError(ValueError):
-    """Raised when an NCBI update has no usable contact identity configured."""
-
-
 def normalize_ncbi_contact_email(value: object) -> str:
     if not isinstance(value, str):
         raise ValueError("NCBI contact email must be a string")
@@ -38,11 +28,16 @@ def normalize_ncbi_contact_email(value: object) -> str:
     return normalized
 
 
-def require_ncbi_contact_email(value: object) -> str:
-    normalized = normalize_ncbi_contact_email(value)
+def resolve_ncbi_contact_email(value: object) -> str:
+    """Return the NCBI contact identity, or "" when none is usable.
+
+    NCBI contact identification is optional; blank and `.local` placeholder
+    addresses fall back to tool-name-only identification.
+    """
+    normalized = normalize_ncbi_contact_email("" if value is None else value)
     domain = normalized.rsplit("@", maxsplit=1)[-1].casefold()
     if not normalized or domain == "local" or domain.endswith(".local"):
-        raise NCBIContactEmailRequiredError(NCBI_CONTACT_EMAIL_REQUIRED_DETAIL)
+        return ""
     return normalized
 
 

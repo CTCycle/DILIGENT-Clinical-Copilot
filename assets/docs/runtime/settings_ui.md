@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-10-21
+Last updated: 2026-10-28
 
 ## Scope
 
@@ -114,8 +114,8 @@ The Integrations category includes `ncbi_contact_email`. The value is trimmed
 and validated as a basic email address, then persisted in the
 `application_configuration` payload with the other runtime settings. It may be
 blank, and an Integrations reset clears it. LiverTox and combined structured
-source updates require a real contact email registered with NCBI; blank and
-`.local` addresses receive an actionable error before a job starts. A saved
+source updates send it as NCBI contact identity when it is a real address;
+blank and `.local` values fall back to tool-name-only identification. A saved
 `.local` value remains visible until the user replaces or clears it. The field
 is a contact identity, not an API key or credential.
 

@@ -21,11 +21,11 @@ DOWNLOAD_PROGRESS_BYTE_INTERVAL = 5 * 1024 * 1024
 
 ###############################################################################
 def build_ncbi_http_headers(contact_email: str) -> dict[str, str]:
+    user_agent = f"DILIGENTClinicalCopilot/{resolve_application_version()}"
+    if contact_email:
+        user_agent = f"{user_agent} (contact={contact_email})"
     return {
-        "User-Agent": (
-            f"DILIGENTClinicalCopilot/{resolve_application_version()} "
-            f"(contact={contact_email})"
-        ),
+        "User-Agent": user_agent,
         "Accept-Encoding": "gzip, deflate",
     }
 
