@@ -13,64 +13,64 @@ from domain.clinical.dili import (
     EvidenceStatus,
 )
 
+# Each phrase is a regular expression matched case-insensitively at word
+# boundaries; stems carry an explicit `\w*` suffix.
 CAUSE_PATTERNS: dict[str, tuple[str, ...]] = {
     "viral_hepatitis_a_b_c_d_e": (
-        "hepatitis a",
-        "hepatitis b",
-        "hepatitis c",
-        "hepatitis d",
-        "hepatitis e",
-        "hav",
-        "hbv",
-        "hcv",
-        "hdv",
-        "hev",
+        r"hepatitis [a-e]",
+        r"hav",
+        r"hbv",
+        r"hcv",
+        r"hdv",
+        r"hev",
+        r"hbsag",
+        r"anti-hbc",
     ),
-    "ebv_cmv_hsv": ("ebv", "cmv", "hsv", "epstein-barr", "cytomegal"),
+    "ebv_cmv_hsv": (r"ebv", r"cmv", r"hsv", r"epstein-barr", r"cytomegal\w*"),
     "autoimmune_hepatitis": (
-        "autoimmune hepatitis",
-        "ana",
-        "asma",
-        "igg",
-        "smooth muscle",
+        r"autoimmune\w*",
+        r"ana",
+        r"asma",
+        r"igg",
+        r"smooth muscle",
     ),
-    "alcoholic_hepatitis": ("alcohol", "ethanol", "etoh"),
-    "masld_mash_nash": ("masld", "mash", "nash", "fatty liver", "steatos"),
+    "alcoholic_hepatitis": (r"alcohol\w*", r"ethanol", r"etoh"),
+    "masld_mash_nash": (r"masld", r"mash", r"nash", r"fatty liver", r"steatos\w*"),
     "biliary_obstruction_gallstones": (
-        "biliary",
-        "gallstone",
-        "choledo",
-        "obstruction",
-        "cholangitis",
+        r"biliary",
+        r"bile ducts?",
+        r"gallstones?",
+        r"choledoch\w*",
+        r"cholangitis",
     ),
-    "ischemic_hypoxic": ("ischemi", "hypoxi", "anoxi", "shock liver"),
+    "ischemic_hypoxic": (r"ischa?emi\w*", r"hypoxi\w*", r"anoxi\w*", r"shock liver"),
     "sepsis_shock_cardiac_failure": (
-        "sepsis",
-        "septic",
-        "shock",
-        "cardiac failure",
-        "heart failure",
+        r"sepsis",
+        r"septic",
+        r"shock",
+        r"cardiac failure",
+        r"heart failure",
     ),
     "overdose_or_toxin": (
-        "overdose",
-        "acetaminophen",
-        "paracetamol",
-        "toxin",
-        "poison",
+        r"overdose",
+        r"acetaminophen",
+        r"paracetamol",
+        r"toxins?",
+        r"poison\w*",
     ),
     "supplement_otc_recreational_occupational": (
-        "herbal",
-        "supplement",
-        "otc",
-        "recreational",
-        "occupational",
+        r"herbal",
+        r"supplements?",
+        r"otc",
+        r"recreational",
+        r"occupational",
     ),
     "pre_existing_chronic_liver_disease": (
-        "cirrhos",
-        "chronic liver",
-        "portal hypertension",
-        "chronic hepatitis",
-        "fibrosis",
+        r"cirrhos\w*",
+        r"chronic liver",
+        r"portal hypertension",
+        r"chronic hepatitis",
+        r"fibrosis",
     ),
 }
 
@@ -79,30 +79,41 @@ BASELINE_CONTEXT_CAUSES = {
     "pre_existing_chronic_liver_disease",
 }
 
-EXCLUDED_RE = re.compile(
-    r"\b(negative|excluded|ruled out|without evidence|not detected|serology negative)\b",
+# Clauses are split on sentence punctuation, semicolons, newlines and commas
+# that are not decimal separators, so each laboratory finding is judged alone.
+CLAUSE_SPLIT_RE = re.compile(r"(?<!\d)\.(?!\d)|[;\n]|,(?!\d)")
+NEGATION_CUE_RE = re.compile(
+    r"\b(no|not|without|denies|denied|negative for|absence of|free of)\b",
     re.IGNORECASE,
 )
-PRESENT_RE = re.compile(
-    r"\b(positive|present|history of|known|documented|consistent with|diagnosed)\b",
+NEGATIVE_RESULT_RE = re.compile(
+    r"\b(negative|not detected|undetectable|excluded|ruled out|normal|"
+    r"unremarkable|none)\b",
+    re.IGNORECASE,
+)
+POSITIVE_RE = re.compile(
+    r"\b(positive|detected|present|confirmed|diagnosed|consistent with|"
+    r"elevated|dilated|ongoing|history of|known|documented)\b"
+    r"|\d+(?:\.\d+)?\s*(?:g|grams?|units?|drinks?)\s*(?:/|per)\s*(?:day|week)\b",
     re.IGNORECASE,
 )
 UNKNOWN_RE = re.compile(
-    r"\b(unclear|pending|awaiting|possible|cannot exclude|not assessed yet)\b",
+    r"\b(unclear|pending|awaiting|possible|cannot exclude|cannot be excluded|"
+    r"not excluded|not ruled out|cannot rule out|not assessed yet)\b",
     re.IGNORECASE,
 )
+STATUS_PRIORITY: dict[str, int] = {"not_excluded": 2, "unknown": 1, "excluded": 0}
 
 ###############################################################################
 class DiliDifferentialEngine:
 
     # -------------------------------------------------------------------------
     def assess(self, source_text: str) -> DiliDifferentialAssessment:
-        lowered = source_text.lower()
         causes: list[DiliCompetingCause] = []
         unresolved: list[str] = []
         for cause, phrases in CAUSE_PATTERNS.items():
             status, rationale, evidence = self._assess_cause(
-                cause, phrases, lowered, source_text
+                cause, phrases, source_text
             )
             causes.append(
                 DiliCompetingCause(
@@ -132,11 +143,17 @@ class DiliDifferentialEngine:
         self,
         cause: str,
         phrases: tuple[str, ...],
-        lowered: str,
         source_text: str,
     ) -> tuple[EvidenceStatus, str, list[ClinicalEvidenceQuote]]:
-        matched_phrase = next((phrase for phrase in phrases if phrase in lowered), None)
-        if matched_phrase is None:
+        phrase_re = re.compile(r"\b(?:" + "|".join(phrases) + r")\b", re.IGNORECASE)
+        assessed: list[tuple[str, str]] = []
+        for clause in CLAUSE_SPLIT_RE.split(source_text):
+            match = phrase_re.search(clause)
+            if match is None:
+                continue
+            assessed.append((self._clause_status(clause, match.start()), clause.strip()))
+
+        if not assessed:
             if cause in BASELINE_CONTEXT_CAUSES:
                 return (
                     "missing_data",
@@ -149,30 +166,40 @@ class DiliDifferentialEngine:
                 [self._quote(cause, None)],
             )
 
-        idx = lowered.index(matched_phrase)
-        window = source_text[max(0, idx - 120) : idx + 180].strip()
-        window_lower = window.lower()
-        if EXCLUDED_RE.search(window_lower):
-            status = "excluded"
+        status = max((item[0] for item in assessed), key=STATUS_PRIORITY.__getitem__)
+        if status == "excluded":
             rationale = "Explicit exclusion or negative workup is documented."
-        elif PRESENT_RE.search(window_lower):
-            status = "not_excluded"
+        elif status == "not_excluded":
             rationale = (
                 "The condition is documented or clinically present and must be interpreted as baseline context and/or a competing explanation."
                 if cause in BASELINE_CONTEXT_CAUSES
                 else "The cause is documented or clinically present, so it remains competing."
             )
-        elif UNKNOWN_RE.search(window_lower):
-            status = "unknown"
-            rationale = "The source mentions this cause but leaves the workup or result unresolved."
         else:
-            status = "unknown"
-            rationale = "The source mentions this cause without a clear exclusion or confirmation."
+            rationale = "The source mentions this cause but leaves the workup or result unresolved."
+        quote = "; ".join(clause for item_status, clause in assessed if item_status == status)
         return (
             cast(EvidenceStatus, status),
             rationale,
-            [self._quote(cause, window or None)],
+            [self._quote(cause, quote[:500] or None)],
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _clause_status(clause: str, phrase_start: int) -> str:
+        if NEGATION_CUE_RE.search(clause[max(0, phrase_start - 40) : phrase_start]):
+            return "excluded"
+        uncertain = UNKNOWN_RE.search(clause)
+        resolved_text = UNKNOWN_RE.sub(" ", clause)
+        negative = NEGATIVE_RESULT_RE.search(resolved_text)
+        positive = POSITIVE_RE.search(NEGATIVE_RESULT_RE.sub(" ", resolved_text))
+        if positive:
+            return "not_excluded"
+        if uncertain:
+            return "unknown"
+        if negative:
+            return "excluded"
+        return "unknown"
 
     # -------------------------------------------------------------------------
     @staticmethod

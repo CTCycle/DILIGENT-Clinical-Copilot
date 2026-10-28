@@ -203,17 +203,18 @@ class DiliEvidenceBuilder:
             for item in (payload.anamnesis, payload.drugs, payload.laboratory_analysis)
             if item
         )
+        patterns = DiliPatternEngine().assess(labs)
+        primary_pattern = patterns[0].pattern if patterns else "indeterminate"
         timeline = DiliTimelineEngine().build(
             drugs.entries,
             labs,
             source_text=payload.anamnesis,
+            primary_pattern=primary_pattern,
         )
         case_qualification = DiliCaseQualificationEngine().assess(
             labs=labs,
             drugs=drugs.entries,
         )
-        patterns = DiliPatternEngine().assess(labs)
-        primary_pattern = patterns[0].pattern if patterns else "indeterminate"
         differential = DiliDifferentialEngine().assess(source_text)
         phenotype = DiliPhenotypeClassifier().assess(patterns, source_text)
         hys_law = HysLawDetector().assess(

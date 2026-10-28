@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
+from common.utils.clinical_dates import parse_clinical_date
 from domain.clinical.entities import DrugEntry, PatientDrugs
 from domain.clinical.extras import CandidateSelectionResult
 from services.text.normalization import normalize_drug_query_name
@@ -33,17 +34,7 @@ def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
 
 ###############################################################################
 def _parse_therapy_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    for date_format in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(text, date_format).date()
-        except ValueError:
-            continue
-    return None
+    return parse_clinical_date(value)
 
 ###############################################################################
 def select_relevant_candidates(

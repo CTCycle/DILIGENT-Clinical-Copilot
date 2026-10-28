@@ -7,7 +7,7 @@ import asyncio
 import re
 import unicodedata
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Literal
 
 from common.prompts.lab_extraction import (
@@ -15,6 +15,7 @@ from common.prompts.lab_extraction import (
     LOCAL_LAB_EXTRACTION_SYSTEM_PROMPT,
     build_lab_extraction_user_prompt,
 )
+from common.utils.clinical_dates import DateOrder, parse_clinical_date
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.generation_policy import GenerationPurpose
@@ -294,6 +295,7 @@ class ClinicalLabExtractor:
         text: str,
         source: Literal["laboratory_analysis", "anamnesis", "merged"],
         visit_date: date | None,
+        date_order: DateOrder = "day_first",
     ) -> list[ClinicalLabEntry]:
         if not text:
             return []
@@ -302,7 +304,9 @@ class ClinicalLabExtractor:
             line = raw_line.strip()
             if not line:
                 continue
-            sample_date = self.extract_date_from_text(line, visit_date=visit_date)
+            sample_date = self.extract_date_from_text(
+                line, visit_date=visit_date, date_order=date_order
+            )
             entries.extend(
                 self.extract_entries_from_line(
                     line=line,
@@ -481,12 +485,18 @@ class ClinicalLabExtractor:
 
     # -------------------------------------------------------------------------
     def extract_date_from_text(
-        self, text: str, *, visit_date: date | None
+        self,
+        text: str,
+        *,
+        visit_date: date | None,
+        date_order: DateOrder = "day_first",
     ) -> str | None:
         match = DATE_RE.search(text)
         if match is None:
             return None
-        return self.normalize_date_with_visit_year(match.group(0), visit_date)
+        return self.normalize_date_with_visit_year(
+            match.group(0), visit_date, date_order
+        )
 
     # -------------------------------------------------------------------------
     def extract_upper_limit(self, text: str) -> float | None:
@@ -522,32 +532,14 @@ class ClinicalLabExtractor:
     # -------------------------------------------------------------------------
     @staticmethod
     def try_parse_date(value: str) -> date | None:
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        iso_candidate = cleaned.replace(".", "-").replace("/", "-")
-        try:
-            return date.fromisoformat(iso_candidate)
-        except ValueError:
-            pass
-        for fmt in (
-            "%d-%m-%Y",
-            "%m-%d-%Y",
-            "%Y-%m-%d",
-            "%d.%m.%Y",
-            "%Y.%m.%d",
-        ):
-            try:
-                return datetime.strptime(cleaned, fmt).date()
-            except ValueError:
-                continue
-        return None
+        return parse_clinical_date(value)
 
     # -------------------------------------------------------------------------
     def normalize_date_with_visit_year(
         self,
         raw_date: str | None,
         visit_date: date | None,
+        date_order: DateOrder = "day_first",
     ) -> str | None:
         if raw_date is None:
             return None
@@ -556,26 +548,20 @@ class ClinicalLabExtractor:
             return None
         normalized = text.replace("/", "-").replace(".", "-").replace(",", "-")
         tokens = [token for token in normalized.split("-") if token]
-        candidates: list[str] = []
         if visit_date is not None and len(tokens) == 2:
-            day, month = tokens
-            candidates.extend(
-                [
-                    f"{day.zfill(2)}-{month.zfill(2)}-{visit_date.year}",
-                    f"{month.zfill(2)}-{day.zfill(2)}-{visit_date.year}",
-                    f"{visit_date.year}-{month.zfill(2)}-{day.zfill(2)}",
-                ]
-            )
-        candidates.extend(["-".join(tokens), text, normalized])
-        checked: set[str] = set()
-        for candidate in candidates:
-            if not candidate or candidate in checked:
-                continue
-            checked.add(candidate)
-            parsed = self.try_parse_date(candidate)
+            # Year-less dates take the visit year, or the previous year when that
+            # would place the sample after the visit.
+            parsed = parse_clinical_date(f"{normalized}-{visit_date.year}", date_order)
+            if parsed is not None and parsed > visit_date:
+                parsed = parse_clinical_date(
+                    f"{normalized}-{visit_date.year - 1}", date_order
+                )
             if parsed is not None:
                 return parsed.isoformat()
-        return text
+        parsed = parse_clinical_date("-".join(tokens), date_order) or parse_clinical_date(
+            text, date_order
+        )
+        return parsed.isoformat() if parsed is not None else text
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -608,12 +594,13 @@ class ClinicalLabExtractor:
         entry: ClinicalLabEntry,
         *,
         visit_date: date | None,
+        date_order: DateOrder = "day_first",
     ) -> ClinicalLabEntry | None:
         marker = self.normalize_marker_name(entry.marker_name)
         if marker == "UNKNOWN":
             return None
         normalized_date = self.normalize_date_with_visit_year(
-            entry.sample_date, visit_date
+            entry.sample_date, visit_date, date_order
         )
         return ClinicalLabEntry(
             marker_name=marker,

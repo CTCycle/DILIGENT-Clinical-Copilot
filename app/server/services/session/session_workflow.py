@@ -20,6 +20,7 @@ from common.utils.languages import (
     MISSING_VISIT_LABEL_BY_LANGUAGE,
     resolve_supported_language_code,
 )
+from common.utils.clinical_dates import DateOrder, case_date_order, parse_clinical_date
 from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
@@ -199,6 +200,22 @@ def _validate_requested_provider_matches_runtime(
         )
 
 ###############################################################################
+def _normalize_drug_dates(drugs: PatientDrugs, date_order: DateOrder) -> PatientDrugs:
+    """Rewrite full numeric therapy dates to ISO using the record's day/month order.
+
+    Partial dates such as a bare year are kept verbatim.
+    """
+    entries = []
+    for entry in drugs.entries:
+        updates: dict[str, str] = {}
+        for field in ("therapy_start_date", "suspension_date"):
+            parsed = parse_clinical_date(getattr(entry, field), date_order)
+            if parsed is not None:
+                updates[field] = parsed.isoformat()
+        entries.append(entry.model_copy(update=updates) if updates else entry)
+    return PatientDrugs(entries=entries)
+
+###############################################################################
 async def process_single_patient_workflow(
     service: Any,
     payload: PatientData,
@@ -324,6 +341,11 @@ async def process_single_patient_workflow(
             progress_callback=progress_callback,
             stop_check=stop_check,
         )
+    date_order = case_date_order(
+        payload.anamnesis, payload.drugs, payload.laboratory_analysis
+    )
+    therapy_drugs = _normalize_drug_dates(therapy_drugs, date_order)
+    anamnesis_drugs = _normalize_drug_dates(anamnesis_drugs, date_order)
 
     _emit_progress(
         progress_callback,
@@ -779,7 +801,9 @@ async def process_single_patient_workflow(
         "manual_review_required": manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,
         "clinical_validity": (
-            "requires_human_review" if session_status == "failed" else "validated"
+            "requires_human_review"
+            if session_status == "failed"
+            else "no_automated_issues_detected"
         ),
         "report_comparison": report_comparison_payload,
         "pipeline_artifacts": {

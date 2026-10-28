@@ -3,22 +3,16 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
+from common.utils.clinical_dates import parse_clinical_date
 from domain.clinical.entities import DrugEntry, PatientDrugs
 from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 def _parse_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    for date_format in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(value.strip(), date_format).date()
-        except ValueError:
-            continue
-    return None
+    return parse_clinical_date(value)
 
 ###############################################################################
 def _entry_score(entry: DrugEntry, visit_date: date | None) -> int:

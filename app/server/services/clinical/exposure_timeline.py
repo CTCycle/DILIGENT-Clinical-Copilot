@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
+from common.utils.clinical_dates import parse_clinical_date
 from domain.clinical.entities import DrugEntry, DrugSuspensionContext
 
 ###############################################################################
@@ -157,19 +158,7 @@ class ExposureTimelineService:
     # -------------------------------------------------------------------------
     @staticmethod
     def try_parse_date(value: str) -> date | None:
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        try:
-            return date.fromisoformat(cleaned.replace(".", "-").replace("/", "-"))
-        except ValueError:
-            pass
-        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d", "%d.%m.%Y", "%Y.%m.%d"):
-            try:
-                return datetime.strptime(cleaned, fmt).date()
-            except ValueError:
-                continue
-        return None
+        return parse_clinical_date(value)
 
     # -------------------------------------------------------------------------
     def format_suspension_prompt(self, suspension: DrugSuspensionContext) -> str:
