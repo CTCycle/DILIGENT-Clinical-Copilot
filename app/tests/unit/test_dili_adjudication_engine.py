@@ -251,6 +251,7 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
 
     assert {issue["code"] for issue in issues} == {
         "clinical_narrative_contradicts_competing_causes",
+        "clinical_narrative_contradicts_cause_status",
         "clinical_narrative_overstates_hys_law",
         "clinical_narrative_overstates_causality",
     }

@@ -25,13 +25,52 @@ from domain.clinical.entities import (
 )
 from services.clinical.dili_case_qualification import DiliCaseQualificationEngine
 from services.clinical.dili_causality import DiliCausalityEngine
-from services.clinical.dili_differential import DiliDifferentialEngine
+from services.clinical.dili_differential import (
+    CAUSE_PATTERNS,
+    CLAUSE_SPLIT_RE,
+    DiliDifferentialEngine,
+)
 from services.clinical.dili_hys_law import HysLawDetector
 from services.clinical.dili_pattern import DiliPatternEngine
 from services.clinical.dili_phenotype import DiliPhenotypeClassifier
 from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
 from services.text.normalization import normalize_drug_query_name
+
+# Structured narrative claims compared with the evidence bundle.
+NARRATIVE_PATTERN_RE = re.compile(
+    r"\b(hepatocellular|cholestatic|mixed)\b(?=\s+(?:(?:liver|hepatic|drug-induced)\s+)?"
+    r"(?:injury|pattern|phenotype|profile|dili|hepatitis|picture))"
+    r"|\bpattern\b[^.;]{0,30}?\b(?:is|was|of|:)\s+(?:\w+\s+){0,2}?"
+    r"(hepatocellular|cholestatic|mixed)\b"
+)
+NARRATIVE_R_RATIO_RE = re.compile(
+    r"\br[- ]?(?:ratio|value|factor)\b\s*(?:of|is|was|=|:|≈|~)?\s*(\d+(?:\.\d+)?)"
+    r"|\br\s*(?:=|≈|:)\s*(\d+(?:\.\d+)?)"
+)
+NARRATIVE_LATENCY_RE = re.compile(
+    r"\blatency\b[^.;\d]{0,30}?(\d+(?:\.\d+)?)\s*(day|week|month)s?\b"
+    r"|\b(\d+(?:\.\d+)?)\s*(day|week|month)s?\s+(?:after|following|from)\s+(?:the\s+)?"
+    r"(?:first\s+dose|start\w*|initiat\w*|commenc\w*|beginning)"
+)
+# Drug-level or literature statements about latency are not patient claims.
+NARRATIVE_GENERIC_CONTEXT_RE = re.compile(
+    r"\b(typical\w*|usual\w*|generally|commonly|reported|described|literature|"
+    r"range|between)\b"
+)
+NARRATIVE_EXCLUSION_RE = re.compile(r"\b(ruled out|excluded|exclude[sd]|eliminated|unlikely)\b")
+NARRATIVE_CLAUSE_SPLIT_RE = re.compile(
+    CLAUSE_SPLIT_RE.pattern + r"|\b(?:but|while|whereas|although|however)\b"
+)
+NARRATIVE_CLAIM_NEGATION_RE = re.compile(
+    r"\b(not|never|cannot|can't|yet to be|should|must|needs?\s+to|to be|remains?\s+to|"
+    r"would|could|if)\b"
+)
+NARRATIVE_CAUSE_ALIASES: dict[str, tuple[str, ...]] = {
+    "viral_hepatitis_a_b_c_d_e": (r"viral",),
+    "autoimmune_hepatitis": (r"aih",),
+}
+LATENCY_UNIT_DAYS = {"day": 1, "week": 7, "month": 30}
 
 ###############################################################################
 class DiliEvidenceBuilder:
@@ -133,6 +172,7 @@ class DiliEvidenceBuilder:
                     ),
                 }
             )
+        issues.extend(cls._structured_claim_issues(text, bundle))
         if re.search(r"\bthis patient\b.{0,100}\blikelihood score\s+[a-e]\b", text):
             issues.append(
                 {
@@ -172,6 +212,12 @@ class DiliEvidenceBuilder:
         patterns = (
             *cls._DEFINITIVE_CAUSALITY_PHRASES,
             r"\b(?:confident|definitive) diagnosis\b",
+            r"\b(?:is|was|being|as) the (?:definite|definitive|certain|undoubted|proven|"
+            r"confirmed|sole) (?:cause|culprit|etiology|aetiology)\b",
+            r"\b(?:definitely|certainly|undoubtedly|unequivocally|conclusively|clearly|"
+            r"almost certainly|very likely|highly likely) (?:the )?(?:caused|causative|"
+            r"responsible|culprit|cause|drug-induced|attributable)\b",
+            r"\bconfirmed (?:dili|drug-induced liver injury)\b",
         )
         pattern = re.compile("|".join(
             phrase if phrase.startswith(r"\b") else re.escape(phrase)
@@ -187,6 +233,147 @@ class DiliEvidenceBuilder:
                     continue
                 return True
         return False
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _structured_claim_issues(
+        cls, text: str, bundle: DiliEvidenceBundle
+    ) -> list[dict[str, str]]:
+        issues: list[dict[str, str]] = []
+        pattern_claim = cls._contradicted_pattern_claim(text, bundle)
+        if pattern_claim:
+            issues.append(
+                {
+                    "code": "clinical_narrative_contradicts_injury_pattern",
+                    "message": (
+                        f"Generated narrative states {pattern_claim}, which contradicts "
+                        "the calculated injury pattern."
+                    ),
+                }
+            )
+        for cause in cls._contradicted_cause_exclusions(text, bundle):
+            issues.append(
+                {
+                    "code": "clinical_narrative_contradicts_cause_status",
+                    "message": (
+                        f"Generated narrative states that {cause.replace('_', ' ')} was "
+                        "excluded or unlikely although the structured differential "
+                        "does not document its exclusion."
+                    ),
+                }
+            )
+        latency_claim = cls._contradicted_latency_claim(text, bundle)
+        if latency_claim:
+            issues.append(
+                {
+                    "code": "clinical_narrative_contradicts_latency",
+                    "message": (
+                        f"Generated narrative states a latency of {latency_claim}, which "
+                        "does not match the documented exposure and injury dates."
+                    ),
+                }
+            )
+        return issues
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _contradicted_pattern_claim(text: str, bundle: DiliEvidenceBundle) -> str | None:
+        """Stated pattern names or R ratios outside every calculated pattern."""
+        calculated = {
+            item.pattern
+            for item in bundle.patterns
+            if item.pattern_source == "calculated" and item.pattern != "indeterminate"
+        }
+        if not calculated:
+            return None
+        for match in NARRATIVE_PATTERN_RE.finditer(text):
+            name = match.group(1) or match.group(2)
+            clause_prefix = text[: match.start()].rsplit(",", 1)[-1][-40:]
+            if name not in calculated and not re.search(
+                r"\b(not|no|rather than|instead of|unlike)\b", clause_prefix
+            ):
+                return f"a {name} pattern"
+        for match in NARRATIVE_R_RATIO_RE.finditer(text):
+            r_ratio = float(match.group(1) or match.group(2))
+            band = (
+                "hepatocellular"
+                if r_ratio >= 5
+                else "cholestatic"
+                if r_ratio <= 2
+                else "mixed"
+            )
+            if band not in calculated:
+                return f"an R ratio of {r_ratio:g}"
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _contradicted_cause_exclusions(
+        text: str, bundle: DiliEvidenceBundle
+    ) -> list[str]:
+        """Per-cause "ruled out/excluded" claims the differential does not support.
+
+        "Unlikely" is flagged only for documented (not_excluded) causes.
+        """
+        contradicted: list[str] = []
+        clauses = NARRATIVE_CLAUSE_SPLIT_RE.split(text)
+        for item in bundle.differential.causes:
+            if item.status == "excluded":
+                continue
+            terms = (*CAUSE_PATTERNS.get(item.cause, ()), *NARRATIVE_CAUSE_ALIASES.get(item.cause, ()))
+            if not terms:
+                continue
+            term_re = re.compile(r"\b(?:" + "|".join(terms) + r")\b")
+            for clause in clauses:
+                if not clause or not term_re.search(clause):
+                    continue
+                claim = NARRATIVE_EXCLUSION_RE.search(clause)
+                if claim is None or NARRATIVE_CLAIM_NEGATION_RE.search(
+                    clause[max(0, claim.start() - 30) : claim.start()]
+                ):
+                    continue
+                if claim.group(1) == "unlikely" and item.status != "not_excluded":
+                    continue
+                contradicted.append(item.cause)
+                break
+        return contradicted
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _contradicted_latency_claim(text: str, bundle: DiliEvidenceBundle) -> str | None:
+        """Stated patient latency matching no exposure-to-injury interval."""
+        onset_dates = [
+            parsed
+            for value in (
+                bundle.timeline.first_abnormal_liver_test_date,
+                bundle.timeline.first_symptom_date,
+            )
+            for parsed in [DiliTimelineEngine.parse_date(value)]
+            if parsed is not None
+        ]
+        latencies = [
+            (onset - start).days
+            for exposure in bundle.exposures
+            for start in [DiliTimelineEngine.parse_date(exposure.start_date)]
+            if start is not None
+            for onset in onset_dates
+            if onset >= start
+        ]
+        if not latencies:
+            return None
+        for sentence in re.split(r"[.!?;]+", text):
+            if NARRATIVE_GENERIC_CONTEXT_RE.search(sentence):
+                continue
+            for match in NARRATIVE_LATENCY_RE.finditer(sentence):
+                amount = float(match.group(1) or match.group(3))
+                unit = match.group(2) or match.group(4)
+                stated_days = amount * LATENCY_UNIT_DAYS[unit]
+                if not any(
+                    abs(stated_days - actual) <= max(3, 0.25 * actual)
+                    for actual in latencies
+                ):
+                    return f"{amount:g} {unit}(s)"
+        return None
 
     # -------------------------------------------------------------------------
     def build(

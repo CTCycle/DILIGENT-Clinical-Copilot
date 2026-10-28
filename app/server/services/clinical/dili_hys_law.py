@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from domain.clinical.dili import (
     ClinicalEvidenceQuote,
     DiliDifferentialAssessment,
@@ -11,6 +13,10 @@ from domain.clinical.dili import (
 )
 from domain.clinical.entities import DrugEntry, PatientLabTimeline
 from services.clinical.dili_timeline import DiliTimelineEngine
+
+# ALP is taken from the qualifying aminotransferase panel or the nearest
+# sample within this many days (FDA 2009: no initial cholestasis).
+ONSET_ALP_WINDOW_DAYS = 7
 
 ###############################################################################
 class HysLawDetector:
@@ -29,11 +35,12 @@ class HysLawDetector:
         baseline_bili = self._first_multiple(labs, {"BILIRUBIN", "TBIL"})
         peak_alt = self._peak_multiple(labs, {"ALT", "AST"})
         peak_bili = self._peak_multiple(labs, {"BILIRUBIN", "TBIL"})
-        initial_alp = self._first_multiple(labs, {"ALP"})
+        onset_date = self._first_qualifying_aminotransferase_date(labs)
+        initial_alp = self._onset_alp_multiple(labs, onset_date)
 
         amino_met = peak_alt >= 3 if peak_alt is not None else None
         bilirubin_met = peak_bili > 2 if peak_bili is not None else None
-        same_episode = self._same_episode(labs, timeline)
+        same_episode = self._same_episode(onset_date, timeline)
         initial_cholestasis = initial_alp >= 2 if initial_alp is not None else None
         cholestasis_excluded = (
             (initial_cholestasis is False) if initial_cholestasis is not None else None
@@ -59,21 +66,17 @@ class HysLawDetector:
             else "individual_patient_risk_flag"
         )
 
+        # ALP >= 2x ULN at onset marks cholestatic injury, which FDA 2009
+        # excludes from Hy's Law; "possible" is kept for unresolved exclusion,
+        # exposure timing or missing onset ALP only.
         if None in (amino_met, bilirubin_met, same_episode):
             status = "not_assessable"
-        elif (
-            amino_met
-            and bilirubin_met
-            and same_episode
-            and cholestasis_excluded
-            and alternatives
-            and exposure_timing_compatible
-        ):
-            status = "meets_criteria"
-        elif amino_met and bilirubin_met and same_episode:
-            status = "possible"
-        else:
+        elif not (amino_met and bilirubin_met and same_episode) or initial_cholestasis:
             status = "not_met"
+        elif cholestasis_excluded and alternatives and exposure_timing_compatible:
+            status = "meets_criteria"
+        else:
+            status = "possible"
 
         return DiliHysLawAssessment(
             status=status,
@@ -92,7 +95,7 @@ class HysLawDetector:
             rationale=[
                 f"Peak ALT/AST multiple: {peak_alt if peak_alt is not None else 'unavailable'}",
                 f"Peak bilirubin multiple: {peak_bili if peak_bili is not None else 'unavailable'}",
-                f"Initial ALP multiple: {initial_alp if initial_alp is not None else 'unavailable'}",
+                f"ALP multiple at the qualifying ALT/AST rise: {initial_alp if initial_alp is not None else 'unavailable'}",
                 "Hy's Law is a risk signal, not a standalone DILI diagnosis.",
             ],
         )
@@ -134,26 +137,45 @@ class HysLawDetector:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _same_episode(labs: PatientLabTimeline, timeline: DiliTimeline) -> bool | None:
-        first_alt_date = None
-        first_bili_date = timeline.jaundice_or_bilirubin_rise_date
-        for lab in labs.entries:
-            marker = lab.marker_name.upper()
-            if (
-                marker not in {"ALT", "AST"}
-                or lab.value is None
-                or not lab.upper_limit_normal
-            ):
-                continue
-            if float(lab.value) / float(lab.upper_limit_normal) < 3:
-                continue
-            first_alt_date = lab.sample_date
-            break
-        parsed_alt = DiliTimelineEngine.parse_date(first_alt_date)
-        parsed_bili = DiliTimelineEngine.parse_date(first_bili_date)
-        if parsed_alt is None or parsed_bili is None:
+    def _first_qualifying_aminotransferase_date(labs: PatientLabTimeline) -> date | None:
+        qualifying = [
+            parsed
+            for lab in labs.entries
+            if lab.marker_name.upper() in {"ALT", "AST"}
+            and lab.value is not None
+            and lab.upper_limit_normal
+            and float(lab.value) / float(lab.upper_limit_normal) >= 3
+            for parsed in [DiliTimelineEngine.parse_date(lab.sample_date)]
+            if parsed is not None
+        ]
+        return min(qualifying) if qualifying else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _onset_alp_multiple(
+        labs: PatientLabTimeline, onset_date: date | None
+    ) -> float | None:
+        if onset_date is None:
             return None
-        return abs((parsed_bili - parsed_alt).days) <= 14
+        candidates = [
+            (abs((parsed - onset_date).days), float(lab.value) / float(lab.upper_limit_normal))
+            for lab in labs.entries
+            if lab.marker_name.upper() == "ALP"
+            and lab.value is not None
+            and lab.upper_limit_normal
+            for parsed in [DiliTimelineEngine.parse_date(lab.sample_date)]
+            if parsed is not None
+            and abs((parsed - onset_date).days) <= ONSET_ALP_WINDOW_DAYS
+        ]
+        return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _same_episode(onset_date: date | None, timeline: DiliTimeline) -> bool | None:
+        parsed_bili = DiliTimelineEngine.parse_date(timeline.jaundice_or_bilirubin_rise_date)
+        if onset_date is None or parsed_bili is None:
+            return None
+        return abs((parsed_bili - onset_date).days) <= 14
 
     # -------------------------------------------------------------------------
     @staticmethod

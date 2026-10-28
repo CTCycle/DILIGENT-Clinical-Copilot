@@ -28,6 +28,7 @@ class RucamSourceReportedScore:
     causality_category: str | None
     source_name: str
     evidence: str
+    stated_category: str | None = None
 
 ###############################################################################
 @dataclass(slots=True)

@@ -18,7 +18,7 @@ def get_marker_aliases() -> dict[str, tuple[str, ...]]:
         "ALT": ("alt", "alat", "gpt"),
         "AST": ("ast", "asat", "got"),
         "ALP": ("alp", "alkp", "alkaline phosphatase"),
-        "TBIL": ("tbil", "total bilirubin", "bilirubin total", "bilirubin"),
+        "TBIL": ("tbil", "total bilirubin", "bilirubin total", "bil tot", "bilirubin"),
         "DBIL": ("dbil", "direct bilirubin", "bilirubin direct"),
         "GGT": ("ggt", "gamma gt", "gamma-glutamyl transferase"),
         "INR": ("inr",),
