@@ -9,6 +9,7 @@ from domain.clinical.drug_resolution import (
     DrugResolutionDecision,
     NormalizedDrugMention,
 )
+from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 def decision_to_payload(
@@ -86,3 +87,30 @@ def decision_to_payload(
         "rxnav_validation_status": decision.rxnav_validation_status,
     }
     return payload
+
+###############################################################################
+def index_resolved_drugs(
+    resolved_drugs: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """Resolved payloads keyed by normalized lookup key and by each raw mention.
+
+    The identity fallback re-keys an accepted payload under its LiverTox name
+    (for example "valproate"), so lookups by the extracted mention ("valproic
+    acid") must also go through ``raw_mentions``.
+    """
+    index: dict[str, dict[str, Any]] = {}
+    payloads = [
+        (key, payload)
+        for key, payload in (resolved_drugs or {}).items()
+        if isinstance(payload, dict)
+    ]
+    for key, payload in payloads:
+        normalized_key = normalize_drug_query_name(key)
+        if normalized_key:
+            index[normalized_key] = payload
+    for _key, payload in payloads:
+        for mention in payload.get("raw_mentions") or []:
+            normalized_mention = normalize_drug_query_name(str(mention))
+            if normalized_mention:
+                index.setdefault(normalized_mention, payload)
+    return index

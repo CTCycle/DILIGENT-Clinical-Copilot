@@ -18,6 +18,7 @@ from services.clinical.report_language import (
     rucam_summary_text,
 )
 from services.clinical.report_language import report_heading
+from services.clinical.livertox_likelihood import normalize_livertox_likelihood
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.hepatox_constants import (
     BIBLIOGRAPHY_LINE_RE,
@@ -392,12 +393,9 @@ class ReportFinalizer:
         if not metadata:
             return NOT_AVAILABLE_TEXT
         score = metadata.get("likelihood_score")
-        if score is None:
+        if normalize_livertox_likelihood(score) is None:
             return NOT_AVAILABLE_TEXT
-        text = str(score).strip()
-        if not text or text.lower() == "nan":
-            return NOT_AVAILABLE_TEXT
-        return text.upper() if text.isalpha() else text
+        return str(score).strip().upper()
 
     # -------------------------------------------------------------------------
     @staticmethod

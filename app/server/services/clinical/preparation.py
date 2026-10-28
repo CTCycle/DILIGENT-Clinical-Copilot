@@ -538,10 +538,18 @@ class ClinicalKnowledgePreparation:
             if detected_drug_names is not None
             else None
         )
+        direct_keys = {normalize_drug_query_name(key) for key in resolved_drugs}
         for key, payload in resolved_drugs.items():
+            # A payload re-keyed by the identity fallback is still audited for
+            # its mention unless another payload is keyed by that mention.
+            mention_keys = {
+                normalize_drug_query_name(str(name))
+                for name in payload.get("raw_mentions") or []
+            }
             if (
                 detected_keys is not None
                 and normalize_drug_query_name(key) not in detected_keys
+                and not (mention_keys & detected_keys) - direct_keys
             ):
                 continue
             raw_mentions = payload.get("raw_mentions") or []
@@ -572,6 +580,19 @@ class ClinicalKnowledgePreparation:
                         message=f"LiverTox match is ambiguous for {raw_label}.",
                     )
                 )
+            if self.is_spelling_corrected_match(payload):
+                issues.append(
+                    PipelineIssue(
+                        severity="warning",
+                        code="livertox_match_spelling_corrected",
+                        field="matched_drugs",
+                        message=(
+                            f"LiverTox match for {raw_label} relies on a spelling "
+                            f"correction to {payload.get('accepted_livertox_name') or 'another name'}; "
+                            "confirm the drug identity."
+                        ),
+                    )
+                )
             if isinstance(confidence, int | float) and float(confidence) < 0.75:
                 issues.append(
                     PipelineIssue(
@@ -594,6 +615,27 @@ class ClinicalKnowledgePreparation:
                     )
                 )
         return issues
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_spelling_corrected_match(payload: dict[str, Any]) -> bool:
+        """Accepted LiverTox identity that depends on a spelling correction.
+
+        Flagged regardless of confidence because a look-alike name absent from
+        the catalog can be corrected to a different drug.
+        """
+        if not payload.get("accepted_livertox_name"):
+            return False
+        accepted_reasons = [
+            str(candidate.get("reason") or "")
+            for candidate in payload.get("livertox_candidates") or []
+            if isinstance(candidate, dict) and candidate.get("accepted")
+        ]
+        notes = [str(note) for note in payload.get("match_notes") or []]
+        return any(
+            "spelling" in text or "corrected_query=" in text
+            for text in (*accepted_reasons, str(payload.get("match_reason") or ""), *notes)
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

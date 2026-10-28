@@ -10,6 +10,7 @@ from domain.clinical.entities import (
     DrugRucamAssessment,
     PatientRucamAssessmentBundle,
 )
+from services.clinical.drug_resolution.serialization import index_resolved_drugs
 from services.clinical.match_quality import classify_match_evidence
 from services.text.normalization import normalize_drug_query_name
 
@@ -141,12 +142,7 @@ def build_single_matched_drug_row(
 def _normalized_resolved_drug_map(prepared_inputs: Any) -> dict[str, dict[str, Any]]:
     if prepared_inputs is None:
         return {}
-    resolved_drug_map: dict[str, dict[str, Any]] = {}
-    for key, value in prepared_inputs.resolved_drugs.items():
-        normalized_key = normalize_drug_query_name(key)
-        if normalized_key and isinstance(value, dict):
-            resolved_drug_map[normalized_key] = value
-    return resolved_drug_map
+    return index_resolved_drugs(prepared_inputs.resolved_drugs)
 
 ###############################################################################
 def _normalized_rucam_map(

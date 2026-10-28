@@ -1123,3 +1123,67 @@ def test_livertox_match_audit_ignores_identity_candidates_not_in_analysis_set() 
 
     codes = [issue.code for issue in issues]
     assert codes == ["rxnav_alias_not_validated"]
+
+###############################################################################
+def test_ingredient_alias_selects_the_named_chapter_among_same_key_monographs() -> None:
+    # LiverTox lists flucloxacillin (spelled "Flucoxacillin") under one of four
+    # "Penicillins (... Generation)" chapters that share a canonical key.
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": f"NBK090{index}",
+                "drug_name": f"Penicillins ({generation} Generation)",
+                "excerpt": f"{generation} generation penicillins excerpt.",
+                "synonyms": "",
+                "ingredient": ingredient,
+                "brand_name": "",
+            }
+            for index, (generation, ingredient) in enumerate(
+                [("1st", "Ampicillin"), ("2nd", "Flucoxacillin"), ("3rd", "Ticarcillin")]
+            )
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    result = matcher.match_drug_names(["Flucloxacillin"])[0]
+
+    assert result.status == "matched"
+    assert result.matched_name == "Penicillins (2nd Generation)"
+    assert result.reason == "spelling_correction"
+    # The class name stays ambiguous, and its cached result must not shadow
+    # the evidence lookup by the accepted full chapter name.
+    assert matcher.match_drug_names(["Penicillins"])[0].status == "ambiguous"
+    chapter = matcher.match_drug_names(["Penicillins (2nd Generation)"])[0]
+    assert chapter.status == "matched"
+    assert chapter.matched_name == "Penicillins (2nd Generation)"
+
+###############################################################################
+def test_livertox_match_audit_warns_on_spelling_correction_regardless_of_confidence() -> None:
+    graph = build_repository_graph()
+    preparation = ClinicalKnowledgePreparation(
+        knowledge_repository=graph.knowledge_repository,
+        drug_catalog_repository=graph.drug_catalog_repository,
+    )
+    corrected = {
+        "raw_mentions": ["Flucloxacillin"],
+        "match_status": "accepted_livertox_without_rxnav",
+        "match_confidence": 0.94,
+        "accepted_livertox_name": "Penicillins (2nd Generation)",
+        "livertox_candidates": [{"accepted": True, "reason": "spelling_correction"}],
+        "rxnav_validated": True,
+        "rxnav_rxcui": "1",
+    }
+    exact = {
+        **corrected,
+        "raw_mentions": ["Nimodipine"],
+        "accepted_livertox_name": "Nimodipine",
+        "livertox_candidates": [{"accepted": True, "reason": "exact_canonical"}],
+    }
+
+    issues = preparation.build_match_audit_issues(
+        {"penicillins": corrected, "nimodipine": exact},
+        detected_drug_names=["Flucloxacillin", "Nimodipine"],
+    )
+
+    assert [issue.code for issue in issues] == ["livertox_match_spelling_corrected"]
+    assert "Flucloxacillin" in issues[0].message

@@ -93,17 +93,19 @@ competing-cause checklist, Hy's Law status, explicit severity grade,
 conservative drug identity resolution, per-drug RUCAM evidence, and a separate
 internal structured causality synthesis.
 
-Case qualification is intentionally separate from drug attribution. It records whether available laboratory evidence meets the application's typical liver-injury detection criteria, whether threshold findings still need repeat confirmation, and whether an abnormal pretreatment baseline changes the reference used for interpretation. A qualifying episode does not itself establish DILI or implicate a specific drug.
+Case qualification is intentionally separate from drug attribution. It records whether available laboratory evidence meets the EASL 2019 biochemical criteria, whether repeat testing is recommended, and whether an abnormal pretreatment baseline changes the reference used for interpretation. A qualifying episode does not itself establish DILI or implicate a specific drug.
+
+The criteria are ALT/AST ≥5× reference, ALP ≥2× reference, or ALT/AST ≥3× reference with total bilirubin >2× reference within one day. The reference is the ULN, or the pretreatment value when that baseline is abnormal. A single qualifying panel qualifies, and `pending_confirmation` then notes that repeat testing is recommended. Bilirubin multiples compare value and reference in mg/dL (µmol/L ÷ 17.1), so a value and ULN in different units still compare correctly. INR >1.5 with elevated enzymes is only a supporting rationale note, never a qualifying criterion. When nothing qualifies and an ALT, AST or ALP value has no ULN or baseline reference, the status is `insufficient_data`, not `below_typical_detection_criteria`.
 
 The clinical source hierarchy is AASLD, LiverTox, FDA DILI guidance, then DILIN expert methodology and RUCAM. RUCAM remains supportive and never dispositive. An explicitly documented RUCAM score from the current patient's clinical record is preserved as patient-specific evidence and mapped to its causality category. When no patient RUCAM score is supplied, DILIGENT does not synthesize a numeric pseudo-RUCAM score. It retains a non-scoring criterion-level evidence checklist and its limitations instead. RUCAM scores reported in LiverTox monographs, papers, or representative cases are never promoted to the current patient.
 
 A patient-record score is read only when it follows `RUCAM` directly (`RUCAM: 6`) or through score/total wording in the same sentence (`RUCAM 2016 ... total score 5`, `RUCAM score of 7`); a year is never read as a score. Scores are clamped to the updated RUCAM range of −9 to +14. The category is always the score band. A differing stated category is kept as `stated_category` and recorded as a limitation; it never overrides the band.
 
-LiverTox likelihood describes a drug-level prior hepatotoxicity classification and remains separate from patient-specific causality. A weak or sparse LiverTox prior can limit the available reference support, but it does not impose an artificial hard ceiling on patient-level causality when stronger patient evidence exists.
+LiverTox likelihood describes a drug-level prior hepatotoxicity classification and remains separate from patient-specific causality. Stored values are validated where they are read (`services/clinical/livertox_likelihood.py`): only A, B, C, D, E, E* and X are grades, qualifiers such as `[HD]` are dropped, and anything else, including `NAN` from missing table cells, is treated as unknown. A weak or sparse LiverTox prior can limit the available reference support, but it does not impose an artificial hard ceiling on patient-level causality when stronger patient evidence exists.
 
 FDA DILIrank 2.0 is handled by the same principle. A linked DILIrank record contributes structured drug-level context such as `vDILI-Concern`, severity class, label section, and source comment. It is never converted into a numeric patient-causality weight and never overrides chronology, dechallenge or rechallenge, phenotype, competing causes, or patient-specific evidence. Only deterministic links to the canonical drug identity are eligible for clinical use; unlinked or ambiguous FDA rows remain inspection-only. When DILIrank evidence is supplied to a per-drug consultation, its LTKB identifiers are recorded in existing assessment provenance metadata and the rendered source label includes `FDA DILIrank 2.0` conditionally.
 
-The internal structured causality synthesis integrates auditable patient evidence such as drug identity, chronology, drug-specific dechallenge or rechallenge evidence, phenotype information, competing causes, and source quality. It is an internal deterministic synthesis for review, not a validated DILIN score and not a replacement for expert adjudication.
+The internal structured causality synthesis integrates auditable patient evidence such as drug identity, chronology, drug-specific dechallenge or rechallenge evidence, phenotype information, competing causes, and source quality. Rechallenge is `positive` only with documented recurrence (RUCAM 2016): explicit wording such as `rechallenge: positive` or `positive rechallenge`, or re-exposure with a laboratory re-elevation in the same sentence. A bare restart or resumption stays `present_unclear`. A positive rechallenge gives `supportive` only when all major competing causes are excluded; otherwise synthesis is capped at `limited`. It is an internal deterministic synthesis for review, not a validated DILIN score and not a replacement for expert adjudication.
 
 The deterministic dossier provides the FDA-style fourteen-section report
 structure. The bundle also carries twelve acceptance-question answers with
@@ -226,9 +228,13 @@ LiverTox and RxNav matching keeps raw extracted name, normalized name, matched L
 
 Candidate admission is intentionally high recall: structurally plausible medication labels are not discarded merely because they lack an exact local alias or recognized INN suffix. Exact, alias, normalized, structured ingredient/brand, and bounded unique spelling resolution run before a match is declared missing.
 
-Before candidate selection and downstream RUCAM, retrieval, matching, and consultation, therapy and anamnesis mentions are deduplicated by normalized identity. Raw section entries remain available for audit, while the deduplicated artifact records origins, raw mentions, evidence snippets, and the selected clinical entry.
+Before candidate selection and downstream RUCAM, retrieval, matching, and consultation, therapy and anamnesis mentions are deduplicated by normalized identity. Raw section entries remain available for audit, while the deduplicated artifact records origins, raw mentions, evidence snippets, and the selected clinical entry. When therapy and anamnesis give different start or stop dates for the same patient drug, `find_drug_date_conflicts` raises the blocking issue `drug_date_conflict` instead of silently keeping one entry.
 
-When a plausible mention remains unresolved, ambiguous, or low-confidence, the configured parser model may propose generic names, alternate names, or active ingredients in one structured batch. These proposals are candidate generation only. Every proposed identity is re-run through the local RxNav/LiverTox resolver, and no LiverTox evidence is accepted unless the local policy produces a unique accepted match. Unvalidated or ambiguous proposals remain unresolved and auditable.
+Candidate selection keeps a stopped exposure, including an anamnesis-only one, in the consultation set when its stop date is no more than 30 days before injury onset (the RUCAM 2016 bound for cholestatic or mixed injury) and its start is not after onset. Onset comes from the onset context, with the visit date as fallback. The historical penalty applies only to exposures outside that window.
+
+When a plausible mention remains unresolved, ambiguous, or low-confidence, the configured parser model may propose generic names, alternate names, or active ingredients in one structured batch. These proposals are candidate generation only. Every proposed identity is re-run through the local RxNav/LiverTox resolver, and no LiverTox evidence is accepted unless the local policy produces a unique accepted match. Unvalidated or ambiguous proposals remain unresolved and auditable. An accepted proposal is keyed by its LiverTox name, for example `valproate` for `Valproic acid`. Matched-drug payloads, the DILI evidence bundle and the match audit therefore look payloads up by raw mention as well (`index_resolved_drugs`).
+
+A LiverTox brand or ingredient alias resolves to the chapter it names. Chapters that share a canonical key, such as `Penicillins (1st–4th Generation)`, are not all returned as ambiguous candidates. A query with a full chapter name selects that chapter, and the in-memory match cache is keyed by the full name for such shared keys, so an ambiguous class query (`Penicillins`) cannot shadow the evidence lookup for the accepted chapter.
 
 Resolution statuses are:
 - `accepted_exact_livertox`
@@ -241,7 +247,7 @@ Resolution statuses are:
 
 An available LiverTox excerpt means evidence text is available for the accepted monograph. It is not treated as proof that a ranked or ambiguous candidate is clinically correct.
 
-Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox matches, low-confidence matches, and unvalidated RxNav aliases.
+Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox matches, low-confidence matches, unvalidated RxNav aliases, and any accepted match that relies on a spelling correction (`livertox_match_spelling_corrected`, regardless of confidence).
 
 Before session persistence, `ClinicalKnowledgePreparation` resolves a stable
 `drug_id` for each matched mention using the catalog and match cache. The
@@ -300,6 +306,13 @@ after the visit. When the order matters but the record does not settle it,
 dates are read day-first and the blocking issue `ambiguous_date_order` sends
 the session to human review.
 
+The drug extraction prompts state that the end date of a range (`from X to Y`,
+`X to Y`, `X - Y`, `until Y`) is the suspension date. After extraction,
+`DrugRulesMixin.normalize_entry` checks this deterministically. When
+`suspension_date` is empty and the evidence sentence naming the drug contains
+exactly one such parseable end date, that date fills `suspension_date` and sets
+`suspension_status`.
+
 The first abnormal liver test, which anchors latency and per-drug temporal
 compatibility, considers only ALT, AST, ALP and total bilirubin on or after the
 earliest exposure start. Each marker is compared with its reference: the ULN, or
@@ -344,4 +357,4 @@ not reuse the patient visit date as an invented exact event date.
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
 
-Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, onset-ALP Hy's Law, DILIN severity with negation-aware events, patient-record RUCAM parsing, baseline-aware episode anchoring, reference-range lab parsing, structured narrative claim checks, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.
+Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, onset-ALP Hy's Law, DILIN severity with negation-aware events, patient-record RUCAM parsing, baseline-aware episode anchoring, EASL single-panel and bilirubin-combined qualification, recurrence-based rechallenge, range stop-date recovery, recently stopped anamnesis drugs, therapy/anamnesis date conflicts, LiverTox likelihood validation, spelling-correction match warnings, same-key LiverTox chapters, reference-range lab parsing, structured narrative claim checks, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.

@@ -144,14 +144,14 @@ class DiliSeverityGrader:
             converted
             for item in labs.entries
             if item.marker_name.upper() in {"BILIRUBIN", "TBIL"}
-            for converted in [cls._bilirubin_mg_dl(item)]
+            for converted in [cls.bilirubin_mg_dl(item)]
             if converted is not None
         ]
         return max(values) if values else None
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _bilirubin_mg_dl(item: ClinicalLabEntry) -> float | None:
+    def bilirubin_mg_dl(item: ClinicalLabEntry) -> float | None:
         """Total bilirubin in mg/dL; µmol/L is divided by 17.1.
 
         Without a unit, the ULN magnitude identifies it (about 1.2 mg/dL versus
