@@ -11,6 +11,7 @@ from common.utils.clinical_dates import parse_clinical_date
 from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliTimeline, DiliTimelineEvent
 from domain.clinical.entities import ClinicalLabEntry, DrugEntry, PatientLabTimeline
+from services.clinical.dili_differential import NEGATION_CUE_RE
 
 DATE_RE = re.compile(r"\b(\d{4}[-/.]\d{2}[-/.]\d{2}|\d{2}[-/.]\d{2}[-/.]\d{4})\b")
 DOSE_CHANGE_RE = re.compile(
@@ -29,6 +30,16 @@ SYMPTOM_RE = re.compile(
     re.IGNORECASE,
 )
 JAUNDICE_RE = re.compile(r"\b(jaundice|icterus|bilirubin)\b", re.IGNORECASE)
+# A textual bilirubin mention is a rise only with an explicit increase cue.
+BILIRUBIN_RISE_RE = re.compile(
+    r"\b(elevated|raised|ris(?:e|ing)|rose|increas\w*|high|peak\w*)\b", re.IGNORECASE
+)
+LIVER_INJURY_MARKER_GROUPS: tuple[set[str], ...] = (
+    {"ALT"},
+    {"AST"},
+    {"ALP"},
+    {"TBIL", "BILIRUBIN"},
+)
 DechallengeStatus = Literal[
     "no_follow_up",
     "improving_after_stop",
@@ -61,12 +72,14 @@ class DiliTimelineEngine:
         events.extend(self._lab_events(dated_labs))
         first_symptom = self._first_event_date(events, "symptom_onset")
         bilirubin_event = self._first_event_date(events, "jaundice_or_bilirubin_rise")
-        first_abnormal = self._first_abnormal_liver_test_date(dated_labs)
+        exposure_start = self._exposure_start(drugs)
+        first_abnormal = self._first_abnormal_liver_test_date(dated_labs, exposure_start)
         peak_dates = self._peak_dates(dated_labs)
         dechallenge_status, recovery_date, last_abnormal_date = self._dechallenge(
             drugs,
             dated_labs,
             primary_pattern,
+            exposure_start,
         )
         jaundice_date = bilirubin_event or peak_dates.get("BILIRUBIN")
 
@@ -171,7 +184,7 @@ class DiliTimelineEngine:
                     ),
                 )
             )
-        symptom_match = SYMPTOM_RE.search(evidence)
+        symptom_match = self._affirmed_match(SYMPTOM_RE, evidence)
         if symptom_match:
             symptom_date = self._date_near_position(evidence, symptom_match.start())
             events.append(
@@ -187,7 +200,7 @@ class DiliTimelineEngine:
                     ),
                 )
             )
-        jaundice_match = JAUNDICE_RE.search(evidence)
+        jaundice_match = self._affirmed_match(JAUNDICE_RE, evidence)
         if jaundice_match:
             jaundice_date = self._date_near_position(evidence, jaundice_match.start())
             events.append(
@@ -213,7 +226,7 @@ class DiliTimelineEngine:
             fragment = fragment.strip()
             if not fragment:
                 continue
-            symptom_match = SYMPTOM_RE.search(fragment)
+            symptom_match = self._affirmed_match(SYMPTOM_RE, fragment)
             if symptom_match:
                 event_date = self._date_near_position(fragment, symptom_match.start())
                 events.append(
@@ -228,7 +241,7 @@ class DiliTimelineEngine:
                         ),
                     )
                 )
-            jaundice_match = JAUNDICE_RE.search(fragment)
+            jaundice_match = self._affirmed_match(JAUNDICE_RE, fragment)
             if jaundice_match:
                 event_date = self._date_near_position(fragment, jaundice_match.start())
                 events.append(
@@ -318,29 +331,64 @@ class DiliTimelineEngine:
 
     # -------------------------------------------------------------------------
     def _first_abnormal_liver_test_date(
-        self, labs: list[ClinicalLabEntry]
+        self, labs: list[ClinicalLabEntry], exposure_start: date | None
     ) -> str | None:
-        for lab in labs:
-            multiple = self._multiple(lab)
-            if multiple is not None and multiple > 1:
-                return lab.sample_date
-        return labs[0].sample_date if labs else None
+        """First liver test above its reference on or after exposure start.
+
+        Only ALT, AST, ALP and total bilirubin count. Pre-exposure values are
+        baseline, and an abnormal baseline replaces the ULN (EASL 2019).
+        """
+        onsets: list[tuple[date, str]] = []
+        for markers in LIVER_INJURY_MARKER_GROUPS:
+            series = self._marker_series(labs, markers)
+            reference = self._dechallenge_reference(series, exposure_start)
+            onsets.extend(
+                (point_date, raw)
+                for point_date, multiple, raw in series
+                if (exposure_start is None or point_date >= exposure_start)
+                and multiple > reference
+            )
+        return min(onsets)[1] if onsets else None
 
     # -------------------------------------------------------------------------
     def _peak_dates(self, labs: list[ClinicalLabEntry]) -> dict[str, str | None]:
         peak_dates: dict[str, str | None] = {}
-        for marker in ("ALT", "AST", "ALP", "GGT", "BILIRUBIN", "TBIL", "INR"):
+        for key, markers in (
+            ("ALT", {"ALT"}),
+            ("AST", {"AST"}),
+            ("ALP", {"ALP"}),
+            ("GGT", {"GGT"}),
+            ("BILIRUBIN", {"BILIRUBIN", "TBIL"}),
+            ("INR", {"INR"}),
+        ):
             candidates = [
                 item
                 for item in labs
-                if item.marker_name.upper() == marker and item.value is not None
+                if item.marker_name.upper() in markers and item.value is not None
             ]
-            peak_dates[marker if marker != "TBIL" else "BILIRUBIN"] = (
-                max(candidates, key=lambda item: float(item.value or 0)).sample_date
+            # ULN multiples are compared when available, so mixed units rank correctly.
+            peak_dates[key] = (
+                max(
+                    candidates,
+                    key=lambda item: (
+                        self._multiple(item) is not None,
+                        self._multiple(item) or float(item.value or 0),
+                    ),
+                ).sample_date
                 if candidates
                 else None
             )
         return peak_dates
+
+    # -------------------------------------------------------------------------
+    def _exposure_start(self, drugs: list[DrugEntry]) -> date | None:
+        start_dates = [
+            parsed_date
+            for item in drugs
+            for parsed_date in [self.parse_date(item.therapy_start_date)]
+            if parsed_date is not None
+        ]
+        return min(start_dates) if start_dates else None
 
     # -------------------------------------------------------------------------
     def _dechallenge(
@@ -348,6 +396,7 @@ class DiliTimelineEngine:
         drugs: list[DrugEntry],
         labs: list[ClinicalLabEntry],
         primary_pattern: str,
+        exposure_start: date | None,
     ) -> tuple[DechallengeStatus, str | None, str | None]:
         stop_dates = sorted(
             parsed_date
@@ -355,13 +404,6 @@ class DiliTimelineEngine:
             for parsed_date in [self.parse_date(item.suspension_date)]
             if parsed_date is not None
         )
-        start_dates = [
-            parsed_date
-            for item in drugs
-            for parsed_date in [self.parse_date(item.therapy_start_date)]
-            if parsed_date is not None
-        ]
-        exposure_start = min(start_dates) if start_dates else None
         series = self.dechallenge_series(labs, primary_pattern)
         reference = self._dechallenge_reference(series, exposure_start)
         abnormal_dates = [
@@ -397,17 +439,24 @@ class DiliTimelineEngine:
             else ("ALT", "AST")
         )
         for marker in markers:
-            series = sorted(
-                (point_date, multiple, item.sample_date or "")
-                for item in labs
-                if item.marker_name.upper() == marker
-                for point_date in [cls.parse_date(item.sample_date)]
-                for multiple in [cls._multiple(item)]
-                if point_date is not None and multiple is not None
-            )
+            series = cls._marker_series(labs, {marker})
             if series:
                 return series
         return []
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _marker_series(
+        cls, labs: list[ClinicalLabEntry], markers: set[str]
+    ) -> list[tuple[date, float, str]]:
+        return sorted(
+            (point_date, multiple, item.sample_date or "")
+            for item in labs
+            if item.marker_name.upper() in markers
+            for point_date in [cls.parse_date(item.sample_date)]
+            for multiple in [cls._multiple(item)]
+            if point_date is not None and multiple is not None
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -477,6 +526,21 @@ class DiliTimelineEngine:
         if (last_date - stop_date).days > window_days:
             return "chronic_or_persistent", None
         return "stable_abnormality", None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _affirmed_match(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
+        """First match not negated in its clause; bilirubin needs a rise cue."""
+        for match in pattern.finditer(text):
+            clause_prefix = text[: match.start()].rsplit(",", 1)[-1][-40:]
+            if NEGATION_CUE_RE.search(clause_prefix):
+                continue
+            if match.group(0).casefold() == "bilirubin" and not BILIRUBIN_RISE_RE.search(
+                text
+            ):
+                continue
+            return match
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod

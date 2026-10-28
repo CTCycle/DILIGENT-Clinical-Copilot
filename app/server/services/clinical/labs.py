@@ -61,9 +61,25 @@ DATE_RE = re.compile(
     r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b"
 )
 VALUE_UNIT_RE = re.compile(
-    r"(?P<value>[-+]?\d+(?:[.,]\d+)?)\s*(?P<unit>u/l|ui/l|µmol/l|umol/l|mg/dl|ml/min(?:/1\.73m2)?)?",
+    r"(?P<value>[-+]?\d+(?:[.,]\d+)?)\s*"
+    r"(?P<unit>u/l|ui/l|[µμu]mol/l|[µμu]kat/l|mg/dl|g/l|ml/min(?:/1\.73m2)?)?",
     re.IGNORECASE,
 )
+UPPER_LIMIT_PATTERNS = (
+    re.compile(r"\bULN\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", re.IGNORECASE),
+    re.compile(
+        r"upper\s+limit(?:\s+normal)?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", re.IGNORECASE
+    ),
+)
+# "(ref 10-40)", "(10-40)", "normal range 7-56": the upper bound is the ULN.
+REFERENCE_RANGE_RE = re.compile(
+    r"(?:\b(?:ref(?:erence)?(?:\s+(?:range|interval|values?))?|normal\s+(?:range|values?))"
+    r"\b\.?\s*[:=]?\s*|\(\s*)"
+    r"(?P<low>\d+(?:[.,]\d+)?)\s*(?:[-–—]|to)\s*(?P<high>\d+(?:[.,]\d+)?)",
+    re.IGNORECASE,
+)
+# Any hyphenated numeric range; its bounds are never laboratory values.
+NUMERIC_RANGE_RE = re.compile(r"\d+(?:[.,]\d+)?\s*[-–—]\s*\d+(?:[.,]\d+)?")
 RELATIVE_TIME_VALUE_PREFIX_RE = re.compile(
     r"(?:^|[\s.;,:(-])(?:day|week|month|year|giorno|settimana|mese|anno|d)\s*$",
     re.IGNORECASE,
@@ -73,10 +89,6 @@ SINGLE_VALUE_MARKERS = frozenset({"CR", "EGFR", "INR", "ALB"})
 ###############################################################################
 HEPATIC_PATTERN_RE = re.compile(
     r"\b(?:hepatic\s+pattern|injury\s+pattern|pattern)\s*[:=]?\s*(hepatocellular|cholestatic|mixed|indeterminate)\b",
-    re.IGNORECASE,
-)
-RUCAM_SCORE_TEXT_RE = re.compile(
-    r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})\b",
     re.IGNORECASE,
 )
 
@@ -209,18 +221,6 @@ class ClinicalLabExtractor:
         if value in {"hepatocellular", "cholestatic", "mixed", "indeterminate"}:
             return value
         return None
-
-    # -------------------------------------------------------------------------
-    def extract_explicit_rucam_score(self, text: str) -> int | None:
-        if not text:
-            return None
-        match = RUCAM_SCORE_TEXT_RE.search(text)
-        if match is None:
-            return None
-        try:
-            return int(match.group(1))
-        except ValueError:
-            return None
 
     # -------------------------------------------------------------------------
     def calculate_hepatic_pattern_from_lab_timeline(
@@ -438,34 +438,30 @@ class ClinicalLabExtractor:
         *,
         marker: str,
     ) -> list[tuple[float, str, str | None]]:
-        date_spans = [match.span() for match in DATE_RE.finditer(segment)]
-        upper_limit_spans = [
-            match.span(1)
-            for pattern in (
-                r"\bULN\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
-                r"upper\s+limit(?:\s+normal)?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
-            )
-            for match in re.finditer(pattern, segment, flags=re.IGNORECASE)
+        excluded_spans = [
+            *(match.span() for match in DATE_RE.finditer(segment)),
+            *(
+                match.span(1)
+                for pattern in UPPER_LIMIT_PATTERNS
+                for match in pattern.finditer(segment)
+            ),
+            *(match.span() for match in REFERENCE_RANGE_RE.finditer(segment)),
+            *(match.span() for match in NUMERIC_RANGE_RE.finditer(segment)),
         ]
         values: list[tuple[float, str, str | None]] = []
         seen: set[tuple[str, str | None]] = set()
         for match in VALUE_UNIT_RE.finditer(segment):
             start, end = match.span("value")
             if any(
-                start < date_end and end > date_start
-                for date_start, date_end in date_spans
-            ):
-                continue
-            if any(
-                start < limit_end and end > limit_start
-                for limit_start, limit_end in upper_limit_spans
+                start < span_end and end > span_start
+                for span_start, span_end in excluded_spans
             ):
                 continue
             if self.value_looks_like_relative_timepoint(segment[:start]):
                 continue
             raw_value = match.group("value")
             parsed = self.parse_numeric(raw_value)
-            if parsed is None:
+            if parsed is None or parsed < 0:
                 continue
             unit = match.group("unit")
             normalized_unit = unit.strip() if unit else None
@@ -500,17 +496,16 @@ class ClinicalLabExtractor:
 
     # -------------------------------------------------------------------------
     def extract_upper_limit(self, text: str) -> float | None:
-        patterns = (
-            r"\bULN\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
-            r"upper\s+limit(?:\s+normal)?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
-        )
-        for pattern in patterns:
-            match = re.search(pattern, text, flags=re.IGNORECASE)
+        for pattern in UPPER_LIMIT_PATTERNS:
+            match = pattern.search(text)
             if match is None:
                 continue
             parsed = self.parse_numeric(match.group(1))
             if parsed is not None:
                 return parsed
+        range_match = REFERENCE_RANGE_RE.search(text)
+        if range_match is not None:
+            return self.parse_numeric(range_match.group("high"))
         return None
 
     # -------------------------------------------------------------------------

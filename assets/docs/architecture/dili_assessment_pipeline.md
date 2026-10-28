@@ -97,6 +97,8 @@ Case qualification is intentionally separate from drug attribution. It records w
 
 The clinical source hierarchy is AASLD, LiverTox, FDA DILI guidance, then DILIN expert methodology and RUCAM. RUCAM remains supportive and never dispositive. An explicitly documented RUCAM score from the current patient's clinical record is preserved as patient-specific evidence and mapped to its causality category. When no patient RUCAM score is supplied, DILIGENT does not synthesize a numeric pseudo-RUCAM score. It retains a non-scoring criterion-level evidence checklist and its limitations instead. RUCAM scores reported in LiverTox monographs, papers, or representative cases are never promoted to the current patient.
 
+A patient-record score is read only when it follows `RUCAM` directly (`RUCAM: 6`) or through score/total wording in the same sentence (`RUCAM 2016 ... total score 5`, `RUCAM score of 7`); a year is never read as a score. Scores are clamped to the updated RUCAM range of −9 to +14. The category is always the score band. A differing stated category is kept as `stated_category` and recorded as a limitation; it never overrides the band.
+
 LiverTox likelihood describes a drug-level prior hepatotoxicity classification and remains separate from patient-specific causality. A weak or sparse LiverTox prior can limit the available reference support, but it does not impose an artificial hard ceiling on patient-level causality when stronger patient evidence exists.
 
 FDA DILIrank 2.0 is handled by the same principle. A linked DILIrank record contributes structured drug-level context such as `vDILI-Concern`, severity class, label section, and source comment. It is never converted into a numeric patient-causality weight and never overrides chronology, dechallenge or rechallenge, phenotype, competing causes, or patient-specific evidence. Only deterministic links to the canonical drug identity are eligible for clinical use; unlinked or ambiguous FDA rows remain inspection-only. When DILIrank evidence is supplied to a per-drug consultation, its LTKB identifiers are recorded in existing assessment provenance metadata and the rendered source label includes `FDA DILIrank 2.0` conditionally.
@@ -132,6 +134,21 @@ causes were excluded, asserts Hy's Law when the structured status is not
 uses definitive/lifelong causality language while structured causality is limited,
 the workflow records a blocking faithfulness issue and persists the session as
 requiring human review rather than `successful`.
+
+Structured claim checks extend the phrase gate:
+- `clinical_narrative_contradicts_injury_pattern`: a stated pattern name or R
+  ratio band (≥5 hepatocellular, ≤2 cholestatic) that matches no calculated
+  bundle pattern.
+- `clinical_narrative_contradicts_cause_status`: a clause that names a specific
+  competing cause and calls it ruled out, excluded or eliminated while the
+  differential does not mark it `excluded`; "unlikely" is flagged only for a
+  `not_excluded` cause. Negated or conditional wording ("cannot be excluded",
+  "should be excluded") is not a claim.
+- `clinical_narrative_contradicts_latency`: a stated patient latency that matches
+  no exposure-start-to-onset interval (tolerance 3 days or 25%). Sentences about
+  typical or literature latency are skipped.
+- Definitive causality wording such as "the definite cause" or "very likely
+  responsible" counts as `clinical_narrative_overstates_causality`.
 
 The same deterministic clinical safety audit is applied to agentic report revisions before a revised report can be persisted as a successful revision. LLM QA therefore cannot override contradictions with the structured competing-cause, Hy's Law, causality-certainty, LiverTox-provenance, or rechallenge safeguards.
 
@@ -172,6 +189,28 @@ Hy's Law evaluation is same-episode aware and records baseline multiples,
 initial cholestasis, alternative-cause exclusion, exposure compatibility, and
 individual-patient versus trial-signal context. Rechallenge remains a safety
 signal only; the workflow never recommends rechallenge.
+
+Initial cholestasis uses the ALP contemporaneous with the first ALT/AST ≥3× ULN
+result (same panel, or the nearest ALP within 7 days), never the first ALP ever
+recorded. ALP ≥2× ULN at that point marks cholestatic injury and gives `not_met`
+(FDA 2009). `possible` is reserved for an otherwise qualifying episode whose
+alternative-cause exclusion, exposure timing or onset ALP is unresolved.
+
+Severity follows the DILIN scale (Fontana 2009). Total bilirubin is compared in
+mg/dL; µmol/L is divided by 17.1, and a unitless value is read from its ULN
+magnitude.
+- 1 mild: bilirubin < 2.5 mg/dL and INR < 1.5.
+- 2 moderate: bilirubin ≥ 2.5 mg/dL or INR ≥ 1.5.
+- 3 moderate-severe: bilirubin ≥ 2.5 mg/dL and liver-related hospitalization.
+- 4 severe: bilirubin ≥ 2.5 mg/dL and INR ≥ 1.5, ascites, encephalopathy or
+  other organ failure.
+- 5: death or liver transplantation.
+
+Clinical events are matched sentence by sentence. A negation cue, a family
+member, history wording (`history of`, `prior`) or hypothetical/planned wording
+(`risk of`, `evaluated for`) in the clause before the term discards it.
+Hospitalization counts only when the sentence names a liver-related reason, and
+transplant only when it is a liver transplant.
 
 ## Match Audit
 Drug matching uses a first-class local resolution decision layer. Extracted mentions are normalized once, regimen parents and components are preserved separately, RxNav candidates are built from the persisted RxNorm-backed catalog, LiverTox candidates are built from local monographs, and a deterministic policy decides whether a match can be accepted automatically.
@@ -254,6 +293,27 @@ after the visit. When the order matters but the record does not settle it,
 dates are read day-first and the blocking issue `ambiguous_date_order` sends
 the session to human review.
 
+The first abnormal liver test, which anchors latency and per-drug temporal
+compatibility, considers only ALT, AST, ALP and total bilirubin on or after the
+earliest exposure start. Each marker is compared with its reference: the ULN, or
+the last pre-exposure value when that baseline is abnormal (EASL 2019). When no
+marker qualifies the date stays missing; no normal or pre-exposure laboratory is
+used as a fallback. A chronic pre-existing elevation therefore does not mark a
+later drug as `incompatible_pre_exposure`. The trade-off is that an acute injury
+that began just before exposure is anchored on its later rise, so per-drug review
+must still weigh the pre-exposure values.
+
+Anamnesis jaundice and symptom mentions are ignored when negated in their
+clause, and a textual bilirubin mention counts as a rise only with an increase
+cue. Bilirubin peak dates rank `TBIL` and `BILIRUBIN` entries together by ULN
+multiple.
+
+Deterministic laboratory parsing treats `(ref a-b)`, `(a-b)` and
+`normal range a-b` as reference ranges whose upper bound is the ULN when no
+explicit ULN is given. Range bounds and negative numbers are never emitted as
+values. Recognized units include U/L, µmol/L, µkat/L, mg/dL and g/L, and
+`Bil tot` is a total-bilirubin alias.
+
 LLM-generated timeline events require preserved source evidence to remain in the
 normalized event set. Events without source evidence are dropped rather than
 persisted as clinically grounded chronology.
@@ -277,4 +337,4 @@ not reuse the patient visit date as an invented exact event date.
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
 
-Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.
+Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, onset-ALP Hy's Law, DILIN severity with negation-aware events, patient-record RUCAM parsing, baseline-aware episode anchoring, reference-range lab parsing, structured narrative claim checks, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.

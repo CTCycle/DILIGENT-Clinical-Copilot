@@ -255,11 +255,10 @@ def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
     assert all("[Chunk" not in prompt for prompt in client.prompts)
 
 ###############################################################################
-def test_extracts_explicit_pattern_and_rucam_score() -> None:
+def test_extracts_explicit_pattern() -> None:
     extractor = ClinicalLabExtractor(client=FakeLabClient([]))
     text = "Hepatic pattern: mixed. RUCAM score: 7."
     assert extractor.extract_explicit_hepatic_pattern(text) == "mixed"
-    assert extractor.extract_explicit_rucam_score(text) == 7
 
 ###############################################################################
 def test_calculates_pattern_from_alt_alp_with_uln() -> None:

@@ -51,9 +51,21 @@ def _exclusion_re() -> re.Pattern[str]:
     return _compile_terms_regex("rucam_exclusion_terms")
 
 
+# A score follows "RUCAM" directly ("RUCAM: 6") or through score/total wording
+# in the same sentence ("RUCAM 2016 ... total score 5", "RUCAM score of 7").
+# The trailing guard keeps a year or a decimal from reading as a score.
 RUCAM_SCORE_RE = re.compile(
-    r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})", re.IGNORECASE
+    r"\brucam\b\s*[:=]?\s*(?P<direct>[-−]?\d{1,2})(?!\d|[.,]\d)"
+    r"|\brucam\b[^.;\n]{0,80}?\b(?:score|total)\b\s*(?:of|is|was|[:=])?\s*"
+    r"(?P<contextual>[-−]?\d{1,2})(?!\d|[.,]\d)",
+    re.IGNORECASE,
 )
+RUCAM_CATEGORY_RE = re.compile(
+    r"\b(highly probable|probable|possible|unlikely|excluded)\b", re.IGNORECASE
+)
+# Updated RUCAM total range (Danan & Teschke 2016).
+RUCAM_MIN_SCORE = -9
+RUCAM_MAX_SCORE = 14
 NON_PATIENT_RUCAM_CONTEXT_TERMS = (
     "livertox",
     "monograph",
@@ -112,23 +124,21 @@ class RucamScoreEstimator:
             if require_drug_attribution:
                 if not drug_name or drug_name.casefold() not in window.casefold():
                     continue
-            score = max(-10, min(14, int(match.group(1))))
-            category = None
-            for candidate in (
-                "highly probable",
-                "probable",
-                "possible",
-                "unlikely",
-                "excluded",
-            ):
-                if candidate in lowered:
-                    category = candidate
-                    break
+            raw_score = (match.group("direct") or match.group("contextual")).replace("−", "-")
+            score = max(RUCAM_MIN_SCORE, min(RUCAM_MAX_SCORE, int(raw_score)))
+            # The category is always the score band; a differing stated
+            # category is kept for review, never allowed to override the band.
+            stated = RUCAM_CATEGORY_RE.search(
+                laboratory_history_text[match.end() : match.end() + 80]
+            ) or RUCAM_CATEGORY_RE.search(
+                laboratory_history_text[max(0, match.start() - 80) : match.start()]
+            )
             return RucamSourceReportedScore(
                 score=score,
-                causality_category=category,
+                causality_category=self.resolve_causality_bucket(score),
                 source_name="patient_laboratory_history",
                 evidence=window.strip(),
+                stated_category=stated.group(1).lower() if stated else None,
             )
         return None
 
@@ -372,9 +382,16 @@ class RucamScoreEstimator:
         source: RucamSourceReportedScore,
         report_language: str,
     ) -> DrugRucamAssessment:
-        category = source.causality_category or self.resolve_causality_bucket(
-            source.score
-        )
+        category = self.resolve_causality_bucket(source.score)
+        limitations = [
+            "The score is preserved from the current patient record and was not independently recalculated by DILIGENT."
+        ]
+        if source.stated_category and source.stated_category != category:
+            limitations.append(
+                f"The record states the category '{source.stated_category}', which "
+                f"disagrees with the RUCAM band for {source.score} ('{category}'); "
+                "the score band is used."
+            )
         return DrugRucamAssessment(
             drug_name=drug.name,
             injury_type_for_rucam=cast(RucamInjuryType, injury_type),
@@ -393,9 +410,7 @@ class RucamScoreEstimator:
                     rationale=phrase("rucam_source_reported", report_language),
                 )
             ],
-            limitations=[
-                "The score is preserved from the current patient record and was not independently recalculated by DILIGENT."
-            ],
+            limitations=limitations,
             summary=phrase("rucam_source_reported", report_language),
             calculation_method="source_reported",
             score_source=source.source_name,
