@@ -505,33 +505,22 @@ def test_ncbi_failures_are_sanitized_and_do_not_return_contact_email() -> None:
 
 ###############################################################################
 @pytest.mark.parametrize("contact_email", ["", "legacy@pharmagent.local"])
-@pytest.mark.parametrize("request_kind", ["eutils", "books-oai", "litarch"])
-def test_ncbi_request_rejects_missing_or_local_contact_before_network(
-    contact_email: str,
-    request_kind: str,
-) -> None:
+def test_ncbi_request_without_usable_contact_omits_email(contact_email: str) -> None:
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        return _response_json(request, {"esearchresult": {"idlist": ["987"]}})
+        return _response_json(request, {"esearchresult": {"idlist": []}})
 
     async def resolve() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            if request_kind == "eutils":
-                await search_bookshelf_record(client, contact_email=contact_email)
-            elif request_kind == "books-oai":
-                await resolve_books_oai_master_list_url(
-                    client, contact_email=contact_email
-                )
-            else:
-                await livertox_download.resolve_litarch_archive(
-                    client, contact_email=contact_email
-                )
+            await search_bookshelf_record(client, contact_email=contact_email)
 
-    with pytest.raises(ValueError, match="Settings > Integrations"):
+    with pytest.raises(NCBIClientError):
         asyncio.run(resolve())
-    assert requests == []
+    assert len(requests) == 1
+    assert "email" not in requests[0].url.params
+    assert "contact=" not in build_ncbi_http_headers("")["User-Agent"]
 
 ###############################################################################
 def test_ncbi_contact_is_not_written_to_discovery_logs(caplog) -> None:  # type: ignore[no-untyped-def]

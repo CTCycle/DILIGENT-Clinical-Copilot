@@ -103,7 +103,7 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
     title: 'Integrations',
     description: 'LiverTox and RxNav controls.',
     fields: [
-      { key: 'ncbi_contact_email', label: 'NCBI developer contact email', help: 'Optional until a LiverTox or combined source update is started. Configure a real email registered with NCBI; blank and .local addresses cannot start those updates.', scope: 'NCBI / LiverTox', kind: 'email' },
+      { key: 'ncbi_contact_email', label: 'NCBI developer contact email', help: 'Optional. When set to a real address, it is sent to NCBI as contact identity for LiverTox and combined source updates; otherwise requests identify the application by tool name only.', scope: 'NCBI / LiverTox', kind: 'email' },
       { key: 'livertox_download_timeout', label: 'LiverTox download timeout', help: 'Maximum wait for a LiverTox download request.', scope: 'LiverTox', kind: 'number', min: 1, max: 3600, step: 1, unit: 'seconds' },
       { key: 'livertox_archive', label: 'LiverTox archive name', help: 'Archive filename used for the LiverTox source bundle.', scope: 'LiverTox', kind: 'text' },
       { key: 'livertox_yield_interval', label: 'LiverTox yield interval', help: 'Progress interval used while processing LiverTox records.', scope: 'LiverTox', kind: 'number', min: 1, max: 10000, step: 1, unit: 'records' },

@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -120,10 +120,11 @@ does not solve or bypass human-verification challenges.
 - If Books-OAI does not expose a usable spreadsheet, the updater extracts one
   unambiguous safe `masterlist*.xlsx` member from that official archive.
 
-`ncbi_contact_email` is blank by default and can be cleared in Settings.
-LiverTox and combined structured-source updates require a real developer or
-organization email registered with NCBI. Blank and `.local` values are rejected
-before a job starts and checked again before NCBI requests. A previously saved
+`ncbi_contact_email` is blank by default, optional, and can be cleared in
+Settings. When a real developer or organization email is configured, it is sent
+as the E-utilities `email` parameter and in the `User-Agent` contact. Blank and
+`.local` values do not block LiverTox or combined structured-source updates;
+requests then identify the application by tool name only. A previously saved
 `.local` value remains unchanged until the user replaces or clears it. The
 value is sent only as request identity, is not a credential, and is excluded
 from update results, source metadata, clinical artifacts, and ordinary logs.

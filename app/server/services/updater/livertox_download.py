@@ -27,7 +27,7 @@ from common.constants import (
 )
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
-from domain.settings.configuration import require_ncbi_contact_email
+from domain.settings.configuration import resolve_ncbi_contact_email
 from services.updater import livertox_common, livertox_parse
 from services.updater.ncbi_client import (
     NCBIClientError,
@@ -52,7 +52,6 @@ async def download_file(
     progress_start: float = 0.0,
     progress_span: float = 0.0,
 ) -> None:
-    require_ncbi_contact_email(contact_email)
     await livertox_common.download_file(
         client,
         url,
@@ -72,7 +71,6 @@ async def download_bulk_data(
     *,
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
-    _contact_email(self)
     async with _http_client(self) as client:
         return await _download_archive(
             self,
@@ -126,7 +124,6 @@ async def download_master_list(
     *,
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
-    _contact_email(self)
     async with _http_client(self) as client:
         master_url = await resolve_master_list_url(self, client)
         if master_url is not None:
@@ -230,7 +227,6 @@ async def resolve_litarch_archive(
     contact_email: str,
     accession: str = LIVERTOX_BOOK_ACCESSION,
 ) -> str:
-    require_ncbi_contact_email(contact_email)
     try:
         response = await client.get(NLM_LITARCH_FILE_LIST_URL)
         response.raise_for_status()
@@ -456,7 +452,6 @@ async def _fetch_remote_metadata(
     *,
     contact_email: str,
 ) -> dict[str, Any]:
-    require_ncbi_contact_email(contact_email)
     try:
         response = await client.head(url)
         if response.status_code in {405, 501}:
@@ -568,7 +563,7 @@ def _build_litarch_archive_url(path: str, *, accession: str) -> str:
 
 ###############################################################################
 def _contact_email(self) -> str:
-    return require_ncbi_contact_email(getattr(self, "ncbi_contact_email", None))
+    return resolve_ncbi_contact_email(getattr(self, "ncbi_contact_email", None))
 
 ###############################################################################
 def _http_client(self) -> httpx.AsyncClient:
