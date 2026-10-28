@@ -41,6 +41,7 @@ from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.drug_deduplication import (
     build_deduplication_audit,
     deduplicate_detected_drugs,
+    find_drug_date_conflicts,
 )
 from services.clinical.language import ClinicalLanguageDetector
 from domain.clinical.extractor_contracts import HepaticPatternResolutionInput
@@ -447,6 +448,9 @@ async def process_single_patient_workflow(
         therapy_drugs=deduplicated_drugs,
         anamnesis_drugs=PatientDrugs(entries=[]),
         visit_date=payload.visit_date,
+        onset_date=parse_clinical_date(
+            onset_context.onset_date if onset_context else None
+        ),
     )
 
     _emit_progress(
@@ -597,12 +601,15 @@ async def process_single_patient_workflow(
         extraction_artifact=extraction_artifact,
         fact_graph_validation=fact_graph_validation,
         report_metadata=report_metadata,
-        additional_blocking_issues=DiliEvidenceBuilder.audit_generated_narrative(
-            clinical_narrative="\n".join(
-                text for text in (llm_clinical_summary, generated_report) if text
+        additional_blocking_issues=[
+            *find_drug_date_conflicts(therapy_drugs, anamnesis_drugs),
+            *DiliEvidenceBuilder.audit_generated_narrative(
+                clinical_narrative="\n".join(
+                    text for text in (llm_clinical_summary, generated_report) if text
+                ),
+                bundle=dili_evidence_bundle,
             ),
-            bundle=dili_evidence_bundle,
-        ),
+        ],
     )
     try:
         report_comparison_payload = json.loads(faithfulness_audit.discrepancy_report)

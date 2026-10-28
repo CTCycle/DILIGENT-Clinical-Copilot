@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
@@ -19,11 +20,32 @@ from domain.clinical.entities import (
     DrugRucamAssessment,
     PatientLabTimeline,
 )
+from services.clinical.dili_differential import NEGATION_CUE_RE
 from services.clinical.dili_timeline import DiliTimelineEngine
+from services.clinical.livertox_likelihood import normalize_livertox_likelihood
 
 LOW_CONFIDENCE_LIVERTOX = {"", "U", "E", "E*", "X", "UNKNOWN"}
 DIRECT_TOXIN_LIVERTOX = {"T", "T*"}
 SUPPORTIVE_DECHALLENGE = {"improving_after_stop", "resolved_to_baseline"}
+SENTENCE_SPLIT_RE = re.compile(r"(?<!\d)\.(?!\d)|[;\n]")
+LAB_TERMS = (
+    r"(?:ALT|AST|ALP|GGT|bilirubin|aminotransferases?|transaminases?|"
+    r"liver (?:enzymes|tests)|LFTs?)"
+)
+RECURRENCE_TERMS = r"(?:recur\w*|re-?elevat\w*|rose again|rising again|increased again|elevated again)"
+POSITIVE_RECHALLENGE_RE = re.compile(
+    r"\bpositive\s+re-?challenge\b|\bre-?challenge\b\s*(?:was|is|:|-|=)?\s*positive\b",
+    re.IGNORECASE,
+)
+REEXPOSURE_RE = re.compile(
+    r"\b(?:re-?challeng\w*|re-?expos\w*|re-?start\w*|resum\w*|reintroduc\w*)",
+    re.IGNORECASE,
+)
+LAB_RECURRENCE_RE = re.compile(
+    rf"\b{LAB_TERMS}\b[^.;\n]{{0,60}}?\b{RECURRENCE_TERMS}"
+    rf"|\b{RECURRENCE_TERMS}[^.;\n]{{0,40}}?\b{LAB_TERMS}\b",
+    re.IGNORECASE,
+)
 
 ###############################################################################
 class DiliCausalityEngine:
@@ -87,7 +109,7 @@ class DiliCausalityEngine:
         accepted = status.startswith("accepted_")
         row = resolved.get("matched_livertox_row")
         likelihood = (
-            str(row.get("likelihood_score") or "").strip().upper()
+            normalize_livertox_likelihood(row.get("likelihood_score")) or ""
             if isinstance(row, dict)
             else ""
         )
@@ -185,7 +207,8 @@ class DiliCausalityEngine:
         if temporal == "incompatible_pre_exposure" and rechallenge != "positive":
             return "argues_against"
         if rechallenge == "positive":
-            return "supportive"
+            # Unresolved competing causes cap synthesis even after recurrence.
+            return "supportive" if competing == "complete" else "limited"
         if (
             temporal == "compatible"
             and dechallenge in SUPPORTIVE_DECHALLENGE
@@ -268,21 +291,27 @@ class DiliCausalityEngine:
     def _rechallenge_status(
         drug: DrugEntry,
     ) -> Literal["positive", "present_unclear", "absent", "unknown"]:
-        evidence = (drug.evidence or "").lower()
-        if (
-            "rechallenge positive" in evidence
-            or "re-exposure with recurrence" in evidence
-            or "recurred after restart" in evidence
-        ):
-            return "positive"
+        """Positive only with documented recurrence (RUCAM 2016).
+
+        Explicit "positive rechallenge" wording, or re-exposure with a
+        laboratory re-elevation in the same sentence, is required; a bare
+        restart stays ``present_unclear``.
+        """
+        evidence = drug.evidence or ""
+        for sentence in SENTENCE_SPLIT_RE.split(evidence):
+            explicit = POSITIVE_RECHALLENGE_RE.search(sentence)
+            if explicit and not NEGATION_CUE_RE.search(sentence[: explicit.start()]):
+                return "positive"
+            recurrence = LAB_RECURRENCE_RE.search(sentence)
+            if (
+                recurrence
+                and REEXPOSURE_RE.search(sentence)
+                and not NEGATION_CUE_RE.search(sentence)
+            ):
+                return "positive"
         if contains_explicitly_negative_rechallenge(evidence):
             return "absent"
-        if (
-            "rechallenge" in evidence
-            or "restarted" in evidence
-            or "resumed" in evidence
-            or "re-exposure" in evidence
-        ):
+        if REEXPOSURE_RE.search(evidence):
             return "present_unclear"
         return "unknown"
 

@@ -289,6 +289,18 @@ def test_generated_narrative_safety_gate_blocks_unsupported_certainty() -> None:
         issue["code"] for issue in precluded_diagnosis_issues
     }
 
+    # Live P2 rerun (C03): hedged "rather than a definitive diagnosis" wording.
+    contrasted_diagnosis_issues = DiliEvidenceBuilder.audit_generated_narrative(
+        clinical_narrative=(
+            "Attribute the episode provisionally to the drug, but document it as an "
+            "unresolved drug-induced liver injury rather than a definitive diagnosis."
+        ),
+        bundle=bundle,
+    )
+    assert "clinical_narrative_overstates_causality" not in {
+        issue["code"] for issue in contrasted_diagnosis_issues
+    }
+
     qualified_exclusion_issues = DiliEvidenceBuilder.audit_generated_narrative(
         clinical_narrative=(
             "The report does not explicitly state that all competing causes were "

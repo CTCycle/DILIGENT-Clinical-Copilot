@@ -35,6 +35,7 @@ from services.clinical.dili_pattern import DiliPatternEngine
 from services.clinical.dili_phenotype import DiliPhenotypeClassifier
 from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
+from services.clinical.drug_resolution.serialization import index_resolved_drugs
 from services.text.normalization import normalize_drug_query_name
 
 # Structured narrative claims compared with the evidence bundle.
@@ -112,7 +113,8 @@ class DiliEvidenceBuilder:
     )
     _DEFINITIVE_LANGUAGE_NEGATION_RE = re.compile(
         r"\b(?:not|never|no|without|cannot|can't|unable|uncertain|"
-        r"unassessable|avoid\w*|refrain\w*|preclud\w*|prevent\w*)\b"
+        r"unassessable|avoid\w*|refrain\w*|preclud\w*|prevent\w*|"
+        r"rather than|instead of)\b"
     )
 
     # -------------------------------------------------------------------------
@@ -445,10 +447,7 @@ class DiliEvidenceBuilder:
             source_text=source_text,
         )
         severity = DiliSeverityGrader().assess(labs, source_text)
-        resolved_map = {
-            normalize_drug_query_name(key): value
-            for key, value in (resolved_drugs or {}).items()
-        }
+        resolved_map = index_resolved_drugs(resolved_drugs)
         rucam_map = {
             normalize_drug_query_name(item.drug_name): item
             for item in rucam_bundle.entries

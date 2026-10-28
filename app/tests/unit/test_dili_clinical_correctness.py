@@ -19,6 +19,7 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     RucamComponentAssessment,
 )
+from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.dili_case_qualification import DiliCaseQualificationEngine
 from services.clinical.dili_causality import DiliCausalityEngine
 from services.clinical.dili_differential import DiliDifferentialEngine
@@ -26,9 +27,14 @@ from services.clinical.dili_evidence import DiliEvidenceBuilder
 from services.clinical.dili_hys_law import HysLawDetector
 from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
+from services.clinical.drug_deduplication import find_drug_date_conflicts
+from services.clinical.drug_resolution.serialization import index_resolved_drugs
 from services.clinical.labs import ClinicalLabExtractor
+from services.clinical.livertox_likelihood import normalize_livertox_likelihood
+from services.clinical.parser import DrugsParser
 from services.clinical.rucam import RucamScoreEstimator
 from services.inspection.revision_clinical_safety import audit_revised_dili_report
+from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
@@ -57,22 +63,77 @@ def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
     assert any("provenance" in item for item in assessment.limitations)
 
 ###############################################################################
-def test_case_qualification_requires_repeat_confirmation_for_enzyme_threshold() -> None:
-    labs = PatientLabTimeline(
-        entries=[
-            ClinicalLabEntry(
-                marker_name="ALT",
-                value=240,
-                upper_limit_normal=40,
-                sample_date="2026-01-10",
-                source="laboratory_analysis",
-            )
-        ]
+def _qualification_lab(
+    marker: str, value: float, uln: float | None, unit: str | None = None
+) -> ClinicalLabEntry:
+    return ClinicalLabEntry(
+        marker_name=marker,
+        value=value,
+        upper_limit_normal=uln,
+        unit=unit,
+        sample_date="2026-01-10",
+        source="laboratory_analysis",
     )
-    result = DiliCaseQualificationEngine().assess(labs=labs, drugs=[])
-    assert result.status == "insufficient_data"
-    assert result.pending_confirmation
-    assert not result.qualifying_criteria
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("entries", "status", "criterion"),
+    [
+        # Single panel ALT 6x ULN qualifies; repeat testing is only recommended.
+        ([_qualification_lab("ALT", 240, 40)], "meets_typical_detection_criteria", "ALT/AST >=5x"),
+        # ALT 4x + TBIL 3x ULN in µmol/L.
+        (
+            [
+                _qualification_lab("ALT", 160, 40),
+                _qualification_lab("TBIL", 61.6, 20.5, "umol/L"),
+            ],
+            "meets_typical_detection_criteria",
+            "total bilirubin >2x",
+        ),
+        # µmol/L value against a mg/dL ULN is converted (61.6 / 17.1 = 3.6 mg/dL).
+        (
+            [
+                _qualification_lab("ALT", 160, 40),
+                _qualification_lab("TBIL", 61.6, 1.2, "umol/L"),
+            ],
+            "meets_typical_detection_criteria",
+            "total bilirubin >2x",
+        ),
+        # ALT 4x with TBIL 1.5x ULN meets no EASL criterion.
+        (
+            [
+                _qualification_lab("ALT", 160, 40),
+                _qualification_lab("TBIL", 1.8, 1.2, "mg/dL"),
+            ],
+            "below_typical_detection_criteria",
+            None,
+        ),
+        # INR >1.5 alone is not an EASL case-definition criterion.
+        (
+            [_qualification_lab("ALT", 70, 40), _qualification_lab("INR", 1.7, 1.1)],
+            "below_typical_detection_criteria",
+            None,
+        ),
+        # Live C14: ALT 410 U/L without a ULN cannot be called below criteria.
+        ([_qualification_lab("ALT", 410, None, "U/L")], "insufficient_data", None),
+    ],
+)
+def test_case_qualification_follows_easl_biochemical_criteria(
+    entries: list[ClinicalLabEntry], status: str, criterion: str | None
+) -> None:
+    result = DiliCaseQualificationEngine().assess(
+        labs=PatientLabTimeline(entries=entries), drugs=[]
+    )
+
+    assert result.status == status
+    if criterion is None:
+        assert not result.qualifying_criteria
+    else:
+        assert any(criterion in item for item in result.qualifying_criteria)
+    if status == "meets_typical_detection_criteria" and len(entries) == 1:
+        assert any("repeat testing" in note for note in result.pending_confirmation)
+    if any(entry.marker_name == "INR" for entry in entries):
+        assert any("not a qualifying criterion" in item for item in result.rationale)
 
 ###############################################################################
 def test_case_qualification_accepts_repeated_aminotransferase_threshold() -> None:
@@ -682,3 +743,205 @@ def test_narrative_gate_ignores_drug_level_and_rounded_patient_statements() -> N
         "LiverTox classifies the drug as a likelihood score B agent (highly likely "
         "cause of clinically apparent liver injury)."
     )
+
+###############################################################################
+def _rechallenge_exposure(evidence: str, *, causes_excluded: bool) -> dict:
+    exposure = DiliCausalityEngine().exposure(
+        DrugEntry(
+            name="Drug A",
+            therapy_start_date="2026-01-01",
+            suspension_date="2026-01-10",
+            evidence=evidence,
+        ),
+        {"decision_status": "accepted_exact_livertox", "accepted_livertox_name": "Drug A"},
+        None,
+        DiliDifferentialAssessment(all_major_causes_excluded=causes_excluded),
+        PatientLabTimeline(entries=[]),
+        "hepatocellular",
+        "2026-01-20",
+    )
+    assert exposure.causality is not None
+    return {
+        "rechallenge": exposure.rechallenge_status,
+        "category": exposure.causality.category,
+    }
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("evidence", "causes_excluded", "rechallenge", "category"),
+    [
+        ("Drug A was restarted in March.", True, "present_unclear", "limited"),
+        ("Rechallenge: positive.", True, "positive", "supportive"),
+        (
+            "Drug A was resumed on 2026-03-01 and ALT rose again to 300 U/L.",
+            True,
+            "positive",
+            "supportive",
+        ),
+        (
+            "Drug A was resumed without recurrence of ALT elevation.",
+            True,
+            "present_unclear",
+            "limited",
+        ),
+        # Probe X-01: positive rechallenge with unresolved HCV stays limited.
+        (
+            "Drug A restarted later; rechallenge positive per notes.",
+            False,
+            "positive",
+            "limited",
+        ),
+    ],
+)
+def test_positive_rechallenge_requires_recurrence_and_is_capped_by_competing_causes(
+    evidence: str, causes_excluded: bool, rechallenge: str, category: str
+) -> None:
+    result = _rechallenge_exposure(evidence, causes_excluded=causes_excluded)
+
+    assert result == {"rechallenge": rechallenge, "category": category}
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("evidence", "stop_date"),
+    [
+        (
+            "Flucloxacillin 1 g oral four times daily from 2024-05-02 to 2024-05-12.",
+            "2024-05-12",
+        ),
+        (
+            "Cellulitis treated with flucloxacillin twice daily from 2024-02-05 "
+            "to 2024-02-12 (course completed). Jaundice from 2024-03-01.",
+            "2024-02-12",
+        ),
+        ("Flucloxacillin 02/05/2024 - 12/05/2024", "12/05/2024"),
+        ("Flucloxacillin until 12.05.2024", "12.05.2024"),
+        ("Flucloxacillin 500 mg since 2019, ongoing.", None),
+        ("Flucloxacillin 1 g, dose increased from 2 to 4 g daily.", None),
+    ],
+)
+def test_therapy_stop_date_is_recovered_from_explicit_range(
+    evidence: str, stop_date: str | None
+) -> None:
+    entry = DrugsParser().normalize_entry(
+        DrugEntry(name="Flucloxacillin", evidence=evidence),
+        source="therapy",
+        historical_flag=False,
+    )
+
+    assert entry is not None
+    assert entry.suspension_date == stop_date
+    assert entry.suspension_status is (True if stop_date else None)
+
+###############################################################################
+def test_recently_stopped_anamnesis_drug_stays_in_consultation_set() -> None:
+    # Live C02: amoxicillin-clavulanate stopped 18 days before onset.
+    def anamnesis_drug(name: str, start: str, stop: str) -> DrugEntry:
+        return DrugEntry(
+            name=name,
+            source="anamnesis",
+            historical_flag=True,
+            temporal_classification="temporal_known",
+            therapy_start_date=start,
+            suspension_date=stop,
+        )
+
+    selection = select_relevant_candidates(
+        PatientDrugs(
+            entries=[
+                anamnesis_drug("Amoxicillin-clavulanate", "2024-02-05", "2024-02-12"),
+                anamnesis_drug("Isoniazid", "2019-01-01", "2019-06-30"),
+            ]
+        ),
+        PatientDrugs(entries=[]),
+        visit_date=date(2024, 3, 5),
+        onset_date=date(2024, 3, 1),
+    )
+
+    assert [item["drug"] for item in selection.relevant] == ["Amoxicillin-clavulanate"]
+    assert "Isoniazid" not in [item["drug"] for item in selection.relevant]
+
+###############################################################################
+def test_conflicting_therapy_and_anamnesis_dates_raise_blocking_issue() -> None:
+    # Live C13: anamnesis start 2024-02-20 versus therapy start 2024-01-20.
+    therapy = PatientDrugs(
+        entries=[
+            DrugEntry(
+                name="Celecoxib",
+                source="therapy",
+                therapy_start_date="2024-01-20",
+                suspension_date="2024-03-05",
+            )
+        ]
+    )
+    anamnesis = PatientDrugs(
+        entries=[
+            DrugEntry(
+                name="Celecoxib", source="anamnesis", therapy_start_date="2024-02-20"
+            ),
+            DrugEntry(name="Ibuprofen", source="anamnesis", attribution="allergy"),
+        ]
+    )
+
+    issues = find_drug_date_conflicts(therapy, anamnesis)
+
+    assert [(issue["code"], issue["severity"]) for issue in issues] == [
+        ("drug_date_conflict", "error")
+    ]
+    assert "2024-01-20" in issues[0]["message"]
+    assert "2024-02-20" in issues[0]["message"]
+    agreeing = PatientDrugs(
+        entries=[
+            DrugEntry(
+                name="Celecoxib", source="anamnesis", therapy_start_date="2024-01-20"
+            )
+        ]
+    )
+    assert find_drug_date_conflicts(therapy, agreeing) == []
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("raw", "grade"),
+    [
+        ("B", "B"),
+        (" e* ", "E*"),
+        ("A [HD]", "A"),
+        ("NAN", None),
+        (float("nan"), None),
+        ("Z", None),
+        (None, None),
+    ],
+)
+def test_livertox_likelihood_is_validated_against_the_livertox_scale(
+    raw: object, grade: str | None
+) -> None:
+    assert normalize_livertox_likelihood(raw) == grade
+
+###############################################################################
+def test_malformed_livertox_likelihood_is_reported_as_unknown() -> None:
+    # Live C03: TMP-SMX stored likelihood "NAN".
+    exposure = DiliCausalityEngine().exposure(
+        DrugEntry(name="Drug A"),
+        {
+            "decision_status": "accepted_exact_livertox",
+            "accepted_livertox_name": "Drug A",
+            "matched_livertox_row": {"likelihood_score": "NAN"},
+        },
+        None,
+        DiliDifferentialAssessment(),
+        PatientLabTimeline(entries=[]),
+        "hepatocellular",
+        None,
+    )
+
+    assert exposure.livertox_likelihood is None
+    assert exposure.causality is not None
+    assert exposure.causality.known_hepatotoxic_potential == "unknown"
+
+###############################################################################
+def test_identity_fallback_payload_is_found_by_extracted_mention() -> None:
+    # Live C14: the identity fallback re-keyed "Valproic acid" as "valproate".
+    payload = {"raw_mentions": ["Valproic acid"], "accepted_livertox_name": "Valproate"}
+    index = index_resolved_drugs({"valproate": payload})
+
+    assert index[normalize_drug_query_name("Valproic acid")] is payload
+    assert index["valproate"] is payload

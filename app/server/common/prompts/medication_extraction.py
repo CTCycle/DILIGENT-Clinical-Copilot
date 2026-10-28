@@ -25,6 +25,7 @@ Field rules:
 - Include exact source `evidence` for each entry and `source_span` character offsets when possible.
 - `daytime_administration` contains four numeric slots in this order: morning, midday, afternoon, night. Use 0 for an unmentioned slot only when a schedule is otherwise explicit; use [] when no schedule is stated.
 - Capture therapy start or suspension status and dates only when explicitly stated. Preserve ISO dates unchanged.
+- A date range such as "from <date> to <date>", "<date> to <date>", "<date> - <date>" or "until <date>" states an end date: put the start date, when given, in `therapy_start_date`, the end date in `suspension_date`, and set `suspension_status` to true. A course stated as completed or ended on a date is a suspension.
 - If therapy is explicitly not started, set `therapy_start_status` to false.
 - Set `source` to "therapy", `historical_flag` to false, `attribution` to "patient", and `current_status` to "current" unless the source explicitly supports a different value.
 - Use null for missing scalar fields and [] for a missing schedule.
@@ -50,6 +51,7 @@ Medication rules:
 
 Field rules:
 - Capture dosage, administration mode, start status/date, suspension status/date, and schedule only when stated.
+- A date range such as "from <date> to <date>", "<date> to <date>", "<date> - <date>" or "until <date>" states an end date: put the start date, when given, in `therapy_start_date`, the end date in `suspension_date`, and set `suspension_status` to true. A course stated as completed or ended on a date is a suspension.
 - Use [] for `daytime_administration` when no schedule is stated.
 - Set `source` to "anamnesis" for every entry.
 - Include exact source `evidence` and `source_span` character offsets when possible.
@@ -62,7 +64,7 @@ Before returning, verify that each medication-like source passage is represented
 Return a JSON object matching `PatientDrugs` with an `entries` array and no explanatory prose.
 """
 
-LOCAL_DRUG_EXTRACTION_SYSTEM_PROMPT = """Return JSON data only. Extract only medication mentions explicitly supported by the source text. Exclude diagnoses, symptoms, procedures, laboratory data, staging, dates, units, and generic clinical prose. Keep fields compact and copy source evidence verbatim when possible.
+LOCAL_DRUG_EXTRACTION_SYSTEM_PROMPT = """Return JSON data only. Extract only medication mentions explicitly supported by the source text. Exclude diagnoses, symptoms, procedures, laboratory data, staging, dates, units, and generic clinical prose. Keep fields compact and copy source evidence verbatim when possible. For "from <date> to <date>" or "until <date>", the end date is the suspension date.
 """
 
 ###############################################################################

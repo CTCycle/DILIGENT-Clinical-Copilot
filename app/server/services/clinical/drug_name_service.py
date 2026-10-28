@@ -432,7 +432,14 @@ class DrugNameService:
                 primary_matches = self.lookup.match_primary_all(
                     self.lookup.canonicalize_query(primary_name)
                 )
-                for record, _, _ in primary_matches:
+                # Chapters such as "Penicillins (1st..4th Generation)" share a
+                # canonical key; the alias names one of them exactly.
+                named_matches = [
+                    item
+                    for item in primary_matches
+                    if item[0].drug_name.casefold() == primary_name.casefold()
+                ]
+                for record, _, _ in named_matches or primary_matches:
                     matches[self.lookup.record_identity_key(record)] = (
                         record,
                         self.lookup.MASTER_CONFIDENCE,

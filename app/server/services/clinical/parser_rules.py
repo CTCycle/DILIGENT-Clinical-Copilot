@@ -9,6 +9,7 @@ from collections.abc import Callable
 from datetime import date
 from typing import Literal, cast
 
+from common.utils.clinical_dates import parse_clinical_date
 from common.utils.logger import logger
 from common.utils.patterns import (
     FORM_DESCRIPTORS,
@@ -28,6 +29,18 @@ from common.utils.text_utils import normalize_token
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.parser_host import ParserHost
 from services.clinical.parser_validation import is_obvious_non_drug_name
+
+DATE_TOKEN = r"(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.](?:\d{4}|\d{2}))"
+DATE_RANGE_RE = re.compile(
+    rf"(?<![\d/.-]){DATE_TOKEN}\s*(?:\bto\b|\buntil\b|\btill\b|\bthrough\b|\bal\b|–|—|\s-)\s*"
+    rf"(?P<stop>{DATE_TOKEN})(?![\d/.-]?\d)",
+    re.IGNORECASE,
+)
+UNTIL_DATE_RE = re.compile(
+    rf"\b(?:until|till)\s+(?P<stop>{DATE_TOKEN})(?![\d/.-]?\d)",
+    re.IGNORECASE,
+)
+SENTENCE_SPLIT_RE = re.compile(r"(?<!\d)\.(?!\d)|[;\n]")
 
 ###############################################################################
 class DrugRulesMixin(ParserHost):
@@ -707,6 +720,13 @@ class DrugRulesMixin(ParserHost):
         normalized.therapy_start_date = self.sanitize_text_field(
             normalized.therapy_start_date
         )
+        if not normalized.suspension_date:
+            stop_date = self.explicit_stop_date_from_evidence(
+                normalized.evidence, name
+            )
+            if stop_date:
+                normalized.suspension_date = stop_date
+                normalized.suspension_status = True
         normalized.source = source
         normalized.historical_flag = historical_flag
         normalized.temporal_classification = cast(
@@ -714,6 +734,33 @@ class DrugRulesMixin(ParserHost):
             self.derive_temporal_classification(normalized),
         )
         return normalized
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def explicit_stop_date_from_evidence(
+        evidence: str | None, drug_name: str
+    ) -> str | None:
+        """Stop date stated as "from X to Y", "X to Y" or "until Y" in the evidence.
+
+        Only sentences naming the drug are read (the whole evidence when it is
+        a single sentence), and the date is kept only when exactly one
+        distinct, parseable end date is found.
+        """
+        sentences = [
+            part for part in SENTENCE_SPLIT_RE.split(evidence or "") if part.strip()
+        ]
+        name = drug_name.casefold()
+        relevant = [part for part in sentences if name in part.casefold()]
+        if not relevant and len(sentences) == 1:
+            relevant = sentences
+        stops = {
+            match.group("stop")
+            for sentence in relevant
+            for pattern in (DATE_RANGE_RE, UNTIL_DATE_RE)
+            for match in pattern.finditer(sentence)
+            if parse_clinical_date(match.group("stop")) is not None
+        }
+        return stops.pop() if len(stops) == 1 else None
 
     # -------------------------------------------------------------------------
     def validate_llm_drug_entry_grounding(

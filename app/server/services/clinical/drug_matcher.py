@@ -36,7 +36,15 @@ class DrugMatcher:
                 )
                 continue
 
-            cached = self.lookup.match_cache.get(normalized_query, CACHE_MISS)
+            # Monographs sharing a key (for example the four penicillin
+            # generations) are cached per full name so one cannot shadow another.
+            cache_key = (
+                raw_name.strip().casefold()
+                if len(self.lookup.require_data().primary_index.get(normalized_query, []))
+                > 1
+                else normalized_query
+            )
+            cached = self.lookup.match_cache.get(cache_key, CACHE_MISS)
             if cached is not CACHE_MISS:
                 results.append(
                     self.lookup.clone_cached_match(cached, raw_name, canonical_query)
@@ -71,7 +79,7 @@ class DrugMatcher:
                     if match.status == "missing" or retry.status == "matched":
                         match = retry
 
-            self.lookup.match_cache.put(normalized_query, match)
+            self.lookup.match_cache.put(cache_key, match)
             results.append(match)
             if match.status == "matched":
                 logger.info(
@@ -131,6 +139,14 @@ class DrugMatcher:
         stage1 = self.lookup.resolve_stage_matches(
             stage1_keys, self.lookup.match_primary_all
         )
+        # A full chapter name such as "Penicillins (2nd Generation)" selects
+        # that chapter among monographs sharing its canonical key.
+        named_stage1 = [
+            item
+            for item in stage1
+            if item[0].drug_name.casefold() == raw_name.strip().casefold()
+        ]
+        stage1 = named_stage1 or stage1
         stage1_result = self.lookup.finalize_stage_result(
             stage_name="exact_canonical",
             raw_name=raw_name,

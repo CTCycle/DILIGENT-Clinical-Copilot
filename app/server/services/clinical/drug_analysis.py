@@ -31,6 +31,7 @@ from common.utils.logger import logger
 from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
 from services.clinical import hepatox_scoring
 from services.clinical.exposure_timeline import ExposureTimelineService
+from services.clinical.livertox_likelihood import normalize_livertox_likelihood
 from services.llm.cloud import CloudLLMClient
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_client import OllamaClient
@@ -262,8 +263,10 @@ class DrugAnalysisService:
     def resolve_livertox_score(metadata: dict[str, Any] | None) -> str:
         if not metadata:
             return "Not available"
-        score = str(metadata.get("likelihood_score") or "").strip()
-        return score.upper() if score and score.isalpha() else score or "Not available"
+        score = metadata.get("likelihood_score")
+        if normalize_livertox_likelihood(score) is None:
+            return "Not available"
+        return str(score).strip().upper()
 
     # -------------------------------------------------------------------------
     def prepare_metadata_prompt(

@@ -8,12 +8,15 @@ from datetime import date
 from common.constants import (
     DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
     DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
+    DILI_COMBINED_AMINOTRANSFERASE_MULTIPLE,
+    DILI_COMBINED_BILIRUBIN_MULTIPLE,
 )
 from domain.clinical.dili import (
     ClinicalEvidenceQuote,
     DiliCaseQualification,
 )
 from domain.clinical.entities import ClinicalLabEntry, DrugEntry, PatientLabTimeline
+from services.clinical.dili_severity import DiliSeverityGrader
 from services.clinical.dili_timeline import DiliTimelineEngine
 
 AMINOTRANSFERASE_MARKERS = {"ALT", "AST"}
@@ -21,7 +24,11 @@ BILIRUBIN_MARKERS = {"BILIRUBIN", "TBIL"}
 
 ###############################################################################
 class DiliCaseQualificationEngine:
-    """Qualify the liver-injury episode before patient-drug causality synthesis."""
+    """Qualify the liver-injury episode before patient-drug causality synthesis.
+
+    Biochemical criteria follow EASL 2019: ALT >=5x ULN, ALP >=2x ULN, or
+    ALT >=3x ULN with total bilirubin >2x ULN.
+    """
 
     # -------------------------------------------------------------------------
     def assess(
@@ -54,88 +61,90 @@ class DiliCaseQualificationEngine:
         )
 
         qualifying: list[str] = []
-        pending: list[str] = []
+        confirmation_notes: list[str] = []
         evidence: list[ClinicalEvidenceQuote] = []
-
-        aminotransferase_qualified, aminotransferase_pending, amino_evidence = (
-            self._repeated_threshold(
+        enzyme_thresholds = (
+            (
+                AMINOTRANSFERASE_MARKERS,
+                DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
+                "ALT/AST >=5x reference",
+            ),
+            (
+                {"ALP"},
+                DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
+                "ALP >=2x reference",
+            ),
+        )
+        for markers, threshold, label in enzyme_thresholds:
+            hits = self._threshold_hits(
                 dated,
-                markers=AMINOTRANSFERASE_MARKERS,
-                threshold=DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
+                markers=markers,
+                threshold=threshold,
                 baseline_entries=baseline_entries,
-                criterion_label="ALT/AST >=5x reference on measurements at least 24 hours apart",
             )
-        )
-        if aminotransferase_qualified:
-            qualifying.append(
-                "ALT/AST >=5x reference on measurements at least 24 hours apart"
-            )
-        elif aminotransferase_pending:
-            pending.append(
-                "A single ALT/AST measurement reaches the 5x reference threshold but repeat confirmation is unavailable"
-            )
-        evidence.extend(amino_evidence)
+            if not hits:
+                continue
+            qualifying.append(label)
+            if len({hit_date for hit_date, _ in hits}) < 2:
+                confirmation_notes.append(
+                    f"{label} on a single panel; repeat testing is recommended to confirm the episode"
+                )
+            evidence.extend(self._quote(label, entry) for _, entry in hits)
 
-        alp_qualified, alp_pending, alp_evidence = self._repeated_threshold(
-            dated,
-            markers={"ALP"},
-            threshold=DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
-            baseline_entries=baseline_entries,
-            criterion_label="ALP >=2x reference on measurements at least 24 hours apart",
-        )
-        if alp_qualified:
-            qualifying.append("ALP >=2x reference on measurements at least 24 hours apart")
-        elif alp_pending:
-            pending.append(
-                "A single ALP measurement reaches the 2x reference threshold but repeat confirmation is unavailable"
-            )
-        evidence.extend(alp_evidence)
-
-        bilirubin_criterion, bilirubin_evidence = self._bilirubin_criterion(
+        combined_criterion, combined_evidence = self._combined_bilirubin_criterion(
             dated,
             baseline_entries=baseline_entries,
         )
-        if bilirubin_criterion:
-            qualifying.append(bilirubin_criterion)
-        evidence.extend(bilirubin_evidence)
+        if combined_criterion:
+            qualifying.append(combined_criterion)
+        evidence.extend(combined_evidence)
 
-        inr_criterion, inr_evidence = self._inr_criterion(
+        inr_note, inr_evidence = self._inr_note(
             dated,
             baseline_entries=baseline_entries,
         )
-        if inr_criterion:
-            qualifying.append(inr_criterion)
         evidence.extend(inr_evidence)
 
-        assessable = any(
-            entry.marker_name.upper()
-            in AMINOTRANSFERASE_MARKERS | {"ALP", "INR"} | BILIRUBIN_MARKERS
+        enzyme_entries = [
+            entry
             for entry in dated
+            if entry.marker_name.upper() in AMINOTRANSFERASE_MARKERS | {"ALP"}
+        ]
+        unreferenced = sorted(
+            {
+                entry.marker_name.upper()
+                for entry in enzyme_entries
+                if self._reference_value(entry, baseline_entries) is None
+            }
         )
         if qualifying:
             status = "meets_typical_detection_criteria"
-        elif not assessable or pending:
+        elif not enzyme_entries or unreferenced:
             status = "insufficient_data"
         else:
             status = "below_typical_detection_criteria"
 
         rationale = [
             "Case qualification is separate from drug causality and does not diagnose DILI.",
+            "EASL 2019 biochemical criteria: ALT >=5x ULN, ALP >=2x ULN, or ALT >=3x ULN with total bilirubin >2x ULN.",
             "For abnormal pretreatment results, the pretreatment value is used as the reference for that marker when available.",
         ]
         if baseline_date is None:
             rationale.append(
                 "No dated pretreatment laboratory panel before the earliest documented exposure start was available."
             )
-        if pending:
+        if not qualifying and unreferenced:
             rationale.append(
-                "Single enzyme-threshold measurements remain provisional until repeat confirmation is documented."
+                "No upper limit of normal or pretreatment reference is available for "
+                f"{', '.join(unreferenced)}, so the thresholds cannot be assessed."
             )
+        if inr_note:
+            rationale.append(inr_note)
 
         return DiliCaseQualification(
             status=status,
             qualifying_criteria=qualifying,
-            pending_confirmation=pending,
+            pending_confirmation=confirmation_notes,
             baseline_date=baseline_date.isoformat() if baseline_date else None,
             baseline_abnormal=baseline_abnormal,
             baseline_multiples=baseline_multiples,
@@ -177,95 +186,111 @@ class DiliCaseQualificationEngine:
         ]
 
     # -------------------------------------------------------------------------
-    def _repeated_threshold(
+    def _threshold_hits(
         self,
         dated_labs: list[ClinicalLabEntry],
         *,
         markers: set[str],
         threshold: float,
         baseline_entries: list[ClinicalLabEntry],
-        criterion_label: str,
-    ) -> tuple[bool, bool, list[ClinicalEvidenceQuote]]:
-        threshold_hits: list[tuple[date, ClinicalLabEntry]] = []
+    ) -> list[tuple[date, ClinicalLabEntry]]:
+        hits: list[tuple[date, ClinicalLabEntry]] = []
         for entry in dated_labs:
-            if entry.marker_name.upper() not in markers:
+            if entry.marker_name.upper() not in markers or entry.value is None:
                 continue
             reference = self._reference_value(entry, baseline_entries)
-            if reference is None or reference <= 0 or entry.value is None:
+            if reference is None or reference <= 0:
                 continue
-            if float(entry.value) / reference >= threshold:
-                parsed = DiliTimelineEngine.parse_date(entry.sample_date)
-                if parsed is not None:
-                    threshold_hits.append((parsed, entry))
-
-        repeated = any(
-            (later_date - earlier_date).days >= 1
-            for index, (earlier_date, _) in enumerate(threshold_hits)
-            for later_date, _ in threshold_hits[index + 1 :]
-        )
-        evidence = [self._quote(criterion_label, entry) for _, entry in threshold_hits]
-        return repeated, bool(threshold_hits) and not repeated, evidence
+            parsed = DiliTimelineEngine.parse_date(entry.sample_date)
+            if parsed is not None and float(entry.value) / reference >= threshold:
+                hits.append((parsed, entry))
+        return hits
 
     # -------------------------------------------------------------------------
-    def _bilirubin_criterion(
+    def _combined_bilirubin_criterion(
         self,
         dated_labs: list[ClinicalLabEntry],
         *,
         baseline_entries: list[ClinicalLabEntry],
     ) -> tuple[str | None, list[ClinicalEvidenceQuote]]:
-        evidence: list[ClinicalEvidenceQuote] = []
+        label = "ALT/AST >=3x reference with total bilirubin >2x reference"
+        aminotransferase_dates = [
+            hit_date
+            for hit_date, _ in self._threshold_hits(
+                dated_labs,
+                markers=AMINOTRANSFERASE_MARKERS,
+                threshold=DILI_COMBINED_AMINOTRANSFERASE_MULTIPLE,
+                baseline_entries=baseline_entries,
+            )
+        ]
         for entry in dated_labs:
             if entry.marker_name.upper() not in BILIRUBIN_MARKERS:
                 continue
-            unit = str(entry.unit or "").strip().casefold().replace(" ", "")
-            if "mg/dl" not in unit or entry.value is None or float(entry.value) <= 2.5:
-                continue
+            multiple = self._bilirubin_multiple(entry, baseline_entries)
             sample_date = DiliTimelineEngine.parse_date(entry.sample_date)
-            if sample_date is None:
-                continue
-            if self._has_elevated_enzyme_near_date(
-                dated_labs,
-                sample_date,
-                baseline_entries=baseline_entries,
+            if (
+                multiple is None
+                or multiple <= DILI_COMBINED_BILIRUBIN_MULTIPLE
+                or sample_date is None
             ):
-                evidence.append(
-                    self._quote(
-                        "Total bilirubin >2.5 mg/dL with elevated liver enzymes",
-                        entry,
-                    )
-                )
-                return (
-                    "Total bilirubin >2.5 mg/dL with elevated liver enzymes",
-                    evidence,
-                )
-        return None, evidence
+                continue
+            if any(abs((sample_date - day).days) <= 1 for day in aminotransferase_dates):
+                return label, [self._quote(label, entry)]
+        return None, []
 
     # -------------------------------------------------------------------------
-    def _inr_criterion(
+    def _bilirubin_multiple(
+        self,
+        entry: ClinicalLabEntry,
+        baseline_entries: list[ClinicalLabEntry],
+    ) -> float | None:
+        """Bilirubin multiple with value and reference both in mg/dL.
+
+        µmol/L is divided by 17.1, so a value and ULN reported in different
+        units still compare correctly.
+        """
+        value = DiliSeverityGrader.bilirubin_mg_dl(entry)
+        baseline = self._latest_marker(baseline_entries, BILIRUBIN_MARKERS)
+        baseline_multiple = self._multiple(baseline)
+        if baseline_multiple is not None and baseline_multiple > 1.0:
+            reference = DiliSeverityGrader.bilirubin_mg_dl(baseline)
+        else:
+            reference = DiliSeverityGrader.bilirubin_mg_dl(
+                ClinicalLabEntry(
+                    marker_name=entry.marker_name,
+                    value=entry.upper_limit_normal,
+                    upper_limit_normal=entry.upper_limit_normal,
+                )
+            )
+        if value is None or reference is None or reference <= 0:
+            return None
+        return value / reference
+
+    # -------------------------------------------------------------------------
+    def _inr_note(
         self,
         dated_labs: list[ClinicalLabEntry],
         *,
         baseline_entries: list[ClinicalLabEntry],
     ) -> tuple[str | None, list[ClinicalEvidenceQuote]]:
-        evidence: list[ClinicalEvidenceQuote] = []
+        """INR >1.5 is severity information, not an EASL case-definition criterion."""
+        label = (
+            "INR >1.5 with elevated liver enzymes "
+            "(supporting severity information, not a qualifying criterion)"
+        )
         for entry in dated_labs:
             if entry.marker_name.upper() != "INR" or entry.value is None:
                 continue
-            if float(entry.value) <= 1.5:
-                continue
             sample_date = DiliTimelineEngine.parse_date(entry.sample_date)
-            if sample_date is None:
+            if float(entry.value) <= 1.5 or sample_date is None:
                 continue
             if self._has_elevated_enzyme_near_date(
                 dated_labs,
                 sample_date,
                 baseline_entries=baseline_entries,
             ):
-                evidence.append(
-                    self._quote("INR >1.5 with elevated liver enzymes", entry)
-                )
-                return "INR >1.5 with elevated liver enzymes", evidence
-        return None, evidence
+                return label, [self._quote(label, entry)]
+        return None, []
 
     # -------------------------------------------------------------------------
     def _has_elevated_enzyme_near_date(

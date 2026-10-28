@@ -27,6 +27,7 @@ from domain.clinical.rucam import (
     RucamSourceReportedScore,
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
+from services.clinical.livertox_likelihood import normalize_livertox_likelihood
 from services.clinical.report_language import phrase, resolve_report_language
 from services.text.normalization import normalize_drug_query_name
 
@@ -561,7 +562,7 @@ class RucamScoreEstimator:
                 else None
             )
             likelihood = (
-                str(metadata.get("likelihood_score") or "").strip().upper()
+                normalize_livertox_likelihood(metadata.get("likelihood_score")) or ""
                 if isinstance(metadata, dict)
                 else ""
             )
@@ -725,7 +726,7 @@ class RucamScoreEstimator:
         )
         token = ""
         if isinstance(metadata, dict):
-            token = str(metadata.get("likelihood_score") or "").strip().upper()
+            token = normalize_livertox_likelihood(metadata.get("likelihood_score")) or ""
         return RucamComponentAssessment(
             component_key="previous_hepatotoxicity",
             label="Previous hepatotoxicity of the drug",
