@@ -135,20 +135,27 @@ uses definitive/lifelong causality language while structured causality is limite
 the workflow records a blocking faithfulness issue and persists the session as
 requiring human review rather than `successful`.
 
-Structured claim checks extend the phrase gate:
-- `clinical_narrative_contradicts_injury_pattern`: a stated pattern name or R
-  ratio band (≥5 hepatocellular, ≤2 cholestatic) that matches no calculated
-  bundle pattern.
+Structured claim checks extend the phrase gate. They judge patient claims
+only: a sentence carrying drug-level or reference wording (LiverTox, literature,
+typical, described, reported cases, recognized, can cause) is not checked for
+pattern names or latency.
+- `clinical_narrative_contradicts_injury_pattern`: a sentence naming exactly one
+  pattern that matches no calculated bundle pattern, or a stated R ratio band
+  (≥5 hepatocellular, ≤2 cholestatic) that matches none and is not introduced by
+  reference wording. "Hepatocellular-cholestatic" reads as mixed, and sentences
+  comparing several patterns are skipped.
 - `clinical_narrative_contradicts_cause_status`: a clause that names a specific
   competing cause and calls it ruled out, excluded or eliminated while the
   differential does not mark it `excluded`; "unlikely" is flagged only for a
   `not_excluded` cause. Negated or conditional wording ("cannot be excluded",
   "should be excluded") is not a claim.
-- `clinical_narrative_contradicts_latency`: a stated patient latency that matches
-  no exposure-start-to-onset interval (tolerance 3 days or 25%). Sentences about
-  typical or literature latency are skipped.
+- `clinical_narrative_contradicts_latency`: a stated patient latency (decimals
+  such as "8.3 weeks" included, range bounds ignored) that is off by more than
+  both 14 days and 50% from every drug-start-to-onset interval, where onset is
+  the first abnormal test, first symptom or bilirubin rise.
 - Definitive causality wording such as "the definite cause" or "very likely
-  responsible" counts as `clinical_narrative_overstates_causality`.
+  responsible" counts as `clinical_narrative_overstates_causality`. LiverTox
+  category wording ("highly likely cause") does not.
 
 The same deterministic clinical safety audit is applied to agentic report revisions before a revised report can be persisted as a successful revision. LLM QA therefore cannot override contradictions with the structured competing-cause, Hy's Law, causality-certainty, LiverTox-provenance, or rechallenge safeguards.
 

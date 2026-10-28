@@ -598,8 +598,9 @@ def _narrative_codes(narrative: str, *, bundle: DiliEvidenceBundle) -> set[str]:
     return {issue["code"] for issue in issues}
 
 ###############################################################################
-def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
-    bundle = DiliEvidenceBuilder().build(
+def _gate_bundle(alp: float) -> DiliEvidenceBundle:
+    # ALT 15x ULN with HCV RNA detectable; latency 29 days from 2024-02-01.
+    return DiliEvidenceBuilder().build(
         payload=PatientData(
             anamnesis="Jaundice. Anti-HCV positive, HCV RNA detectable. No alcohol use.",
         ),
@@ -615,7 +616,7 @@ def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
         labs=PatientLabTimeline(
             entries=[
                 _lab("ALT", 600, 40, "2024-03-01"),
-                _lab("ALP", 180, 120, "2024-03-01"),
+                _lab("ALP", alp, 120, "2024-03-01"),
                 _lab("TBIL", 5.0, 1.2, "2024-03-01", "mg/dL"),
             ]
         ),
@@ -623,11 +624,18 @@ def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
         rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
     )
 
+###############################################################################
+def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
+    bundle = _gate_bundle(alp=180)
+
     codes = partial(_narrative_codes, bundle=bundle)
     assert "clinical_narrative_contradicts_cause_status" in codes("Hepatitis C was ruled out.")
     assert "clinical_narrative_contradicts_cause_status" in codes("Viral causes appear unlikely.")
     assert "clinical_narrative_contradicts_injury_pattern" in codes("The pattern is cholestatic.")
     assert "clinical_narrative_contradicts_injury_pattern" in codes("Injury with an R ratio of 1.4.")
+    assert "clinical_narrative_contradicts_injury_pattern" in codes(
+        "The injury pattern is cholestatic (R ratio 1.4), typical of amoxicillin-clavulanate."
+    )
     assert "clinical_narrative_contradicts_latency" in codes("Latency of 3 days after first dose.")
     assert "clinical_narrative_overstates_causality" in codes(
         "Amoxicillin-clavulanate is the definite cause."
@@ -639,4 +647,38 @@ def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
         "The injury pattern is hepatocellular (R ratio 10). Hepatitis C cannot be "
         "excluded given detectable HCV RNA. Alcohol was excluded. Latency was about "
         "4 weeks. Amoxicillin-clavulanate typically has a latency of 1 to 8 weeks."
+    )
+
+###############################################################################
+def test_narrative_gate_ignores_drug_level_and_rounded_patient_statements() -> None:
+    # Sentences from the live P1 rerun (2026-10-28) that were wrongly blocked.
+    hepatocellular = partial(_narrative_codes, bundle=_gate_bundle(alp=180))
+    mixed = partial(_narrative_codes, bundle=_gate_bundle(alp=600))
+
+    assert not hepatocellular(
+        "LiverTox describes terbinafine hepatotoxicity as initially hepatocellular "
+        "or mixed, often evolving to a prolonged cholestatic pattern."
+    )
+    assert not hepatocellular(
+        "The observed hepatocellular pattern is compatible with the LiverTox "
+        "description of atorvastatin hepatotoxicity, which notes that although "
+        "cholestatic hepatitis is the most common presentation, a distinctly "
+        "hepatocellular pattern with marked aminotransferase elevations occurs."
+    )
+    assert not hepatocellular(
+        "Drug B has a far weaker case: an atypical mixed rather than "
+        "aminotransferase-predominant or bland-cholestatic pattern."
+    )
+    assert not mixed(
+        "She presented with a mixed hepatocellular-cholestatic injury pattern (R ≈ 3.0)."
+    )
+    assert not hepatocellular("On 2024-03-01, roughly 4.3 weeks after initiation, ALT rose.")
+    assert not hepatocellular(
+        "LiverTox states that the latency is characteristically short, 1 to 8 weeks "
+        "after initiation."
+    )
+    assert not hepatocellular("The latency here (~6 weeks) falls within that window.")
+    assert not hepatocellular(
+        "LiverTox classifies the drug as a likelihood score B agent (highly likely "
+        "cause of clinically apparent liver injury)."
     )
