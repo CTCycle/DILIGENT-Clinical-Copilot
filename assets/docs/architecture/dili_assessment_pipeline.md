@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-09-10
+Last updated: 2026-10-28
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -116,6 +116,10 @@ with the unchanged `dili_evidence_bundle` as the authoritative structured audit
 contract. LLM clinical synthesis must remain evidence-bounded and is not allowed
 to introduce unsupported clinical facts.
 
+The result field `clinical_validity` is `no_automated_issues_detected` when no
+automated gate fired and `requires_human_review` otherwise. It never states
+clinical validation.
+
 Blocking faithfulness issues are finalization blockers. The workflow may retain
 generated artifacts for audit, but the persisted session status must not remain
 `successful` when blocking faithfulness issues exist. Such cases require human
@@ -137,11 +141,30 @@ marker-specific peaks, dechallenge direction, recovery versus persistence, and
 worsening after discontinuation remain explicit timeline events or missing-data
 statements instead of being inferred as negatives. Dechallenge evidence is interpreted per drug and requires a documented discontinuation context for that exposure; a global laboratory improvement is not automatically attributed to every medication in a polypharmacy case.
 
+Case-level and per-drug dechallenge share one implementation that follows the
+updated RUCAM course criteria. The course marker is ALT (AST when ALT is
+absent) for hepatocellular injury and ALP for cholestatic or mixed injury.
+Improvement means a decline of at least 50% of the peak excess over the
+reference within 30 days (hepatocellular) or 180 days (cholestatic/mixed) of
+discontinuation. The reference is the ULN, or the abnormal pre-treatment
+baseline when one exists. `resolved_to_baseline` and a recovery date are
+recorded only when the marker returns to that reference; a fall below an
+earlier abnormal value is never treated as resolution. Abnormality beyond the
+window without such a decline is `chronic_or_persistent`. The case-level
+course follows the first discontinuation made once injury was present.
+
 Mandatory competing causes use explicit four-state outputs:
 - `excluded`
 - `not_excluded`
 - `unknown`
 - `missing_data`
+
+Each competing cause is assessed clause by clause. Cause terms match at word
+boundaries, a negation cue shortly before the term (`no`, `without`, `denies`,
+`negative for`) excludes it in that clause, and positive or quantified findings
+(`positive`, `detected`, `dilated`, `60 g/day`) keep it competing. Across
+clauses, presence outranks uncertainty, which outranks exclusion, so a negative
+test for one agent never excludes a documented positive finding for another.
 
 Pre-existing or chronic liver disease is retained as baseline context and a potential competing explanation rather than being treated as automatically excluded merely because it predates the acute episode. The differential remains unresolved unless the available evidence supports exclusion of the relevant alternative explanation.
 
@@ -221,6 +244,15 @@ default.
 ## Timeline Grounding
 Patient timeline extraction keeps month-only tokens such as `YYYY-MM` as
 month-precision values and does not promote them to exact calendar days.
+
+Numeric clinical dates are parsed by one shared parser
+(`common/utils/clinical_dates.py`). The day/month order is inferred per record
+from unambiguous tokens (for example `05/20/2024` proves month-first) and
+applied to laboratory and therapy dates, which are normalized to ISO. Year-less
+dates take the visit year, or the previous year when they would otherwise fall
+after the visit. When the order matters but the record does not settle it,
+dates are read day-first and the blocking issue `ambiguous_date_order` sends
+the session to human review.
 
 LLM-generated timeline events require preserved source evidence to remain in the
 normalized event set. Events without source evidence are dropped rather than

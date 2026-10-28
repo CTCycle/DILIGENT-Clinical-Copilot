@@ -16,7 +16,9 @@ from domain.clinical.entities import (
 )
 from services.clinical.dili_case_qualification import DiliCaseQualificationEngine
 from services.clinical.dili_causality import DiliCausalityEngine
+from services.clinical.dili_differential import DiliDifferentialEngine
 from services.clinical.dili_evidence import DiliEvidenceBuilder
+from services.clinical.dili_timeline import DiliTimelineEngine
 from services.inspection.revision_clinical_safety import audit_revised_dili_report
 
 ###############################################################################
@@ -294,3 +296,101 @@ def test_revision_safety_reuses_structured_dili_evidence_gate() -> None:
     )
     assert any("competing causes" in issue.lower() for issue in issues)
     assert any("definitive" in issue.lower() for issue in issues)
+
+###############################################################################
+def _alt(value: float, sample_date: str) -> ClinicalLabEntry:
+    return ClinicalLabEntry(
+        marker_name="ALT",
+        value=value,
+        upper_limit_normal=40,
+        sample_date=sample_date,
+        source="laboratory_analysis",
+    )
+
+###############################################################################
+def _cause_status(text: str, cause: str) -> str:
+    assessment = DiliDifferentialEngine().assess(text)
+    return {item.cause: item.status for item in assessment.causes}[cause]
+
+###############################################################################
+def test_documented_competing_cause_is_not_excluded_by_nearby_negative_test() -> None:
+    assert (
+        _cause_status(
+            "HBsAg negative, anti-HCV positive with detectable HCV RNA.",
+            "viral_hepatitis_a_b_c_d_e",
+        )
+        == "not_excluded"
+    )
+    assert (
+        _cause_status(
+            "Hepatitis E IgM positive and HEV RNA detected. Hepatitis A IgM negative.",
+            "viral_hepatitis_a_b_c_d_e",
+        )
+        == "not_excluded"
+    )
+    assert (
+        _cause_status(
+            "Common bile duct dilated with choledocholithiasis. Serologies negative.",
+            "biliary_obstruction_gallstones",
+        )
+        == "not_excluded"
+    )
+    assert (
+        _cause_status("Alcohol: 60 g/day, ongoing.", "alcoholic_hepatitis")
+        == "not_excluded"
+    )
+
+###############################################################################
+def test_negated_cause_is_excluded_and_substrings_do_not_match() -> None:
+    assert (
+        _cause_status("No alcohol use. No known liver disease.", "alcoholic_hepatitis")
+        == "excluded"
+    )
+    assert (
+        _cause_status(
+            "Anamnesis reviewed. Plasma glucose normal.", "autoimmune_hepatitis"
+        )
+        == "missing_data"
+    )
+    assert (
+        _cause_status("HEV infection cannot be excluded.", "viral_hepatitis_a_b_c_d_e")
+        == "unknown"
+    )
+
+###############################################################################
+def test_persistent_injury_after_withdrawal_is_not_reported_as_resolved() -> None:
+    timeline = DiliTimelineEngine().build(
+        [DrugEntry(name="Drug A", therapy_start_date="2024-01-10", suspension_date="2024-03-01")],
+        PatientLabTimeline(
+            entries=[
+                _alt(30, "2024-01-05"),
+                _alt(800, "2024-02-28"),
+                _alt(780, "2024-03-02"),
+                _alt(600, "2024-03-31"),
+                _alt(420, "2024-05-01"),
+            ]
+        ),
+        primary_pattern="hepatocellular",
+    )
+    assert timeline.dechallenge_status == "chronic_or_persistent"
+    assert timeline.recovery_date is None
+
+###############################################################################
+def test_dechallenge_uses_rucam_window_and_resolution_to_reference() -> None:
+    drug = DrugEntry(name="Drug A", therapy_start_date="2024-01-10", suspension_date="2024-03-01")
+    improving = DiliTimelineEngine().build(
+        [drug],
+        PatientLabTimeline(entries=[_alt(800, "2024-03-01"), _alt(320, "2024-03-08")]),
+        primary_pattern="hepatocellular",
+    )
+    resolved = DiliTimelineEngine().build(
+        [drug],
+        PatientLabTimeline(
+            entries=[_alt(800, "2024-03-01"), _alt(400, "2024-03-08"), _alt(36, "2024-04-10")]
+        ),
+        primary_pattern="hepatocellular",
+    )
+    assert improving.dechallenge_status == "improving_after_stop"
+    assert improving.recovery_date is None
+    assert resolved.dechallenge_status == "resolved_to_baseline"
+    assert resolved.recovery_date == "2024-04-10"

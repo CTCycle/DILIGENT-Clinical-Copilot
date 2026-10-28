@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Literal
 
 from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
@@ -256,42 +255,13 @@ class DiliCausalityEngine:
         stop_date = DiliTimelineEngine.parse_date(drug.suspension_date)
         if stop_date is None:
             return "not_assessable"
-        marker_names = {"ALT"} if primary_pattern == "hepatocellular" else {"ALP"}
-        dated = [
-            entry
-            for entry in labs.entries
-            if entry.marker_name.upper() in marker_names
-            and entry.value is not None
-            and entry.upper_limit_normal
-            and float(entry.upper_limit_normal) > 0
-            and DiliTimelineEngine.parse_date(entry.sample_date) is not None
-        ]
-        dated.sort(
-            key=lambda item: DiliTimelineEngine.parse_date(item.sample_date) or date.max
+        status, _ = DiliTimelineEngine.assess_dechallenge(
+            DiliTimelineEngine.dechallenge_series(labs.entries, primary_pattern),
+            stop_date=stop_date,
+            exposure_start=DiliTimelineEngine.parse_date(drug.therapy_start_date),
+            cholestatic=primary_pattern in {"cholestatic", "mixed"},
         )
-        after_stop = [
-            entry
-            for entry in dated
-            if (DiliTimelineEngine.parse_date(entry.sample_date) or date.min) >= stop_date
-        ]
-        if len(after_stop) < 2:
-            return "insufficient_interval"
-        first_multiple = float(after_stop[0].value or 0.0) / float(
-            after_stop[0].upper_limit_normal or 1.0
-        )
-        last_multiple = float(after_stop[-1].value or 0.0) / float(
-            after_stop[-1].upper_limit_normal or 1.0
-        )
-        last_date = DiliTimelineEngine.parse_date(after_stop[-1].sample_date) or stop_date
-        if last_multiple <= 1.0:
-            return "resolved_to_baseline"
-        if first_multiple > 0 and last_multiple <= first_multiple * 0.5:
-            return "improving_after_stop"
-        if first_multiple > 0 and last_multiple > first_multiple * 1.2:
-            return "worsening_after_stop"
-        if (last_date - stop_date).days >= 180 and last_multiple > 1.0:
-            return "chronic_or_persistent"
-        return "stable_abnormality"
+        return status
 
     # -------------------------------------------------------------------------
     @staticmethod

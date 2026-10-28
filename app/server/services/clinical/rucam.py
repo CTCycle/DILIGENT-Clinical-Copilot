@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Literal, cast
 
+from common.utils.clinical_dates import parse_clinical_date
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DrugEntry,
@@ -212,22 +213,7 @@ class RucamScoreEstimator:
     # -------------------------------------------------------------------------
     @staticmethod
     def try_parse_date(value: str | None) -> date | None:
-        if value is None:
-            return None
-        cleaned = str(value).strip()
-        if not cleaned:
-            return None
-        normalized = cleaned.replace("/", "-").replace(".", "-")
-        try:
-            return date.fromisoformat(normalized)
-        except ValueError:
-            pass
-        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(normalized, fmt).date()
-            except ValueError:
-                continue
-        return None
+        return parse_clinical_date(value)
 
     # -------------------------------------------------------------------------
     @staticmethod

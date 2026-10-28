@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from common.utils.clinical_dates import case_date_order
 from common.utils.logger import logger
 from domain.clinical.entities import (
     ClinicalLabEntry,
@@ -29,6 +30,9 @@ async def extract_from_payload(
         if already_cleaned
         else extractor.clean_text(payload.laboratory_analysis)
     )
+    date_order = case_date_order(
+        payload.anamnesis, payload.drugs, payload.laboratory_analysis
+    )
     deterministic_entries: list[ClinicalLabEntry] = []
     timeline_entries: list[ClinicalLabEntry] = []
     onset_context: LiverInjuryOnsetContext | None = None
@@ -38,6 +42,7 @@ async def extract_from_payload(
             text=primary_labs_text,
             source="laboratory_analysis",
             visit_date=payload.visit_date,
+            date_order=date_order,
         )
     )
     extractor.emit_progress(progress_callback, 0.2)
@@ -131,7 +136,9 @@ async def extract_from_payload(
     normalized: list[ClinicalLabEntry] = []
     seen: set[tuple[str, str, str, str]] = set()
     for entry in timeline_entries:
-        prepared = extractor.normalize_entry(entry, visit_date=payload.visit_date)
+        prepared = extractor.normalize_entry(
+            entry, visit_date=payload.visit_date, date_order=date_order
+        )
         if prepared is None:
             continue
         key = extractor.dedupe_key(prepared)
@@ -160,6 +167,9 @@ async def extract_from_payload_with_audit(
         text=primary_labs_text,
         source="laboratory_analysis",
         visit_date=payload.visit_date,
+        date_order=case_date_order(
+            payload.anamnesis, payload.drugs, payload.laboratory_analysis
+        ),
     )
     meaningful_lab_lines = sum(
         1

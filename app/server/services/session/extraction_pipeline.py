@@ -9,6 +9,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, TypeVar
 
+from common.utils.clinical_dates import case_date_order
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
@@ -487,11 +488,15 @@ class ClinicalSessionExtractionPipelineMixin:
             supplemental_anamnesis_text = self.lab_extractor.clean_text(
                 payload.anamnesis
             )
+            date_order = case_date_order(
+                payload.anamnesis, payload.drugs, payload.laboratory_analysis
+            )
             fallback_entries.extend(
                 self.lab_extractor.extract_entries_from_text(
                     text=primary_labs_text,
                     source="laboratory_analysis",
                     visit_date=payload.visit_date,
+                    date_order=date_order,
                 )
             )
             fallback_entries.extend(
@@ -499,13 +504,14 @@ class ClinicalSessionExtractionPipelineMixin:
                     text=supplemental_anamnesis_text,
                     source="anamnesis",
                     visit_date=payload.visit_date,
+                    date_order=date_order,
                 )
             )
             normalized_entries = []
             seen_keys: set[tuple[str, str, str, str]] = set()
             for entry in fallback_entries:
                 prepared = self.lab_extractor.normalize_entry(
-                    entry, visit_date=payload.visit_date
+                    entry, visit_date=payload.visit_date, date_order=date_order
                 )
                 if prepared is None:
                     continue

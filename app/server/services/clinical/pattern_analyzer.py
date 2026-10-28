@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 from typing import Literal
 
+from common.utils.clinical_dates import parse_clinical_date
 from common.constants import (
     DILI_ALKALINE_PHOSPHATASE_QUALIFYING_MULTIPLE,
     DILI_AMINOTRANSFERASE_QUALIFYING_MULTIPLE,
@@ -265,17 +266,7 @@ class HepatotoxicityPatternAnalyzer:
     # -------------------------------------------------------------------------
     @staticmethod
     def _date_sort_key(value: str) -> date:
-        normalized = str(value).strip().replace("/", "-").replace(".", "-")
-        try:
-            return date.fromisoformat(normalized)
-        except ValueError:
-            pass
-        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(normalized, fmt).date()
-            except ValueError:
-                continue
-        return date.max
+        return parse_clinical_date(value) or date.max
 
     # -------------------------------------------------------------------------
     def safe_ratio(self, value: float | None, reference: float | None) -> float | None:

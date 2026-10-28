@@ -8,6 +8,7 @@ import re
 from datetime import date
 from typing import Any
 
+from common.utils.clinical_dates import has_ambiguous_date_order
 from common.utils.clinical_safety import RECHALLENGE_RECOMMENDATION_CODE
 from common.utils.languages import resolve_supported_language_code
 from domain.clinical.entities import (
@@ -163,6 +164,21 @@ def build_extraction_artifact(
                 "code": "timed_drugs_missing",
                 "message": "No drug mention with explicit timing was found.",
                 "field": "drugs",
+            }
+        )
+    if has_ambiguous_date_order(
+        payload.anamnesis, payload.drugs, payload.laboratory_analysis
+    ):
+        issues.append(
+            {
+                "severity": "error",
+                "code": "ambiguous_date_order",
+                "message": (
+                    "Numeric dates could be read as day/month or month/day and the "
+                    "record does not settle the convention; dates were read "
+                    "day-first and the chronology requires review."
+                ),
+                "field": "clinical_input",
             }
         )
     for key, section in sections.items():
@@ -410,6 +426,16 @@ def audit_report(
             {
                 "code": "timed_drugs_missing",
                 "message": "Timed-drug requirement was not satisfied.",
+            }
+        )
+    if any(
+        issue.get("code") == "ambiguous_date_order"
+        for issue in extraction_artifact.extraction_issues
+    ):
+        blocking_issues.append(
+            {
+                "code": "ambiguous_date_order",
+                "message": "Day/month order of numeric dates is unresolved.",
             }
         )
     if blocking_issues:

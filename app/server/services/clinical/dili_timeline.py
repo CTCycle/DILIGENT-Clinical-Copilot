@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 from typing import Literal
 
+from common.utils.clinical_dates import parse_clinical_date
 from common.utils.clinical_safety import contains_explicitly_negative_rechallenge
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliTimeline, DiliTimelineEvent
 from domain.clinical.entities import ClinicalLabEntry, DrugEntry, PatientLabTimeline
@@ -47,6 +48,7 @@ class DiliTimelineEngine:
         drugs: list[DrugEntry],
         labs: PatientLabTimeline,
         source_text: str | None = None,
+        primary_pattern: str = "indeterminate",
     ) -> DiliTimeline:
         events: list[DiliTimelineEvent] = []
         missing: list[str] = []
@@ -64,6 +66,7 @@ class DiliTimelineEngine:
         dechallenge_status, recovery_date, last_abnormal_date = self._dechallenge(
             drugs,
             dated_labs,
+            primary_pattern,
         )
         jaundice_date = bilirubin_event or peak_dates.get("BILIRUBIN")
 
@@ -90,19 +93,7 @@ class DiliTimelineEngine:
     # -------------------------------------------------------------------------
     @staticmethod
     def parse_date(value: str | None) -> date | None:
-        if not value:
-            return None
-        normalized = str(value).strip().replace("/", "-").replace(".", "-")
-        try:
-            return date.fromisoformat(normalized)
-        except ValueError:
-            pass
-        for fmt in ("%d-%m-%Y", "%m-%d-%Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(normalized, fmt).date()
-            except ValueError:
-                continue
-        return None
+        return parse_clinical_date(value)
 
     # -------------------------------------------------------------------------
     def _drug_events(
@@ -356,6 +347,7 @@ class DiliTimelineEngine:
         self,
         drugs: list[DrugEntry],
         labs: list[ClinicalLabEntry],
+        primary_pattern: str,
     ) -> tuple[DechallengeStatus, str | None, str | None]:
         stop_dates = sorted(
             parsed_date
@@ -363,48 +355,128 @@ class DiliTimelineEngine:
             for parsed_date in [self.parse_date(item.suspension_date)]
             if parsed_date is not None
         )
+        start_dates = [
+            parsed_date
+            for item in drugs
+            for parsed_date in [self.parse_date(item.therapy_start_date)]
+            if parsed_date is not None
+        ]
+        exposure_start = min(start_dates) if start_dates else None
+        series = self.dechallenge_series(labs, primary_pattern)
+        reference = self._dechallenge_reference(series, exposure_start)
+        abnormal_dates = [
+            point_date for point_date, multiple, _ in series if multiple > reference
+        ]
+        last_abnormal_date = abnormal_dates[-1].isoformat() if abnormal_dates else None
         if not stop_dates:
-            return "no_follow_up", None, labs[-1].sample_date if labs else None
+            return "no_follow_up", None, last_abnormal_date
 
-        stop_date = stop_dates[-1]
-        alt_like = [
-            item
-            for item in labs
-            if item.marker_name.upper() in {"ALT", "AST"}
-            and self.parse_date(item.sample_date) is not None
-        ]
-        if len(alt_like) < 2:
-            return "insufficient_interval", None, labs[-1].sample_date if labs else None
+        # The case-level dechallenge follows the first discontinuation made once
+        # injury was present; when every stop preceded detection, the latest stop
+        # is the closest withdrawal to onset.
+        onset = abnormal_dates[0] if abnormal_dates else None
+        stops_after_onset = [item for item in stop_dates if onset and item >= onset]
+        stop_date = stops_after_onset[0] if stops_after_onset else stop_dates[-1]
+        status, recovery_date = self.assess_dechallenge(
+            series,
+            stop_date=stop_date,
+            exposure_start=exposure_start,
+            cholestatic=primary_pattern in {"cholestatic", "mixed"},
+        )
+        return status, recovery_date, last_abnormal_date
 
-        after_stop = [
-            item
-            for item in alt_like
-            if (self.parse_date(item.sample_date) or date.min) >= stop_date
-        ]
-        if len(after_stop) < 2:
-            return "insufficient_interval", None, labs[-1].sample_date if labs else None
+    # -------------------------------------------------------------------------
+    @classmethod
+    def dechallenge_series(
+        cls, labs: list[ClinicalLabEntry], primary_pattern: str
+    ) -> list[tuple[date, float, str]]:
+        """Dated ULN multiples of the RUCAM course marker (ALT, or ALP when cholestatic/mixed)."""
+        markers = (
+            ("ALP",)
+            if primary_pattern in {"cholestatic", "mixed"}
+            else ("ALT", "AST")
+        )
+        for marker in markers:
+            series = sorted(
+                (point_date, multiple, item.sample_date or "")
+                for item in labs
+                if item.marker_name.upper() == marker
+                for point_date in [cls.parse_date(item.sample_date)]
+                for multiple in [cls._multiple(item)]
+                if point_date is not None and multiple is not None
+            )
+            if series:
+                return series
+        return []
 
-        baseline_multiples = [
-            self._multiple(item) or 0.0
-            for item in alt_like
-            if (self.parse_date(item.sample_date) or date.min) <= stop_date
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _dechallenge_reference(
+        series: list[tuple[date, float, str]], exposure_start: date | None
+    ) -> float:
+        """ULN, or the abnormal pre-treatment baseline multiple when one exists."""
+        if exposure_start is None:
+            return 1.0
+        baseline = [multiple for point_date, multiple, _ in series if point_date < exposure_start]
+        return max(1.0, baseline[-1]) if baseline else 1.0
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def assess_dechallenge(
+        cls,
+        series: list[tuple[date, float, str]],
+        *,
+        stop_date: date,
+        exposure_start: date | None,
+        cholestatic: bool,
+    ) -> tuple[DechallengeStatus, str | None]:
+        """Course after withdrawal following the updated RUCAM criteria.
+
+        The decline is measured as the fraction of the peak excess over the
+        reference (ULN or abnormal baseline) and must reach 50% within 30 days
+        (hepatocellular) or 180 days (cholestatic/mixed) after discontinuation.
+        Resolution requires a return to the reference, never a fall below an
+        earlier abnormal value.
+        """
+        reference = cls._dechallenge_reference(series, exposure_start)
+        episode = [
+            point
+            for point in series
+            if exposure_start is None or point[0] >= exposure_start
         ]
-        baseline_multiple = max(baseline_multiples) if baseline_multiples else 0.0
-        first_multiple = self._multiple(after_stop[0]) or 0.0
-        last_multiple = self._multiple(after_stop[-1]) or 0.0
-        last_date = after_stop[-1].sample_date
-        if last_multiple > first_multiple * 1.2:
-            return "worsening_after_stop", None, last_date
-        if last_multiple <= 1.0:
-            return "resolved_to_baseline", last_date, last_date
-        if baseline_multiple > 0 and last_multiple <= baseline_multiple:
-            return "resolved_to_baseline", last_date, last_date
-        days_followed = ((self.parse_date(last_date) or stop_date) - stop_date).days
-        if days_followed >= 180 and last_multiple > 1.0:
-            return "chronic_or_persistent", None, last_date
-        if last_multiple < first_multiple * 0.5:
-            return "improving_after_stop", None, last_date
-        return "stable_abnormality", None, last_date
+        if not episode:
+            return "insufficient_interval", None
+        peak_date, peak, _ = max(episode, key=lambda point: point[1])
+        if peak <= reference:
+            return "insufficient_interval", None
+        follow_up = [
+            point for point in episode if point[0] >= stop_date and point[0] > peak_date
+        ]
+        if not follow_up:
+            return "insufficient_interval", None
+
+        last_date, last_multiple, last_raw = follow_up[-1]
+        if last_multiple <= reference:
+            recovery = last_raw
+            for _point_date, multiple, raw in reversed(follow_up):
+                if multiple > reference:
+                    break
+                recovery = raw
+            return "resolved_to_baseline", recovery
+        if last_multiple > follow_up[0][1] * 1.2:
+            return "worsening_after_stop", None
+
+        window_days = 180 if cholestatic else 30
+        excess = peak - reference
+        if any(
+            (peak - multiple) / excess >= 0.5
+            and (point_date - stop_date).days <= window_days
+            for point_date, multiple, _ in follow_up
+        ):
+            return "improving_after_stop", None
+        if (last_date - stop_date).days > window_days:
+            return "chronic_or_persistent", None
+        return "stable_abnormality", None
 
     # -------------------------------------------------------------------------
     @staticmethod
