@@ -4,11 +4,23 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Generator
+from contextlib import contextmanager
+import signal
 
 import uvicorn
 
 from app import app
 from services.runtime.desktop import get_desktop_runtime_service
+
+
+class LauncherOwnedServer(uvicorn.Server):
+    """Leave Ctrl+C to the launcher so shutdown uses the authenticated API."""
+
+    # -------------------------------------------------------------------------
+    @contextmanager
+    def capture_signals(self) -> Generator[None, None, None]:
+        yield
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,7 +34,8 @@ def main() -> None:
     arguments = build_parser().parse_args()
     if arguments.host not in {"127.0.0.1", "localhost"}:
         raise SystemExit("Source-mode server must bind to a loopback host.")
-    server = uvicorn.Server(
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    server = LauncherOwnedServer(
         uvicorn.Config(
             app,
             host=arguments.host,

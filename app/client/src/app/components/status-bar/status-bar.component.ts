@@ -1,12 +1,21 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Component, OnDestroy, computed, inject } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
 
+import { RuntimeSettings } from '../../core/models/types';
 import { MemoryUsage } from '../../core/services/system-status-api';
+import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { SystemStatusStateService } from '../../core/state/system-status-state.service';
 
-type LedState = 'ok' | 'error' | 'pending' | 'unknown';
+type LedState = 'ok' | 'warning' | 'error' | 'pending' | 'unknown';
+
+const MODEL_ROLES: { label: string; key: keyof RuntimeSettings & `${string}Model` }[] = [
+  { label: 'Clinical', key: 'clinicalModel' },
+  { label: 'Text extraction', key: 'textExtractionModel' },
+  { label: 'Revision', key: 'revisionModel' },
+  { label: 'Timeline', key: 'timelineModel' },
+];
 
 type MemoryReading = { detail: string; percent: string };
 
@@ -30,6 +39,8 @@ function formatMemory(usage: MemoryUsage | null | undefined): MemoryReading | nu
 })
 export class StatusBarComponent implements OnDestroy {
   private readonly state = inject(SystemStatusStateService);
+  private readonly modelConfig = inject(ModelConfigStateService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly notAvailable = NOT_AVAILABLE;
 
   readonly backend = computed<{ led: LedState; label: string }>(() => {
@@ -67,6 +78,28 @@ export class StatusBarComponent implements OnDestroy {
       : { led: 'unknown', label: 'Unknown' };
   });
 
+  readonly modelsOpen = signal(false);
+
+  readonly modelRoles = computed<{ role: string; model: string | null }[]>(() => {
+    const settings = this.modelConfig.settings();
+    if (!settings) {
+      return MODEL_ROLES.map(({ label }) => ({ role: label, model: null }));
+    }
+    return MODEL_ROLES.map(({ label, key }) => ({
+      role: label,
+      model: (settings.useCloudServices ? settings.cloudModel : settings[key]) || null,
+    }));
+  });
+
+  readonly models = computed<{ led: LedState; label: string }>(() => {
+    const roles = this.modelRoles();
+    const assigned = roles.filter((entry) => entry.model).length;
+    if (assigned === roles.length) return { led: 'ok', label: 'All assigned' };
+    return assigned > 0
+      ? { led: 'warning', label: 'Partial' }
+      : { led: 'error', label: 'None assigned' };
+  });
+
   readonly cpu = computed(() => {
     const value = this.state.status()?.cpu_percent;
     return typeof value === 'number' ? `${Math.round(value)}%` : NOT_AVAILABLE;
@@ -77,6 +110,25 @@ export class StatusBarComponent implements OnDestroy {
 
   constructor() {
     this.state.start();
+    if (this.modelConfig.status() === 'idle') {
+      this.modelConfig.load().catch(() => undefined);
+    }
+  }
+
+  toggleModels(): void {
+    this.modelsOpen.update((open) => !open);
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  closeOnOutsidePointer(event: Event): void {
+    if (this.modelsOpen() && !this.host.nativeElement.querySelector('.models-anchor')?.contains(event.target as Node)) {
+      this.modelsOpen.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  closeOnEscape(): void {
+    this.modelsOpen.set(false);
   }
 
   ngOnDestroy(): void {

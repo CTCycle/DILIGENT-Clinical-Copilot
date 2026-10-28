@@ -63,6 +63,52 @@
   background: var(--color-status-success-text);
 }
 
+.status-led.is-warning {
+  background: var(--color-status-warning-text);
+}
+
+.status-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.models-anchor {
+  position: relative;
+}
+
+.models-popover {
+  position: absolute;
+  bottom: calc(100% + var(--space-sm));
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 260px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.models-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.models-unassigned {
+  color: var(--color-text-subtle);
+  font-style: italic;
+}
+
 .status-led.is-error {
   background: var(--color-status-error-text);
 }
