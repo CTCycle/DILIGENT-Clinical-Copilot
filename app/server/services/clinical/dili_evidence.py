@@ -53,11 +53,20 @@ NARRATIVE_LATENCY_RE = re.compile(
     r"|\b(\d+(?:\.\d+)?)\s*(day|week|month)s?\s+(?:after|following|from)\s+(?:the\s+)?"
     r"(?:first\s+dose|start\w*|initiat\w*|commenc\w*|beginning)"
 )
-# Drug-level or literature statements about latency are not patient claims.
+# Sentences carrying drug-level, reference or literature wording describe what
+# a drug can do, not this patient, and are not checked as patient claims.
 NARRATIVE_GENERIC_CONTEXT_RE = re.compile(
-    r"\b(typical\w*|usual\w*|generally|commonly|reported|described|literature|"
-    r"range|between)\b"
+    r"\b(typical\w*|usual\w*|generally|common\w*|reported|describ\w*|literature|"
+    r"livertox|monographs?|excerpt|published|case series|cases|characteri[sz]\w*|"
+    r"recogni[sz]\w*|can cause|may cause|also occur\w*|range|between)\b"
 )
+# Decimal points ("8.3 weeks") do not end a sentence.
+NARRATIVE_SENTENCE_SPLIT_RE = re.compile(r"(?<!\d)\.(?!\d)|[!?;\n]")
+NARRATIVE_MIXED_COMPOUND_RE = re.compile(
+    r"\b(?:mixed\s+)?(?:hepatocellular[-/ ](?:and\s+)?cholestatic|"
+    r"cholestatic[-/ ](?:and\s+)?hepatocellular)\b"
+)
+NARRATIVE_RANGE_END_RE = re.compile(r"\d\s*(?:-|–|—|to)\s*$")
 NARRATIVE_EXCLUSION_RE = re.compile(r"\b(ruled out|excluded|exclude[sd]|eliminated|unlikely)\b")
 NARRATIVE_CLAUSE_SPLIT_RE = re.compile(
     CLAUSE_SPLIT_RE.pattern + r"|\b(?:but|while|whereas|although|however)\b"
@@ -214,8 +223,10 @@ class DiliEvidenceBuilder:
             r"\b(?:confident|definitive) diagnosis\b",
             r"\b(?:is|was|being|as) the (?:definite|definitive|certain|undoubted|proven|"
             r"confirmed|sole) (?:cause|culprit|etiology|aetiology)\b",
+            # "Highly likely" is omitted: it is LiverTox likelihood category B
+            # wording, not a patient-level claim.
             r"\b(?:definitely|certainly|undoubtedly|unequivocally|conclusively|clearly|"
-            r"almost certainly|very likely|highly likely) (?:the )?(?:caused|causative|"
+            r"almost certainly|very likely) (?:the )?(?:caused|causative|"
             r"responsible|culprit|cause|drug-induced|attributable)\b",
             r"\bconfirmed (?:dili|drug-induced liver injury)\b",
         )
@@ -278,7 +289,12 @@ class DiliEvidenceBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def _contradicted_pattern_claim(text: str, bundle: DiliEvidenceBundle) -> str | None:
-        """Stated pattern names or R ratios outside every calculated pattern."""
+        """Stated patient pattern names or R ratios outside every calculated pattern.
+
+        Only sentences naming one pattern are judged: drug-level or literature
+        sentences and comparisons of several patterns are not patient claims.
+        "Hepatocellular-cholestatic" wording reads as mixed.
+        """
         calculated = {
             item.pattern
             for item in bundle.patterns
@@ -286,24 +302,32 @@ class DiliEvidenceBuilder:
         }
         if not calculated:
             return None
-        for match in NARRATIVE_PATTERN_RE.finditer(text):
-            name = match.group(1) or match.group(2)
-            clause_prefix = text[: match.start()].rsplit(",", 1)[-1][-40:]
-            if name not in calculated and not re.search(
-                r"\b(not|no|rather than|instead of|unlike)\b", clause_prefix
-            ):
-                return f"a {name} pattern"
-        for match in NARRATIVE_R_RATIO_RE.finditer(text):
-            r_ratio = float(match.group(1) or match.group(2))
-            band = (
-                "hepatocellular"
-                if r_ratio >= 5
-                else "cholestatic"
-                if r_ratio <= 2
-                else "mixed"
-            )
-            if band not in calculated:
-                return f"an R ratio of {r_ratio:g}"
+        for raw_sentence in NARRATIVE_SENTENCE_SPLIT_RE.split(text):
+            sentence = NARRATIVE_MIXED_COMPOUND_RE.sub("mixed", raw_sentence)
+            matches = list(NARRATIVE_PATTERN_RE.finditer(sentence))
+            names = {match.group(1) or match.group(2) for match in matches}
+            if len(names) == 1 and not NARRATIVE_GENERIC_CONTEXT_RE.search(sentence):
+                name = names.pop()
+                clause_prefix = sentence[: matches[0].start()].rsplit(",", 1)[-1]
+                if name not in calculated and not re.search(
+                    r"\b(not|no|rather than|instead of|unlike)\b", clause_prefix
+                ):
+                    return f"a {name} pattern"
+            # A stated R value is a patient claim unless literature wording
+            # introduces it ("reported cases (R = 13.8)").
+            for match in NARRATIVE_R_RATIO_RE.finditer(sentence):
+                if NARRATIVE_GENERIC_CONTEXT_RE.search(sentence[: match.start()]):
+                    continue
+                r_ratio = float(match.group(1) or match.group(2))
+                band = (
+                    "hepatocellular"
+                    if r_ratio >= 5
+                    else "cholestatic"
+                    if r_ratio <= 2
+                    else "mixed"
+                )
+                if band not in calculated:
+                    return f"an R ratio of {r_ratio:g}"
         return None
 
     # -------------------------------------------------------------------------
@@ -341,12 +365,18 @@ class DiliEvidenceBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def _contradicted_latency_claim(text: str, bundle: DiliEvidenceBundle) -> str | None:
-        """Stated patient latency matching no exposure-to-injury interval."""
+        """Stated patient latency matching no exposure-to-injury interval.
+
+        Narratives round latencies ("~2 months" for 46 days), so a claim only
+        contradicts the record when it is off by more than 50% and 14 days for
+        every drug start and onset date. Range bounds are drug-level wording.
+        """
         onset_dates = [
             parsed
             for value in (
                 bundle.timeline.first_abnormal_liver_test_date,
                 bundle.timeline.first_symptom_date,
+                bundle.timeline.jaundice_or_bilirubin_rise_date,
             )
             for parsed in [DiliTimelineEngine.parse_date(value)]
             if parsed is not None
@@ -361,15 +391,18 @@ class DiliEvidenceBuilder:
         ]
         if not latencies:
             return None
-        for sentence in re.split(r"[.!?;]+", text):
+        for sentence in NARRATIVE_SENTENCE_SPLIT_RE.split(text):
             if NARRATIVE_GENERIC_CONTEXT_RE.search(sentence):
                 continue
             for match in NARRATIVE_LATENCY_RE.finditer(sentence):
-                amount = float(match.group(1) or match.group(3))
-                unit = match.group(2) or match.group(4)
+                amount_group = 1 if match.group(1) else 3
+                if NARRATIVE_RANGE_END_RE.search(sentence[: match.start(amount_group)]):
+                    continue
+                amount = float(match.group(amount_group))
+                unit = match.group(amount_group + 1)
                 stated_days = amount * LATENCY_UNIT_DAYS[unit]
                 if not any(
-                    abs(stated_days - actual) <= max(3, 0.25 * actual)
+                    abs(stated_days - actual) <= max(14, 0.5 * actual)
                     for actual in latencies
                 ):
                     return f"{amount:g} {unit}(s)"
