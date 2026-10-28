@@ -11,6 +11,29 @@
       <span class="status-label">Providers</span>
       <span class="status-value">{{ providers() }}</span>
     </span>
+    <span class="status-item models-anchor">
+      <button
+        type="button"
+        class="status-button"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="modelsOpen()"
+        (click)="toggleModels()"
+      >
+        <span class="status-label">Models</span>
+        <span class="status-led" [class]="'status-led is-' + models().led" aria-hidden="true"></span>
+        <span class="status-value">{{ models().label }}</span>
+      </button>
+      @if (modelsOpen()) {
+        <div class="models-popover" role="dialog" aria-label="Model roles">
+          @for (entry of modelRoles(); track entry.role) {
+            <div class="models-row">
+              <span class="status-label">{{ entry.role }}</span>
+              <span [class]="entry.model ? 'status-value' : 'models-unassigned'">{{ entry.model || 'Not selected' }}</span>
+            </div>
+          }
+        </div>
+      }
+    </span>
     <span class="status-item" title="Ollama server at the endpoint configured in Settings">
       <span class="status-label">Local</span>
       <span class="status-led" [class]="'status-led is-' + local().led" aria-hidden="true"></span>
