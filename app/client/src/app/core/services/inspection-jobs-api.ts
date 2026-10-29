@@ -8,6 +8,7 @@ import {
   InspectionRagUpdateRequest,
   InspectionRxNavOverrideRequest,
   InspectionStructuredSourcesUpdateRequest,
+  InspectionTerminologyOverrideRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobListResponse,
   InspectionUpdateJobStatusResponse,
@@ -97,6 +98,43 @@ export async function cancelInspectionLiverToxUpdateJob(
 ): Promise<JobCancelResponse> {
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionTerminologyUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(
+    `${API_BASE_URL}/inspection/terminology/update-config`,
+    { method: "GET" },
+  );
+}
+
+export async function startInspectionTerminologyUpdateJob(
+  payload: InspectionTerminologyOverrideRequest = {},
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/terminology/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchInspectionTerminologyUpdateJobStatus(
+  jobId: string,
+  timeoutSeconds: number = INSPECTION_JOB_STATUS_TIMEOUT_SECONDS,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/terminology/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+    timeoutSeconds,
+  );
+}
+
+export async function cancelInspectionTerminologyUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/terminology/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
   );
 }

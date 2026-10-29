@@ -305,11 +305,12 @@ export type InspectionDeleteResponse = {
   deleted: boolean;
 };
 
-export type InspectionUpdateTarget = "rxnav" | "livertox" | "dilirank" | "rag";
+export type InspectionUpdateTarget = "rxnav" | "livertox" | "terminology" | "dilirank" | "rag";
 
 export const INSPECTION_UPDATE_ALL_TARGETS = [
   "livertox",
   "rxnav",
+  "terminology",
   "dilirank",
 ] as const;
 
@@ -318,6 +319,7 @@ export type InspectionUpdateAllTarget = (typeof INSPECTION_UPDATE_ALL_TARGETS)[n
 export type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
   livertox: InspectionLiverToxOverrideRequest;
+  terminology: InspectionTerminologyOverrideRequest;
   dilirank: InspectionDiliRankUpdateRequest;
   rag: InspectionRagUpdateRequest;
 };
@@ -325,12 +327,14 @@ export type InspectionUpdateOverridesByTarget = {
 export type InspectionUpdateStartRequest =
   | { target: "rxnav"; payload: InspectionUpdateOverridesByTarget["rxnav"] }
   | { target: "livertox"; payload: InspectionUpdateOverridesByTarget["livertox"] }
+  | { target: "terminology"; payload: InspectionUpdateOverridesByTarget["terminology"] }
   | { target: "dilirank"; payload: InspectionUpdateOverridesByTarget["dilirank"] }
   | { target: "rag"; payload: InspectionUpdateOverridesByTarget["rag"] };
 
 export type InspectionStructuredSourcesUpdateRequest = {
   rxnav: InspectionRxNavOverrideRequest;
   livertox: InspectionLiverToxOverrideRequest;
+  terminology: InspectionTerminologyOverrideRequest;
   dilirank: InspectionDiliRankUpdateRequest;
 };
 
@@ -385,8 +389,132 @@ export type InspectionUpdateConfigResponse = {
 };
 
 export type InspectionRxNavOverrideRequest = {
-  rxnav_request_timeout?: number;
-  rxnav_max_concurrency?: number;
+  force_full?: boolean;
+};
+
+export type InspectionTerminologyOverrideRequest = {
+  force_full?: boolean;
+  drugcentral_enabled?: boolean;
+  chembl_enabled?: boolean;
+  swissmedic_enabled?: boolean;
+};
+
+export type TerminologyResolutionStatus = "verified" | "probable" | "ambiguous" | "unresolved";
+
+export type TerminologyIngredient = {
+  drug_id: number;
+  name: string;
+  concept_type: string;
+  parent_drug_id: number | null;
+  parent_name: string | null;
+};
+
+export type TerminologyCandidate = {
+  drug_id: number;
+  name: string;
+  concept_type: string;
+  matched_alias: string | null;
+  alias_kind: string | null;
+  source: string | null;
+  country: string | null;
+  edit_distance: number | null;
+  similarity: number | null;
+};
+
+export type TerminologyResolution = {
+  original: string;
+  normalized: string;
+  strengths: string[];
+  qualifiers: string[];
+  status: TerminologyResolutionStatus;
+  accepted: boolean;
+  method: string;
+  drug_id: number | null;
+  preferred_name: string | null;
+  concept_type: string | null;
+  ingredients: TerminologyIngredient[];
+  precise_forms: TerminologyIngredient[];
+  matched_alias: string | null;
+  alias_kind: string | null;
+  source: string | null;
+  source_version: string | null;
+  country: string | null;
+  strength_supported: boolean | null;
+  candidates: TerminologyCandidate[];
+  review_reasons: string[];
+  external_calls: number;
+  terminology_revision: number | null;
+};
+
+export type TerminologySourceSummary = {
+  source: string;
+  enabled: boolean;
+  license: string;
+  attribution: string;
+  last_status: string | null;
+  last_version: string | null;
+  last_finished_at: string | null;
+  last_completed_version: string | null;
+  last_completed_at: string | null;
+  aliases: number;
+  products: number;
+  open_conflicts: number;
+  last_error: string | null;
+};
+
+export type TerminologySummaryResponse = {
+  revision: number | null;
+  concepts: number;
+  aliases: number;
+  resolvable_aliases: number;
+  provisional_aliases: number;
+  products: number;
+  verified_products: number;
+  livertox_links: number;
+  linked_monographs: number;
+  total_monographs: number;
+  open_conflicts: number;
+  index: Record<string, number | null>;
+  sources: TerminologySourceSummary[];
+};
+
+export type TerminologyImportRunItem = {
+  id: number;
+  source: string;
+  source_version: string | null;
+  mode: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  stats: Record<string, unknown> | null;
+  error: string | null;
+};
+
+export type TerminologyConflictItem = {
+  id: number;
+  source: string;
+  conflict_type: string;
+  subject: string;
+  existing_drug: string | null;
+  proposed_drug: string | null;
+  detail: string | null;
+  status: string;
+  detected_at: string;
+};
+
+export type TerminologyConflictsResponse = {
+  items: TerminologyConflictItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type TerminologyAliasDecision = "confirm" | "reject";
+
+export type TerminologyAliasDecisionResponse = {
+  alias: string;
+  drug_id: number;
+  validation_status: "confirmed" | "rejected";
 };
 
 export type InspectionLiverToxOverrideRequest = {

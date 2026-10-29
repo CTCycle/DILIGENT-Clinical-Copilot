@@ -165,20 +165,14 @@ class InspectionUpdateConfigMixin:
         config = self.load_runtime_config()
         settings = get_server_settings()
         if target == "rxnav":
-            source = config.get("runtime", {})
+            defaults = {"force_full": False}
+            allowed_fields = list(defaults.keys())
+        elif target == "terminology":
             defaults = {
-                "rxnav_request_timeout": float(
-                    source.get(
-                        "rxnav_request_timeout",
-                        settings.runtime.rxnav_request_timeout,
-                    )
-                ),
-                "rxnav_max_concurrency": int(
-                    source.get(
-                        "rxnav_max_concurrency",
-                        settings.runtime.rxnav_max_concurrency,
-                    )
-                ),
+                "force_full": False,
+                "drugcentral_enabled": settings.runtime.drugcentral_enabled,
+                "chembl_enabled": settings.runtime.chembl_enabled,
+                "swissmedic_enabled": settings.runtime.swissmedic_enabled,
             }
             allowed_fields = list(defaults.keys())
         elif target == "livertox":

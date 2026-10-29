@@ -1,6 +1,6 @@
 {
   "manifest": "drug_matching",
-  "version": 2,
+  "version": 3,
   "description": "Deterministic text reference data used by drug matching services.",
   "entries": [
     {
@@ -298,15 +298,476 @@
       "locale": "und",
       "priority": 100,
       "values": [
-        "mab", "nib", "nol", "mide", "zole", "prazole", "statin",
-        "pril", "sartan", "olol", "dipine", "triptan", "coxib",
-        "navir", "oxacin", "mycin", "cycline", "caine", "tidine",
-        "parib", "tinib", "lisib", "grel", "rifa", "vir", "cox",
-        "entan", "uridine", "glitazone", "floxacin", "trexate", "sulfon"
+        "mab",
+        "nib",
+        "nol",
+        "mide",
+        "zole",
+        "prazole",
+        "statin",
+        "pril",
+        "sartan",
+        "olol",
+        "dipine",
+        "triptan",
+        "coxib",
+        "navir",
+        "oxacin",
+        "mycin",
+        "cycline",
+        "caine",
+        "tidine",
+        "parib",
+        "tinib",
+        "lisib",
+        "grel",
+        "rifa",
+        "vir",
+        "cox",
+        "entan",
+        "uridine",
+        "glitazone",
+        "floxacin",
+        "trexate",
+        "sulfon"
       ],
       "metadata": {
         "case_sensitive": false,
         "match_mode": "suffix"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "error_prone_abbreviations",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "AZT",
+        "MS",
+        "MSO4",
+        "MgSO4",
+        "HCT",
+        "TAC",
+        "CPZ"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "description": "Never resolved automatically; reported as ambiguous candidates."
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "hydrochlorothiazide",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "HCTZ"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "methotrexate",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "MTX"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "isoniazid",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "INH"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "acetaminophen",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "APAP"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "aspirin",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "ASA"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "fluorouracil",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "5-FU",
+        "5FU"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "mercaptopurine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "6-MP",
+        "6MP"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "thioguanine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "6-TG"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "pyrazinamide",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "PZA"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "ethambutol",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "EMB"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "acetylcysteine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "NAC"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "propylthiouracil",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "PTU"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "hydroxychloroquine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "HCQ"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "azathioprine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "AZA"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "sulfasalazine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "SSZ"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "carbamazepine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "CBZ"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "valproate",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "VPA"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "lamivudine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "3TC"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "emtricitabine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "FTC"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "efavirenz",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "EFV"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "nevirapine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "NVP"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "dolutegravir",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "DTG"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "cyclosporine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "CsA"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "sulfamethoxazole / trimethoprim",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "TMP/SMX",
+        "SMX/TMP"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "abbreviation"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "sulfamethoxazole / trimethoprim",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "co-trimoxazole",
+        "cotrimoxazole"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "synonym"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "amoxicillin / clavulanate",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "co-amoxiclav",
+        "coamoxiclav",
+        "co-amoxi",
+        "coamoxi",
+        "co-amoxicillina"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "synonym"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "terminology_aliases",
+      "key": "acetaminophen / codeine",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "co-codamol"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "exact",
+        "alias_kind": "synonym"
       }
     }
   ]

@@ -28,6 +28,7 @@ import {
   cancelInspectionLiverToxUpdateJob,
   cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
+  cancelInspectionTerminologyUpdateJob,
   fetchInspectionDiliRankUpdateConfig,
   fetchInspectionDiliRankUpdateJobStatus,
   fetchInspectionLiverToxUpdateConfig,
@@ -36,11 +37,21 @@ import {
   fetchInspectionRagUpdateJobStatus,
   fetchInspectionRxNavUpdateConfig,
   fetchInspectionRxNavUpdateJobStatus,
+  fetchInspectionTerminologyUpdateConfig,
+  fetchInspectionTerminologyUpdateJobStatus,
   startInspectionDiliRankUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
+  startInspectionTerminologyUpdateJob,
 } from '../../core/services/inspection-jobs-api';
+import {
+  decideTerminologyAlias,
+  fetchTerminologyConflicts,
+  fetchTerminologyRuns,
+  fetchTerminologySummary,
+  resolveTerminologyName,
+} from '../../core/services/terminology-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { DesktopDialogService } from '../../core/services/desktop-dialog.service';
 import {
@@ -56,7 +67,13 @@ import {
   INSPECTION_UPDATE_ALL_TARGETS,
   InspectionUpdateAllTarget,
   InspectionUpdateTarget,
+  TerminologyAliasDecision,
+  TerminologyConflictItem,
+  TerminologyImportRunItem,
+  TerminologyResolution,
+  TerminologySummaryResponse,
 } from '../../core/models/inspection-types';
+import { terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
 import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
 import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from '../../core/state/inspection-update-job-resource';
@@ -85,6 +102,11 @@ const INSPECTION_VIEWS: InspectionViewOption[] = [
     id: 'livertox',
     label: 'LiverTox',
     iconPath: 'M8.25 4.5h7.5 M10.5 4.5v5.25l-3.75 7.5a2.25 2.25 0 0 0 2.01 3.25h6.48a2.25 2.25 0 0 0 2.01-3.25l-3.75-7.5V4.5 M8.5 15h7',
+  },
+  {
+    id: 'terminology',
+    label: 'Terminology',
+    iconPath: 'M4.5 6.75h6 M4.5 12h4.5 M4.5 17.25h6 M15.75 9.75a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 8.25l2.25 2.25 M13.5 14.25h6v6h-6z',
   },
   {
     id: 'dilirank',
@@ -244,6 +266,17 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
         await this.loadLiverTox();
       },
     },
+    terminology: {
+      fetchConfig: () => fetchInspectionTerminologyUpdateConfig(),
+      start: (overrides) => startInspectionTerminologyUpdateJob(overrides),
+      status: (jobId, timeoutSeconds) => fetchInspectionTerminologyUpdateJobStatus(jobId, timeoutSeconds),
+      cancel: async (jobId) => {
+        await cancelInspectionTerminologyUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadTerminology();
+      },
+    },
     dilirank: {
       fetchConfig: () => fetchInspectionDiliRankUpdateConfig(),
       start: (overrides) => startInspectionDiliRankUpdateJob(overrides),
@@ -323,6 +356,23 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly livertoxUpdateRunning = computed(() => this.updateTargetState().livertox.running);
   readonly livertoxUpdateProgress = computed(() => this.updateTargetState().livertox.progress);
   readonly livertoxUpdateMessage = computed(() => this.updateTargetState().livertox.message);
+  readonly terminologyUpdateRunning = computed(() => this.updateTargetState().terminology.running);
+  readonly terminologyUpdateProgress = computed(() => this.updateTargetState().terminology.progress);
+  readonly terminologyUpdateMessage = computed(() => this.updateTargetState().terminology.message);
+  readonly terminologySummary = signal<TerminologySummaryResponse | null>(null);
+  readonly terminologyRuns = signal<TerminologyImportRunItem[]>([]);
+  readonly terminologyConflicts = signal<TerminologyConflictItem[]>([]);
+  readonly terminologyConflictTotal = signal(0);
+  readonly terminologyLoading = signal(false);
+  readonly terminologyError = signal<string | null>(null);
+  readonly resolveInput = signal('');
+  readonly resolveAllowExternal = signal(true);
+  readonly resolveLoading = signal(false);
+  readonly resolveError = signal<string | null>(null);
+  readonly resolveResult = signal<TerminologyResolution | null>(null);
+  readonly aliasDecisionMessage = signal<string | null>(null);
+  readonly terminologyStatusLabel = terminologyStatusLabel;
+  readonly terminologyStatusTone = terminologyStatusTone;
   readonly dilirankUpdateRunning = computed(() => this.updateTargetState().dilirank.running);
   readonly dilirankUpdateProgress = computed(() => this.updateTargetState().dilirank.progress);
   readonly dilirankUpdateMessage = computed(() => this.updateTargetState().dilirank.message);
@@ -336,6 +386,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     await Promise.all([
       this.loadRxNav(),
       this.loadLiverTox(),
+      this.loadTerminology(),
       this.loadDiliRank(),
       this.loadRag(),
     ]);
@@ -360,6 +411,85 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async loadLiverTox(): Promise<void> {
     await this.liverToxCatalog.loadInitial();
+  }
+
+  async loadTerminology(): Promise<void> {
+    this.terminologyLoading.set(true);
+    this.terminologyError.set(null);
+    try {
+      const [summary, runs, conflicts] = await Promise.all([
+        fetchTerminologySummary(),
+        fetchTerminologyRuns(12),
+        fetchTerminologyConflicts(0, 25),
+      ]);
+      this.terminologySummary.set(summary);
+      this.terminologyRuns.set(runs);
+      this.terminologyConflicts.set(conflicts.items);
+      this.terminologyConflictTotal.set(conflicts.total);
+    } catch (error) {
+      this.terminologyError.set(error instanceof Error ? error.message : 'Failed to load terminology.');
+    } finally {
+      this.terminologyLoading.set(false);
+    }
+  }
+
+  async resolveName(): Promise<void> {
+    const name = this.resolveInput().trim();
+    if (!name || this.resolveLoading()) {
+      return;
+    }
+    this.resolveLoading.set(true);
+    this.resolveError.set(null);
+    this.aliasDecisionMessage.set(null);
+    try {
+      this.resolveResult.set(await resolveTerminologyName(name, this.resolveAllowExternal()));
+    } catch (error) {
+      this.resolveResult.set(null);
+      this.resolveError.set(error instanceof Error ? error.message : 'Failed to resolve the name.');
+    } finally {
+      this.resolveLoading.set(false);
+    }
+  }
+
+  async decideAlias(decision: TerminologyAliasDecision, drugId: number, drugName: string): Promise<void> {
+    const result = this.resolveResult();
+    if (!result) {
+      return;
+    }
+    const verb = decision === 'confirm' ? 'Confirm' : 'Reject';
+    const confirmed = globalThis.confirm(
+      `${verb} "${result.original}" as ${drugName}? This applies to all future assessments.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const response = await decideTerminologyAlias(decision, result.original, drugId);
+      await this.resolveName();
+      this.aliasDecisionMessage.set(`"${response.alias}" ${response.validation_status} for ${drugName}.`);
+    } catch (error) {
+      this.resolveError.set(error instanceof Error ? error.message : 'Failed to record the decision.');
+    }
+  }
+
+  formatRunStats(run: TerminologyImportRunItem): string {
+    const stats = run.stats ?? {};
+    const parts: string[] = [];
+    for (const [key, label] of [
+      ['concepts_created', 'new concepts'],
+      ['aliases', 'aliases'],
+      ['products', 'products'],
+      ['conflicts', 'conflicts'],
+    ] as const) {
+      const value = stats[key];
+      if (typeof value === 'number' && value > 0) {
+        parts.push(`${value.toLocaleString()} ${label}`);
+      }
+    }
+    if (stats['reason'] === 'unchanged') {
+      parts.push('unchanged');
+    }
+    return parts.join(', ') || '—';
   }
 
   async loadDiliRank(): Promise<void> {

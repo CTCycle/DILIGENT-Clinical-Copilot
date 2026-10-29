@@ -19,6 +19,25 @@ from repositories.context import RepositoryContext  # noqa: E402
 from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
 from repositories.drug_catalog_repository import DrugCatalogRepository  # noqa: E402
 from repositories.knowledge_repository import KnowledgeRepository  # noqa: E402
+from repositories.terminology_repository import TerminologyRepository  # noqa: E402
+from services.updater.terminology.snapshot import (  # noqa: E402
+    StagedConcept,
+    TerminologySnapshot,
+)
+
+
+def _seed_rxnorm_fixture(repository: TerminologyRepository) -> None:
+    snapshot = TerminologySnapshot(
+        source="rxnorm", version="live-provider-fixture", license="Public domain"
+    )
+    snapshot.concepts["723"] = StagedConcept(key="723", name="amoxicillin", rxcui="723")
+    snapshot.add_alias("723", "amoxicillin", "canonical", term_type="IN")
+    snapshot.add_alias("723", "Amoxil", "brand", term_type="BN")
+    run_id = repository.start_run(source="rxnorm", mode="full", license_text=snapshot.license)
+    stats = repository.persist_snapshot(snapshot, run_id)
+    repository.finish_run(
+        run_id, status="completed", version=snapshot.version, stats=stats.to_dict()
+    )
 
 
 def seed_live_provider_database() -> tuple[int, int]:
@@ -28,18 +47,8 @@ def seed_live_provider_database() -> tuple[int, int]:
 
     initialize_sqlite_database(database_settings)
     context = RepositoryContext.create()
-    DrugCatalogRepository(context).upsert_drugs_catalog_records(
-        [
-            {
-                "rxcui": "723",
-                "raw_name": "amoxicillin",
-                "term_type": "IN",
-                "name": "amoxicillin",
-                "brand_names": "Amoxil",
-                "synonyms": "amoxicillin",
-            }
-        ]
-    )
+    terminology = TerminologyRepository(context)
+    _seed_rxnorm_fixture(terminology)
     KnowledgeRepository(context).save_livertox_records(
         pd.DataFrame(
             [
@@ -54,6 +63,7 @@ def seed_live_provider_database() -> tuple[int, int]:
             ]
         )
     )
+    terminology.rebuild_livertox_links()
 
     _, rxnav_count = DrugCatalogRepository(context).list_rxnav_catalog(
         search=None, offset=0, limit=1

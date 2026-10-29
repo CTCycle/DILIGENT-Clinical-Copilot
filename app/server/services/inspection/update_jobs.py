@@ -15,11 +15,18 @@ from repositories.knowledge_repository import KnowledgeRepository
 from services.runtime.jobs import JobManager
 from services.updater.dilirank import DiliRankUpdater
 from services.updater.embeddings import RagEmbeddingUpdater
+from repositories.terminology_repository import TerminologyRepository
+from services.terminology.index import get_terminology_index_cache
 from services.updater.livertox_core import LiverToxUpdater
-from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
-from services.updater.rxnav_client import RxNavClient
+from services.updater.terminology.factory import (
+    build_international_sources,
+    build_rxnorm_sources,
+)
+from services.updater.terminology.ingestor import TerminologyIngestor
+from services.updater.terminology.snapshot import TerminologySource
 
-UpdateTarget = Literal["rxnav", "livertox", "dilirank", "rag"]
+UpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
+STRUCTURED_TARGETS: tuple[UpdateTarget, ...] = ("rxnav", "livertox", "terminology", "dilirank")
 
 ###############################################################################
 def _override_float(values: Mapping[str, object], key: str) -> float | None:
@@ -82,6 +89,7 @@ class DataInspectionUpdateJobRunner:
         drug_catalog_repository: DrugCatalogRepository,
         knowledge_repository: KnowledgeRepository,
         dilirank_repository: DiliRankRepository | None,
+        terminology_repository: TerminologyRepository | None,
         jobs: JobManager,
         report_phase_by_target: Callable[[str, str, int, str], None],
         report_job_progress: Callable[
@@ -92,6 +100,7 @@ class DataInspectionUpdateJobRunner:
         self.drug_catalog_repository = drug_catalog_repository
         self.knowledge_repository = knowledge_repository
         self.dilirank_repository = dilirank_repository
+        self.terminology_repository = terminology_repository
         self.jobs = jobs
         self.report_phase_by_target = report_phase_by_target
         self.report_job_progress = report_job_progress
@@ -119,27 +128,73 @@ class DataInspectionUpdateJobRunner:
         phase_reporter(job_id, "rxnav", 1, "Configuration accepted")
         if stop_check():
             return {}
-        phase_reporter(job_id, "rxnav", 4, "RxNav update started")
-        phase_reporter(
-            job_id, "rxnav", 10, "Downloading source catalog data"
+        phase_reporter(job_id, "rxnav", 4, "RxNorm terminology update started")
+        result = self._run_terminology_sources(
+            build_rxnorm_sources(),
+            override_values,
+            progress_callback=progress_callback,
+            should_stop=stop_check,
         )
-        rx_client = RxNavClient(
-            request_timeout=_override_float(override_values, "rxnav_request_timeout"),
-            max_concurrency=_override_int(override_values, "rxnav_max_concurrency"),
-        )
-        builder = RxNavDrugCatalogBuilder(
-            drug_catalog_repository=self.drug_catalog_repository, rx_client=rx_client
-        )
-        phase_reporter(
-            job_id, "rxnav", 20, "Processing aliases and synonyms"
-        )
-        result = builder.update_drug_catalog(
-            progress_callback=progress_callback, should_stop=stop_check
-        )
-        phase_reporter(job_id, "rxnav", 88, "Persisting catalog updates")
-        phase_reporter(job_id, "rxnav", 96, "Finalizing update")
         phase_reporter(job_id, "rxnav", 100, "Completed")
         return {"summary": result}
+
+    # -------------------------------------------------------------------------
+    def run_terminology_update_job(
+        self,
+        job_id: str,
+        overrides: Mapping[str, object] | None = None,
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        report_phase: bool = True,
+    ) -> dict[str, Any]:
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = progress_callback or DataInspectionProgressReporter(
+            self.jobs, job_id, 5.0, 0.90
+        )
+        phase_reporter: Callable[[str, str, int, str], None] = (
+            self.report_phase_by_target
+            if report_phase
+            else lambda *_args: None
+        )
+        override_values = dict(overrides or {})
+        phase_reporter(job_id, "terminology", 1, "Configuration accepted")
+        if stop_check():
+            return {}
+        phase_reporter(job_id, "terminology", 4, "Terminology enrichment started")
+        result = self._run_terminology_sources(
+            build_international_sources(override_values),
+            override_values,
+            progress_callback=progress_callback,
+            should_stop=stop_check,
+        )
+        phase_reporter(job_id, "terminology", 100, "Completed")
+        return {"summary": result}
+
+    # -------------------------------------------------------------------------
+    def _run_terminology_sources(
+        self,
+        sources: list[TerminologySource],
+        overrides: Mapping[str, object],
+        *,
+        progress_callback: Callable[[float, str], None],
+        should_stop: Callable[[], bool],
+    ) -> dict[str, Any]:
+        if self.terminology_repository is None:
+            raise RuntimeError("Terminology repository is unavailable.")
+        ingestor = TerminologyIngestor(
+            self.terminology_repository,
+            sources,
+            on_change=get_terminology_index_cache().invalidate,
+        )
+        result = ingestor.run(
+            force_full=bool(_override_bool(overrides, "force_full") or False),
+            progress=progress_callback,
+            should_stop=should_stop,
+        )
+        failed = result.get("failed_sources") or []
+        if failed and len(failed) == len(sources):
+            raise RuntimeError(f"Terminology refresh failed for: {', '.join(failed)}")
+        return result
 
     # -------------------------------------------------------------------------
     def run_livertox_update_job(
@@ -178,6 +233,12 @@ class DataInspectionUpdateJobRunner:
             progress_callback=progress_callback, should_stop=stop_check
         )
         phase_reporter(job_id, "livertox", 88, "Persisting extracted data")
+        if self.terminology_repository is not None and not stop_check():
+            result = {
+                **(result if isinstance(result, dict) else {"result": result}),
+                "livertox_links": self.terminology_repository.rebuild_livertox_links(),
+            }
+            get_terminology_index_cache().invalidate()
         phase_reporter(job_id, "livertox", 96, "Finalizing update")
         phase_reporter(job_id, "livertox", 100, "Completed")
         return {"summary": result}
@@ -234,7 +295,7 @@ class DataInspectionUpdateJobRunner:
     ) -> dict[str, Any]:
         """Run the dependent structured sources in one cancellable job."""
 
-        targets = ("rxnav", "livertox", "dilirank")
+        targets = STRUCTURED_TARGETS
         override_values = dict(overrides or {})
         source_state: dict[str, dict[str, Any]] = {
             target: {
@@ -310,6 +371,13 @@ class DataInspectionUpdateJobRunner:
                     )
                 elif target == "livertox":
                     child_result = self.run_livertox_update_job(
+                        job_id,
+                        child_overrides(target),
+                        progress_callback=report_child_progress,
+                        report_phase=False,
+                    )
+                elif target == "terminology":
+                    child_result = self.run_terminology_update_job(
                         job_id,
                         child_overrides(target),
                         progress_callback=report_child_progress,

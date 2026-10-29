@@ -19,26 +19,6 @@ from services.catalogs.runtime import get_reference_catalog_snapshot
 def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
     try:
         snapshot = get_reference_catalog_snapshot()
-        repository = get_default_repository()
-        catalogs = ReferenceCatalogSerializer(repository.session_factory)
-        query_aliases: dict[str, str] = {}
-        brand_combo_preferences: dict[str, str] = {}
-        for entry in catalogs.list_active_entries():
-            if (
-                entry.domain == "text_normalization"
-                and entry.category == "query_aliases"
-                and entry.active
-            ):
-                query_aliases[normalize_catalog_value(entry.value)] = (
-                    normalize_catalog_value(entry.key)
-                )
-            if (
-                entry.domain == "drug_matching"
-                and entry.category == "catalog_fallback_aliases"
-            ):
-                brand_combo_preferences[normalize_catalog_value(entry.value)] = (
-                    normalize_catalog_value(entry.key)
-                )
         manufacturer_tokens = frozenset(
             normalize_catalog_value(value)
             for value in snapshot.values("drug_matching", "company_suffix_terms")
@@ -66,7 +46,6 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
                 | set(snapshot.values("clinical_extraction", "drug_frequency_terms"))
                 | set(snapshot.values("text_normalization", "noisy_phrases"))
             ),
-            query_aliases=query_aliases,
             noisy_phrases=frozenset(
                 snapshot.values("text_normalization", "noisy_phrases")
             ),
@@ -76,7 +55,6 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
             drug_duration_words=frozenset(),
             drug_weekday_words=frozenset(),
             lab_marker_aliases={},
-            brand_combo_preferences=brand_combo_preferences,
             knowledge_source_references={},
             section_title_aliases={},
         )

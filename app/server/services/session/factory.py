@@ -45,7 +45,6 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
         payload_sanitizer=PayloadSanitizationService(),
         input_preparator=ClinicalKnowledgePreparation(
             knowledge_repository=knowledge_repository,
-            drug_catalog_repository=drug_catalog_repository,
         ),
         hepatox_consultation_cls=HepatoxConsultation,
         job_manager=job_manager,

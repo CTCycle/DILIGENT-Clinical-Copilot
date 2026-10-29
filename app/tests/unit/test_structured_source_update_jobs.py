@@ -17,6 +17,7 @@ def build_runner(jobs: JobManager) -> DataInspectionUpdateJobRunner:
         drug_catalog_repository=object(),  # type: ignore[arg-type]
         knowledge_repository=object(),  # type: ignore[arg-type]
         dilirank_repository=object(),  # type: ignore[arg-type]
+        terminology_repository=object(),  # type: ignore[arg-type]
         jobs=jobs,
         report_phase_by_target=lambda *_args: None,
         report_job_progress=lambda *_args, **_kwargs: None,
@@ -59,22 +60,29 @@ def test_structured_sources_run_in_dependency_order() -> None:
 
     runner.run_rxnav_update_job = child("rxnav", {"records": 1})  # type: ignore[method-assign]
     runner.run_livertox_update_job = child("livertox", {"records": 2})  # type: ignore[method-assign]
+    runner.run_terminology_update_job = child("terminology", {"records": 4})  # type: ignore[method-assign]
     runner.run_dilirank_update_job = child("dilirank", {"records": 3})  # type: ignore[method-assign]
 
     result = runner.run_structured_sources_update_job(
         job_id,
         {
-            "rxnav": {"rxnav_max_concurrency": 2},
+            "rxnav": {"force_full": True},
             "livertox": {"redownload": True},
+            "terminology": {"chembl_enabled": False},
             "dilirank": {"redownload": False},
         },
     )
 
-    assert calls == [("rxnav", False), ("livertox", False), ("dilirank", False)]
+    assert calls == [
+        ("rxnav", False),
+        ("livertox", False),
+        ("terminology", False),
+        ("dilirank", False),
+    ]
     assert [
         result["sources"][target]["status"]
-        for target in ("rxnav", "livertox", "dilirank")
-    ] == ["completed", "completed", "completed"]
+        for target in ("rxnav", "livertox", "terminology", "dilirank")
+    ] == ["completed", "completed", "completed", "completed"]
     assert result["summaries"]["dilirank"] == {"records": 3}
     assert jobs.get_job_status(job_id)["progress"] == 100
 
@@ -100,6 +108,7 @@ def test_structured_sources_cancellation_does_not_start_following_sources() -> N
 
     runner.run_rxnav_update_job = rxnav_child  # type: ignore[method-assign]
     runner.run_livertox_update_job = lambda *_args, **_kwargs: calls.append("livertox")  # type: ignore[method-assign]
+    runner.run_terminology_update_job = lambda *_args, **_kwargs: calls.append("terminology")  # type: ignore[method-assign]
     runner.run_dilirank_update_job = lambda *_args, **_kwargs: calls.append("dilirank")  # type: ignore[method-assign]
 
     result = runner.run_structured_sources_update_job(job_id)
@@ -107,6 +116,7 @@ def test_structured_sources_cancellation_does_not_start_following_sources() -> N
     assert calls == ["rxnav"]
     assert result["sources"]["rxnav"]["status"] == "cancelled"
     assert result["sources"]["livertox"]["status"] == "cancelled"
+    assert result["sources"]["terminology"]["status"] == "cancelled"
     assert result["sources"]["dilirank"]["status"] == "cancelled"
 
 ###############################################################################
@@ -123,6 +133,7 @@ def test_structured_source_cancellation_exception_is_not_reported_as_failure() -
 
     runner.run_rxnav_update_job = cancel_rxnav  # type: ignore[method-assign]
     runner.run_livertox_update_job = lambda *_args, **_kwargs: calls.append("livertox")  # type: ignore[method-assign]
+    runner.run_terminology_update_job = lambda *_args, **_kwargs: calls.append("terminology")  # type: ignore[method-assign]
     runner.run_dilirank_update_job = lambda *_args, **_kwargs: calls.append("dilirank")  # type: ignore[method-assign]
 
     result = runner.run_structured_sources_update_job(job_id)
@@ -130,8 +141,8 @@ def test_structured_source_cancellation_exception_is_not_reported_as_failure() -
     assert calls == ["rxnav"]
     assert [
         result["sources"][target]["status"]
-        for target in ("rxnav", "livertox", "dilirank")
-    ] == ["cancelled", "cancelled", "cancelled"]
+        for target in ("rxnav", "livertox", "terminology", "dilirank")
+    ] == ["cancelled", "cancelled", "cancelled", "cancelled"]
     assert all(
         result["sources"][target]["error"] is None for target in result["sources"]
     )
@@ -152,6 +163,9 @@ def test_structured_source_failure_marks_remaining_sources_skipped() -> None:
         "summary": {"records": 1}
     }
     runner.run_livertox_update_job = fail_livertox  # type: ignore[method-assign]
+    runner.run_terminology_update_job = lambda *_args, **_kwargs: {  # type: ignore[method-assign]
+        "summary": {"records": 4}
+    }
     runner.run_dilirank_update_job = lambda *_args, **_kwargs: {  # type: ignore[method-assign]
         "summary": {"records": 3}
     }
@@ -162,17 +176,18 @@ def test_structured_source_failure_marks_remaining_sources_skipped() -> None:
     result = jobs.get_job_status(job_id)["result"]
     assert result["sources"]["rxnav"]["status"] == "completed"
     assert result["sources"]["livertox"]["status"] == "failed"
+    assert result["sources"]["terminology"]["status"] == "failed"
     assert result["sources"]["dilirank"]["status"] == "failed"
 
 ###############################################################################
-@pytest.mark.parametrize("failing_target", ["rxnav", "livertox", "dilirank"])
+@pytest.mark.parametrize("failing_target", ["rxnav", "livertox", "terminology", "dilirank"])
 def test_structured_source_failure_stops_at_each_ordered_boundary(
     failing_target: str,
 ) -> None:
     jobs = JobManager()
     runner = build_runner(jobs)
     job_id = make_job(jobs)
-    targets = ("rxnav", "livertox", "dilirank")
+    targets = ("rxnav", "livertox", "terminology", "dilirank")
     calls: list[str] = []
 
     def child(target: str):
@@ -194,6 +209,7 @@ def test_structured_source_failure_stops_at_each_ordered_boundary(
 
     runner.run_rxnav_update_job = child("rxnav")  # type: ignore[method-assign]
     runner.run_livertox_update_job = child("livertox")  # type: ignore[method-assign]
+    runner.run_terminology_update_job = child("terminology")  # type: ignore[method-assign]
     runner.run_dilirank_update_job = child("dilirank")  # type: ignore[method-assign]
 
     with pytest.raises(RuntimeError, match=f"{failing_target} refresh failed"):
@@ -222,6 +238,7 @@ def test_structured_sources_cancelled_while_pending_do_not_start_any_source() ->
     calls: list[str] = []
     runner.run_rxnav_update_job = lambda *_args, **_kwargs: calls.append("rxnav")  # type: ignore[method-assign]
     runner.run_livertox_update_job = lambda *_args, **_kwargs: calls.append("livertox")  # type: ignore[method-assign]
+    runner.run_terminology_update_job = lambda *_args, **_kwargs: calls.append("terminology")  # type: ignore[method-assign]
     runner.run_dilirank_update_job = lambda *_args, **_kwargs: calls.append("dilirank")  # type: ignore[method-assign]
 
     result = runner.run_structured_sources_update_job(job_id)
@@ -229,5 +246,5 @@ def test_structured_sources_cancelled_while_pending_do_not_start_any_source() ->
     assert calls == []
     assert [
         result["sources"][target]["status"]
-        for target in ("rxnav", "livertox", "dilirank")
-    ] == ["cancelled", "cancelled", "cancelled"]
+        for target in ("rxnav", "livertox", "terminology", "dilirank")
+    ] == ["cancelled", "cancelled", "cancelled", "cancelled"]

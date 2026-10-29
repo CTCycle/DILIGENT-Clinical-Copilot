@@ -41,15 +41,7 @@ class ClinicalKnowledgeComposer:
     ) -> None:
         for payload in resolved_drugs.values():
             matched_row = payload.get("matched_livertox_row")
-            if not isinstance(matched_row, dict):
-                payload["drug_id"] = None
-                payload["dilirank_records"] = []
-                payload["knowledge_prompt"] = ""
-                payload["source_provenance"] = self._build_source_provenance(
-                    payload
-                )
-                continue
-            drug_id = self._resolve_drug_id(payload, matched_row)
+            drug_id = self._knowledge_drug_id(payload, matched_row)
             payload["drug_id"] = drug_id
             if drug_id is None:
                 payload["dilirank_records"] = []
@@ -58,7 +50,11 @@ class ClinicalKnowledgeComposer:
                     payload
                 )
                 continue
-            bundle = self.knowledge_repository.get_drug_knowledge_bundle(drug_id)
+            bundle = (
+                self.knowledge_repository.get_drug_knowledge_bundle(drug_id)
+                if isinstance(matched_row, dict)
+                else {}
+            )
             livertox_excerpt = self.select_livertox_excerpt(payload)
             if not livertox_excerpt:
                 livertox_excerpt = str(bundle.get("livertox_excerpt") or "")
@@ -79,28 +75,29 @@ class ClinicalKnowledgeComposer:
         self._enrich_regimen_component_provenance(resolved_drugs)
 
     # -------------------------------------------------------------------------
-    def _resolve_drug_id(
-        self,
+    @staticmethod
+    def _knowledge_drug_id(
         payload: dict[str, Any],
-        matched_row: dict[str, Any],
+        matched_row: Any,
     ) -> int | None:
-        direct_id = repository_values.to_int(matched_row.get("drug_id"))
-        if direct_id is not None:
-            return direct_id
-        for candidate_name in (
-            payload.get("accepted_livertox_name"),
-            matched_row.get("drug_name"),
-            payload.get("canonical_name"),
-            payload.get("drug_name"),
-        ):
-            normalized_name = repository_values.normalize_string(candidate_name)
-            if normalized_name is None:
-                continue
-            resolved_id = self.knowledge_repository.resolve_drug_id_by_name(
-                normalized_name
-            )
-            if resolved_id is not None:
-                return resolved_id
+        """Concept whose knowledge (LiverTox, DILIrank) applies to this payload.
+
+        A linked LiverTox monograph's owner wins; otherwise an accepted
+        terminology identity is used, so DILIrank still applies when LiverTox
+        has no record. Unaccepted identities get no knowledge.
+        """
+        if isinstance(matched_row, dict):
+            owner = repository_values.to_int(matched_row.get("drug_id"))
+            if owner is not None:
+                return owner
+        terminology = payload.get("terminology")
+        if isinstance(terminology, dict) and terminology.get("accepted"):
+            ingredients = terminology.get("ingredients") or []
+            if len(ingredients) == 1 and isinstance(ingredients[0], dict):
+                return repository_values.to_int(
+                    ingredients[0].get("parent_drug_id") or terminology.get("drug_id")
+                )
+            return repository_values.to_int(terminology.get("drug_id"))
         return None
 
     # -------------------------------------------------------------------------
@@ -238,12 +235,16 @@ class ClinicalKnowledgeComposer:
     # -------------------------------------------------------------------------
     @staticmethod
     def _build_source_provenance(payload: dict[str, Any]) -> dict[str, Any]:
+        terminology = payload.get("terminology")
+        terminology = terminology if isinstance(terminology, dict) else {}
         provenance: dict[str, Any] = {
-            "rxnav": {
-                "validated": bool(payload.get("accepted_rxnav_rxcui")),
-                "rxcui": payload.get("accepted_rxnav_rxcui")
-                or payload.get("rxnav_rxcui"),
-                "validation_status": payload.get("rxnav_validation_status"),
+            "terminology": {
+                "status": terminology.get("status"),
+                "method": terminology.get("method"),
+                "source": terminology.get("source"),
+                "source_version": terminology.get("source_version"),
+                "matched_alias": terminology.get("matched_alias"),
+                "rxcui": payload.get("accepted_rxnav_rxcui"),
             }
         }
         for item in payload.get("extraction_metadata") or []:

@@ -73,7 +73,7 @@ def test_runtime_settings_state_exposes_complete_database_settings(monkeypatch) 
     assert state.values.general.polling_interval == 1.0
     assert state.values.data.retrieval_batch_size == 8
     assert state.values.integrations.livertox_archive == "custom-livertox.tar.gz"
-    assert state.values.matching.spelling_short_name_length == 8
+    assert state.values.matching.fuzzy_short_name_length == 8
     assert state.values.advanced.parser_llm_timeout == 3600.0
     assert set(state.values.model_dump()) == {
         "general",
@@ -97,9 +97,9 @@ def test_runtime_settings_partial_update_persists_all_mapped_blocks(monkeypatch)
                 },
                 "integrations": {
                     "rxnav_request_timeout": 20.0,
-                    "rxnav_max_concurrency": 12,
+                    "chembl_max_phase": 3,
                 },
-                "matching": {"spelling_short_name_length": 10},
+                "matching": {"fuzzy_short_name_length": 10},
             }
         )
     )
@@ -108,12 +108,13 @@ def test_runtime_settings_partial_update_persists_all_mapped_blocks(monkeypatch)
     assert updated.values.data.retrieval_batch_size == 12
     assert updated.values.data.min_best_score == 3.0
     assert updated.values.integrations.rxnav_request_timeout == 20.0
-    assert updated.values.matching.spelling_short_name_length == 10
+    assert updated.values.integrations.chembl_max_phase == 3
+    assert updated.values.matching.fuzzy_short_name_length == 10
     assert serializer.payload["jobs"]["polling_interval"] == 2.5
     assert serializer.payload["session_pipeline"]["retrieval_batch_size"] == 12
     assert serializer.payload["clinical_language_detection"]["min_best_score"] == 3.0
     assert serializer.payload["runtime"]["livertox_archive"] == "custom-livertox.tar.gz"
-    assert serializer.payload["drugs_matcher"]["spelling_short_name_length"] == 10
+    assert serializer.payload["drugs_matcher"]["fuzzy_short_name_length"] == 10
 
 ###############################################################################
 def test_runtime_settings_rapid_updates_preserve_sibling_fields(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -130,7 +131,7 @@ def test_runtime_settings_rapid_updates_preserve_sibling_fields(monkeypatch) -> 
             {"integrations": {"livertox_skip_deterministic_ratio": 0.4}},
             {"integrations": {"livertox_monograph_max_workers": 7}},
             {"integrations": {"rxnav_request_timeout": 13.0}},
-            {"integrations": {"rxnav_max_concurrency": 4}},
+            {"integrations": {"drugcentral_enabled": False}},
         ]
     )
 
@@ -155,7 +156,7 @@ def test_runtime_settings_rapid_updates_preserve_sibling_fields(monkeypatch) -> 
     assert saved["livertox_skip_deterministic_ratio"] == 0.4
     assert saved["livertox_monograph_max_workers"] == 7
     assert saved["rxnav_request_timeout"] == 13.0
-    assert saved["rxnav_max_concurrency"] == 4
+    assert saved["drugcentral_enabled"] is False
 
 ###############################################################################
 def test_runtime_settings_persist_reload_and_reset_ncbi_contact(monkeypatch) -> None:  # type: ignore[no-untyped-def]

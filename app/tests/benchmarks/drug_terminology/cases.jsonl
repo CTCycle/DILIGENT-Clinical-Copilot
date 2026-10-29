@@ -1,0 +1,407 @@
+{"id": "gen001", "input": "amoxicillin", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen002", "input": "atorvastatin", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen003", "input": "metformin", "expect": "accept", "ingredients": ["metformin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen004", "input": "hydrochlorothiazide", "expect": "accept", "ingredients": ["hydrochlorothiazide"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen005", "input": "isoniazid", "expect": "accept", "ingredients": ["isoniazid"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen006", "input": "methotrexate", "expect": "accept", "ingredients": ["methotrexate"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen007", "input": "azathioprine", "expect": "accept", "ingredients": ["azathioprine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen008", "input": "allopurinol", "expect": "accept", "ingredients": ["allopurinol"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen009", "input": "amiodarone", "expect": "accept", "ingredients": ["amiodarone"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen010", "input": "carbamazepine", "expect": "accept", "ingredients": ["carbamazepine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen011", "input": "phenytoin", "expect": "accept", "ingredients": ["phenytoin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen012", "input": "diclofenac", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen013", "input": "ibuprofen", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen014", "input": "naproxen", "expect": "accept", "ingredients": ["naproxen"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen015", "input": "nitrofurantoin", "expect": "accept", "ingredients": ["nitrofurantoin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen016", "input": "minocycline", "expect": "accept", "ingredients": ["minocycline"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen017", "input": "doxycycline", "expect": "accept", "ingredients": ["doxycycline"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen018", "input": "ciprofloxacin", "expect": "accept", "ingredients": ["ciprofloxacin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen019", "input": "clarithromycin", "expect": "accept", "ingredients": ["clarithromycin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen020", "input": "azithromycin", "expect": "accept", "ingredients": ["azithromycin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen021", "input": "ketoconazole", "expect": "accept", "ingredients": ["ketoconazole"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen022", "input": "terbinafine", "expect": "accept", "ingredients": ["terbinafine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen023", "input": "fluconazole", "expect": "accept", "ingredients": ["fluconazole"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen024", "input": "valproic acid", "expect": "accept", "ingredients": ["valproate"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen025", "input": "lamotrigine", "expect": "accept", "ingredients": ["lamotrigine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen026", "input": "levetiracetam", "expect": "accept", "ingredients": ["levetiracetam"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen027", "input": "simvastatin", "expect": "accept", "ingredients": ["simvastatin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen028", "input": "rosuvastatin", "expect": "accept", "ingredients": ["rosuvastatin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen029", "input": "warfarin", "expect": "accept", "ingredients": ["warfarin"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen030", "input": "clopidogrel", "expect": "accept", "ingredients": ["clopidogrel"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen031", "input": "apixaban", "expect": "accept", "ingredients": ["apixaban"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen032", "input": "rivaroxaban", "expect": "accept", "ingredients": ["rivaroxaban"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen033", "input": "lisinopril", "expect": "accept", "ingredients": ["lisinopril"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen034", "input": "losartan", "expect": "accept", "ingredients": ["losartan"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen035", "input": "amlodipine", "expect": "accept", "ingredients": ["amlodipine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen036", "input": "omeprazole", "expect": "accept", "ingredients": ["omeprazole"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen037", "input": "pantoprazole", "expect": "accept", "ingredients": ["pantoprazole"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen038", "input": "sertraline", "expect": "accept", "ingredients": ["sertraline"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen039", "input": "duloxetine", "expect": "accept", "ingredients": ["duloxetine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen040", "input": "tramadol", "expect": "accept", "ingredients": ["tramadol"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen041", "input": "prednisone", "expect": "accept", "ingredients": ["prednisone"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen042", "input": "methylprednisolone", "expect": "accept", "ingredients": ["methylprednisolone"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen043", "input": "sulfasalazine", "expect": "accept", "ingredients": ["sulfasalazine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen044", "input": "leflunomide", "expect": "accept", "ingredients": ["leflunomide"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen045", "input": "hydroxychloroquine", "expect": "accept", "ingredients": ["hydroxychloroquine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen046", "input": "pyrazinamide", "expect": "accept", "ingredients": ["pyrazinamide"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen047", "input": "ethambutol", "expect": "accept", "ingredients": ["ethambutol"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen048", "input": "nevirapine", "expect": "accept", "ingredients": ["nevirapine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen049", "input": "efavirenz", "expect": "accept", "ingredients": ["efavirenz"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen050", "input": "acetylcysteine", "expect": "accept", "ingredients": ["acetylcysteine"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen051", "input": "Ceftriaxone", "expect": "accept", "ingredients": ["ceftriaxone"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen052", "input": "  Piperacillin  ", "expect": "accept", "ingredients": ["piperacillin"], "alias_type": "generic", "language": "en", "error_category": "none", "note": "surrounding whitespace"}
+{"id": "gen053", "input": "OXACILLIN", "expect": "accept", "ingredients": ["oxacillin"], "alias_type": "generic", "language": "en", "error_category": "none", "note": "upper case"}
+{"id": "gen054", "input": "bosentan", "expect": "accept", "ingredients": ["bosentan"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "gen055", "input": "ketoprofen", "expect": "accept", "ingredients": ["ketoprofen"], "alias_type": "generic", "language": "en", "error_category": "none"}
+{"id": "brd001", "input": "Lipitor", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd002", "input": "Zocor", "expect": "accept", "ingredients": ["simvastatin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd003", "input": "Crestor", "expect": "accept", "ingredients": ["rosuvastatin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd004", "input": "Glucophage", "expect": "accept", "ingredients": ["metformin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd005", "input": "Coumadin", "expect": "accept", "ingredients": ["warfarin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd006", "input": "Lasix", "expect": "accept", "ingredients": ["furosemide"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd007", "input": "Synthroid", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd008", "input": "Prilosec", "expect": "accept", "ingredients": ["omeprazole"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd009", "input": "Nexium", "expect": "accept", "ingredients": ["esomeprazole"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd010", "input": "Zoloft", "expect": "accept", "ingredients": ["sertraline"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd011", "input": "Prozac", "expect": "accept", "ingredients": ["fluoxetine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd012", "input": "Tylenol", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd013", "input": "Advil", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd014", "input": "Aleve", "expect": "accept", "ingredients": ["naproxen"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd015", "input": "Keflex", "expect": "accept", "ingredients": ["cephalexin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd016", "input": "Cipro", "expect": "accept", "ingredients": ["ciprofloxacin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd017", "input": "Levaquin", "expect": "accept", "ingredients": ["levofloxacin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd018", "input": "Zithromax", "expect": "accept", "ingredients": ["azithromycin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd019", "input": "Flagyl", "expect": "accept", "ingredients": ["metronidazole"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd020", "input": "Diflucan", "expect": "accept", "ingredients": ["fluconazole"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd021", "input": "Lamisil", "expect": "accept", "ingredients": ["terbinafine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd022", "input": "Tegretol", "expect": "accept", "ingredients": ["carbamazepine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd023", "input": "Dilantin", "expect": "accept", "ingredients": ["phenytoin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd024", "input": "Lamictal", "expect": "accept", "ingredients": ["lamotrigine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd025", "input": "Keppra", "expect": "accept", "ingredients": ["levetiracetam"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd026", "input": "Zyprexa", "expect": "accept", "ingredients": ["olanzapine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd027", "input": "Seroquel", "expect": "accept", "ingredients": ["quetiapine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd028", "input": "Risperdal", "expect": "accept", "ingredients": ["risperidone"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd029", "input": "Xanax", "expect": "accept", "ingredients": ["alprazolam"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd030", "input": "Valium", "expect": "accept", "ingredients": ["diazepam"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd031", "input": "Ativan", "expect": "accept", "ingredients": ["lorazepam"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd032", "input": "Klonopin", "expect": "accept", "ingredients": ["clonazepam"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd033", "input": "Ambien", "expect": "accept", "ingredients": ["zolpidem"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd034", "input": "Celebrex", "expect": "accept", "ingredients": ["celecoxib"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd035", "input": "Celexa", "expect": "accept", "ingredients": ["citalopram"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd036", "input": "Plavix", "expect": "accept", "ingredients": ["clopidogrel"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd037", "input": "Eliquis", "expect": "accept", "ingredients": ["apixaban"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd038", "input": "Xarelto", "expect": "accept", "ingredients": ["rivaroxaban"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd039", "input": "Norvasc", "expect": "accept", "ingredients": ["amlodipine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd040", "input": "Zestril", "expect": "accept", "ingredients": ["lisinopril"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd041", "input": "Cozaar", "expect": "accept", "ingredients": ["losartan"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd042", "input": "Diovan", "expect": "accept", "ingredients": ["valsartan"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd043", "input": "Zyloprim", "expect": "accept", "ingredients": ["allopurinol"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd044", "input": "Imuran", "expect": "accept", "ingredients": ["azathioprine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd045", "input": "Arava", "expect": "accept", "ingredients": ["leflunomide"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd046", "input": "Plaquenil", "expect": "accept", "ingredients": ["hydroxychloroquine"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd047", "input": "Depakote", "expect": "accept", "ingredients": ["valproate"], "alias_type": "brand", "language": "en", "error_category": "none", "note": "RxNorm models divalproex sodium as a precise ingredient (salt complex) of valproate"}
+{"id": "brd048", "input": "Cordarone", "expect": "accept", "ingredients": ["amiodarone"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd049", "input": "Tracleer", "expect": "accept", "ingredients": ["bosentan"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "brd050", "input": "Macrobid", "expect": "accept", "ingredients": ["nitrofurantoin"], "alias_type": "brand", "language": "en", "error_category": "none"}
+{"id": "chb001", "input": "Dafalgan", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb002", "input": "Panadol", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "brand", "language": "en", "error_category": "none", "note": "international brand"}
+{"id": "chb003", "input": "Novalgin", "expect": "accept", "ingredients": ["metamizole"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss/German brand; not US-marketed"}
+{"id": "chb004", "input": "Minalgin", "expect": "accept", "ingredients": ["metamizole"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb005", "input": "Ponstan", "expect": "accept", "ingredients": ["mefenamic acid"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb006", "input": "Voltaren", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "brand", "language": "de", "error_category": "none"}
+{"id": "chb007", "input": "Brufen", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "brand", "language": "en", "error_category": "none", "note": "international brand"}
+{"id": "chb008", "input": "Irfen", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb009", "input": "Algifor", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb010", "input": "Sortis", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss/German brand"}
+{"id": "chb011", "input": "Torem", "expect": "accept", "ingredients": ["torsemide"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb012", "input": "Pantozol", "expect": "accept", "ingredients": ["pantoprazole"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb013", "input": "Zurcal", "expect": "accept", "ingredients": ["pantoprazole"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb014", "input": "Marcoumar", "expect": "accept", "ingredients": ["phenprocoumon"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand; not US-marketed"}
+{"id": "chb015", "input": "Sintrom", "expect": "accept", "ingredients": ["acenocoumarol"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand; not US-marketed"}
+{"id": "chb016", "input": "Tramal", "expect": "accept", "ingredients": ["tramadol"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb017", "input": "Seresta", "expect": "accept", "ingredients": ["oxazepam"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb018", "input": "Temesta", "expect": "accept", "ingredients": ["lorazepam"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb019", "input": "Dormicum", "expect": "accept", "ingredients": ["midazolam"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb020", "input": "Zyloric", "expect": "accept", "ingredients": ["allopurinol"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb021", "input": "Rivotril", "expect": "accept", "ingredients": ["clonazepam"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "international brand"}
+{"id": "chb022", "input": "Imurek", "expect": "accept", "ingredients": ["azathioprine"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss/German brand"}
+{"id": "chb023", "input": "Euthyrox", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "international brand"}
+{"id": "chb024", "input": "Eltroxin", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb025", "input": "Concor", "expect": "accept", "ingredients": ["bisoprolol"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "international brand"}
+{"id": "chb026", "input": "Depakine", "expect": "accept", "ingredients": ["valproate"], "alias_type": "brand", "language": "fr", "error_category": "none", "note": "international brand"}
+{"id": "chb027", "input": "Aspirin Cardio", "expect": "accept", "ingredients": ["aspirin"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss product name"}
+{"id": "chb028", "input": "Beloc Zok", "expect": "accept", "ingredients": ["metoprolol"], "alias_type": "brand", "language": "de", "error_category": "none", "salt": "succinate", "note": "Swiss brand for metoprolol succinate"}
+{"id": "chb029", "input": "Ecofenac", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "brand", "language": "de", "error_category": "none", "note": "Swiss brand"}
+{"id": "chb030", "input": "Losec", "expect": "accept", "ingredients": ["omeprazole"], "alias_type": "brand", "language": "en", "error_category": "none", "note": "international brand"}
+{"id": "inn001", "input": "paracetamol", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn002", "input": "acetaminophen", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn003", "input": "salbutamol", "expect": "accept", "ingredients": ["albuterol"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn004", "input": "glibenclamide", "expect": "accept", "ingredients": ["glyburide"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn005", "input": "metamizole", "expect": "accept", "ingredients": ["metamizole"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn006", "input": "dipyrone", "expect": "accept", "ingredients": ["metamizole"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn007", "input": "adrenaline", "expect": "accept", "ingredients": ["epinephrine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn008", "input": "noradrenaline", "expect": "accept", "ingredients": ["norepinephrine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn009", "input": "lignocaine", "expect": "accept", "ingredients": ["lidocaine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn010", "input": "rifampicin", "expect": "accept", "ingredients": ["rifampin"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn011", "input": "ciclosporin", "expect": "accept", "ingredients": ["cyclosporine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn012", "input": "frusemide", "expect": "accept", "ingredients": ["furosemide"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn013", "input": "pethidine", "expect": "accept", "ingredients": ["meperidine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn014", "input": "aciclovir", "expect": "accept", "ingredients": ["acyclovir"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn015", "input": "valaciclovir", "expect": "accept", "ingredients": ["valacyclovir"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn016", "input": "cefalexin", "expect": "accept", "ingredients": ["cephalexin"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn017", "input": "mesalazine", "expect": "accept", "ingredients": ["mesalamine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn018", "input": "beclometasone", "expect": "accept", "ingredients": ["beclomethasone"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn019", "input": "dexamfetamine", "expect": "accept", "ingredients": ["dextroamphetamine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn020", "input": "glyceryl trinitrate", "expect": "accept", "ingredients": ["nitroglycerin"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn021", "input": "hydroxycarbamide", "expect": "accept", "ingredients": ["hydroxyurea"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn022", "input": "chlorphenamine", "expect": "accept", "ingredients": ["chlorpheniramine"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn023", "input": "acetylsalicylic acid", "expect": "accept", "ingredients": ["aspirin"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn024", "input": "torasemide", "expect": "accept", "ingredients": ["torsemide"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn025", "input": "colecalciferol", "expect": "accept", "ingredients": ["cholecalciferol"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn026", "input": "flucloxacillin", "expect": "accept", "ingredients": ["flucloxacillin"], "alias_type": "inn_usan", "language": "en", "error_category": "none", "note": "not US-marketed"}
+{"id": "inn027", "input": "isoprenaline", "expect": "accept", "ingredients": ["isoproterenol"], "alias_type": "inn_usan", "language": "en", "error_category": "none"}
+{"id": "inn028", "input": "amoxycillin", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "inn_usan", "language": "en", "error_category": "none", "note": "former BAN spelling"}
+{"id": "inn029", "input": "sodium valproate", "expect": "accept", "ingredients": ["valproate"], "alias_type": "inn_usan", "language": "en", "error_category": "none", "salt": "sodium"}
+{"id": "inn030", "input": "dosulepin", "expect": "accept", "ingredients": ["dothiepin"], "alias_type": "inn_usan", "language": "en", "error_category": "none", "note": "not US-marketed"}
+{"id": "abb001", "input": "HCTZ", "expect": "accept", "ingredients": ["hydrochlorothiazide"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb002", "input": "MTX", "expect": "accept", "ingredients": ["methotrexate"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb003", "input": "INH", "expect": "accept", "ingredients": ["isoniazid"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb004", "input": "APAP", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb005", "input": "ASA", "expect": "accept", "ingredients": ["aspirin"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb006", "input": "5-FU", "expect": "accept", "ingredients": ["fluorouracil"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb007", "input": "6-MP", "expect": "accept", "ingredients": ["mercaptopurine"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb008", "input": "PZA", "expect": "accept", "ingredients": ["pyrazinamide"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb009", "input": "NAC", "expect": "accept", "ingredients": ["acetylcysteine"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb010", "input": "PTU", "expect": "accept", "ingredients": ["propylthiouracil"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb011", "input": "HCQ", "expect": "accept", "ingredients": ["hydroxychloroquine"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb012", "input": "TMP-SMX", "expect": "accept", "ingredients": ["sulfamethoxazole", "trimethoprim"], "alias_type": "abbreviation", "language": "en", "error_category": "none"}
+{"id": "abb013", "input": "MS", "expect": "abstain", "ingredients": [], "alias_type": "abbreviation", "language": "en", "error_category": "none", "note": "morphine sulfate vs magnesium sulfate; error-prone abbreviation"}
+{"id": "abb014", "input": "HCT", "expect": "abstain", "ingredients": [], "alias_type": "abbreviation", "language": "en", "error_category": "none", "note": "hydrocortisone vs hydrochlorothiazide"}
+{"id": "abb015", "input": "AZT", "expect": "abstain", "ingredients": [], "alias_type": "abbreviation", "language": "en", "error_category": "none", "note": "zidovudine vs azathioprine; error-prone abbreviation"}
+{"id": "salt001", "input": "metoprolol succinate", "expect": "accept", "ingredients": ["metoprolol"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "succinate"}
+{"id": "salt002", "input": "metoprolol tartrate", "expect": "accept", "ingredients": ["metoprolol"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "tartrate"}
+{"id": "salt003", "input": "amlodipine besylate", "expect": "accept", "ingredients": ["amlodipine"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "besylate"}
+{"id": "salt004", "input": "losartan potassium", "expect": "accept", "ingredients": ["losartan"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "potassium"}
+{"id": "salt005", "input": "atorvastatin calcium", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "calcium"}
+{"id": "salt006", "input": "sertraline hydrochloride", "expect": "accept", "ingredients": ["sertraline"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "hydrochloride"}
+{"id": "salt007", "input": "levothyroxine sodium", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "sodium"}
+{"id": "salt008", "input": "diclofenac sodium", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "sodium"}
+{"id": "salt009", "input": "diclofenac potassium", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "potassium"}
+{"id": "salt010", "input": "morphine sulfate", "expect": "accept", "ingredients": ["morphine"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "sulfate"}
+{"id": "salt011", "input": "magnesium sulfate", "expect": "accept", "ingredients": ["magnesium sulfate"], "alias_type": "salt", "language": "en", "error_category": "none", "note": "must not become morphine"}
+{"id": "salt012", "input": "amoxicillin trihydrate", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "trihydrate"}
+{"id": "salt013", "input": "doxycycline hyclate", "expect": "accept", "ingredients": ["doxycycline"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "hyclate"}
+{"id": "salt014", "input": "esomeprazole magnesium", "expect": "accept", "ingredients": ["esomeprazole"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "magnesium"}
+{"id": "salt015", "input": "pantoprazole sodium", "expect": "accept", "ingredients": ["pantoprazole"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "sodium"}
+{"id": "salt016", "input": "tramadol hydrochloride", "expect": "accept", "ingredients": ["tramadol"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "hydrochloride"}
+{"id": "salt017", "input": "potassium chloride", "expect": "accept", "ingredients": ["potassium chloride"], "alias_type": "salt", "language": "en", "error_category": "none"}
+{"id": "salt018", "input": "valproate sodium", "expect": "accept", "ingredients": ["valproate"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "sodium"}
+{"id": "salt019", "input": "metformin hydrochloride", "expect": "accept", "ingredients": ["metformin"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "hydrochloride"}
+{"id": "salt020", "input": "clopidogrel bisulfate", "expect": "accept", "ingredients": ["clopidogrel"], "alias_type": "salt", "language": "en", "error_category": "none", "salt": "bisulfate"}
+{"id": "ste001", "input": "esomeprazole", "expect": "accept", "ingredients": ["esomeprazole"], "alias_type": "stereoisomer", "language": "en", "error_category": "none", "note": "must not become omeprazole"}
+{"id": "ste002", "input": "levofloxacin", "expect": "accept", "ingredients": ["levofloxacin"], "alias_type": "stereoisomer", "language": "en", "error_category": "none", "note": "must not become ofloxacin"}
+{"id": "ste003", "input": "ofloxacin", "expect": "accept", "ingredients": ["ofloxacin"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste004", "input": "escitalopram", "expect": "accept", "ingredients": ["escitalopram"], "alias_type": "stereoisomer", "language": "en", "error_category": "none", "note": "must not become citalopram"}
+{"id": "ste005", "input": "citalopram", "expect": "accept", "ingredients": ["citalopram"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste006", "input": "levocetirizine", "expect": "accept", "ingredients": ["levocetirizine"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste007", "input": "dexmethylphenidate", "expect": "accept", "ingredients": ["dexmethylphenidate"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste008", "input": "dexlansoprazole", "expect": "accept", "ingredients": ["dexlansoprazole"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste009", "input": "armodafinil", "expect": "accept", "ingredients": ["armodafinil"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste010", "input": "esketamine", "expect": "accept", "ingredients": ["esketamine"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste011", "input": "levalbuterol", "expect": "accept", "ingredients": ["levalbuterol"], "alias_type": "stereoisomer", "language": "en", "error_category": "none"}
+{"id": "ste012", "input": "liothyronine", "expect": "accept", "ingredients": ["liothyronine"], "alias_type": "stereoisomer", "language": "en", "error_category": "none", "note": "must not become levothyroxine"}
+{"id": "lasa001", "input": "hydroxyzine", "expect": "accept", "ingredients": ["hydroxyzine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa002", "input": "hydralazine", "expect": "accept", "ingredients": ["hydralazine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa003", "input": "trazodone", "expect": "accept", "ingredients": ["trazodone"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa004", "input": "chlorpromazine", "expect": "accept", "ingredients": ["chlorpromazine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa005", "input": "chlorpropamide", "expect": "accept", "ingredients": ["chlorpropamide"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa006", "input": "clonidine", "expect": "accept", "ingredients": ["clonidine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa007", "input": "clonazepam", "expect": "accept", "ingredients": ["clonazepam"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa008", "input": "clozapine", "expect": "accept", "ingredients": ["clozapine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa009", "input": "olanzapine", "expect": "accept", "ingredients": ["olanzapine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa010", "input": "quetiapine", "expect": "accept", "ingredients": ["quetiapine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa011", "input": "prednisolone", "expect": "accept", "ingredients": ["prednisolone"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa012", "input": "metronidazole", "expect": "accept", "ingredients": ["metronidazole"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa013", "input": "sitagliptin", "expect": "accept", "ingredients": ["sitagliptin"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa014", "input": "sumatriptan", "expect": "accept", "ingredients": ["sumatriptan"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa015", "input": "glipizide", "expect": "accept", "ingredients": ["glipizide"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa016", "input": "glyburide", "expect": "accept", "ingredients": ["glyburide"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa017", "input": "risperidone", "expect": "accept", "ingredients": ["risperidone"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa018", "input": "ropinirole", "expect": "accept", "ingredients": ["ropinirole"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa019", "input": "cetirizine", "expect": "accept", "ingredients": ["cetirizine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa020", "input": "hydrocodone", "expect": "accept", "ingredients": ["hydrocodone"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa021", "input": "oxycodone", "expect": "accept", "ingredients": ["oxycodone"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa022", "input": "hydromorphone", "expect": "accept", "ingredients": ["hydromorphone"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa023", "input": "cycloserine", "expect": "accept", "ingredients": ["cycloserine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa024", "input": "cyclosporine", "expect": "accept", "ingredients": ["cyclosporine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa025", "input": "cyclophosphamide", "expect": "accept", "ingredients": ["cyclophosphamide"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa026", "input": "azacitidine", "expect": "accept", "ingredients": ["azacitidine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa027", "input": "paroxetine", "expect": "accept", "ingredients": ["paroxetine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa028", "input": "fluoxetine", "expect": "accept", "ingredients": ["fluoxetine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa029", "input": "nicardipine", "expect": "accept", "ingredients": ["nicardipine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa030", "input": "nifedipine", "expect": "accept", "ingredients": ["nifedipine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa031", "input": "vinblastine", "expect": "accept", "ingredients": ["vinblastine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa032", "input": "vincristine", "expect": "accept", "ingredients": ["vincristine"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa033", "input": "carboplatin", "expect": "accept", "ingredients": ["carboplatin"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa034", "input": "cisplatin", "expect": "accept", "ingredients": ["cisplatin"], "alias_type": "lasa", "language": "en", "error_category": "none"}
+{"id": "lasa035", "input": "Zyrtec", "expect": "accept", "ingredients": ["cetirizine"], "alias_type": "lasa", "language": "en", "error_category": "none", "note": "brand; look-alike of Zyprexa"}
+{"id": "lasa036", "input": "Cerebyx", "expect": "accept", "ingredients": ["fosphenytoin"], "alias_type": "lasa", "language": "en", "error_category": "none", "note": "brand; look-alike of Celebrex/Celexa"}
+{"id": "lasa037", "input": "Celebra", "expect": "accept", "ingredients": ["celecoxib"], "alias_type": "lasa", "language": "en", "error_category": "none", "note": "Celebra is a marketed celecoxib brand in several countries (ChEMBL trade name)"}
+{"id": "lasa040", "input": "clonazine", "expect": "abstain", "ingredients": [], "alias_type": "lasa", "language": "en", "error_category": "multi_edit", "note": "near clonidine, clozapine and clonazepam"}
+{"id": "lasa041", "input": "Lamisal", "expect": "accept", "ingredients": ["terbinafine"], "alias_type": "lasa", "language": "en", "error_category": "substitution", "note": "one edit from Lamisil, two from Lamictal"}
+{"id": "lasa042", "input": "carbaplatin", "expect": "accept", "ingredients": ["carboplatin"], "alias_type": "lasa", "language": "en", "error_category": "substitution", "note": "one edit from carboplatin; must not become cisplatin"}
+{"id": "mis001", "input": "amoxcillin", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis002", "input": "amoxicilin", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis003", "input": "amoxicillim", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis004", "input": "atrovastatin", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "misspelling", "language": "en", "error_category": "transposition"}
+{"id": "mis005", "input": "simvastatn", "expect": "accept", "ingredients": ["simvastatin"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis006", "input": "metfromin", "expect": "accept", "ingredients": ["metformin"], "alias_type": "misspelling", "language": "en", "error_category": "transposition"}
+{"id": "mis007", "input": "metforman", "expect": "accept", "ingredients": ["metformin"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis008", "input": "lisinipril", "expect": "accept", "ingredients": ["lisinopril"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis009", "input": "levothyroxin", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis010", "input": "levothryoxine", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "misspelling", "language": "en", "error_category": "transposition"}
+{"id": "mis011", "input": "omeprazle", "expect": "accept", "ingredients": ["omeprazole"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis012", "input": "ibuprophen", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "misspelling", "language": "en", "error_category": "phonetic"}
+{"id": "mis013", "input": "acetaminophin", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis014", "input": "ciprofloxacn", "expect": "accept", "ingredients": ["ciprofloxacin"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis015", "input": "azithromicin", "expect": "accept", "ingredients": ["azithromycin"], "alias_type": "misspelling", "language": "en", "error_category": "phonetic"}
+{"id": "mis016", "input": "clarithromicin", "expect": "accept", "ingredients": ["clarithromycin"], "alias_type": "misspelling", "language": "en", "error_category": "phonetic"}
+{"id": "mis017", "input": "doxycyclin", "expect": "accept", "ingredients": ["doxycycline"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis018", "input": "doxicycline", "expect": "accept", "ingredients": ["doxycycline"], "alias_type": "misspelling", "language": "en", "error_category": "phonetic"}
+{"id": "mis019", "input": "carbamazapine", "expect": "accept", "ingredients": ["carbamazepine"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis020", "input": "carbamezepine", "expect": "accept", "ingredients": ["carbamazepine"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis021", "input": "methotrexete", "expect": "accept", "ingredients": ["methotrexate"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis022", "input": "azathiaprine", "expect": "accept", "ingredients": ["azathioprine"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis023", "input": "allopurinal", "expect": "accept", "ingredients": ["allopurinol"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis024", "input": "diclophenac", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "misspelling", "language": "en", "error_category": "phonetic"}
+{"id": "mis025", "input": "naproxin", "expect": "accept", "ingredients": ["naproxen"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis026", "input": "celecoxeb", "expect": "accept", "ingredients": ["celecoxib"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis027", "input": "warfrin", "expect": "accept", "ingredients": ["warfarin"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis028", "input": "clopidogral", "expect": "accept", "ingredients": ["clopidogrel"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis029", "input": "apixiban", "expect": "accept", "ingredients": ["apixaban"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis030", "input": "rivaroxiban", "expect": "accept", "ingredients": ["rivaroxaban"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis031", "input": "predinsone", "expect": "accept", "ingredients": ["prednisone"], "alias_type": "misspelling", "language": "en", "error_category": "transposition"}
+{"id": "mis032", "input": "nitrofurantion", "expect": "accept", "ingredients": ["nitrofurantoin"], "alias_type": "misspelling", "language": "en", "error_category": "transposition"}
+{"id": "mis033", "input": "sulfamethoxazol", "expect": "accept", "ingredients": ["sulfamethoxazole"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis034", "input": "terbinafin", "expect": "accept", "ingredients": ["terbinafine"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis035", "input": "isonaizid", "expect": "accept", "ingredients": ["isoniazid"], "alias_type": "misspelling", "language": "en", "error_category": "transposition"}
+{"id": "mis036", "input": "leflunomid", "expect": "accept", "ingredients": ["leflunomide"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis037", "input": "hydroxychloroqine", "expect": "accept", "ingredients": ["hydroxychloroquine"], "alias_type": "misspelling", "language": "en", "error_category": "deletion"}
+{"id": "mis038", "input": "amiodorone", "expect": "accept", "ingredients": ["amiodarone"], "alias_type": "misspelling", "language": "en", "error_category": "substitution"}
+{"id": "mis039", "input": "Lipiter", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "misspelling", "language": "en", "error_category": "substitution", "note": "misspelled brand"}
+{"id": "mis040", "input": "Augmentn", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "misspelling", "language": "en", "error_category": "deletion", "note": "misspelled combination brand"}
+{"id": "mis041", "input": "amxclln", "expect": "abstain", "ingredients": [], "alias_type": "misspelling", "language": "en", "error_category": "multi_edit", "note": "too many edits to trust"}
+{"id": "mis042", "input": "metotrexat", "expect": "accept", "ingredients": ["methotrexate"], "alias_type": "misspelling", "language": "de", "error_category": "multi_edit", "note": "German-style spelling"}
+{"id": "mis043", "input": "tegretal", "expect": "accept", "ingredients": ["carbamazepine"], "alias_type": "misspelling", "language": "en", "error_category": "substitution", "note": "misspelled brand"}
+{"id": "mis044", "input": "keprra", "expect": "accept", "ingredients": ["levetiracetam"], "alias_type": "misspelling", "language": "en", "error_category": "transposition", "note": "misspelled brand"}
+{"id": "mis045", "input": "fluconazol", "expect": "accept", "ingredients": ["fluconazole"], "alias_type": "misspelling", "language": "de", "error_category": "deletion"}
+{"id": "lang001", "input": "metformine", "expect": "accept", "ingredients": ["metformin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang002", "input": "metformina", "expect": "accept", "ingredients": ["metformin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang003", "input": "amoxicilline", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang004", "input": "amoxicillina", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang005", "input": "paracetamolo", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang006", "input": "paracétamol", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang007", "input": "ibuprofène", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang008", "input": "ibuprofeno", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang009", "input": "acido acetilsalicilico", "expect": "accept", "ingredients": ["aspirin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang010", "input": "acide acétylsalicylique", "expect": "accept", "ingredients": ["aspirin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang011", "input": "Acetylsalicylsäure", "expect": "accept", "ingredients": ["aspirin"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang012", "input": "Metamizol", "expect": "accept", "ingredients": ["metamizole"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang013", "input": "metamizolo", "expect": "accept", "ingredients": ["metamizole"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang014", "input": "diclofenaco", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang015", "input": "Omeprazol", "expect": "accept", "ingredients": ["omeprazole"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang016", "input": "Pantoprazol", "expect": "accept", "ingredients": ["pantoprazole"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang017", "input": "simvastatina", "expect": "accept", "ingredients": ["simvastatin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang018", "input": "atorvastatina", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang019", "input": "levotiroxina", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang020", "input": "furosemida", "expect": "accept", "ingredients": ["furosemide"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang021", "input": "Furosemid", "expect": "accept", "ingredients": ["furosemide"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang022", "input": "furosémide", "expect": "accept", "ingredients": ["furosemide"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang023", "input": "ciprofloxacine", "expect": "accept", "ingredients": ["ciprofloxacin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang024", "input": "ciprofloxacino", "expect": "accept", "ingredients": ["ciprofloxacin"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang025", "input": "claritromicina", "expect": "accept", "ingredients": ["clarithromycin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang026", "input": "eritromicina", "expect": "accept", "ingredients": ["erythromycin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang027", "input": "isoniazide", "expect": "accept", "ingredients": ["isoniazid"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang028", "input": "rifampicine", "expect": "accept", "ingredients": ["rifampin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang029", "input": "rifampicina", "expect": "accept", "ingredients": ["rifampin"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang030", "input": "carbamazepina", "expect": "accept", "ingredients": ["carbamazepine"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang031", "input": "acido valproico", "expect": "accept", "ingredients": ["valproate"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang032", "input": "Methotrexat", "expect": "accept", "ingredients": ["methotrexate"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang033", "input": "Azathioprin", "expect": "accept", "ingredients": ["azathioprine"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang034", "input": "allopurinolo", "expect": "accept", "ingredients": ["allopurinol"], "alias_type": "language_variant", "language": "it", "error_category": "none"}
+{"id": "lang035", "input": "amiodarona", "expect": "accept", "ingredients": ["amiodarone"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang036", "input": "Ciclosporin", "expect": "accept", "ingredients": ["cyclosporine"], "alias_type": "language_variant", "language": "de", "error_category": "none"}
+{"id": "lang037", "input": "ciclosporina", "expect": "accept", "ingredients": ["cyclosporine"], "alias_type": "language_variant", "language": "es", "error_category": "none"}
+{"id": "lang038", "input": "flucloxacilline", "expect": "accept", "ingredients": ["flucloxacillin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang039", "input": "nitrofurantoïne", "expect": "accept", "ingredients": ["nitrofurantoin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "lang040", "input": "Paracetamolum", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "language_variant", "language": "la", "error_category": "none", "note": "Latin pharmacopoeial name"}
+{"id": "lang041", "input": "Amoxicillinum trihydricum", "expect": "accept", "ingredients": ["amoxicillin"], "alias_type": "language_variant", "language": "la", "error_category": "none", "salt": "trihydrate", "note": "Latin pharmacopoeial name"}
+{"id": "lang042", "input": "Acidum clavulanicum", "expect": "accept", "ingredients": ["clavulanate"], "alias_type": "language_variant", "language": "la", "error_category": "none", "note": "Latin pharmacopoeial name"}
+{"id": "lang043", "input": "Ibuprofenum", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "language_variant", "language": "la", "error_category": "none", "note": "Latin pharmacopoeial name"}
+{"id": "lang044", "input": "Metformini hydrochloridum", "expect": "accept", "ingredients": ["metformin"], "alias_type": "language_variant", "language": "la", "error_category": "none", "salt": "hydrochloride", "note": "Latin pharmacopoeial name"}
+{"id": "lang045", "input": "cefalexine", "expect": "accept", "ingredients": ["cephalexin"], "alias_type": "language_variant", "language": "fr", "error_category": "none"}
+{"id": "cmb001", "input": "Augmentin", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb002", "input": "amoxicillin/clavulanic acid", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb003", "input": "amoxicillin-clavulanate", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb004", "input": "co-amoxiclav", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb005", "input": "Bactrim", "expect": "accept", "ingredients": ["sulfamethoxazole", "trimethoprim"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb006", "input": "co-trimoxazole", "expect": "accept", "ingredients": ["sulfamethoxazole", "trimethoprim"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb007", "input": "sulfamethoxazole/trimethoprim", "expect": "accept", "ingredients": ["sulfamethoxazole", "trimethoprim"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb008", "input": "Vicodin", "expect": "accept", "ingredients": ["acetaminophen", "hydrocodone"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb009", "input": "Percocet", "expect": "accept", "ingredients": ["acetaminophen", "oxycodone"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb010", "input": "Zestoretic", "expect": "accept", "ingredients": ["hydrochlorothiazide", "lisinopril"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb011", "input": "Hyzaar", "expect": "accept", "ingredients": ["hydrochlorothiazide", "losartan"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb012", "input": "Janumet", "expect": "accept", "ingredients": ["metformin", "sitagliptin"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb013", "input": "Advair", "expect": "accept", "ingredients": ["fluticasone", "salmeterol"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb014", "input": "Kaletra", "expect": "accept", "ingredients": ["lopinavir", "ritonavir"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb015", "input": "Paxlovid", "expect": "accept", "ingredients": ["nirmatrelvir", "ritonavir"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb016", "input": "Rifater", "expect": "accept", "ingredients": ["isoniazid", "pyrazinamide", "rifampin"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb017", "input": "Rifinah", "expect": "accept", "ingredients": ["isoniazid", "rifampin"], "alias_type": "combination", "language": "en", "error_category": "none", "note": "international brand"}
+{"id": "cmb018", "input": "Dafalgan Codein", "expect": "accept", "ingredients": ["acetaminophen", "codeine"], "alias_type": "combination", "language": "de", "error_category": "none", "note": "Swiss product; distinct from Dafalgan"}
+{"id": "cmb019", "input": "Co-Amoxi-Mepha", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "combination", "language": "de", "error_category": "none", "note": "Swiss product"}
+{"id": "cmb020", "input": "piperacillin/tazobactam", "expect": "accept", "ingredients": ["piperacillin", "tazobactam"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb021", "input": "Zosyn", "expect": "accept", "ingredients": ["piperacillin", "tazobactam"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb022", "input": "Tazocin", "expect": "accept", "ingredients": ["piperacillin", "tazobactam"], "alias_type": "combination", "language": "en", "error_category": "none", "note": "international brand"}
+{"id": "cmb023", "input": "Exforge", "expect": "accept", "ingredients": ["amlodipine", "valsartan"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb024", "input": "Entresto", "expect": "accept", "ingredients": ["sacubitril", "valsartan"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb025", "input": "Epclusa", "expect": "accept", "ingredients": ["sofosbuvir", "velpatasvir"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb026", "input": "Harvoni", "expect": "accept", "ingredients": ["ledipasvir", "sofosbuvir"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb027", "input": "Triumeq", "expect": "accept", "ingredients": ["abacavir", "dolutegravir", "lamivudine"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb028", "input": "amoxicillin + clavulanic acid", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb029", "input": "trimethoprim-sulfamethoxazole", "expect": "accept", "ingredients": ["sulfamethoxazole", "trimethoprim"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "cmb030", "input": "Tylenol with Codeine", "expect": "accept", "ingredients": ["acetaminophen", "codeine"], "alias_type": "combination", "language": "en", "error_category": "none"}
+{"id": "str001", "input": "metformin 500mg", "expect": "accept", "ingredients": ["metformin"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "500 mg"}
+{"id": "str002", "input": "metformin 500 mg tablet", "expect": "accept", "ingredients": ["metformin"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "500 mg"}
+{"id": "str003", "input": "atorvastatin 40 mg PO daily", "expect": "accept", "ingredients": ["atorvastatin"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "40 mg"}
+{"id": "str004", "input": "paracetamol 1 g", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "1 g"}
+{"id": "str005", "input": "ibuprofen 400mg tid", "expect": "accept", "ingredients": ["ibuprofen"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "400 mg"}
+{"id": "str006", "input": "levothyroxine 50 mcg", "expect": "accept", "ingredients": ["levothyroxine"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "50 mcg"}
+{"id": "str007", "input": "Metoprolol succinate ER 50 mg", "expect": "accept", "ingredients": ["metoprolol"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "50 mg", "salt": "succinate"}
+{"id": "str008", "input": "diclofenac sodium 75 mg SR", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "75 mg", "salt": "sodium"}
+{"id": "str009", "input": "omeprazole 20 mg capsule", "expect": "accept", "ingredients": ["omeprazole"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "20 mg"}
+{"id": "str010", "input": "Dafalgan 500 mg Filmtabletten", "expect": "accept", "ingredients": ["acetaminophen"], "alias_type": "strength", "language": "de", "error_category": "none", "strength": "500 mg"}
+{"id": "str011", "input": "Voltaren Retard 100 mg", "expect": "accept", "ingredients": ["diclofenac"], "alias_type": "strength", "language": "de", "error_category": "none", "strength": "100 mg"}
+{"id": "str012", "input": "amoxicillin 875 mg / clavulanate 125 mg", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "875 mg / 125 mg"}
+{"id": "str013", "input": "prednisone 5mg", "expect": "accept", "ingredients": ["prednisone"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "5 mg"}
+{"id": "str014", "input": "Augmentin 1 g", "expect": "accept", "ingredients": ["amoxicillin", "clavulanate"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "1 g"}
+{"id": "str015", "input": "methotrexate 15 mg weekly", "expect": "accept", "ingredients": ["methotrexate"], "alias_type": "strength", "language": "en", "error_category": "none", "strength": "15 mg"}
+{"id": "unk001", "input": "zentrovamab", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "n/a", "error_category": "none", "note": "invented name"}
+{"id": "unk002", "input": "quorpelix", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "n/a", "error_category": "none", "note": "invented name"}
+{"id": "unk003", "input": "vitamin", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk004", "input": "antibiotics", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk005", "input": "chemotherapy", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk006", "input": "statin", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk007", "input": "painkillers", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk008", "input": "NSAID", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk009", "input": "beta blocker", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk010", "input": "insulin", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "many distinct insulin ingredients"}
+{"id": "unk011", "input": "vitamin D", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "cholecalciferol vs ergocalciferol"}
+{"id": "unk012", "input": "steroids", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk013", "input": "unknown medication", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none"}
+{"id": "unk014", "input": "herbal tea", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none"}
+{"id": "unk015", "input": "blood pressure pills", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none"}
+{"id": "unk016", "input": "Blutdrucktabletten", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "de", "error_category": "none"}
+{"id": "unk017", "input": "contrast agent", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none"}
+{"id": "unk018", "input": "xyz", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "n/a", "error_category": "none"}
+{"id": "unk019", "input": "ACE inhibitor", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "en", "error_category": "none", "note": "class term"}
+{"id": "unk020", "input": "flortamizine", "expect": "abstain", "ingredients": [], "alias_type": "unknown", "language": "n/a", "error_category": "none", "note": "invented name"}

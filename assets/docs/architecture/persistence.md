@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-10-24
+Last updated: 2026-10-29
 
 ## Relational Database
 
@@ -119,6 +119,8 @@ erDiagram
         int id PK
         string canonical_name
         string canonical_name_norm
+        string concept_type
+        string preferred_inn
     }
     DRUG_RXNORM_CODES {
         int id PK
@@ -129,6 +131,33 @@ erDiagram
         int id PK
         int drug_id FK
         string alias
+        string alias_norm
+        string source
+        string validation_status
+    }
+    DRUG_CONCEPT_RELATIONS {
+        int id PK
+        int drug_id FK
+        int related_drug_id FK
+        string relation_type
+    }
+    MEDICINAL_PRODUCTS {
+        int id PK
+        int drug_id FK
+        string source_product_id
+        string composition_status
+    }
+    DRUG_LIVERTOX_LINKS {
+        int id PK
+        int drug_id FK
+        int monograph_id FK
+        string link_type
+    }
+    TERMINOLOGY_IMPORT_RUNS {
+        int id PK
+        string source
+        string status
+        json stats_json
     }
     DRUG_IDENTIFIERS {
         int id PK
@@ -154,7 +183,8 @@ erDiagram
         int drug_id FK
         string normalized_key
         string source
-        float confidence
+        string resolution_status
+        datetime expires_at
     }
     ACCESS_KEYS {
         int id PK
@@ -207,6 +237,10 @@ erDiagram
     DRUGS ||--o{ DRUG_ALIASES : aliases
     DRUGS ||--o{ DRUG_IDENTIFIERS : identifiers
     DRUGS ||--o{ LIVERTOX_MONOGRAPHS : monographs
+    DRUGS ||--o{ DRUG_CONCEPT_RELATIONS : relations
+    DRUGS o|--o{ MEDICINAL_PRODUCTS : products
+    DRUGS ||--o{ DRUG_LIVERTOX_LINKS : livertox_links
+    LIVERTOX_MONOGRAPHS ||--o{ DRUG_LIVERTOX_LINKS : linked_concepts
     DRUGS o|--o{ DILIRANK_RECORDS : dilirank
     DRUGS o|--o{ KB_MATCH_CACHE : cached_matches
     DRUGS o|--o{ CLINICAL_DRUG_MENTIONS : resolves
@@ -234,9 +268,10 @@ erDiagram
   Alembic head, and apply pending revisions before repositories or services run.
 - SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
 - Fresh databases are upgraded through the linear Alembic history before the
-  application starts. The v2.4 baseline and revisions through
-  `202610240001` remain available so databases from the v3.5.0 release are
-  recognized at the current head without changing user rows. Populated
+  application starts. The current head is `202610290001` (drug terminology
+  resolution). The v2.4 baseline and revisions through `202610240001` remain
+  available, so databases from the v3.5.x releases upgrade to the head without
+  losing user rows. Populated
   databases without an Alembic revision and databases with unknown or
   divergent revisions are rejected before application tables are changed; the
   runtime never guesses or stamps migration history.
@@ -248,6 +283,7 @@ erDiagram
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - FDA DILIrank 2.0 rows are stored in `dilirank_records` as a source-complete snapshot. `ltkb_id` is unique. `drug_id` is nullable so unmatched or ambiguous FDA rows remain inspectable without inventing a canonical drug mapping. A linked row also receives a `drug_identifiers` entry using identifier system `dilirank_ltkb`.
 - Complete RxNav and LiverTox refreshes reconcile their source-owned aliases, mappings, monographs, and source metadata after successful preparation in one database transaction. Shared `Drug` entities and records owned by other sources are preserved when obsolete source rows are removed.
+- Drug terminology (`drugs` concept types, `drug_aliases` validation status and provenance, `drug_concept_relations`, `drug_atc_codes`, `medicinal_products`, `medicinal_product_ingredients`, `terminology_conflicts`, `terminology_import_runs`, `drug_livertox_links`) is described in [drug_terminology.md](drug_terminology.md). Only `verified` and `confirmed` aliases resolve; reviewer decisions use alias source `reviewer` and survive every source refresh.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
 
 ## Resumable Clinical Input Draft
@@ -274,7 +310,8 @@ erDiagram
 
 - `KnowledgeRepository` owns LiverTox and existing evidence data.
 - `DiliRankRepository` owns FDA DILIrank 2.0 source rows and their deterministic links to the canonical drug catalog.
-- `DrugCatalogRepository` owns RxNav data.
+- `DrugCatalogRepository` owns the Drug Catalog inspection reads, renames, and deletes.
+- `TerminologyRepository` owns terminology import, reconciliation, and LiverTox link rebuilds; `TerminologyLookupRepository` owns runtime resolution reads, runtime aliases, and the resolution outcome cache; `TerminologyInspectionRepository` owns Knowledge > Terminology reads.
 - `ClinicalSessionRepository` owns session-result persistence.
 - `SessionTimelineRepository` owns timeline rows.
 - `SessionRevisionRepository` owns revision data, steps, and artifacts.
@@ -283,8 +320,8 @@ erDiagram
   drug-identity resolution, runtime vocabulary observations, and knowledge
   match-cache updates. `ClinicalSessionRepository` persists resolved drug
   mentions and does not learn catalog aliases while saving a session.
-- `DataInspectionService` coordinates cross-repository inspection responses and owns the canonical update-job dispatch for RxNav, LiverTox, DILIrank, and RAG; it combines clinical session detail with revision records rather than making either repository depend on the other. Session deletion follows the same ownership boundary: it asks `SessionRevisionRepository` to remove revision-owned rows before `ClinicalSessionRepository` removes the session.
-- The combined structured-source job is the backend orchestration boundary for `RxNav -> LiverTox -> DILIrank`; RAG remains independent. Its child progress is exposed through the same inspection job status contract.
+- `DataInspectionService` coordinates cross-repository inspection responses and owns the canonical update-job dispatch for RxNav, LiverTox, terminology, DILIrank, and RAG; it combines clinical session detail with revision records rather than making either repository depend on the other. Session deletion follows the same ownership boundary: it asks `SessionRevisionRepository` to remove revision-owned rows before `ClinicalSessionRepository` removes the session.
+- The combined structured-source job is the backend orchestration boundary for `RxNav -> LiverTox -> Terminology -> DILIrank`; RAG remains independent. Its child progress is exposed through the same inspection job status contract.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
 - `repositories/serialization` is a mixed historical package: pure row and
   payload converters remain there, but access-key and model-configuration

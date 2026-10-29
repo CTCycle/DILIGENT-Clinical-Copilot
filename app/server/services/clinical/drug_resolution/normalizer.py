@@ -10,7 +10,6 @@ from typing import Any
 from common.utils.logger import logger
 from domain.clinical.drug_resolution import NormalizedDrugMention
 from domain.clinical.entities import DrugEntry, PatientDrugs
-from services.clinical.drug_identity import DrugIdentityResolver
 from services.text.normalization import (
     canonicalize_drug_query,
     normalize_drug_query_name,
@@ -27,6 +26,32 @@ _AGE_SEX_PROSE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+
+###############################################################################
+def _is_name_component(value: str) -> bool:
+    tokens = normalize_drug_query_name(value).split()
+    return any(any(char.isalpha() for char in token) and len(token) > 1 for token in tokens)
+
+###############################################################################
+def split_regimen_components(value: str) -> list[str]:
+    """Split an explicit multi-drug regimen label into its component names."""
+    text = (value or "").strip()
+    if not text:
+        return []
+    numeric_slash = "__NUMERIC_SLASH__"
+    protected = text.replace("IU/ml", "IU per ml").replace("IU/ML", "IU per ML")
+    protected = protected.replace("mg/ml", "mg per ml").replace("MG/ML", "MG per ML")
+    protected = re.sub(r"(?<=\d)/(?=\d)", numeric_slash, protected)
+    protected = re.sub(r"(?<=[A-Za-z]{4})-(?=[A-Za-z]{4})", " + ", protected)
+    if "/" in protected:
+        protected = protected.replace("/", " / ")
+    for separator in (" + ", " plus ", " and "):
+        protected = protected.replace(separator, " + ")
+    raw_parts = [part.strip(" 	,;:.") for part in protected.split(" + ")]
+    if len(raw_parts) == 1:
+        raw_parts = [part.strip(" 	,;:.") for part in protected.split(" / ")]
+    parts = [part.replace(numeric_slash, "/") for part in raw_parts if _is_name_component(part)]
+    return parts or [text]
 
 ###############################################################################
 class DrugMentionNormalizer:
@@ -121,7 +146,7 @@ class DrugMentionNormalizer:
     def _expand_components(
         self, mention: NormalizedDrugMention
     ) -> list[NormalizedDrugMention]:
-        components = DrugIdentityResolver.split_components(mention.extracted_name)
+        components = split_regimen_components(mention.extracted_name)
         canonical_components = [
             canonical
             for component in components

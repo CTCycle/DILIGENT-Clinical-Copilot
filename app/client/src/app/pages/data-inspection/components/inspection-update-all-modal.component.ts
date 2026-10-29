@@ -369,6 +369,7 @@ export class InspectionUpdateAllModalComponent {
   targetLabel(target: InspectionUpdateAllTarget): string {
     if (target === 'livertox') return 'LiverTox';
     if (target === 'rxnav') return 'RxNav';
+    if (target === 'terminology') return 'Terminology';
     return 'DILIrank';
   }
 

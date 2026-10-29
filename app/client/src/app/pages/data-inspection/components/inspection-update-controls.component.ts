@@ -20,32 +20,48 @@ export type InspectionUpdateFieldChange = {
       @if (target === 'rxnav') {
         <div class="inspection-update-field-grid">
           <label class="inspection-update-field">
-            <span>Request timeout</span>
-            <input
-              type="number"
-              min="1"
-              max="120"
-              step="0.5"
-              [ngModel]="numberValue('rxnav_request_timeout', 30)"
-              (ngModelChange)="updateNumber('rxnav_request_timeout', $event, 1, 120, false)"
+            <span>Refresh mode</span>
+            <select
+              [ngModel]="booleanValue('force_full', false) ? 'full' : 'incremental'"
+              (ngModelChange)="updateBoolean('force_full', $event === 'full')"
               [disabled]="disabled"
-            />
-            <small>Seconds, 1 to 120.</small>
+            >
+              <option value="incremental">Skip unchanged releases</option>
+              <option value="full">Force full re-import</option>
+            </select>
+            <small>RxNorm Prescribable Content and curated aliases; a source is replaced only after a complete download.</small>
           </label>
+        </div>
+      }
 
+      @if (target === 'terminology') {
+        <div class="inspection-update-field-grid">
           <label class="inspection-update-field">
-            <span>Max concurrency</span>
-            <input
-              type="number"
-              min="1"
-              max="64"
-              step="1"
-              [ngModel]="numberValue('rxnav_max_concurrency', 4)"
-              (ngModelChange)="updateNumber('rxnav_max_concurrency', $event, 1, 64, true)"
+            <span>Refresh mode</span>
+            <select
+              [ngModel]="booleanValue('force_full', false) ? 'full' : 'incremental'"
+              (ngModelChange)="updateBoolean('force_full', $event === 'full')"
               [disabled]="disabled"
-            />
-            <small>Parallel RxNav requests, 1 to 64.</small>
+            >
+              <option value="incremental">Skip unchanged releases</option>
+              <option value="full">Force full re-import</option>
+            </select>
+            <small>Unchanged source versions are skipped unless a full re-import is forced.</small>
           </label>
+          @for (source of terminologySources; track source.key) {
+            <label class="inspection-update-field">
+              <span>{{ source.label }}</span>
+              <select
+                [ngModel]="booleanValue(source.key, true) ? 'on' : 'off'"
+                (ngModelChange)="updateBoolean(source.key, $event === 'on')"
+                [disabled]="disabled"
+              >
+                <option value="on">Include</option>
+                <option value="off">Skip this run</option>
+              </select>
+              <small>{{ source.hint }}</small>
+            </label>
+          }
         </div>
       }
 
@@ -184,6 +200,12 @@ export type InspectionUpdateFieldChange = {
   `,
 })
 export class InspectionUpdateControlsComponent {
+  readonly terminologySources = [
+    { key: 'drugcentral_enabled', label: 'DrugCentral', hint: 'International names and identifiers, CC BY-SA 4.0.' },
+    { key: 'chembl_enabled', label: 'ChEMBL', hint: 'INN, BAN, JAN and trade names, CC BY-SA 3.0.' },
+    { key: 'swissmedic_enabled', label: 'Swissmedic', hint: 'Swiss authorised products, open use with attribution.' },
+  ] as const;
+
   @Input() target: InspectionUpdateTarget | null = null;
   @Input() config: Record<string, unknown> | null = null;
   @Input() disabled = false;

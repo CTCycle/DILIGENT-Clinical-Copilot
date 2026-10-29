@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { ClinicalSessionDetail } from '../../core/models/inspection-types';
-import { previewDetectedDiseases, previewHepatotoxicityPattern, previewLaboratorySummary, previewLabTimeline, previewReport } from './clinical-session-preview';
+import { buildPersistedDrugEvidence, previewDetectedDiseases, previewHepatotoxicityPattern, previewLaboratorySummary, previewLabTimeline, previewReport, terminologyResolvedLabel } from './clinical-session-preview';
+import { terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
 import { describe, expect, it } from 'vitest';
 import { type RevisionArtifact, type RevisionPipelineStep } from '../../core/models/revision-types';
 import { formatRevisionArtifactLabel, formatRevisionArtifactMeta, formatRevisionArtifactPurpose, formatRevisionStatusLabel, formatRevisionStepLabel, formatRevisionStepMeta, formatRevisionStepSummary, revisionStatusTone } from './clinical-session-revision-display';
@@ -42,6 +43,60 @@ describe('clinical-session-preview', () => {
     }))).toBe('payload report');
 
     expect(previewReport(detail())).toBe('No AI report preview is available for this session.');
+  });
+
+  it('exposes the persisted terminology identity of detected drugs', () => {
+    const rows = buildPersistedDrugEvidence(detail({
+      result_payload: {
+        detected_drugs: ['Augmentin', 'Hydroxazine', 'Legacy drug'],
+        matched_drugs: [
+          {
+            raw_drug_name: 'Augmentin',
+            match_status: 'accepted_verified',
+            terminology: {
+              status: 'verified',
+              accepted: true,
+              method: 'exact_alias',
+              drug_id: 7,
+              preferred_name: 'amoxicillin / clavulanate',
+              ingredients: [
+                { drug_id: 1, name: 'amoxicillin', concept_type: 'ingredient' },
+                { drug_id: 2, name: 'clavulanate', concept_type: 'ingredient' },
+              ],
+              candidates: [],
+              review_reasons: [],
+            },
+          },
+          {
+            raw_drug_name: 'Hydroxazine',
+            match_status: 'ambiguous_requires_review',
+            terminology: {
+              status: 'ambiguous',
+              accepted: false,
+              method: 'fuzzy',
+              candidates: [
+                { drug_id: 3, name: 'hydroxyzine', concept_type: 'ingredient' },
+                { drug_id: 4, name: 'hydralazine', concept_type: 'ingredient' },
+                { name: 'malformed candidate' },
+              ],
+            },
+          },
+          { raw_drug_name: 'Legacy drug', match_status: 'matched', terminology: { status: 'legacy' } },
+        ],
+      },
+    }));
+    const byName = new Map(rows.map((row) => [row.name, row]));
+
+    const augmentin = byName.get('Augmentin')!.terminology!;
+    expect(terminologyResolvedLabel(augmentin)).toBe('amoxicillin / clavulanate (amoxicillin + clavulanate)');
+    expect(byName.get('Augmentin')!.liverTox).toBe(true);
+    const ambiguous = byName.get('Hydroxazine')!.terminology!;
+    expect(terminologyStatusLabel(ambiguous.status)).toBe('Ambiguous');
+    expect(terminologyStatusTone(ambiguous.status)).toBe('is-warning');
+    expect(terminologyResolvedLabel(ambiguous)).toBe('');
+    expect(ambiguous.candidates.map((item) => item.name)).toEqual(['hydroxyzine', 'hydralazine']);
+    expect(byName.get('Legacy drug')!.terminology).toBeNull();
+    expect(terminologyStatusLabel(undefined)).toBe('Not resolved');
   });
 
   it('uses direct disease payloads before source-text fallback and ignores unknown payload shapes', () => {

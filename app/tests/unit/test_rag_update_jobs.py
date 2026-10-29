@@ -22,6 +22,7 @@ def build_runner(
         drug_catalog_repository=object(),  # type: ignore[arg-type]
         knowledge_repository=object(),  # type: ignore[arg-type]
         dilirank_repository=object(),  # type: ignore[arg-type]
+        terminology_repository=object(),  # type: ignore[arg-type]
         jobs=jobs,
         report_phase_by_target=lambda *_args: None,
         report_job_progress=lambda *_args, **_kwargs: None,

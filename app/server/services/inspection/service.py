@@ -21,6 +21,7 @@ from domain.inspection import InspectionJobPhase
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
+from repositories.terminology_repository import TerminologyRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from repositories.session_revision_repository import SessionRevisionRepository
@@ -29,6 +30,7 @@ from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
 from services.clinical.timeline import PatientTimelineExtractor
+from services.inspection.terminology import InspectionTerminologyMixin
 from services.inspection.timeline import InspectionTimelineMixin
 from services.inspection.update_jobs import DataInspectionUpdateJobRunner
 from services.inspection.update_config import InspectionUpdateConfigMixin
@@ -37,21 +39,23 @@ from services.inspection.revision_agent import RevisionAgentRunner
 from services.runtime.jobs import JobManager
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
-UpdateTarget = Literal["rxnav", "livertox", "dilirank", "rag"]
+UpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
 
 ###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,
     InspectionRevisionScaffoldMixin,
     InspectionTimelineMixin,
+    InspectionTerminologyMixin,
 ):
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
     DILIRANK_JOB_TYPE = "dilirank_update"
+    TERMINOLOGY_JOB_TYPE = "terminology_update"
     STRUCTURED_SOURCES_JOB_TYPE = "structured_sources_update"
     RAG_JOB_TYPE = "rag_update"
     STRUCTURED_SOURCE_JOB_TYPES = frozenset(
-        {RXNAV_JOB_TYPE, LIVERTOX_JOB_TYPE, DILIRANK_JOB_TYPE}
+        {RXNAV_JOB_TYPE, LIVERTOX_JOB_TYPE, TERMINOLOGY_JOB_TYPE, DILIRANK_JOB_TYPE}
     )
     STRUCTURED_SOURCES_SCOPE_KEY = "catalog:structured_sources"
     REVISION_JOB_TYPE = "session_revision"
@@ -61,11 +65,20 @@ class DataInspectionService(
         "rxnav": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
             ("update_started", 2, 7, "Update started"),
-            ("source_data_loading", 3, 7, "Downloading source catalog data"),
-            ("processing_extraction", 4, 7, "Loading aliases and synonyms"),
-            ("persistence_indexing", 5, 7, "Persisting catalog updates"),
-            ("finalization", 6, 7, "Finalizing RxNav update"),
-            ("completed", 7, 7, "RxNav update completed"),
+            ("source_data_loading", 3, 7, "Downloading RxNorm Prescribable Content"),
+            ("processing_extraction", 4, 7, "Parsing RxNorm concepts and relations"),
+            ("persistence_indexing", 5, 7, "Reconciling and persisting terminology"),
+            ("finalization", 6, 7, "Finalizing RxNorm update"),
+            ("completed", 7, 7, "RxNorm update completed"),
+        ],
+        "terminology": [
+            ("configuration_accepted", 1, 7, "Configuration accepted"),
+            ("update_started", 2, 7, "Terminology enrichment started"),
+            ("source_data_loading", 3, 7, "Fetching DrugCentral, ChEMBL and Swissmedic"),
+            ("processing_extraction", 4, 7, "Staging concepts, aliases and products"),
+            ("persistence_indexing", 5, 7, "Reconciling and persisting terminology"),
+            ("finalization", 6, 7, "Rebuilding LiverTox links"),
+            ("completed", 7, 7, "Terminology enrichment completed"),
         ],
         "livertox": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
@@ -128,6 +141,9 @@ class DataInspectionService(
             drug_catalog_repository=self.drug_catalog_repository,
             knowledge_repository=self.knowledge_repository,
             dilirank_repository=self.dilirank_repository,
+            terminology_repository=(
+                TerminologyRepository(context) if isinstance(context, RepositoryContext) else None
+            ),
             jobs=self.jobs,
             report_phase_by_target=self._report_phase_by_target_for_runner,
             report_job_progress=self._report_job_progress_for_runner,
@@ -714,6 +730,12 @@ class DataInspectionService(
         return self.update_job_runner.run_livertox_update_job(job_id, overrides)
 
     # -------------------------------------------------------------------------
+    def run_terminology_update_job(
+        self, job_id: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        return self.update_job_runner.run_terminology_update_job(job_id, overrides)
+
+    # -------------------------------------------------------------------------
     def run_dilirank_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -763,6 +785,8 @@ class DataInspectionService(
             runner = partial(self.run_rxnav_update_job, overrides=override_values)
         elif job_type == self.LIVERTOX_JOB_TYPE:
             runner = partial(self.run_livertox_update_job, overrides=override_values)
+        elif job_type == self.TERMINOLOGY_JOB_TYPE:
+            runner = partial(self.run_terminology_update_job, overrides=override_values)
         elif job_type == self.DILIRANK_JOB_TYPE:
             runner = partial(self.run_dilirank_update_job, overrides=override_values)
         elif job_type == self.STRUCTURED_SOURCES_JOB_TYPE:
@@ -899,6 +923,7 @@ class DataInspectionService(
         supported_types = {
             self.RXNAV_JOB_TYPE,
             self.LIVERTOX_JOB_TYPE,
+            self.TERMINOLOGY_JOB_TYPE,
             self.DILIRANK_JOB_TYPE,
             self.STRUCTURED_SOURCES_JOB_TYPE,
             self.RAG_JOB_TYPE,

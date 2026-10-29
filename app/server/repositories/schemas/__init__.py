@@ -34,6 +34,15 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 from repositories.schemas.security import AccessKey
+from repositories.schemas.terminology import (
+    DrugAtcCode,
+    DrugConceptRelation,
+    DrugLiverToxLink,
+    MedicinalProduct,
+    MedicinalProductIngredient,
+    TerminologyConflict,
+    TerminologyImportRun,
+)
 
 __all__ = [
     "Base",
@@ -61,4 +70,11 @@ __all__ = [
     "KbMatchCache",
     "LiverToxMonograph",
     "AccessKey",
+    "DrugAtcCode",
+    "DrugConceptRelation",
+    "DrugLiverToxLink",
+    "MedicinalProduct",
+    "MedicinalProductIngredient",
+    "TerminologyConflict",
+    "TerminologyImportRun",
 ]

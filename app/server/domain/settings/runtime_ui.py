@@ -99,7 +99,15 @@ class IntegrationRuntimeSettings(_StrictModel):
     livertox_skip_deterministic_ratio: float = Field(ge=0.0, le=1.0)
     livertox_monograph_max_workers: int = Field(ge=1, le=64)
     rxnav_request_timeout: float = Field(gt=0.0, le=120.0)
-    rxnav_max_concurrency: int = Field(ge=1, le=64)
+    terminology_download_timeout: float = Field(ge=10.0, le=3600.0)
+    drugcentral_enabled: bool
+    drugcentral_host: str = Field(min_length=1, max_length=255)
+    drugcentral_port: int = Field(ge=1, le=65535)
+    drugcentral_database: str = Field(min_length=1, max_length=128)
+    drugcentral_user: str = Field(min_length=1, max_length=128)
+    chembl_enabled: bool
+    chembl_max_phase: int = Field(ge=1, le=4)
+    swissmedic_enabled: bool
 
 ###############################################################################
 class IntegrationRuntimeSettingsPatch(_PatchModel):
@@ -112,41 +120,41 @@ class IntegrationRuntimeSettingsPatch(_PatchModel):
     )
     livertox_monograph_max_workers: int | None = Field(default=None, ge=1, le=64)
     rxnav_request_timeout: float | None = Field(default=None, gt=0.0, le=120.0)
-    rxnav_max_concurrency: int | None = Field(default=None, ge=1, le=64)
+    terminology_download_timeout: float | None = Field(default=None, ge=10.0, le=3600.0)
+    drugcentral_enabled: bool | None = None
+    drugcentral_host: str | None = Field(default=None, min_length=1, max_length=255)
+    drugcentral_port: int | None = Field(default=None, ge=1, le=65535)
+    drugcentral_database: str | None = Field(default=None, min_length=1, max_length=128)
+    drugcentral_user: str | None = Field(default=None, min_length=1, max_length=128)
+    chembl_enabled: bool | None = None
+    chembl_max_phase: int | None = Field(default=None, ge=1, le=4)
+    swissmedic_enabled: bool | None = None
 
 ###############################################################################
 class MatchingRuntimeSettings(_StrictModel):
-    direct_confidence: float = Field(ge=0.0, le=1.0)
-    master_confidence: float = Field(ge=0.0, le=1.0)
-    synonym_confidence: float = Field(ge=0.0, le=1.0)
-    normalization_cache_limit: int = Field(ge=1, le=2_000_000)
-    match_cache_limit: int = Field(ge=1, le=2_000_000)
-    alias_cache_limit: int = Field(ge=1, le=2_000_000)
-    min_confidence: float = Field(ge=0.0, le=1.0)
-    token_min_length: int = Field(ge=1, le=128)
-    catalog_index_limit: int = Field(ge=1, le=2_000_000)
-    spelling_confidence: float = Field(ge=0.0, le=1.0)
-    spelling_min_query_length: int = Field(ge=1, le=128)
-    spelling_short_name_length: int = Field(ge=1, le=128)
-    spelling_short_max_distance: int = Field(ge=0, le=16)
-    spelling_long_max_distance: int = Field(ge=0, le=16)
+    resolution_cache_limit: int = Field(ge=1, le=2_000_000)
+    fuzzy_min_query_length: int = Field(ge=3, le=32)
+    fuzzy_shortlist_size: int = Field(ge=5, le=500)
+    fuzzy_short_name_length: int = Field(ge=3, le=64)
+    fuzzy_short_max_distance: int = Field(ge=0, le=4)
+    fuzzy_long_max_distance: int = Field(ge=0, le=4)
+    fuzzy_min_margin: int = Field(ge=1, le=4)
+    external_fallback_enabled: bool
+    external_max_requests_per_name: int = Field(ge=1, le=10)
+    external_negative_cache_days: int = Field(ge=1, le=365)
 
 ###############################################################################
 class MatchingRuntimeSettingsPatch(_PatchModel):
-    direct_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    master_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    synonym_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    normalization_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
-    match_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
-    alias_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
-    min_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    token_min_length: int | None = Field(default=None, ge=1, le=128)
-    catalog_index_limit: int | None = Field(default=None, ge=1, le=2_000_000)
-    spelling_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    spelling_min_query_length: int | None = Field(default=None, ge=1, le=128)
-    spelling_short_name_length: int | None = Field(default=None, ge=1, le=128)
-    spelling_short_max_distance: int | None = Field(default=None, ge=0, le=16)
-    spelling_long_max_distance: int | None = Field(default=None, ge=0, le=16)
+    resolution_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
+    fuzzy_min_query_length: int | None = Field(default=None, ge=3, le=32)
+    fuzzy_shortlist_size: int | None = Field(default=None, ge=5, le=500)
+    fuzzy_short_name_length: int | None = Field(default=None, ge=3, le=64)
+    fuzzy_short_max_distance: int | None = Field(default=None, ge=0, le=4)
+    fuzzy_long_max_distance: int | None = Field(default=None, ge=0, le=4)
+    fuzzy_min_margin: int | None = Field(default=None, ge=1, le=4)
+    external_fallback_enabled: bool | None = None
+    external_max_requests_per_name: int | None = Field(default=None, ge=1, le=10)
+    external_negative_cache_days: int | None = Field(default=None, ge=1, le=365)
 
 ###############################################################################
 class AdvancedRuntimeSettings(_StrictModel):
@@ -248,23 +256,27 @@ RUNTIME_SETTINGS_DEFAULTS = RuntimeSettingsValues(
         livertox_skip_deterministic_ratio=0.8,
         livertox_monograph_max_workers=4,
         rxnav_request_timeout=12.0,
-        rxnav_max_concurrency=10,
+        terminology_download_timeout=300.0,
+        drugcentral_enabled=True,
+        drugcentral_host="unmtid-dbs.net",
+        drugcentral_port=5433,
+        drugcentral_database="drugcentral",
+        drugcentral_user="drugman",
+        chembl_enabled=True,
+        chembl_max_phase=4,
+        swissmedic_enabled=True,
     ),
     matching=MatchingRuntimeSettings(
-        direct_confidence=1.0,
-        master_confidence=0.92,
-        synonym_confidence=0.9,
-        normalization_cache_limit=10000,
-        match_cache_limit=5000,
-        alias_cache_limit=2000,
-        min_confidence=0.9,
-        token_min_length=4,
-        catalog_index_limit=75000,
-        spelling_confidence=0.94,
-        spelling_min_query_length=6,
-        spelling_short_name_length=8,
-        spelling_short_max_distance=1,
-        spelling_long_max_distance=2,
+        resolution_cache_limit=5000,
+        fuzzy_min_query_length=5,
+        fuzzy_shortlist_size=50,
+        fuzzy_short_name_length=8,
+        fuzzy_short_max_distance=1,
+        fuzzy_long_max_distance=2,
+        fuzzy_min_margin=1,
+        external_fallback_enabled=True,
+        external_max_requests_per_name=4,
+        external_negative_cache_days=7,
     ),
     advanced=AdvancedRuntimeSettings(
         default_llm_timeout=3600.0,

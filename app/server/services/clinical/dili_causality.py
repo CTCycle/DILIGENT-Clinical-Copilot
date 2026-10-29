@@ -227,20 +227,21 @@ class DiliCausalityEngine:
         self, drug: DrugEntry, resolved: dict, accepted: bool
     ) -> DrugIdentityResolution:
         components = resolved.get("regimen_components") or []
+        terminology = resolved.get("terminology")
+        terminology = terminology if isinstance(terminology, dict) else {}
         return DrugIdentityResolution(
             raw_mention=drug.name,
             source_section=drug.source,
             evidence_quote=drug.evidence,
             normalized_name=resolved.get("normalized_name")
             or resolved.get("lookup_key"),
-            rxnav_candidates=resolved.get("rxnav_candidates") or [],
+            terminology_candidates=terminology.get("candidates") or [],
             livertox_candidates=resolved.get("livertox_candidates") or [],
             accepted_identity=resolved.get("accepted_livertox_name")
             if accepted
             else None,
-            identity_confidence=resolved.get("match_confidence"),
+            identity_status=terminology.get("status"),
             identity_reason=resolved.get("match_reason"),
-            rejected_candidates=resolved.get("rejected_candidates") or [],
             combination_components=list(components)
             if isinstance(components, list)
             else [],

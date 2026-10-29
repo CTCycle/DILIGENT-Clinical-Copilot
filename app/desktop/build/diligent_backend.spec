@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from PyInstaller.building.build_main import Analysis, EXE, COLLECT, PYZ
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 server_root = Path(SPECPATH).parents[1] / "server"
 hiddenimports = [
@@ -31,6 +31,9 @@ hiddenimports = [
     "uvicorn.protocols.websockets.websockets_impl",
     "uvicorn.lifespan.on",
 ]
+# rapidfuzz picks its compiled backend (AVX2, SSE2, generic) at import time
+# and its extensions import Python helpers from C; collect them explicitly.
+hiddenimports += collect_submodules("rapidfuzz", filter=lambda name: "__pyinstaller" not in name)
 
 binaries = []
 for package in [

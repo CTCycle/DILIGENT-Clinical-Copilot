@@ -685,10 +685,6 @@ async def process_single_patient_workflow(
         prepared_inputs=prepared_inputs,
         rucam_bundle=rucam_bundle,
     )
-    matched_drugs_payload = await asyncio.to_thread(
-        service.input_preparator.resolve_session_drug_ids,
-        matched_drugs_payload,
-    )
     serialized_issues = service.serialize_pipeline_issues(issues)
     pattern_strings = service.pattern_analyzer.stringify_scores(pattern_score)
     narrative = NarrativeBuilder.build_patient_narrative(
@@ -911,8 +907,7 @@ async def process_single_patient_workflow(
         if persisted_session_id is not None:
             try:
                 vocabulary_changed = await asyncio.to_thread(
-                    service.input_preparator.learn_session_drug_mentions,
-                    persisted_session_id,
+                    service.input_preparator.record_drug_mention_observations,
                     matched_drugs_payload,
                 )
             except Exception as exc:  # noqa: BLE001

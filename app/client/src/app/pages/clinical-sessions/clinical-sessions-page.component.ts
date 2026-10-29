@@ -82,7 +82,11 @@ import {
   previewLabTimeline as extractLabTimeline,
   previewReport as extractReport,
   resolveDrugBibliographyLabel,
+  terminologyResolvedLabel,
 } from './clinical-session-preview';
+import { TerminologyCandidate } from '../../core/models/inspection-types';
+import { decideTerminologyAlias } from '../../core/services/terminology-api';
+import { terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
 
 function selectPersistedRevision(
   versions: SessionVersionSummary[],
@@ -179,6 +183,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly saveStatus = signal('');
   readonly deletingSessionId = signal<number | null>(null);
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
+  readonly terminologyDecisionPending = signal(false);
+  readonly terminologyStatusLabel = terminologyStatusLabel;
+  readonly terminologyStatusTone = terminologyStatusTone;
+  readonly terminologyResolvedLabel = terminologyResolvedLabel;
   readonly detectedDiseases = signal<string[]>([]);
   readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
   readonly labTimeline = signal<LabTimelineRow[]>([]);
@@ -875,6 +883,45 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   diseaseTemporalLabel(disease: string): string {
     return previewDiseaseTemporalLabel(disease);
+  }
+
+  async confirmDrugIdentity(drugName: string, candidate: TerminologyCandidate): Promise<void> {
+    const confirmed = globalThis.confirm(
+      `Confirm "${drugName}" as ${candidate.name}? Future assessments will use this identity; this session is not changed.`,
+    );
+    if (!confirmed) return;
+    this.terminologyDecisionPending.set(true);
+    try {
+      await decideTerminologyAlias('confirm', drugName, candidate.drug_id);
+      this.detailError.set(null);
+      this.detectedDrugEvidence.update((rows) => rows.map((row) => (
+        row.name === drugName && row.terminology
+          ? {
+            ...row,
+            terminology: {
+              ...row.terminology,
+              status: 'verified',
+              accepted: true,
+              method: 'confirmed_local',
+              drug_id: candidate.drug_id,
+              preferred_name: candidate.name,
+              ingredients: [{
+                drug_id: candidate.drug_id,
+                name: candidate.name,
+                concept_type: candidate.concept_type,
+                parent_drug_id: null,
+                parent_name: null,
+              }],
+              candidates: [],
+            },
+          }
+          : row
+      )));
+    } catch (error) {
+      this.detailError.set(error instanceof Error ? error.message : 'Failed to confirm the drug identity.');
+    } finally {
+      this.terminologyDecisionPending.set(false);
+    }
   }
 
   private async loadDetectedDrugEvidence(

@@ -65,23 +65,27 @@ const VALUES: RuntimeSettingsValues = {
     livertox_skip_deterministic_ratio: 0.8,
     livertox_monograph_max_workers: 4,
     rxnav_request_timeout: 12,
-    rxnav_max_concurrency: 10,
+    terminology_download_timeout: 300,
+    drugcentral_enabled: true,
+    drugcentral_host: 'unmtid-dbs.net',
+    drugcentral_port: 5433,
+    drugcentral_database: 'drugcentral',
+    drugcentral_user: 'drugman',
+    chembl_enabled: true,
+    chembl_max_phase: 4,
+    swissmedic_enabled: true,
   },
   matching: {
-    direct_confidence: 1,
-    master_confidence: 0.92,
-    synonym_confidence: 0.9,
-    normalization_cache_limit: 10000,
-    match_cache_limit: 5000,
-    alias_cache_limit: 2000,
-    min_confidence: 0.9,
-    token_min_length: 4,
-    catalog_index_limit: 75000,
-    spelling_confidence: 0.94,
-    spelling_min_query_length: 6,
-    spelling_short_name_length: 8,
-    spelling_short_max_distance: 1,
-    spelling_long_max_distance: 2,
+    resolution_cache_limit: 5000,
+    fuzzy_min_query_length: 5,
+    fuzzy_shortlist_size: 50,
+    fuzzy_short_name_length: 8,
+    fuzzy_short_max_distance: 1,
+    fuzzy_long_max_distance: 2,
+    fuzzy_min_margin: 1,
+    external_fallback_enabled: true,
+    external_max_requests_per_name: 4,
+    external_negative_cache_days: 7,
   },
   advanced: {
     default_llm_timeout: 3600,
@@ -109,7 +113,8 @@ describe('operational settings definitions', () => {
     const fields = Object.values(SETTINGS_SECTION_DEFINITIONS)
       .flatMap((section) => section.fields);
     expect(fields.map((field) => field.key)).toContain('clinical_assessment_batch_size');
-    expect(fields.map((field) => field.key)).toContain('spelling_long_max_distance');
+    expect(fields.map((field) => field.key)).toContain('fuzzy_long_max_distance');
+    expect(fields.map((field) => field.key)).toContain('drugcentral_enabled');
     expect(fields.map((field) => field.kind)).toContain('text');
     expect(fields.map((field) => field.key)).toContain('ncbi_contact_email');
     const ncbiField = SETTINGS_SECTION_DEFINITIONS.integrations.fields.find(
@@ -117,7 +122,7 @@ describe('operational settings definitions', () => {
     );
     expect(ncbiField?.kind).toBe('email');
     expect(ncbiField?.scope).toBe('NCBI / LiverTox');
-    expect(fields.map((field) => field.kind)).not.toContain('boolean');
+    expect(SETTINGS_SECTION_DEFINITIONS.matching.fields.find((field) => field.key === 'external_fallback_enabled')?.kind).toBe('boolean');
     expect(fields.every((field) => !field.scope.toLowerCase().includes('env'))).toBe(true);
   });
 

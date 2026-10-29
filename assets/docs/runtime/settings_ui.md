@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Scope
 
@@ -58,8 +58,8 @@ are defined by typed application models.
 | General | Jobs | Polling interval |
 | Models | Application configuration | Provider, access-key workflow, model roles, reasoning, and the complete RAG payload |
 | Data Processing | Ingestion, session pipeline, language detection | Drug-name limits, batch/concurrency limits, and clinical language thresholds |
-| Integrations | Runtime integrations | NCBI/LiverTox contact and download/archive/worker controls, plus RxNav timeout/concurrency |
-| Drug Matching | Matcher runtime | Confidence thresholds, cache sizes, catalog index size, token limits, and spelling distances |
+| Integrations | Runtime integrations | NCBI/LiverTox contact and download/archive/worker controls, RxNav request timeout, terminology download timeout, and the DrugCentral (connection), ChEMBL (clinical phase), and Swissmedic source switches |
+| Drug Matching | Terminology resolver | Spelling-correction length, short-name threshold, edit bounds, runner-up margin, shortlist size, resolution cache size, and the RxNav fallback switch, per-name request budget, and negative-result lifetime |
 | Advanced | LLM/evidence runtime | Role-specific timeouts, timeout floors/caps, Ollama startup timeout, and excerpt length |
 
 RAG is represented once as `rag_settings` in the database payload. The Models

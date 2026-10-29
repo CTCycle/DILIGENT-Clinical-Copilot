@@ -83,13 +83,13 @@ def test_settings_api_get_patch_and_reset(monkeypatch) -> None:  # type: ignore[
         json={
             "general": {"polling_interval": 3.0},
             "data": {"retrieval_batch_size": 10},
-            "matching": {"spelling_confidence": 0.8},
+            "matching": {"fuzzy_min_margin": 2},
         },
     )
     assert response.status_code == 200
     assert response.json()["values"]["general"]["polling_interval"] == 3.0
     assert response.json()["values"]["data"]["retrieval_batch_size"] == 10
-    assert response.json()["values"]["matching"]["spelling_confidence"] == 0.8
+    assert response.json()["values"]["matching"]["fuzzy_min_margin"] == 2
     assert serializer.payload["jobs"]["polling_interval"] == 3.0
     assert serializer.payload["session_pipeline"]["retrieval_batch_size"] == 10
 
@@ -143,7 +143,7 @@ def test_settings_api_rejects_unknown_or_invalid_fields(monkeypatch) -> None:  #
 
     invalid = client.patch(
         "/api/settings",
-        json={"integrations": {"rxnav_max_concurrency": 0}},
+        json={"integrations": {"chembl_max_phase": 0}},
     )
     assert invalid.status_code == 422
 

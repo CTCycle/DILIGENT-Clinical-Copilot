@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from repositories.schemas.base import Base
 
 DRUGS_ID_FK = "drugs.id"
+IMPORT_RUNS_ID_FK = "terminology_import_runs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
@@ -36,6 +37,10 @@ class Drug(Base):
     canonical_name_norm: Mapped[str] = mapped_column(String, nullable=False)
     livertox_nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
     rxnav_last_update: Mapped[str | None] = mapped_column(String, nullable=True)
+    concept_type: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'ingredient'")
+    )
+    preferred_inn: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     rxnorm_codes: Mapped[list["DrugRxnormCode"]] = relationship(
         "DrugRxnormCode",
@@ -55,6 +60,10 @@ class Drug(Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "concept_type IN ('ingredient', 'precise_ingredient', 'multi_ingredient')",
+            name="concept_type",
+        ),
         UniqueConstraint("canonical_name_norm", name="uq_drugs_canonical_name_norm"),
         Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
     )
@@ -90,10 +99,23 @@ class DrugAlias(Base):
     alias_kind: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)
     term_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
+    country: Mapped[str | None] = mapped_column(String, nullable=True)
+    validation_status: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'verified'")
+    )
+    import_run_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(IMPORT_RUNS_ID_FK, ondelete="SET NULL"), nullable=True
+    )
+    source_record_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     drug: Mapped["Drug"] = relationship("Drug", back_populates="aliases")
 
     __table_args__ = (
+        CheckConstraint(
+            "validation_status IN ('verified', 'confirmed', 'provisional', 'rejected')",
+            name="validation_status",
+        ),
         UniqueConstraint(
             "drug_id",
             "alias_norm",
@@ -159,6 +181,10 @@ class KbMatchCache(Base):
     )
     invalidated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     invalidation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    method: Mapped[str | None] = mapped_column(String, nullable=True)
+    terminology_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
@@ -177,7 +203,7 @@ class KbMatchCache(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "source IN ('rxnav', 'livertox', 'rag')",
+            "source IN ('rxnav', 'livertox', 'rag', 'terminology')",
             name="ck_kb_match_cache_source",
         ),
         CheckConstraint(
@@ -207,6 +233,10 @@ class DrugIdentifier(Base):
     )
     identifier_system: Mapped[str] = mapped_column(String, nullable=False)
     identifier_value: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str | None] = mapped_column(String, nullable=True)
+    import_run_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(IMPORT_RUNS_ID_FK, ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
     )

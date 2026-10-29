@@ -80,20 +80,16 @@ class DatabaseSettings(BaseModel):
 ###############################################################################
 class DrugsMatcherSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
-    direct_confidence: float
-    master_confidence: float
-    synonym_confidence: float
-    normalization_cache_limit: int
-    match_cache_limit: int
-    alias_cache_limit: int
-    min_confidence: float
-    token_min_length: int
-    catalog_index_limit: int
-    spelling_confidence: float
-    spelling_min_query_length: int
-    spelling_short_name_length: int
-    spelling_short_max_distance: int
-    spelling_long_max_distance: int
+    resolution_cache_limit: int
+    fuzzy_min_query_length: int
+    fuzzy_shortlist_size: int
+    fuzzy_short_name_length: int
+    fuzzy_short_max_distance: int
+    fuzzy_long_max_distance: int
+    fuzzy_min_margin: int
+    external_fallback_enabled: bool
+    external_max_requests_per_name: int
+    external_negative_cache_days: int
 
 ###############################################################################
 class RagSettings(BaseModel):
@@ -135,7 +131,15 @@ class RuntimeSettings(BaseModel):
     livertox_monograph_max_workers: int
     max_excerpt_length: int
     rxnav_request_timeout: float
-    rxnav_max_concurrency: int
+    terminology_download_timeout: float
+    drugcentral_enabled: bool
+    drugcentral_host: str
+    drugcentral_port: int
+    drugcentral_database: str
+    drugcentral_user: str
+    chembl_enabled: bool
+    chembl_max_phase: int
+    swissmedic_enabled: bool
 
 ###############################################################################
 class IngestionSettings(BaseModel):

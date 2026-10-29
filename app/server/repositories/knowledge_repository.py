@@ -6,7 +6,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import UTC, datetime
 from typing import Any, cast
 
 import pandas as pd
@@ -37,8 +36,6 @@ from repositories.queries.drugs import DrugRepositoryQueries
 from repositories.schemas.knowledge import (
     Drug,
     DrugAlias,
-    KbMatchCache,
-    DrugRxnormCode,
     LiverToxMonograph,
 )
 
@@ -392,18 +389,45 @@ class KnowledgeRepository:
             }
 
     # -------------------------------------------------------------------------
-    def resolve_drug_id_by_name(self, drug_name: str | None) -> int | None:
-        """Resolve a canonical LiverTox drug name to its persisted identity."""
-        if not drug_name:
-            return None
-        normalized_name = normalize_drug_name(drug_name)
-        if not normalized_name:
-            return None
+    def get_monograph_rows(self, monograph_ids: list[int]) -> dict[int, dict[str, Any]]:
+        """LiverTox monograph evidence rows keyed by monograph id."""
+        ids = sorted({int(item) for item in monograph_ids})
+        if not ids:
+            return {}
         with self.session_factory() as db_session:
-            drug_id = db_session.scalar(
-                select(Drug.id).where(Drug.canonical_name_norm == normalized_name)
-            )
-            return int(drug_id) if drug_id is not None else None
+            rows = db_session.execute(
+                select(LiverToxMonograph, Drug.canonical_name)
+                .join(Drug, Drug.id == LiverToxMonograph.drug_id)
+                .where(LiverToxMonograph.id.in_(ids))
+            ).all()
+        return {
+            int(monograph.id): {
+                "drug_id": int(monograph.drug_id),
+                "drug_name": repository_values.normalize_string(drug_name),
+                "drug_name_norm": monograph.drug_name_norm,
+                "monograph_key": monograph.monograph_key,
+                "nbk_id": repository_values.normalize_string(monograph.nbk_id),
+                "excerpt": repository_values.normalize_string(monograph.excerpt),
+                "likelihood_score": repository_values.normalize_string(monograph.likelihood_score),
+                "last_update": repository_values.normalize_string(monograph.last_update),
+                "reference_count": monograph.reference_count,
+                "year_approved": monograph.year_approved,
+                "agent_classification": repository_values.normalize_string(monograph.agent_classification),
+                "primary_classification": repository_values.normalize_string(monograph.primary_classification),
+                "secondary_classification": repository_values.normalize_string(
+                    monograph.secondary_classification
+                ),
+                "include_in_livertox": monograph.include_in_livertox,
+                "source_url": repository_values.normalize_string(monograph.source_url),
+                "source_last_modified": repository_values.normalize_string(monograph.source_last_modified),
+            }
+            for monograph, drug_name in rows
+        }
+
+    # -------------------------------------------------------------------------
+    def count_livertox_monographs(self) -> int:
+        with self.session_factory() as db_session:
+            return int(db_session.scalar(select(func.count(LiverToxMonograph.id))) or 0)
 
     # -------------------------------------------------------------------------
     def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
@@ -450,199 +474,6 @@ class KnowledgeRepository:
                     }
                     for item in monographs
                 ],
-            }
-
-    # -------------------------------------------------------------------------
-    def resolve_drug_id_from_match_cache(
-        self, db_session: Session, *, normalized_drug_key: str
-    ) -> int | None:
-        if not normalized_drug_key:
-            return None
-        cache = db_session.scalar(
-            select(KbMatchCache)
-            .where(
-                KbMatchCache.normalized_drug_key == normalized_drug_key,
-                KbMatchCache.invalidated_at.is_(None),
-                KbMatchCache.confidence
-                >= get_server_settings().drugs_matcher.min_confidence,
-            )
-            .order_by(KbMatchCache.updated_at.desc(), KbMatchCache.id.desc())
-            .limit(1)
-        )
-        if cache is None or cache.drug_id is None:
-            return None
-        drug = db_session.get(Drug, int(cache.drug_id))
-        if drug is None:
-            cache.invalidated_at = datetime.now(UTC)
-            cache.invalidation_reason = "matched_drug_deleted"
-            return None
-        if (
-            cache.rxnorm_rxcui
-            and db_session.execute(
-                select(Drug)
-                .join(DrugRxnormCode, DrugRxnormCode.drug_id == Drug.id)
-                .where(DrugRxnormCode.rxcui == cache.rxnorm_rxcui)
-                .limit(1)
-            )
-            .scalars()
-            .first()
-            is None
-        ):
-            cache.invalidated_at = datetime.now(UTC)
-            cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
-            return None
-        if (
-            cache.livertox_monograph_key
-            and db_session.scalar(
-                select(LiverToxMonograph).where(
-                    LiverToxMonograph.monograph_key == cache.livertox_monograph_key,
-                    LiverToxMonograph.drug_id == cache.drug_id,
-                )
-            )
-            is None
-        ):
-            cache.invalidated_at = datetime.now(UTC)
-            cache.invalidation_reason = "livertox_monograph_identity_changed"
-            return None
-        return int(cache.drug_id)
-
-    # -------------------------------------------------------------------------
-    def upsert_high_confidence_kb_match_cache(
-        self,
-        db_session: Session,
-        *,
-        raw_drug_name: str,
-        raw_drug_name_norm: str,
-        normalized_drug_key: str,
-        drug_id: int | None,
-        rxnorm_rxcui: str | None,
-        livertox_nbk_id: str | None,
-        source: str,
-        confidence: float | None,
-        evidence: dict[str, Any],
-        ambiguous: bool,
-    ) -> None:
-        minimum_confidence = get_server_settings().drugs_matcher.min_confidence
-        if (
-            drug_id is None
-            or confidence is None
-            or confidence < minimum_confidence
-            or ambiguous
-            or source not in {"rxnav", "livertox", "rag"}
-        ):
-            return
-        monograph = db_session.scalar(
-            select(LiverToxMonograph)
-            .where(LiverToxMonograph.drug_id == drug_id)
-            .order_by(LiverToxMonograph.id.desc())
-            .limit(1)
-        )
-        if livertox_nbk_id:
-            matching_count = db_session.scalar(
-                select(func.count())
-                .select_from(LiverToxMonograph)
-                .where(LiverToxMonograph.nbk_id == livertox_nbk_id)
-            )
-            if matching_count and int(matching_count) > 1 and monograph is None:
-                return
-        evidence_json = json.dumps(evidence, ensure_ascii=False, default=str)
-        existing = db_session.scalar(
-            select(KbMatchCache).where(
-                KbMatchCache.normalized_drug_key == normalized_drug_key,
-                KbMatchCache.source == source,
-            )
-        )
-        now = datetime.now(UTC)
-        deterministic_version = f"rxnorm:{rxnorm_rxcui}" if rxnorm_rxcui else None
-        if monograph is not None:
-            deterministic_version = f"livertox:{monograph.monograph_key}"
-        if existing is None:
-            db_session.add(
-                KbMatchCache(
-                    raw_drug_name=raw_drug_name,
-                    raw_drug_name_norm=raw_drug_name_norm,
-                    normalized_drug_key=normalized_drug_key,
-                    drug_id=drug_id,
-                    rxnorm_rxcui=rxnorm_rxcui,
-                    livertox_monograph_key=monograph.monograph_key
-                    if monograph
-                    else None,
-                    livertox_nbk_id=livertox_nbk_id,
-                    source=source,
-                    confidence=confidence,
-                    evidence_json=evidence_json,
-                    deterministic_evidence_version=deterministic_version,
-                    updated_at=now,
-                )
-            )
-            return
-        existing.raw_drug_name = raw_drug_name
-        existing.raw_drug_name_norm = raw_drug_name_norm
-        existing.drug_id = drug_id
-        existing.rxnorm_rxcui = rxnorm_rxcui
-        existing.livertox_monograph_key = monograph.monograph_key if monograph else None
-        existing.livertox_nbk_id = livertox_nbk_id
-        existing.confidence = confidence
-        existing.evidence_json = evidence_json
-        existing.deterministic_evidence_version = deterministic_version
-        existing.invalidated_at = None
-        existing.invalidation_reason = None
-        existing.updated_at = now
-
-    # -------------------------------------------------------------------------
-    def load_livertox_match_from_db_cache(
-        self, *, normalized_drug_key: str
-    ) -> dict[str, Any] | None:
-        if not normalized_drug_key:
-            return None
-        with self.session_factory() as db_session:
-            cache = db_session.scalar(
-                select(KbMatchCache)
-                .where(
-                    KbMatchCache.normalized_drug_key == normalized_drug_key,
-                    KbMatchCache.invalidated_at.is_(None),
-                    KbMatchCache.confidence >= 0.95,
-                    KbMatchCache.livertox_monograph_key.isnot(None),
-                )
-                .order_by(
-                    KbMatchCache.confidence.desc(), KbMatchCache.updated_at.desc()
-                )
-                .limit(1)
-            )
-            if cache is None or cache.drug_id is None:
-                return None
-            drug = db_session.get(Drug, int(cache.drug_id))
-            monograph = db_session.scalar(
-                select(LiverToxMonograph).where(
-                    LiverToxMonograph.monograph_key == cache.livertox_monograph_key
-                )
-            )
-            if drug is None or monograph is None:
-                return None
-            evidence: dict[str, Any] = {}
-            if cache.evidence_json:
-                try:
-                    parsed = json.loads(cache.evidence_json)
-                    if isinstance(parsed, dict):
-                        evidence = parsed
-                except json.JSONDecodeError, TypeError:
-                    evidence = {}
-            return {
-                "drug_id": int(cache.drug_id),
-                "drug_name": drug.canonical_name,
-                "normalized_drug_name": drug.canonical_name_norm,
-                "nbk_id": monograph.nbk_id,
-                "monograph_key": str(monograph.monograph_key),
-                "excerpt": monograph.excerpt,
-                "likelihood_score": monograph.likelihood_score,
-                "reference_count": monograph.reference_count,
-                "agent_classification": monograph.agent_classification,
-                "primary_classification": monograph.primary_classification,
-                "secondary_classification": monograph.secondary_classification,
-                "confidence": float(cache.confidence),
-                "rxnorm_rxcui": cache.rxnorm_rxcui,
-                "source": cache.source,
-                "evidence": evidence,
             }
 
     # -------------------------------------------------------------------------

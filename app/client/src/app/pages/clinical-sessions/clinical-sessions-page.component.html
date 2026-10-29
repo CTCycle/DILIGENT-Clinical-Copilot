@@ -170,6 +170,31 @@
                         <tr>
                           <td>
                             <strong>{{ drug.name }}</strong>
+                            @if (drug.terminology; as identity) {
+                              <span class="clinical-session-drug-identity">
+                                <span class="inspection-status-chip" [ngClass]="terminologyStatusTone(identity.status)">
+                                  {{ terminologyStatusLabel(identity.status) }}
+                                </span>
+                                @if (terminologyResolvedLabel(identity); as resolved) {
+                                  <span [title]="identity.source ? 'Source: ' + identity.source : ''">→ {{ resolved }}</span>
+                                }
+                              </span>
+                              @if (identity.status === 'ambiguous' && identity.candidates.length) {
+                                <span class="clinical-session-drug-candidates">
+                                  @for (candidate of identity.candidates; track candidate.drug_id) {
+                                    <button
+                                      type="button"
+                                      class="btn btn-secondary inspection-mini-btn"
+                                      [disabled]="terminologyDecisionPending()"
+                                      [title]="'Confirm ' + drug.name + ' as ' + candidate.name + ' for future assessments'"
+                                      (click)="confirmDrugIdentity(drug.name, candidate)"
+                                    >
+                                      {{ candidate.name }}
+                                    </button>
+                                  }
+                                </span>
+                              }
+                            }
                             <small>{{ drug.temporalReference }}</small>
                             @if (drug.extractionFallback) {
                               <small class="clinical-session-evidence-fallback">Display fallback</small>

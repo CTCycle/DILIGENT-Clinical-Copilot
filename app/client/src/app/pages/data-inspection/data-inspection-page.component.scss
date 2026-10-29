@@ -234,3 +234,83 @@
 .inspection-update-actions .btn {
   width: auto;
 }
+
+.inspection-terminology-resolve {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inspection-terminology-resolve .inspection-search {
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+
+.inspection-terminology-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.inspection-terminology-body {
+  max-height: min(68vh, 720px);
+  padding: var(--space-md);
+}
+
+.inspection-terminology-result {
+  display: grid;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-alt);
+}
+
+.inspection-terminology-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.inspection-terminology-original {
+  color: var(--color-text-secondary);
+}
+
+.inspection-terminology-facts,
+.inspection-terminology-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-sm) var(--space-lg);
+  margin: 0;
+}
+
+.inspection-terminology-facts dt,
+.inspection-terminology-stats dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+}
+
+.inspection-terminology-facts dd,
+.inspection-terminology-stats dd {
+  margin: 0;
+  font-size: var(--font-sm);
+  word-break: break-word;
+}
+
+.inspection-terminology-stats dd {
+  font-size: var(--font-md, 1rem);
+  font-weight: 700;
+}
+
+.inspection-terminology-heading {
+  margin: var(--space-lg) 0 var(--space-sm);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}

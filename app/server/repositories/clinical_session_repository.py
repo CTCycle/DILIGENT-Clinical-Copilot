@@ -569,7 +569,8 @@ class ClinicalSessionRepository:
             nbk_id = repository_values.normalize_string(item.get("nbk_id"))
             resolved_drug_id = repository_values.to_int(item.get("drug_id"))
             match_reason = repository_values.normalize_string(item.get("match_reason"))
-            match_confidence = repository_values.to_float(item.get("match_confidence"))
+            terminology = item.get("terminology")
+            terminology = terminology if isinstance(terminology, dict) else {}
             db_session.add(
                 ClinicalDrugMention(
                     session_id=session_id,
@@ -577,14 +578,8 @@ class ClinicalSessionRepository:
                     raw_name=raw_drug_name,
                     normalized_name=raw_drug_name_norm,
                     drug_id=resolved_drug_id,
-                    match_status=(
-                        "ambiguous"
-                        if bool(item.get("ambiguous_match"))
-                        else "matched"
-                        if resolved_drug_id is not None
-                        else "unresolved"
-                    ),
-                    confidence=match_confidence,
+                    match_status=str(terminology.get("status") or "unresolved"),
+                    confidence=None,
                     match_reason=match_reason,
                     evidence_json={
                         "matched_drug_name": matched_drug_name,
@@ -592,10 +587,7 @@ class ClinicalSessionRepository:
                         "accepted_rxnav_rxcui": repository_values.normalize_string(
                             item.get("accepted_rxnav_rxcui")
                         ),
-                        "rxnav_candidates": item.get("rxnav_candidates") or [],
-                        "rxnav_validation_status": repository_values.normalize_string(
-                            item.get("rxnav_validation_status")
-                        ),
+                        "terminology": terminology or None,
                         "nbk_id": nbk_id,
                         "source_provenance": item.get("source_provenance") or {},
                         "extraction_metadata": item.get("extraction_metadata") or [],

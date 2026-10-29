@@ -178,6 +178,7 @@ function initialUpdateAllConfigMap(): InspectionUpdateAllConfigMap {
   return {
     livertox: null,
     rxnav: null,
+    terminology: null,
     dilirank: null,
   };
 }
@@ -186,6 +187,7 @@ function initialUpdateAllConfigLoadingMap(): InspectionUpdateAllConfigLoadingMap
   return {
     livertox: false,
     rxnav: false,
+    terminology: false,
     dilirank: false,
   };
 }
@@ -194,6 +196,7 @@ function initialUpdateAllConfigErrorMap(): InspectionUpdateAllConfigErrorMap {
   return {
     livertox: null,
     rxnav: null,
+    terminology: null,
     dilirank: null,
   };
 }
@@ -222,6 +225,14 @@ function initialUpdateAllState(): InspectionUpdateAllState {
         message: 'Waiting to start.',
         error: null,
       },
+      terminology: {
+        started: false,
+        jobId: null,
+        status: null,
+        progress: 0,
+        message: 'Waiting to start.',
+        error: null,
+      },
       dilirank: {
         started: false,
         jobId: null,
@@ -242,6 +253,7 @@ export class InspectionUpdateJobResource {
   readonly targetState = signal<InspectionUpdateTargetSnapshotMap>({
     rxnav: { running: false, progress: 0, message: '', error: null },
     livertox: { running: false, progress: 0, message: '', error: null },
+    terminology: { running: false, progress: 0, message: '', error: null },
     dilirank: { running: false, progress: 0, message: '', error: null },
     rag: { running: false, progress: 0, message: '', error: null },
   });
@@ -284,12 +296,13 @@ export class InspectionUpdateJobResource {
       this.tracker.configureRefreshers({
         rxnav: this.actions.rxnav.refresh,
         livertox: this.actions.livertox.refresh,
+        terminology: this.actions.terminology.refresh,
         dilirank: this.actions.dilirank.refresh,
         rag: this.actions.rag.refresh,
       });
       effect(() => {
         const states = this.tracker!.targetState();
-        for (const target of ['rxnav', 'livertox', 'dilirank', 'rag'] as InspectionUpdateTarget[]) {
+        for (const target of ['rxnav', 'livertox', 'terminology', 'dilirank', 'rag'] as InspectionUpdateTarget[]) {
           const state = states[target];
           this.patchTargetState(target, {
             jobId: state.jobId,
@@ -463,6 +476,10 @@ export class InspectionUpdateJobResource {
         target: 'rxnav',
         payload: this.buildStartPayload('rxnav'),
       },
+      terminology: {
+        target: 'terminology',
+        payload: this.buildStartPayload('terminology'),
+      },
       dilirank: {
         target: 'dilirank',
         payload: this.buildStartPayload('dilirank'),
@@ -555,6 +572,9 @@ export class InspectionUpdateJobResource {
       return { target, payload: this.buildStartPayload(target) };
     }
     if (target === 'livertox') {
+      return { target, payload: this.buildStartPayload(target) };
+    }
+    if (target === 'terminology') {
       return { target, payload: this.buildStartPayload(target) };
     }
     if (target === 'dilirank') {
@@ -669,7 +689,7 @@ export class InspectionUpdateJobResource {
       ...patch,
     };
     this.targetStates.set(target, next);
-    if (target === 'livertox' || target === 'rxnav' || target === 'dilirank') {
+    if (target === 'livertox' || target === 'rxnav' || target === 'terminology' || target === 'dilirank') {
       this.updateAllConfigs.update((configs) => ({ ...configs, [target]: next.config }));
       this.updateAllConfigLoading.update((loading) => ({ ...loading, [target]: next.loading }));
       this.updateAllConfigErrors.update((errors) => ({ ...errors, [target]: next.configError }));

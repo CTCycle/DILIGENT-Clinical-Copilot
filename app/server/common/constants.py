@@ -40,22 +40,22 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
 # [DRUG MATCHING]
 ###############################################################################
-DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH = 4
-DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT = 75000
-DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE = 0.94
-DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH = 6
-DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH = 10
-DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE = 1
-DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE = 2
-
-RXNORM_CATALOG_COLUMNS = [
-    "rxcui",
-    "raw_name",
-    "term_type",
-    "name",
-    "brand_names",
-    "synonyms",
-]
+DEFAULT_DRUG_MATCHER_SETTINGS = {
+    "resolution_cache_limit": 5000,
+    "fuzzy_min_query_length": 5,
+    "fuzzy_shortlist_size": 50,
+    "fuzzy_short_name_length": 8,
+    "fuzzy_short_max_distance": 1,
+    "fuzzy_long_max_distance": 2,
+    "fuzzy_min_margin": 1,
+    "external_fallback_enabled": True,
+    "external_max_requests_per_name": 4,
+    "external_negative_cache_days": 7,
+}
+DEFAULT_DRUGCENTRAL_HOST = "unmtid-dbs.net"
+DEFAULT_DRUGCENTRAL_PORT = 5433
+DEFAULT_DRUGCENTRAL_DATABASE = "drugcentral"
+DEFAULT_DRUGCENTRAL_USER = "drugman"
 
 LIVERTOX_REQUIRED_COLUMNS = [
     "nbk_id",

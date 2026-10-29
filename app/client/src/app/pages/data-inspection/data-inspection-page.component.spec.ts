@@ -36,6 +36,7 @@ describe('DataInspectionPageComponent folder selection', () => {
       targetState: signal({
         rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
         livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        terminology: { jobId: null, running: false, progress: 0, message: '', error: null },
         dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
@@ -48,6 +49,7 @@ describe('DataInspectionPageComponent folder selection', () => {
         targets: {
           livertox: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
           rxnav: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+          terminology: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
           dilirank: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
         },
       }),
@@ -215,8 +217,8 @@ describe('DataInspectionPageComponent folder selection', () => {
       const target = url.split('/').at(-2);
       const defaults = target === 'livertox'
         ? { livertox_monograph_max_workers: 4, livertox_archive: 'livertox.tar.gz', redownload: false }
-        : target === 'rxnav'
-          ? { rxnav_request_timeout: 30, rxnav_max_concurrency: 4 }
+        : target === 'rxnav' || target === 'terminology'
+          ? { force_full: false }
           : { redownload: false };
       return jsonResponse({
         target,
@@ -247,9 +249,12 @@ describe('DataInspectionPageComponent folder selection', () => {
       rxnav: {
         target: 'rxnav',
         payload: {
-          rxnav_request_timeout: 30,
-          rxnav_max_concurrency: 4,
+          force_full: false,
         },
+      },
+      terminology: {
+        target: 'terminology',
+        payload: { force_full: false },
       },
       dilirank: {
         target: 'dilirank',
@@ -257,6 +262,58 @@ describe('DataInspectionPageComponent folder selection', () => {
       },
     });
     expect(tracker.startAll.mock.calls[0][0]).not.toHaveProperty('rag');
+  });
+
+  it('resolves a name and records a reviewer confirmation for a candidate', async () => {
+    createComponent(false);
+    const ambiguous = {
+      original: 'hydroxazine',
+      normalized: 'hydroxazine',
+      strengths: [],
+      qualifiers: [],
+      status: 'ambiguous',
+      accepted: false,
+      method: 'fuzzy',
+      drug_id: null,
+      preferred_name: null,
+      concept_type: null,
+      ingredients: [],
+      precise_forms: [],
+      matched_alias: null,
+      alias_kind: null,
+      source: null,
+      source_version: null,
+      country: null,
+      strength_supported: null,
+      candidates: [{ drug_id: 3, name: 'hydroxyzine', concept_type: 'ingredient', matched_alias: 'hydroxyzine', alias_kind: 'canonical', source: 'rxnorm', country: null, edit_distance: 1, similarity: 0.9 }],
+      review_reasons: ['lookalike_within_edit_bound'],
+      external_calls: 0,
+      terminology_revision: 4,
+    };
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/terminology/aliases/confirm')) {
+        return jsonResponse({ alias: 'hydroxazine', drug_id: 3, validation_status: 'confirmed' });
+      }
+      if (url.endsWith('/terminology/resolve')) {
+        const body = JSON.parse(String(init?.body));
+        expect(body).toEqual({ name: 'hydroxazine', allow_external: false });
+        return jsonResponse(ambiguous);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+
+    component.resolveInput.set(' hydroxazine ');
+    component.resolveAllowExternal.set(false);
+    await component.resolveName();
+    expect(component.resolveResult()?.status).toBe('ambiguous');
+
+    await component.decideAlias('confirm', 3, 'hydroxyzine');
+
+    const confirmCall = fetchMock.mock.calls.find((call) => String(call[0]).endsWith('/aliases/confirm'));
+    expect(JSON.parse(String((confirmCall?.[1] as RequestInit).body))).toEqual({ alias: 'hydroxazine', drug_id: 3 });
+    expect(component.aliasDecisionMessage()).toBe('"hydroxazine" confirmed for hydroxyzine.');
   });
 
   it('keeps the modal open and exposes a safe browse error', async () => {

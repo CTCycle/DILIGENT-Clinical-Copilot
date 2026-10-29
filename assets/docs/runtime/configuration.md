@@ -1,5 +1,5 @@
 # Configuration
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
@@ -130,6 +130,35 @@ value is sent only as request identity, is not a credential, and is excluded
 from update results, source metadata, clinical artifacts, and ordinary logs.
 Requests remain sequential and no NCBI API key is required for this low-volume
 workflow.
+
+## Drug terminology sources
+
+Terminology settings live in the `application_configuration` singleton and are
+edited on the Settings > Integrations and Drug Matching pages:
+
+- `runtime.drugcentral_enabled|host|port|database|user`: DrugCentral read-only
+  PostgreSQL source; the default is the public instance `unmtid-dbs.net:5433`
+  with its published read-only user.
+- `runtime.chembl_enabled`, `runtime.chembl_max_phase` (default `4`, approved
+  drugs) and `runtime.swissmedic_enabled`.
+- `runtime.terminology_download_timeout` (default 300 seconds) for RxNorm,
+  ChEMBL and Swissmedic downloads; `runtime.rxnav_request_timeout` for the
+  runtime RxNav fallback.
+- `drugs_matcher`: `fuzzy_min_query_length`, `fuzzy_shortlist_size`,
+  `fuzzy_short_name_length`, `fuzzy_short_max_distance`,
+  `fuzzy_long_max_distance`, `fuzzy_min_margin`, `resolution_cache_limit`,
+  `external_fallback_enabled`, `external_max_requests_per_name` and
+  `external_negative_cache_days`. Migration `202610290001` rewrote stored
+  legacy matcher keys (confidences, catalog index limit, spelling distances,
+  `rxnav_max_concurrency`) to this block.
+- Curated abbreviations and blocked abbreviations are catalog data in
+  `data/catalogs/drug_matching.json` (`terminology_aliases`,
+  `error_prone_abbreviations`) and are applied by the RxNav and Terminology
+  updates.
+
+Downloads go to `<data-root>/sources/archives`. Sources, licensing, and
+behaviour are described in
+[`architecture/drug_terminology.md`](../architecture/drug_terminology.md).
 
 ## LLM Time Budgets
 

@@ -125,15 +125,8 @@ def resolve_known_query_alias(value: str) -> str:
     normalized = normalize_drug_name(value)
     if not normalized:
         return ""
-    snapshot = get_text_normalization_snapshot()
-    if normalized in snapshot.noisy_phrases:
+    if normalized in get_text_normalization_snapshot().noisy_phrases:
         return ""
-    alias = snapshot.query_aliases.get(normalized)
-    if alias is not None:
-        return alias
-    for candidate, replacement in snapshot.query_aliases.items():
-        if candidate and " " in candidate and candidate in normalized:
-            return replacement
     return normalized
 
 

@@ -6,10 +6,15 @@ from __future__ import annotations
 from typing import Any
 
 from domain.clinical.drug_resolution import (
+    ACCEPTED_DECISION_STATUSES,
     DrugResolutionDecision,
     NormalizedDrugMention,
 )
 from services.text.normalization import normalize_drug_query_name
+
+UNLINKED_STATUSES = frozenset(
+    {"missing_livertox", "ambiguous_requires_review", "unresolved", "rejected_false_positive"}
+)
 
 ###############################################################################
 def decision_to_payload(
@@ -18,75 +23,55 @@ def decision_to_payload(
     *,
     matched_row: dict[str, Any] | None,
     excerpts: list[str],
+    rxcui: str | None,
 ) -> dict[str, Any]:
-    primary_reason = next(
-        (str(reason).strip() for reason in decision.reasons if str(reason).strip()),
-        None,
+    terminology = decision.terminology
+    accepted_identity = decision.decision_status in ACCEPTED_DECISION_STATUSES or (
+        decision.decision_status == "missing_livertox"
     )
-    accepted_candidate = next(
-        (candidate for candidate in decision.livertox_candidates if candidate.accepted),
-        None,
+    resolved_name = (
+        terminology.preferred_name
+        if accepted_identity and terminology.preferred_name
+        else mention.canonical_name
     )
-    normalized_lookup = (
-        accepted_candidate.normalized_name
-        if decision.accepted_livertox_name and accepted_candidate is not None
-        else mention.normalized_name
-    )
-    missing_livertox = decision.decision_status in {
-        "missing_livertox",
-        "ambiguous_requires_review",
-        "rejected_false_positive",
-    }
-    payload = {
+    normalized_lookup = normalize_drug_query_name(resolved_name) or mention.normalized_name
+    candidate_names = [
+        *(candidate.drug_name for candidate in decision.livertox_candidates),
+        *(candidate.name for candidate in terminology.candidates),
+    ]
+    return {
         "lookup_key": normalized_lookup,
-        "drug_name": decision.accepted_livertox_name or mention.canonical_name,
-        "canonical_name": decision.accepted_livertox_name or mention.canonical_name,
+        "drug_name": resolved_name,
+        "canonical_name": resolved_name,
         "normalized_name": normalized_lookup,
         "matched_livertox_row": matched_row,
         "extracted_excerpts": excerpts,
-        "match_confidence": decision.confidence,
-        "match_reason": primary_reason,
+        "match_reason": next((reason for reason in decision.reasons if reason), None),
         "match_status": decision.decision_status,
         "match_notes": decision.reasons,
-        "match_candidates": [
-            candidate.model_dump(mode="json")
-            for candidate in decision.livertox_candidates
-        ],
+        "match_candidates": list(dict.fromkeys(name for name in candidate_names if name)),
         "chosen_candidate": decision.accepted_livertox_name,
-        "rejected_candidates": [
-            candidate.model_dump(mode="json")
-            for candidate in decision.livertox_candidates
-            if candidate.rejected_reason
-        ],
-        "missing_livertox": missing_livertox,
+        "missing_livertox": decision.decision_status in UNLINKED_STATUSES,
         "ambiguous_match": decision.decision_status == "ambiguous_requires_review",
         "origins": mention.origins,
         "raw_mentions": mention.raw_mentions,
         "extraction_metadata": mention.extraction_metadata,
-        "regimen_group_ids": [mention.regimen_group_id]
-        if mention.regimen_group_id
-        else [],
+        "regimen_group_ids": [mention.regimen_group_id] if mention.regimen_group_id else [],
         "is_regimen_parent": mention.is_regimen_parent,
         "regimen_components": mention.regimen_components,
-        "rxnav_candidates": [
-            candidate.model_dump(mode="json") for candidate in decision.rxnav_candidates
-        ],
         "livertox_candidates": [
-            candidate.model_dump(mode="json")
-            for candidate in decision.livertox_candidates
+            candidate.model_dump(mode="json") for candidate in decision.livertox_candidates
         ],
-        "accepted_rxnav_rxcui": decision.accepted_rxnav_rxcui,
+        "accepted_rxnav_rxcui": rxcui,
+        "rxnav_rxcui": rxcui,
         "accepted_livertox_nbk_id": decision.accepted_livertox_nbk_id,
         "accepted_livertox_name": decision.accepted_livertox_name,
         "accepted_livertox_match_has_excerpt": decision.accepted_livertox_match_has_excerpt,
         "requires_human_review": decision.requires_human_review,
         "decision_status": decision.decision_status,
+        "terminology": terminology.model_dump(mode="json"),
         "resolution_decision": decision.model_dump(mode="json"),
-        "rxnav_rxcui": decision.accepted_rxnav_rxcui,
-        "rxnav_validated": decision.accepted_rxnav_rxcui is not None,
-        "rxnav_validation_status": decision.rxnav_validation_status,
     }
-    return payload
 
 ###############################################################################
 def index_resolved_drugs(
@@ -94,9 +79,9 @@ def index_resolved_drugs(
 ) -> dict[str, dict[str, Any]]:
     """Resolved payloads keyed by normalized lookup key and by each raw mention.
 
-    The identity fallback re-keys an accepted payload under its LiverTox name
-    (for example "valproate"), so lookups by the extracted mention ("valproic
-    acid") must also go through ``raw_mentions``.
+    A payload is keyed by its resolved concept name (for example
+    "acetaminophen"), so lookups by the extracted mention ("Dafalgan") must
+    also go through ``raw_mentions``.
     """
     index: dict[str, dict[str, Any]] = {}
     payloads = [

@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-10-27
+Last updated: 2026-10-29
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -28,7 +28,8 @@ branch-status record.
 - The standard CI workflow runs the existing Angular/Vitest suite with `npm run test -- --no-watch` in addition to the frontend build.
 - The mandatory regression matrix uses the shared deterministic Windows browser harness (`run_browser_e2e.ps1 -Suite Full`), including seeded session/timeline prerequisites, a fake Ollama protocol fixture, and the synthetic access-key lifecycle; the real OpenCode Go path is a separate `LiveProvider` integration lane.
 - Deterministic hepatic injury-pattern calculation is shared by the clinical workflow and DILI evidence; nonqualifying laboratory pairs remain indeterminate rather than being promoted to a qualifying anchor.
-- Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> DILIrank; RAG has a separate job and control. RxNav and LiverTox source-owned records are reconciled only after a complete successful snapshot is prepared.
+- Combined structured-source updates are backend-owned and ordered RxNav -> LiverTox -> Terminology -> DILIrank; RAG has a separate job and control. Each source's records are reconciled only after a complete successful snapshot is prepared.
+- Drug identity is resolved against a locally imported terminology (RxNorm Prescribable, DrugCentral, ChEMBL, Swissmedic, curated aliases) with explicit LiverTox links, a strict spelling-correction gate, and a bounded RxNav fallback; see [`architecture/drug_terminology.md`](architecture/drug_terminology.md).
 - Desktop release uses manual `prepare`/`publish` workflow modes. Preparation validates synchronized `main`/`develop`, backend/frontend, browser/provider E2E, security, explicit signing status, and Windows lifecycle gates; publication promotes the exact candidate after protected-environment operator review. Any unavailable host checks are recorded as waivers, not passes. These are release prerequisites, not product validation gates.
 - Angular page and component state uses signals/computed state in current model-configuration, access-key, clinical-session preview, and runtime-settings surfaces.
 - The primary UI navigation has four workspaces: DILI Agent, Clinical Sessions, Knowledge, and Settings; Patient Timeline is opened from a selected session's Timeline tab. Settings contains General, Models, Data Processing, Integrations, Drug Matching, Advanced, and Database pages with persistent left navigation.
@@ -58,6 +59,8 @@ branch-status record.
 ### Architecture
 - `architecture/system_overview.md`
   - Repository layout, maintained code structure, and entry points.
+- `architecture/drug_terminology.md`
+  - Drug terminology sources and licensing, schema, import pipeline, runtime resolver, clinical decision statuses, reviewer decisions, configuration, and troubleshooting.
 - `architecture/dili_assessment_pipeline.md`
   - Production DILI extraction audit design, tool registry, strategy decisions, hepatic pattern resolution, match audit, and testing matrix.
 - `architecture/api_surface.md`

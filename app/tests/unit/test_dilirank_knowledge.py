@@ -613,17 +613,18 @@ def test_clinical_composer_scopes_component_dilirank_evidence_for_combinations()
         "amoxicillin clavulanate": {
             "normalized_name": "amoxicillin clavulanate",
             "matched_livertox_row": {
+                "drug_id": parent_id,
                 "drug_name": "Amoxicillin-Clavulanate",
             },
             "extracted_excerpts": ["Combination LiverTox evidence."],
             "is_regimen_parent": True,
             "regimen_components": ["Amoxicillin", "Clavulanate"],
             "accepted_rxnav_rxcui": "12345",
-            "rxnav_validation_status": "exact_rxcui",
         },
         "amoxicillin": {
             "normalized_name": "amoxicillin",
             "matched_livertox_row": {
+                "drug_id": component_id,
                 "drug_name": "Amoxicillin",
             },
             "extracted_excerpts": ["Amoxicillin LiverTox evidence."],
@@ -649,7 +650,7 @@ def test_clinical_composer_scopes_component_dilirank_evidence_for_combinations()
     )
     assert provenance["evidence_scope"] == "regimen_component"
     assert provenance["components"][0]["name"] == "Amoxicillin"
-    assert parent_payload["source_provenance"]["rxnav"]["rxcui"] == "12345"
+    assert parent_payload["source_provenance"]["terminology"]["rxcui"] == "12345"
 
     assessment = DrugClinicalAssessment(
         drug_name="Amoxicillin/clavulanate",

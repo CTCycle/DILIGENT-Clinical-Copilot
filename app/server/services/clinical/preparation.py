@@ -14,7 +14,10 @@ from common.prompts.identity import (
 )
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
-from domain.clinical.drug_resolution import DrugIdentityProposalBatch
+from domain.clinical.drug_resolution import (
+    ACCEPTED_DECISION_STATUSES,
+    DrugIdentityProposalBatch,
+)
 from domain.clinical.entities import (
     DrugEntry,
     HepatotoxicityPatternScore,
@@ -23,160 +26,64 @@ from domain.clinical.entities import (
 )
 from domain.clinical.extras import HepatoxPreparedInputs
 from repositories import values as repository_values
-from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
+from repositories.terminology_lookup_repository import TerminologyLookupRepository
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.drug_resolution import DrugResolutionService
 from services.llm.generation_policy import GenerationPurpose
-from services.clinical.matches_core import (
-    LiverToxMatcher,
-)
+from services.terminology.factory import build_terminology_resolver
 from services.text.normalization import normalize_drug_query_name
+
+FALLBACK_STATUSES = frozenset({"missing_livertox", "ambiguous_requires_review", "unresolved"})
 
 ###############################################################################
 class ClinicalKnowledgePreparation:
 
     # -------------------------------------------------------------------------
-    def __init__(
-        self,
-        *,
-        knowledge_repository: KnowledgeRepository,
-        drug_catalog_repository: DrugCatalogRepository,
-    ) -> None:
+    def __init__(self, *, knowledge_repository: KnowledgeRepository) -> None:
         self.knowledge_repository = knowledge_repository
-        self.drug_catalog_repository = drug_catalog_repository
         self.knowledge_composer = ClinicalKnowledgeComposer(
             knowledge_repository=knowledge_repository
         )
-        self.livertox_matcher: LiverToxMatcher | None = None
+        self.terminology_lookup = TerminologyLookupRepository(knowledge_repository.context)
 
     # -------------------------------------------------------------------------
-    def resolve_session_drug_ids(
-        self, matched_drugs: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        if not matched_drugs:
-            return []
-        resolved: list[dict[str, Any]] = []
-        with self.knowledge_repository.session_factory() as db_session:
-            for source_item in matched_drugs:
-                item = dict(source_item)
-                raw_name = repository_values.normalize_string(
-                    item.get("raw_drug_name") or item.get("name")
-                )
-                if raw_name is None:
-                    resolved.append(item)
-                    continue
-                rxcui = repository_values.normalize_string(
-                    item.get("rxcui")
-                    or item.get("accepted_rxnav_rxcui")
-                    or item.get("rxnorm_rxcui")
-                )
-                nbk_id = repository_values.normalize_string(
-                    item.get("nbk_id") or item.get("accepted_livertox_nbk_id")
-                )
-                drug_id = repository_values.to_int(item.get("drug_id"))
-                if drug_id is None:
-                    drug_id = self.drug_catalog_repository.resolve_drug_id(
-                        db_session,
-                        matched_drug_name=repository_values.normalize_string(
-                            item.get("matched_drug_name")
-                            or item.get("accepted_livertox_name")
-                        ),
-                        rxcui=rxcui,
-                        nbk_id=nbk_id,
-                    )
-                if drug_id is None:
-                    drug_id = (
-                        self.knowledge_repository.resolve_drug_id_from_match_cache(
-                            db_session,
-                            normalized_drug_key=normalize_drug_query_name(raw_name),
-                        )
-                    )
-                item["drug_id"] = drug_id
-                resolved.append(item)
-        return resolved
-
-    # -------------------------------------------------------------------------
-    def learn_session_drug_mentions(
-        self, session_id: int, matched_drugs: list[dict[str, Any]]
-    ) -> bool:
-        vocabulary_changed = False
-        catalog_serializer = ReferenceCatalogSerializer(
-            self.knowledge_repository.session_factory
+    def build_resolver(self) -> DrugResolutionService:
+        return DrugResolutionService(
+            build_terminology_resolver(self.terminology_lookup),
+            self.terminology_lookup,
+            self.knowledge_repository,
         )
+
+    # -------------------------------------------------------------------------
+    def record_drug_mention_observations(self, matched_drugs: list[dict[str, Any]]) -> bool:
+        """Record mentions without an accepted identity for vocabulary review.
+
+        Terminology aliases are never learned from sessions: only verified
+        terminology relations and explicit user confirmations create aliases.
+        """
+        catalog_serializer = ReferenceCatalogSerializer(self.knowledge_repository.session_factory)
+        changed = False
         with self.knowledge_repository.session_factory() as db_session:
             for item in matched_drugs:
                 raw_name = repository_values.normalize_string(
                     item.get("raw_drug_name") or item.get("name")
                 )
-                if raw_name is None:
+                terminology = item.get("terminology")
+                terminology = terminology if isinstance(terminology, dict) else {}
+                if raw_name is None or terminology.get("accepted"):
                     continue
-                raw_name_norm = normalize_drug_query_name(raw_name)
-                drug_id = repository_values.to_int(item.get("drug_id"))
-                match_reason = repository_values.normalize_string(
-                    item.get("match_reason")
+                catalog_serializer.upsert_runtime_observation(
+                    term=raw_name,
+                    category="observed_unresolved_query",
+                    source="session",
+                    is_active=True,
+                    db_session=db_session,
                 )
-                match_confidence = repository_values.to_float(
-                    item.get("match_confidence")
-                )
-                matched_drug_name = repository_values.normalize_string(
-                    item.get("matched_drug_name") or item.get("accepted_livertox_name")
-                )
-                rxcui = repository_values.normalize_string(
-                    item.get("rxcui")
-                    or item.get("accepted_rxnav_rxcui")
-                    or item.get("rxnorm_rxcui")
-                )
-                nbk_id = repository_values.normalize_string(
-                    item.get("nbk_id") or item.get("accepted_livertox_nbk_id")
-                )
-                if (
-                    drug_id is not None
-                    and match_reason == "exact_canonical"
-                    and match_confidence == 1.0
-                ):
-                    self.drug_catalog_repository.upsert_drug_alias(
-                        db_session,
-                        drug_id=drug_id,
-                        alias=raw_name,
-                        alias_kind="observed_query",
-                        source="session",
-                        term_type=None,
-                    )
-                else:
-                    catalog_serializer.upsert_runtime_observation(
-                        term=raw_name,
-                        category=(
-                            "observed_unresolved_query"
-                            if drug_id is None
-                            else "observed_unpromoted_query"
-                        ),
-                        source="session",
-                        is_active=True,
-                        db_session=db_session,
-                    )
-                    vocabulary_changed = True
-                self.knowledge_repository.upsert_high_confidence_kb_match_cache(
-                    db_session,
-                    raw_drug_name=raw_name,
-                    raw_drug_name_norm=raw_name_norm,
-                    normalized_drug_key=raw_name_norm,
-                    drug_id=drug_id,
-                    rxnorm_rxcui=rxcui,
-                    livertox_nbk_id=nbk_id,
-                    source="rxnav" if rxcui else "livertox",
-                    confidence=match_confidence,
-                    evidence={
-                        "match_reason": match_reason,
-                        "match_notes": item.get("match_notes"),
-                        "matched_drug_name": matched_drug_name,
-                        "source_session_id": int(session_id),
-                    },
-                    ambiguous=bool(item.get("ambiguous_match")),
-                )
+                changed = True
             db_session.commit()
-        return vocabulary_changed
+        return changed
 
     # -------------------------------------------------------------------------
     async def prepare_inputs(
@@ -192,16 +99,10 @@ class ClinicalKnowledgePreparation:
     ) -> HepatoxPreparedInputs | None:
         self.emit_progress(progress_callback, 0.0)
         self.emit_progress(progress_callback, 0.2)
-        if not await self.ensure_livertox_matcher() or self.livertox_matcher is None:
+        if await asyncio.to_thread(self.knowledge_repository.count_livertox_monographs) == 0:
+            logger.warning("LiverTox monograph table is empty; toxicity essay cannot run")
             return None
-        resolver = DrugResolutionService(
-            self.livertox_matcher,
-            cache_lookup=lambda key: (
-                self.knowledge_repository.load_livertox_match_from_db_cache(
-                    normalized_drug_key=key,
-                )
-            ),
-        )
+        resolver = self.build_resolver()
         resolved_drugs = await asyncio.to_thread(resolver.resolve, drugs)
         resolved_drugs = await self.apply_validated_identity_fallback(
             resolver=resolver,
@@ -361,20 +262,7 @@ class ClinicalKnowledgePreparation:
         }
         unresolved: dict[str, tuple[DrugEntry, dict[str, Any]]] = {}
         for payload in resolved_drugs.values():
-            decision_status = str(payload.get("decision_status") or "")
-            confidence = payload.get("match_confidence")
-            low_confidence = (
-                isinstance(confidence, int | float) and float(confidence) < 0.75
-            )
-            if (
-                decision_status
-                not in {
-                    "missing_livertox",
-                    "missing_rxnav",
-                    "ambiguous_requires_review",
-                }
-                and not low_confidence
-            ):
+            if str(payload.get("decision_status") or "") not in FALLBACK_STATUSES:
                 continue
             raw_mentions = payload.get("raw_mentions") or []
             for raw_mention in raw_mentions:
@@ -406,9 +294,12 @@ class ClinicalKnowledgePreparation:
     # -------------------------------------------------------------------------
     @staticmethod
     def is_locally_accepted(payload: dict[str, Any]) -> bool:
+        """LLM proposals count only when they resolve to verified terminology."""
+        terminology = payload.get("terminology")
+        terminology = terminology if isinstance(terminology, dict) else {}
         return bool(
-            str(payload.get("decision_status") or "").startswith("accepted_")
-            and payload.get("accepted_livertox_name")
+            str(payload.get("decision_status") or "") in ACCEPTED_DECISION_STATUSES
+            and terminology.get("status") == "verified"
             and payload.get("matched_livertox_row")
         )
 
@@ -508,7 +399,7 @@ class ClinicalKnowledgePreparation:
                 decision["decision_status"] = "ambiguous_requires_review"
                 decision["requires_human_review"] = True
         for attempted in attempted_payloads:
-            for field_name in ("rxnav_candidates", "livertox_candidates"):
+            for field_name in ("livertox_candidates",):
                 existing = payload.setdefault(field_name, [])
                 for candidate in attempted.get(field_name) or []:
                     if candidate not in existing:
@@ -556,86 +447,48 @@ class ClinicalKnowledgePreparation:
             raw_label = ", ".join(str(item) for item in raw_mentions if item) or str(
                 payload.get("drug_name") or payload.get("canonical_name") or "unknown"
             )
-            status = str(payload.get("match_status") or "").lower()
-            confidence = payload.get("match_confidence")
-            if payload.get("missing_livertox") or status in {
-                "missing",
-                "missing_match",
-                "no_match",
-            }:
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="livertox_match_missing",
-                        field="matched_drugs",
-                        message=f"No LiverTox match was validated for {raw_label}.",
-                    )
-                )
-            if payload.get("ambiguous_match") or status == "ambiguous":
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="livertox_match_ambiguous",
-                        field="matched_drugs",
-                        message=f"LiverTox match is ambiguous for {raw_label}.",
-                    )
-                )
-            if self.is_spelling_corrected_match(payload):
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="livertox_match_spelling_corrected",
-                        field="matched_drugs",
-                        message=(
-                            f"LiverTox match for {raw_label} relies on a spelling "
-                            f"correction to {payload.get('accepted_livertox_name') or 'another name'}; "
-                            "confirm the drug identity."
-                        ),
-                    )
-                )
-            if isinstance(confidence, int | float) and float(confidence) < 0.75:
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="livertox_match_low_confidence",
-                        field="matched_drugs",
-                        message=f"LiverTox match confidence is low for {raw_label}.",
-                    )
-                )
-            if (
-                not payload.get("rxnav_validated")
-                and payload.get("rxnav_rxcui") is None
-            ):
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="rxnav_alias_not_validated",
-                        field="matched_drugs",
-                        message=f"RxNav alias was not validated for {raw_label}.",
-                    )
-                )
+            issues.extend(self.match_audit_issues_for(payload, raw_label))
         return issues
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def is_spelling_corrected_match(payload: dict[str, Any]) -> bool:
-        """Accepted LiverTox identity that depends on a spelling correction.
+    def match_audit_issues_for(payload: dict[str, Any], raw_label: str) -> list[PipelineIssue]:
+        terminology = payload.get("terminology")
+        terminology = terminology if isinstance(terminology, dict) else {}
+        status = str(payload.get("decision_status") or "")
+        resolved = terminology.get("preferred_name") or payload.get("drug_name") or "another name"
 
-        Flagged regardless of confidence because a look-alike name absent from
-        the catalog can be corrected to a different drug.
-        """
-        if not payload.get("accepted_livertox_name"):
-            return False
-        accepted_reasons = [
-            str(candidate.get("reason") or "")
-            for candidate in payload.get("livertox_candidates") or []
-            if isinstance(candidate, dict) and candidate.get("accepted")
-        ]
-        notes = [str(note) for note in payload.get("match_notes") or []]
-        return any(
-            "spelling" in text or "corrected_query=" in text
-            for text in (*accepted_reasons, str(payload.get("match_reason") or ""), *notes)
-        )
+        def issue(code: str, message: str) -> PipelineIssue:
+            return PipelineIssue(severity="warning", code=code, field="matched_drugs", message=message)
+
+        if status == "unresolved":
+            if terminology.get("method") == "product_unverified":
+                return [
+                    issue(
+                        "drug_composition_unverified",
+                        f"{raw_label} matches a product whose composition could not be verified.",
+                    )
+                ]
+            return [issue("drug_identity_unresolved", f"No terminology identity was verified for {raw_label}.")]
+        if status == "ambiguous_requires_review":
+            candidates = ", ".join(
+                str(item.get("name")) for item in terminology.get("candidates") or [] if item.get("name")
+            )
+            suffix = f" Candidates: {candidates}." if candidates else ""
+            return [issue("drug_identity_ambiguous", f"Drug identity is ambiguous for {raw_label}.{suffix}")]
+        issues: list[PipelineIssue] = []
+        if terminology.get("status") == "probable":
+            issues.append(
+                issue(
+                    "drug_identity_probable",
+                    f"{raw_label} was matched to {resolved} by spelling correction; confirm the drug identity.",
+                )
+            )
+        if status == "missing_livertox":
+            issues.append(
+                issue("livertox_link_missing", f"No LiverTox record is linked to {resolved} ({raw_label}).")
+            )
+        return issues
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -647,37 +500,6 @@ class ClinicalKnowledgePreparation:
             return
         bounded_fraction = min(1.0, max(0.0, float(fraction)))
         progress_callback(bounded_fraction)
-
-    # -------------------------------------------------------------------------
-    async def ensure_livertox_matcher(self) -> bool:
-        if self.livertox_matcher is not None:
-            return True
-        try:
-            dataset = await asyncio.to_thread(
-                self.knowledge_repository.get_livertox_records
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed loading LiverTox monographs from database: %s", exc)
-            self.livertox_matcher = None
-            return False
-        if dataset is None or dataset.empty:
-            logger.warning(
-                "LiverTox monograph table is empty; toxicity essay cannot run"
-            )
-            self.livertox_matcher = None
-            return False
-        catalog_stream = self.drug_catalog_repository.stream_drugs_catalog()
-        try:
-            self.livertox_matcher = await asyncio.to_thread(
-                LiverToxMatcher,
-                dataset,
-                drugs_catalog_df=catalog_stream,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed preparing LiverTox matcher: %s", exc)
-            self.livertox_matcher = None
-            return False
-        return True
 
     # -------------------------------------------------------------------------
     @staticmethod

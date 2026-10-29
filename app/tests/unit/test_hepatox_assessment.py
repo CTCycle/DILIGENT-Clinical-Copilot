@@ -222,7 +222,7 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
     consultation = build_test_consultation()
     entry = DrugClinicalAssessment(
         drug_name="Pantozol",
-        match_status="matched",
+        match_status="accepted_verified",
         match_confidence=0.92,
         match_reason="exact_alias_ranked",
         evidence_quality="weak_alias_or_class_match",
@@ -269,7 +269,7 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
             [
                 DrugClinicalAssessment(
                     drug_name="Acetaminophen",
-                    match_status="matched",
+                    match_status="accepted_verified",
                     matched_livertox_row={"likelihood_score": "A"},
                     paragraph="Per-drug assessment.",
                 )
@@ -283,6 +283,46 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     assert report is not None
     assert "## Global Synthesis and Clinical Recommendations" in report
     assert "## Conclusion" not in report
+
+###############################################################################
+def test_finalize_patient_report_lists_drug_identification_with_original_names() -> None:
+    consultation = build_test_consultation()
+
+    async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
+        _ = kwargs
+        return "Integrated recommendations."
+
+    report = asyncio.run(
+        consultation.report_finalizer.finalize_report(
+            [
+                DrugClinicalAssessment(
+                    drug_name="Augmentin",
+                    match_status="accepted_verified",
+                    matched_livertox_row={"likelihood_score": "A"},
+                    paragraph="Per-drug assessment.",
+                    terminology_status="verified",
+                    terminology_source="rxnorm",
+                    resolved_ingredients=["amoxicillin", "clavulanate"],
+                ),
+                DrugClinicalAssessment(
+                    drug_name="Hydroxazine",
+                    match_status="ambiguous_requires_review",
+                    ambiguous_match=True,
+                    terminology_status="ambiguous",
+                    resolved_ingredients=["hydroxyzine"],
+                ),
+            ],
+            clinical_context="Clinical context",
+            report_language="en",
+            generate_conclusion=fake_generate_conclusion,
+        )
+    )
+
+    assert report is not None
+    assert "## Drug Identification" in report
+    assert "| Augmentin | amoxicillin, clavulanate | verified | rxnorm |" in report
+    # An ambiguous identity never shows a resolved ingredient.
+    assert "| Hydroxazine | — |" in report
 
 ###############################################################################
 def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> (
@@ -299,7 +339,7 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
             [
                 DrugClinicalAssessment(
                     drug_name="Pantozol",
-                    match_status="matched",
+                    match_status="accepted_verified",
                     matched_livertox_row={"likelihood_score": "C"},
                     paragraph=(
                         "**Pantozol - LiverTox score C**\n\n"
@@ -313,13 +353,13 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
                 ),
                 DrugClinicalAssessment(
                     drug_name="Carboplatin",
-                    match_status="matched",
+                    match_status="accepted_verified",
                     matched_livertox_row={"likelihood_score": "D"},
                     paragraph="Carboplatin narrative.",
                 ),
                 DrugClinicalAssessment(
                     drug_name="ulteriore ciclo (originariamente previsto il",
-                    match_status="missing",
+                    match_status="unresolved",
                     missing_livertox=True,
                     paragraph="Ignored unresolved paragraph.",
                 ),
@@ -352,7 +392,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
             [
                 DrugClinicalAssessment(
                     drug_name="Valium",
-                    match_status="matched",
+                    match_status="accepted_verified",
                     missing_livertox=True,
                     matched_livertox_row={"likelihood_score": "D"},
                     paragraph="Valium: local LiverTox excerpt not available.",
@@ -372,7 +412,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     )
 
 ###############################################################################
-def test_finalize_patient_report_renders_accepted_resolution_status_as_matched() -> (
+def test_finalize_patient_report_renders_probable_identity_as_matched() -> (
     None
 ):
     consultation = build_test_consultation()
@@ -386,7 +426,7 @@ def test_finalize_patient_report_renders_accepted_resolution_status_as_matched()
             [
                 DrugClinicalAssessment(
                     drug_name="Abiraterone",
-                    match_status="accepted_exact_livertox",
+                    match_status="accepted_probable",
                     missing_livertox=False,
                     matched_livertox_row={"likelihood_score": "C"},
                     extracted_excerpts=["Abiraterone excerpt."],
@@ -409,13 +449,13 @@ def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() 
     resolved = {
         "piperacillina tazobactam": {
             "normalized_name": "piperacillina tazobactam",
-            "match_status": "missing_match",
+            "match_status": "unresolved",
             "missing_livertox": True,
             "raw_mentions": ["Piperacillina/tazobactam"],
         },
         "piperacillina": {
             "normalized_name": "piperacillina",
-            "match_status": "matched_with_excerpt",
+            "match_status": "accepted_verified",
             "missing_livertox": False,
             "raw_mentions": ["Piperacillina/tazobactam"],
             "matched_livertox_row": {"drug_name": "Piperacillin"},
@@ -429,7 +469,7 @@ def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() 
         resolved_drugs=resolved,
     )
 
-    assert payload["match_status"] == "matched_with_excerpt"
+    assert payload["match_status"] == "accepted_verified"
     assert payload["matched_livertox_row"]["drug_name"] == "Piperacillin"
 
 ###############################################################################
@@ -447,7 +487,7 @@ def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() 
     resolved = {
         "abiraterone": {
             "normalized_name": "abiraterone",
-            "match_status": "matched_with_excerpt",
+            "match_status": "accepted_verified",
             "missing_livertox": False,
             "matched_livertox_row": {"drug_name": "Abiraterone"},
             "extracted_excerpts": ["Abiraterone has been linked to liver injury."],
@@ -473,7 +513,7 @@ def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() 
     )
 
     assert entry.drug_name == "Abiraterone"
-    assert entry.match_status == "matched_with_excerpt"
+    assert entry.match_status == "accepted_verified"
     assert entry.narrative is not None
     assert entry.claims
     assert entry.claims[0].source == "source_text"
@@ -500,7 +540,7 @@ def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
     resolved = {
         "acetaminophen": {
             "normalized_name": "acetaminophen",
-            "match_status": "accepted_exact_livertox",
+            "match_status": "accepted_verified",
             "match_reason": "; ".join(reasons),
             "match_notes": reasons,
             "missing_livertox": False,
@@ -533,7 +573,7 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
         [
             DrugClinicalAssessment(
                 drug_name="UnknownX",
-                match_status="missing",
+                match_status="unresolved",
                 missing_livertox=True,
                 rucam=DrugRucamAssessment(
                     drug_name="UnknownX",
@@ -565,7 +605,7 @@ def test_unresolved_candidate_details_render_names_without_raw_payloads() -> Non
         [
             DrugClinicalAssessment(
                 drug_name="Diazepam",
-                match_status="ambiguous_match",
+                match_status="ambiguous_requires_review",
                 ambiguous_match=True,
                 match_candidates=["Diazepam oral", "Diazepam intravenous"],
             )
@@ -678,7 +718,7 @@ def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
     )
     entry = DrugClinicalAssessment(
         drug_name="Unknown Herb",
-        match_status="missing_match",
+        match_status="unresolved",
         evidence_quality="weak",
         claims=narrative.claims,
         narrative=narrative,

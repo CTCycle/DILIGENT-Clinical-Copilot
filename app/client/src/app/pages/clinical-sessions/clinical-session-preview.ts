@@ -1,11 +1,20 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { ClinicalSessionDetail } from '../../core/models/inspection-types';
+import {
+  ClinicalSessionDetail,
+  TerminologyCandidate,
+  TerminologyResolution,
+  TerminologyResolutionStatus,
+} from '../../core/models/inspection-types';
 import { isRecord } from '../../core/utils';
+
+const TERMINOLOGY_STATUSES = new Set<TerminologyResolutionStatus>(['verified', 'probable', 'ambiguous', 'unresolved']);
+const ACCEPTED_DECISIONS = new Set(['accepted_verified', 'accepted_probable']);
 
 export type DetectedDrugEvidence = {
   name: string;
+  terminology: TerminologyResolution | null;
   liverTox: boolean;
   rxNav: boolean;
   inAnamnesis: boolean;
@@ -57,6 +66,7 @@ export function buildPersistedDrugEvidence(detail: ClinicalSessionDetail): DrugE
     }
     const next: DrugEvidenceDraft = {
       name,
+      terminology: null,
       liverTox: false,
       rxNav: false,
       inAnamnesis: textContainsDrug(sections.anamnesis, name),
@@ -112,6 +122,7 @@ export function buildPersistedDrugEvidence(detail: ClinicalSessionDetail): DrugE
     const matchedName = stringValue(record['matched_drug_name']);
     row.hasPersistedMatch = true;
     row.name = row.name || matchedName || name;
+    row.terminology = row.terminology ?? parseTerminology(record['terminology']);
     row.liverTox = row.liverTox || hasLiverToxEvidence(record);
     row.rxNav = row.rxNav || hasRxNavEvidence(record);
     row.bibliographyLabel = resolveDrugBibliographyLabel(row);
@@ -208,7 +219,7 @@ function hasLiverToxEvidence(record: Record<string, unknown>): boolean {
   if (recordValue(record['matched_livertox_row'])) return true;
   if (stringValue(record['nbk_id'])) return true;
   const status = stringValue(record['match_status'])?.toLowerCase();
-  if (status === 'matched_with_excerpt' || status === 'matched_no_excerpt' || status === 'matched') return true;
+  if (status && ACCEPTED_DECISIONS.has(status)) return true;
   if (record['missing_livertox'] === false) return true;
   const candidates = arrayValue(record['livertox_candidates']);
   return candidates.some((candidate) => {
@@ -225,6 +236,35 @@ function hasLiverToxReportEvidence(detail: ClinicalSessionDetail, drugName: stri
   const reportIndex = normalizedReport.indexOf(drugName.trim().toLowerCase());
   if (reportIndex < 0) return false;
   return /livertox/.test(normalizedReport.slice(reportIndex, reportIndex + 2400));
+}
+
+/** Typed view of the persisted terminology identity; null for legacy sessions. */
+export function parseTerminology(value: unknown): TerminologyResolution | null {
+  const record = recordValue(value);
+  const status = stringValue(record?.['status']) as TerminologyResolutionStatus | null;
+  if (!record || !status || !TERMINOLOGY_STATUSES.has(status)) return null;
+  const names = (items: unknown) => arrayValue(items)
+    .map((item) => recordValue(item))
+    .filter((item): item is Record<string, unknown> => !!item && typeof item['drug_id'] === 'number' && !!stringValue(item['name']));
+  return {
+    ...(record as unknown as TerminologyResolution),
+    status,
+    accepted: record['accepted'] === true,
+    ingredients: names(record['ingredients']) as unknown as TerminologyResolution['ingredients'],
+    precise_forms: names(record['precise_forms']) as unknown as TerminologyResolution['precise_forms'],
+    candidates: names(record['candidates']) as unknown as TerminologyCandidate[],
+    review_reasons: arrayValue(record['review_reasons']).filter((item): item is string => typeof item === 'string'),
+    strengths: arrayValue(record['strengths']).filter((item): item is string => typeof item === 'string'),
+    qualifiers: arrayValue(record['qualifiers']).filter((item): item is string => typeof item === 'string'),
+  };
+}
+
+export function terminologyResolvedLabel(terminology: TerminologyResolution): string {
+  if (!terminology.accepted) return '';
+  const ingredients = terminology.ingredients.map((item) => item.name);
+  return ingredients.length > 1
+    ? `${terminology.preferred_name ?? ingredients.join(' + ')} (${ingredients.join(' + ')})`
+    : terminology.preferred_name ?? ingredients[0] ?? '';
 }
 
 function hasRxNavEvidence(record: Record<string, unknown>): boolean {

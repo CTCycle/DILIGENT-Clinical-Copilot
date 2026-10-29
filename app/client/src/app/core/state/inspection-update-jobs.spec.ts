@@ -51,6 +51,13 @@ describe('InspectionUpdateJobResource', () => {
         cancel: vi.fn(),
         refresh: vi.fn(),
       },
+      terminology: {
+        fetchConfig: vi.fn(),
+        start: vi.fn(),
+        status: vi.fn(),
+        cancel: vi.fn(),
+        refresh: vi.fn(),
+      },
       dilirank: {
         fetchConfig: vi.fn(),
         start: vi.fn(),
@@ -83,6 +90,7 @@ describe('InspectionUpdateJobResource', () => {
     const actions = {
       rxnav: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       livertox: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      terminology: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       dilirank: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       rag: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
     } as unknown as InspectionUpdateTargetActionsMap;
@@ -91,6 +99,7 @@ describe('InspectionUpdateJobResource', () => {
       targetState: signal({
         rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
         livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        terminology: { jobId: null, running: false, progress: 0, message: '', error: null },
         dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
@@ -116,6 +125,7 @@ describe('InspectionUpdateJobResource', () => {
     const actions = {
       rxnav: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       livertox: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
+      terminology: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       dilirank: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
       rag: { fetchConfig: vi.fn(), start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn() },
     } as unknown as InspectionUpdateTargetActionsMap;
@@ -125,6 +135,7 @@ describe('InspectionUpdateJobResource', () => {
       targetState: signal({
         rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
         livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        terminology: { jobId: null, running: false, progress: 0, message: '', error: null },
         dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
@@ -147,8 +158,8 @@ describe('InspectionUpdateJobResource', () => {
     });
   });
 
-  it('loads and submits the three structured configurations without including RAG', async () => {
-    const config = (target: 'livertox' | 'rxnav' | 'dilirank', defaults: Record<string, unknown>) => ({
+  it('loads and submits the four structured configurations without including RAG', async () => {
+    const config = (target: 'livertox' | 'rxnav' | 'terminology' | 'dilirank', defaults: Record<string, unknown>) => ({
       target,
       defaults,
       allowed_fields: Object.keys(defaults),
@@ -157,10 +168,7 @@ describe('InspectionUpdateJobResource', () => {
     });
     const actions = {
       rxnav: {
-        fetchConfig: vi.fn().mockResolvedValue(config('rxnav', {
-          rxnav_request_timeout: 30,
-          rxnav_max_concurrency: 4,
-        })),
+        fetchConfig: vi.fn().mockResolvedValue(config('rxnav', { force_full: false })),
         start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
       },
       livertox: {
@@ -169,6 +177,10 @@ describe('InspectionUpdateJobResource', () => {
           livertox_archive: 'livertox.tar.gz',
           redownload: false,
         })),
+        start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
+      },
+      terminology: {
+        fetchConfig: vi.fn().mockResolvedValue(config('terminology', { force_full: false, chembl_enabled: true })),
         start: vi.fn(), status: vi.fn(), cancel: vi.fn(), refresh: vi.fn(),
       },
       dilirank: {
@@ -185,6 +197,7 @@ describe('InspectionUpdateJobResource', () => {
       targetState: signal({
         rxnav: { jobId: null, running: false, progress: 0, message: '', error: null },
         livertox: { jobId: null, running: false, progress: 0, message: '', error: null },
+        terminology: { jobId: null, running: false, progress: 0, message: '', error: null },
         dilirank: { jobId: null, running: false, progress: 0, message: '', error: null },
         rag: { jobId: null, running: false, progress: 0, message: '', error: null },
       }),
@@ -197,6 +210,7 @@ describe('InspectionUpdateJobResource', () => {
         targets: {
           livertox: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
           rxnav: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
+          terminology: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
           dilirank: { started: false, jobId: null, status: null, progress: 0, message: '', error: null },
         },
       }),
@@ -229,10 +243,11 @@ describe('InspectionUpdateJobResource', () => {
       },
       rxnav: {
         target: 'rxnav',
-        payload: {
-          rxnav_request_timeout: 30,
-          rxnav_max_concurrency: 4,
-        },
+        payload: { force_full: false },
+      },
+      terminology: {
+        target: 'terminology',
+        payload: { force_full: false, chembl_enabled: true },
       },
       dilirank: {
         target: 'dilirank',
@@ -290,6 +305,7 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     return {
       livertox: { target: 'livertox', payload: {} },
       rxnav: { target: 'rxnav', payload: {} },
+      terminology: { target: 'terminology', payload: {} },
       dilirank: { target: 'dilirank', payload: {} },
     };
   }
@@ -325,7 +341,7 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
     expect(postUrls.some((url) => url.includes('/rag/jobs'))).toBe(false);
     expect(tracker.updateAllState().phase).toBe('running');
     expect(tracker.updateAllState().progress).toBe(0);
-    expect(tracker.updateAllState().message).toBe('0 of 3 source updates completed.');
+    expect(tracker.updateAllState().message).toBe('0 of 4 source updates completed.');
     expect(tracker.updateAllState().targets.livertox.started).toBe(true);
     expect(tracker.updateAllState().targets.rxnav.started).toBe(true);
     expect(tracker.updateAllState().targets.dilirank.started).toBe(true);
@@ -373,6 +389,12 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
         message: 'RxNav complete',
         error: null,
       },
+      terminology: {
+        status: 'completed',
+        progress: 100,
+        message: 'Terminology complete',
+        error: null,
+      },
       dilirank: {
         status: 'failed',
         progress: 0,
@@ -383,7 +405,7 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
 
     const state = tracker.updateAllState();
     expect(state.phase).toBe('partial_failure');
-    expect(state.progress).toBe(67);
+    expect(state.progress).toBe(75);
     expect(state.targets.dilirank.status).toBe('failed');
     expect(state.targets.dilirank.error).toContain('DILIrank unavailable');
     expect(state.message).toContain('One or more sources failed');
