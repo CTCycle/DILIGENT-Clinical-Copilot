@@ -138,15 +138,6 @@ def upsert_drug_rxnorm_code(
     db_session.execute(statement)
 
 ###############################################################################
-def upsert_drug_rxnorm_codes(db_session: Session, values: list[dict[str, Any]]) -> None:
-    """Atomically insert a deduplicated batch of RxCUI mappings."""
-    if not values:
-        return
-    statement = dialect_insert(db_session, DrugRxnormCode).values(values)
-    statement = statement.on_conflict_do_nothing(index_elements=[DrugRxnormCode.rxcui])
-    db_session.execute(statement)
-
-###############################################################################
 def upsert_livertox_monographs(
     db_session: Session, values: list[dict[str, Any]]
 ) -> None:

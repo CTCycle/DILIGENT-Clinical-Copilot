@@ -44,20 +44,13 @@ from domain.clinical.extras import (
     LabExtractionPayload,
 )
 from domain.clinical.drug_resolution import (
-    DrugIdentityCandidate,
     DrugIdentityProposal,
     DrugIdentityProposalBatch,
     DrugResolutionDecision,
     LiverToxResolutionCandidate,
     NormalizedDrugMention,
-    RxNavResolutionCandidate,
 )
 from domain.clinical.language import LanguageDetectionResult
-from domain.clinical.matching import (
-    AliasCacheEntry,
-    LiverToxMatch,
-    MonographRecord,
-)
 from domain.clinical.revision import (
     RevisedDiliAssessment,
     RevisedDiseasePayload,
@@ -110,7 +103,6 @@ __all__ = [
     "LiverInjuryOnsetContext",
     "LiverToxBatchMatchItem",
     "LiverToxBatchMatchSuggestion",
-    "LiverToxMatch",
     "LiverToxMatchInfo",
     "LiverToxMatchSuggestion",
     "LanguageDetectionResult",
@@ -125,19 +117,15 @@ __all__ = [
     "RucamAnchor",
     "RucamComponentAssessment",
     "ValidationMessageBundle",
-    "AliasCacheEntry",
     "CandidateSelectionResult",
     "HepatoxPreparedInputs",
     "LabExtractionPayload",
-    "DrugIdentityCandidate",
     "DrugIdentityProposal",
     "DrugIdentityProposalBatch",
     "DrugResolutionDecision",
     "LiverToxResolutionCandidate",
     "NormalizedDrugMention",
-    "RxNavResolutionCandidate",
     "LlmClinicalSectionTextDraft",
-    "MonographRecord",
     "RevisedDiliAssessment",
     "RevisedDiseasePayload",
     "RevisedDrugPayload",

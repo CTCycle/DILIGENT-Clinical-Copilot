@@ -41,7 +41,8 @@ class DiliRankRepository:
                 alias_index: dict[str, set[int]] = defaultdict(set)
                 for alias_norm, drug_id in db_session.execute(
                     select(DrugAlias.alias_norm, DrugAlias.drug_id).where(
-                        DrugAlias.source.in_(DILIRANK_TRUSTED_ALIAS_SOURCES)
+                        DrugAlias.source.in_(DILIRANK_TRUSTED_ALIAS_SOURCES),
+                        DrugAlias.validation_status.in_(("verified", "confirmed")),
                     )
                 ).all():
                     if drug_id is None:

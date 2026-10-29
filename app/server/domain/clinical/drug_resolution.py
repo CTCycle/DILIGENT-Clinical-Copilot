@@ -8,36 +8,17 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-RxNavValidationStatus = Literal[
-    "exact_rxcui",
-    "alias_to_rxcui",
-    "ingredient_to_rxcui",
-    "brand_to_rxcui",
-    "no_rxnav_match",
-    "ambiguous_rxnav",
-    "not_applicable_livertox_direct",
-]
+from domain.terminology import TerminologyResolution
 
 DrugDecisionStatus = Literal[
-    "accepted_exact_livertox",
-    "accepted_rxnav_validated",
-    "accepted_livertox_without_rxnav",
-    "ambiguous_requires_review",
-    "missing_rxnav",
+    "accepted_verified",
+    "accepted_probable",
     "missing_livertox",
+    "ambiguous_requires_review",
+    "unresolved",
     "rejected_false_positive",
 ]
-
-###############################################################################
-@dataclass(frozen=True)
-class DrugIdentityCandidate:
-    source_label: str
-    canonical_candidate: str
-    normalized_candidate: str
-    kind: str
-    confidence: float
-    notes: tuple[str, ...] = field(default_factory=tuple)
+ACCEPTED_DECISION_STATUSES = frozenset({"accepted_verified", "accepted_probable"})
 
 ###############################################################################
 @dataclass(slots=True)
@@ -54,29 +35,16 @@ class NormalizedDrugMention:
     regimen_components: list[str] = field(default_factory=list)
 
 ###############################################################################
-class RxNavResolutionCandidate(BaseModel):
-    rxcui: str | None = None
-    name: str
-    normalized_name: str
-    term_type: str | None = None
-    source: Literal["rxnorm", "manual", "livertox", "catalog"]
-    alias_kind: str | None = None
-    confidence: float | None = None
-    reason: str
-    accepted: bool = False
-    rejected_reason: str | None = None
-
-###############################################################################
 class LiverToxResolutionCandidate(BaseModel):
+    """A LiverTox monograph explicitly linked to the resolved concept."""
+
     nbk_id: str | None = None
     drug_name: str
     normalized_name: str
     monograph_key: str | None = None
     has_excerpt: bool
-    confidence: float | None = None
-    reason: str
+    link_type: str
     accepted: bool = False
-    rejected_reason: str | None = None
 
 ###############################################################################
 class DrugResolutionDecision(BaseModel):
@@ -86,15 +54,12 @@ class DrugResolutionDecision(BaseModel):
     regimen_group_id: str | None = None
     is_regimen_parent: bool = False
     regimen_components: list[str] = Field(default_factory=list)
-    rxnav_candidates: list[RxNavResolutionCandidate] = Field(default_factory=list)
-    accepted_rxnav_rxcui: str | None = None
-    rxnav_validation_status: RxNavValidationStatus = "no_rxnav_match"
+    terminology: TerminologyResolution
     livertox_candidates: list[LiverToxResolutionCandidate] = Field(default_factory=list)
     accepted_livertox_nbk_id: str | None = None
     accepted_livertox_name: str | None = None
     accepted_livertox_match_has_excerpt: bool = False
     decision_status: DrugDecisionStatus
-    confidence: float | None = None
     reasons: list[str] = Field(default_factory=list)
     requires_human_review: bool
 

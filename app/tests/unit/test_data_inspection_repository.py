@@ -104,20 +104,15 @@ def test_clinical_services_receive_only_their_repository_capabilities() -> None:
     )
     preparation = ClinicalKnowledgePreparation(
         knowledge_repository=repository_graph.knowledge_repository,
-        drug_catalog_repository=repository_graph.drug_catalog_repository,
     )
 
     assert composer.knowledge_repository is repository_graph.knowledge_repository
     assert preparation.knowledge_repository is repository_graph.knowledge_repository
-    assert (
-        preparation.drug_catalog_repository is repository_graph.drug_catalog_repository
-    )
     assert set(signature(ClinicalKnowledgeComposer).parameters) == {
         "knowledge_repository",
     }
     assert set(signature(ClinicalKnowledgePreparation).parameters) == {
         "knowledge_repository",
-        "drug_catalog_repository",
     }
 
 ###############################################################################
@@ -369,14 +364,15 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
     repository_graph, engine = build_repository_graph_for_test()
     session_factory = sessionmaker(bind=engine, future=True)
     with session_factory() as db_session:
-        drug = repository_graph.drug_catalog_repository.ensure_drug(
-            db_session,
+        drug = Drug(
             canonical_name="Acetaminophen",
             canonical_name_norm="acetaminophen",
-            rxnorm_rxcui="161",
             livertox_nbk_id="NBK100",
             rxnav_last_update="2025-01-05",
         )
+        db_session.add(drug)
+        db_session.flush()
+        db_session.add(DrugRxnormCode(drug_id=int(drug.id), rxcui="161"))
         repository_graph.drug_catalog_repository.upsert_drug_alias(
             db_session,
             drug_id=int(drug.id),
@@ -470,20 +466,12 @@ def test_livertox_catalog_reports_missing_excerpt() -> None:
     repository_graph, engine = build_repository_graph_for_test()
     session_factory = sessionmaker(bind=engine, future=True)
     with session_factory() as db_session:
-        available = repository_graph.drug_catalog_repository.ensure_drug(
-            db_session,
-            canonical_name="Available Drug",
-            canonical_name_norm="available drug",
-            rxnorm_rxcui=None,
-            livertox_nbk_id=None,
+        available = Drug(canonical_name="Available Drug", canonical_name_norm="available drug")
+        missing = Drug(
+            canonical_name="Missing Excerpt Drug", canonical_name_norm="missing excerpt drug"
         )
-        missing = repository_graph.drug_catalog_repository.ensure_drug(
-            db_session,
-            canonical_name="Missing Excerpt Drug",
-            canonical_name_norm="missing excerpt drug",
-            rxnorm_rxcui=None,
-            livertox_nbk_id=None,
-        )
+        db_session.add_all([available, missing])
+        db_session.flush()
         db_session.add_all(
             [
                 LiverToxMonograph(

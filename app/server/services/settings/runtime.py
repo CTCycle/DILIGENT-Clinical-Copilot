@@ -209,7 +209,15 @@ class RuntimeSettingsService:
                 livertox_skip_deterministic_ratio=settings.runtime.livertox_skip_deterministic_ratio,
                 livertox_monograph_max_workers=settings.runtime.livertox_monograph_max_workers,
                 rxnav_request_timeout=settings.runtime.rxnav_request_timeout,
-                rxnav_max_concurrency=settings.runtime.rxnav_max_concurrency,
+                terminology_download_timeout=settings.runtime.terminology_download_timeout,
+                drugcentral_enabled=settings.runtime.drugcentral_enabled,
+                drugcentral_host=settings.runtime.drugcentral_host,
+                drugcentral_port=settings.runtime.drugcentral_port,
+                drugcentral_database=settings.runtime.drugcentral_database,
+                drugcentral_user=settings.runtime.drugcentral_user,
+                chembl_enabled=settings.runtime.chembl_enabled,
+                chembl_max_phase=settings.runtime.chembl_max_phase,
+                swissmedic_enabled=settings.runtime.swissmedic_enabled,
             ),
             matching=MatchingRuntimeSettings(
                 **settings.drugs_matcher.model_dump(mode="python")

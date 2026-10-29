@@ -30,7 +30,8 @@ dependencies = [
     "onnxruntime==1.27.0",
     "tokenizers==0.23.1",
     "huggingface-hub>=0.36.0",
-    "openpyxl==3.1.5",    
+    "openpyxl==3.1.5",
+    "rapidfuzz==3.14.3",
 ]
 
 [project.optional-dependencies]

@@ -11,12 +11,11 @@ from pydantic import ValidationError
 
 from configurations.database_config import database_settings, load_database_configuration
 from common.constants import (
-    DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
-    DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
-    DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
-    DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
-    DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
-    DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
+    DEFAULT_DRUG_MATCHER_SETTINGS,
+    DEFAULT_DRUGCENTRAL_DATABASE,
+    DEFAULT_DRUGCENTRAL_HOST,
+    DEFAULT_DRUGCENTRAL_PORT,
+    DEFAULT_DRUGCENTRAL_USER,
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
     OLLAMA_DEFAULT_HOST,
@@ -236,45 +235,14 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
 
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
-    return DrugsMatcherSettings(
-        direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
-        master_confidence=coerce_float(data.get("master_confidence"), 0.92),
-        synonym_confidence=coerce_float(data.get("synonym_confidence"), 0.90),
-        normalization_cache_limit=coerce_positive_int(
-            data.get("normalization_cache_limit"), 10000
-        ),
-        match_cache_limit=coerce_positive_int(data.get("match_cache_limit"), 5000),
-        alias_cache_limit=coerce_positive_int(data.get("alias_cache_limit"), 2000),
-        min_confidence=coerce_float(data.get("min_confidence"), 0.90),
-        token_min_length=coerce_positive_int(
-            data.get("token_min_length"),
-            DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
-        ),
-        catalog_index_limit=coerce_positive_int(
-            data.get("catalog_index_limit"),
-            DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
-        ),
-        spelling_confidence=coerce_float(
-            data.get("spelling_confidence"),
-            DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
-        ),
-        spelling_min_query_length=coerce_positive_int(
-            data.get("spelling_min_query_length"),
-            DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
-        ),
-        spelling_short_name_length=coerce_positive_int(
-            data.get("spelling_short_name_length"),
-            8,
-        ),
-        spelling_short_max_distance=coerce_positive_int(
-            data.get("spelling_short_max_distance"),
-            DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
-        ),
-        spelling_long_max_distance=coerce_positive_int(
-            data.get("spelling_long_max_distance"),
-            DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
-        ),
-    )
+    defaults = DEFAULT_DRUG_MATCHER_SETTINGS
+    values: dict[str, Any] = {}
+    for key, default in defaults.items():
+        if isinstance(default, bool):
+            values[key] = coerce_bool(data.get(key), default)
+        else:
+            values[key] = coerce_int(data.get(key), int(default), minimum=0)
+    return DrugsMatcherSettings(**values)
 
 ###############################################################################
 def _build_rag_settings(
@@ -416,9 +384,19 @@ def _build_runtime_settings(
         ),
         max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8000),
         rxnav_request_timeout=coerce_float(data.get("rxnav_request_timeout"), 12.0),
-        rxnav_max_concurrency=coerce_positive_int(
-            data.get("rxnav_max_concurrency"), 10
+        terminology_download_timeout=max(
+            coerce_float(data.get("terminology_download_timeout"), 300.0), 10.0
         ),
+        drugcentral_enabled=coerce_bool(data.get("drugcentral_enabled"), True),
+        drugcentral_host=coerce_str(data.get("drugcentral_host"), DEFAULT_DRUGCENTRAL_HOST),
+        drugcentral_port=coerce_positive_int(data.get("drugcentral_port"), DEFAULT_DRUGCENTRAL_PORT),
+        drugcentral_database=coerce_str(
+            data.get("drugcentral_database"), DEFAULT_DRUGCENTRAL_DATABASE
+        ),
+        drugcentral_user=coerce_str(data.get("drugcentral_user"), DEFAULT_DRUGCENTRAL_USER),
+        chembl_enabled=coerce_bool(data.get("chembl_enabled"), True),
+        chembl_max_phase=min(4, coerce_positive_int(data.get("chembl_max_phase"), 4)),
+        swissmedic_enabled=coerce_bool(data.get("swissmedic_enabled"), True),
     )
 
 ###############################################################################

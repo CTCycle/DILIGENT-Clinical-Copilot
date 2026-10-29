@@ -37,24 +37,28 @@ export interface IntegrationRuntimeSettings {
   livertox_skip_deterministic_ratio: number;
   livertox_monograph_max_workers: number;
   rxnav_request_timeout: number;
-  rxnav_max_concurrency: number;
+  terminology_download_timeout: number;
+  drugcentral_enabled: boolean;
+  drugcentral_host: string;
+  drugcentral_port: number;
+  drugcentral_database: string;
+  drugcentral_user: string;
+  chembl_enabled: boolean;
+  chembl_max_phase: number;
+  swissmedic_enabled: boolean;
 }
 
 export interface MatchingRuntimeSettings {
-  direct_confidence: number;
-  master_confidence: number;
-  synonym_confidence: number;
-  normalization_cache_limit: number;
-  match_cache_limit: number;
-  alias_cache_limit: number;
-  min_confidence: number;
-  token_min_length: number;
-  catalog_index_limit: number;
-  spelling_confidence: number;
-  spelling_min_query_length: number;
-  spelling_short_name_length: number;
-  spelling_short_max_distance: number;
-  spelling_long_max_distance: number;
+  resolution_cache_limit: number;
+  fuzzy_min_query_length: number;
+  fuzzy_shortlist_size: number;
+  fuzzy_short_name_length: number;
+  fuzzy_short_max_distance: number;
+  fuzzy_long_max_distance: number;
+  fuzzy_min_margin: number;
+  external_fallback_enabled: boolean;
+  external_max_requests_per_name: number;
+  external_negative_cache_days: number;
 }
 
 export interface AdvancedRuntimeSettings {

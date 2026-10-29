@@ -1,5 +1,5 @@
 # User Troubleshooting
-Last updated: 2026-10-27
+Last updated: 2026-10-29
 
 ## Windows desktop app does not open
 
@@ -80,6 +80,23 @@ Check that:
 - database initialization completed successfully
 - embedding or catalog update jobs completed successfully
 - the backend was restarted after maintenance
+
+## Drugs Are Unresolved Or Ambiguous
+- **Every drug is Unresolved**: open **Knowledge → Terminology**. If RxNorm has
+  never completed an import, run **Update all**.
+- **DrugCentral import failed**: the public DrugCentral server may be
+  unavailable or port 5433 may be blocked. Skip DrugCentral in the update
+  dialog or point **Settings → Integrations** to another DrugCentral server.
+- **A name shows Probable — review**: it was matched by spelling correction.
+  Confirm it in **Knowledge → Terminology** to make it verified.
+- **A name shows Ambiguous**: several drugs are close to it (for example
+  hydroxyzine and hydralazine). Confirm the correct one; nothing is attached
+  until you do.
+- **A brand resolves to the wrong drug**: use **Reject mapping**, confirm the
+  correct drug, and check **Open conflicts** for the source involved.
+- **No LiverTox evidence for an identified drug**: LiverTox may cover it only
+  in a class chapter, or not at all; the report lists it as missing a LiverTox
+  link rather than guessing.
 
 ## Database Connection or Switch Failed
 

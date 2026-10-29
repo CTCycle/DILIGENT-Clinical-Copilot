@@ -38,7 +38,7 @@
           @if (updateAllRunning()) {
             {{ updateAllState().message || 'Updating sources...' }}
           } @else {
-            Refreshes RxNav, LiverTox and DILIrank in order. RAG is updated from its own view.
+            Refreshes RxNav, LiverTox, terminology and DILIrank in order. RAG is updated from its own view.
           }
         </p>
       </div>
@@ -177,6 +177,231 @@
                 loadingMoreMessage="Loading more LiverTox rows..."
                 [hasMore]="livertoxHasMore()"
                 [error]="livertoxError()"
+              />
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'terminology') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-terminology-resolve" role="search">
+                <input
+                  type="search"
+                  class="inspection-search"
+                  placeholder="Resolve a drug name, brand, or abbreviation..."
+                  aria-label="Drug name to resolve"
+                  [ngModel]="resolveInput()"
+                  (ngModelChange)="resolveInput.set($event)"
+                  (keydown.enter)="resolveName()"
+                />
+                <label class="inspection-terminology-toggle">
+                  <input
+                    type="checkbox"
+                    [ngModel]="resolveAllowExternal()"
+                    (ngModelChange)="resolveAllowExternal.set($event)"
+                  />
+                  <span>RxNav fallback</span>
+                </label>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="resolveName()" [disabled]="resolveLoading() || !resolveInput().trim()">
+                  {{ resolveLoading() ? 'Resolving...' : 'Resolve' }}
+                </button>
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <app-inspection-progress-button
+                  [buttonLabel]="'Update Terminology'"
+                  [inProgress]="terminologyUpdateRunning()"
+                  [progress]="terminologyUpdateProgress()"
+                  [progressMessage]="terminologyUpdateMessage()"
+                  [disabled]="structuredUpdateActionsDisabled()"
+                  (activated)="openUpdateModal('terminology')"
+                />
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-terminology-body">
+              @if (resolveError()) {
+                <p class="inspection-error-text">{{ resolveError() }}</p>
+              }
+              @if (resolveResult(); as result) {
+                <section class="inspection-terminology-result" aria-label="Resolution result">
+                  <div class="inspection-terminology-result-head">
+                    <span class="inspection-terminology-original">{{ result.original }}</span>
+                    <span aria-hidden="true">→</span>
+                    <strong>{{ result.preferred_name || 'No identity' }}</strong>
+                    <span class="inspection-status-chip" [ngClass]="terminologyStatusTone(result.status)">
+                      {{ terminologyStatusLabel(result.status) }}
+                    </span>
+                  </div>
+                  <dl class="inspection-terminology-facts">
+                    <div><dt>Method</dt><dd>{{ result.method }}</dd></div>
+                    <div><dt>Matched alias</dt><dd>{{ result.matched_alias || '—' }}</dd></div>
+                    <div><dt>Source</dt><dd>{{ result.source || '—' }}{{ result.country ? ' (' + result.country + ')' : '' }}</dd></div>
+                    @if (result.ingredients.length > 0) {
+                      <div>
+                        <dt>Ingredients</dt>
+                        <dd>
+                          @for (ingredient of result.ingredients; track ingredient.drug_id; let last = $last) {
+                            {{ ingredient.name }}@if (ingredient.parent_name) { (form of {{ ingredient.parent_name }}) }@if (!last) {, }
+                          }
+                        </dd>
+                      </div>
+                    }
+                    @if (result.strengths.length > 0) {
+                      <div>
+                        <dt>Strength</dt>
+                        <dd>
+                          {{ result.strengths.join(', ') }}
+                          @if (result.strength_supported === false) { (no matching product strength) }
+                        </dd>
+                      </div>
+                    }
+                    @if (result.review_reasons.length > 0) {
+                      <div><dt>Review notes</dt><dd>{{ result.review_reasons.join(', ') }}</dd></div>
+                    }
+                  </dl>
+                  @if (result.accepted && result.drug_id !== null) {
+                    <div class="inspection-pager-actions">
+                      <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="decideAlias('confirm', result.drug_id, result.preferred_name || '')">Confirm mapping</button>
+                      <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="decideAlias('reject', result.drug_id, result.preferred_name || '')">Reject mapping</button>
+                    </div>
+                  }
+                  @if (result.candidates.length > 0) {
+                    <table class="inspection-table inspection-table-dense" aria-label="Candidate concepts">
+                      <thead>
+                        <tr>
+                          <th>Candidate</th>
+                          <th>Matched alias</th>
+                          <th>Source</th>
+                          <th>Edits</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (candidate of result.candidates; track candidate.drug_id) {
+                          <tr>
+                            <td>{{ candidate.name }}</td>
+                            <td>{{ candidate.matched_alias || '—' }}</td>
+                            <td>{{ candidate.source || '—' }}</td>
+                            <td>{{ candidate.edit_distance ?? '—' }}</td>
+                            <td class="inspection-actions-cell">
+                              <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="decideAlias('confirm', candidate.drug_id, candidate.name)">Confirm</button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  }
+                  @if (aliasDecisionMessage()) {
+                    <p class="inspection-empty-note" role="status">{{ aliasDecisionMessage() }}</p>
+                  }
+                </section>
+              }
+
+              @if (terminologyError()) {
+                <p class="inspection-error-text">{{ terminologyError() }}</p>
+              }
+              @if (terminologySummary(); as summary) {
+                <dl class="inspection-terminology-stats" aria-label="Terminology coverage">
+                  <div><dt>Concepts</dt><dd>{{ summary.concepts | number }}</dd></div>
+                  <div><dt>Resolvable aliases</dt><dd>{{ summary.resolvable_aliases | number }}</dd></div>
+                  <div><dt>Verified products</dt><dd>{{ summary.verified_products | number }} / {{ summary.products | number }}</dd></div>
+                  <div><dt>LiverTox monographs linked</dt><dd>{{ summary.linked_monographs | number }} / {{ summary.total_monographs | number }}</dd></div>
+                  <div><dt>Open conflicts</dt><dd>{{ summary.open_conflicts | number }}</dd></div>
+                </dl>
+
+                <h3 class="inspection-terminology-heading">Sources</h3>
+                <table class="inspection-table inspection-table-dense" aria-label="Terminology sources">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Last import</th>
+                      <th>Version</th>
+                      <th>Aliases</th>
+                      <th>Products</th>
+                      <th>License and attribution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (source of summary.sources; track source.source) {
+                      <tr>
+                        <td>{{ source.source }}@if (!source.enabled) { <span class="inspection-status-chip is-neutral">Disabled</span> }</td>
+                        <td [title]="source.last_error || ''">
+                          @if (source.last_status) {
+                            <span class="inspection-status-chip" [class.is-successful]="source.last_status === 'completed' || source.last_status === 'skipped'" [class.is-failed]="source.last_status === 'failed'" [class.is-neutral]="source.last_status !== 'completed' && source.last_status !== 'skipped' && source.last_status !== 'failed'">{{ source.last_status }}</span>
+                            {{ formatDateTime(source.last_finished_at) }}
+                          } @else {
+                            Never imported
+                          }
+                        </td>
+                        <td [title]="source.last_completed_version || ''">{{ source.last_completed_version || '—' }}</td>
+                        <td>{{ source.aliases | number }}</td>
+                        <td>{{ source.products | number }}</td>
+                        <td [title]="source.attribution">{{ source.license }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+
+              @if (terminologyConflicts().length > 0) {
+                <h3 class="inspection-terminology-heading">Open conflicts ({{ terminologyConflictTotal() | number }})</h3>
+                <table class="inspection-table inspection-table-dense" aria-label="Terminology conflicts">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Type</th>
+                      <th>Subject</th>
+                      <th>Kept</th>
+                      <th>Proposed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (conflict of terminologyConflicts(); track conflict.id) {
+                      <tr [title]="conflict.detail || ''">
+                        <td>{{ conflict.source }}</td>
+                        <td>{{ conflict.conflict_type }}</td>
+                        <td>{{ conflict.subject }}</td>
+                        <td>{{ conflict.existing_drug || '—' }}</td>
+                        <td>{{ conflict.proposed_drug || '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+
+              @if (terminologyRuns().length > 0) {
+                <h3 class="inspection-terminology-heading">Recent imports</h3>
+                <table class="inspection-table inspection-table-dense" aria-label="Terminology import reports">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Status</th>
+                      <th>Finished</th>
+                      <th>Report</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (run of terminologyRuns(); track run.id) {
+                      <tr [title]="run.error || ''">
+                        <td>{{ run.source }} <small>({{ run.mode }})</small></td>
+                        <td>{{ run.status }}</td>
+                        <td>{{ formatDateTime(run.finished_at) }}</td>
+                        <td>{{ run.error || formatRunStats(run) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+              <app-inspection-catalog-status
+                [loading]="terminologyLoading()"
+                loadingMessage="Loading terminology..."
+                [loadingMore]="false"
+                loadingMoreMessage=""
+                [hasMore]="false"
+                [error]="null"
               />
             </div>
           </div>

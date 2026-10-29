@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-10-27
+Last updated: 2026-10-29
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -58,12 +58,15 @@ stateDiagram-v2
 - `ollama_pull`
   - Start: `POST /api/models/pull/jobs`
   - Poll or cancel: `GET|DELETE /api/models/jobs/{job_id}`
-- `rxnav_update`
+- `rxnav_update` (RxNorm Prescribable Content and curated aliases)
   - Start: `POST /api/inspection/rxnav/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/rxnav/jobs/{job_id}`
 - `livertox_update`
   - Start: `POST /api/inspection/livertox/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/livertox/jobs/{job_id}`
+- `terminology_update` (DrugCentral, ChEMBL, Swissmedic, curated aliases)
+  - Start: `POST /api/inspection/terminology/jobs`
+  - Poll or cancel: `GET|DELETE /api/inspection/terminology/jobs/{job_id}`
 - `dilirank_update`
   - Start: `POST /api/inspection/dilirank/jobs`
   - Poll or cancel: `GET|DELETE /api/inspection/dilirank/jobs/{job_id}`
@@ -90,9 +93,9 @@ Additional rules:
 - Clients should treat `version` as monotonic and ignore out-of-order older snapshots.
 - Clinical progress snapshots expose canonical granular stage keys such as `drugs.extracting`, `retrieval.evidence`, `report.generating`, `session.saving`, and terminal `completed`; generic internal wrapper stages are not persisted as the user-facing stage.
 - Inspection update jobs may include `phase`, `step_index`, `step_count`, `progress_message`, and `summary`.
-- Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, `dilirank`, and `rag` through the same `DataInspectionService` and `DataInspectionUpdateJobRunner` path.
-- The combined structured-source job owns the dependency order `RxNav -> LiverTox -> DILIrank`; DILIrank linking starts only after the preceding identity/catalog phases complete. RAG remains an independent job and is not part of this sequence.
-- Full RxNav and LiverTox refreshes prepare source snapshots before replacing source-owned canonical rows. Cancellation or failure before the final transaction leaves the previous usable snapshot intact.
+- Inspection update runners use cooperative cancellation and progress callbacks consistently across `rxnav`, `livertox`, `terminology`, `dilirank`, and `rag` through the same `DataInspectionService` and `DataInspectionUpdateJobRunner` path.
+- The combined structured-source job owns the dependency order `RxNav -> LiverTox -> Terminology -> DILIrank`; DILIrank linking starts only after the preceding identity/catalog phases complete. RAG remains an independent job and is not part of this sequence.
+- Full RxNav, LiverTox and terminology refreshes prepare source snapshots before replacing source-owned canonical rows. Each terminology source commits in its own transaction, records a `terminology_import_runs` report, and is skipped when its upstream version is unchanged unless `force_full` is set. A failing terminology source does not block the others in the same job. Cancellation or failure before the final transaction leaves the previous usable snapshot intact. The LiverTox job rebuilds `drug_livertox_links` after its snapshot commits; see [drug_terminology.md](drug_terminology.md).
 - Inspection clients distinguish a transient polling failure from a lost in-memory job. Repeated failures are bounded, and a confirmed missing job is surfaced as a recoverable interrupted update rather than polled forever.
 - DILIrank refreshes validate a downloaded candidate workbook before promoting it to the stable cache. Validation failure or cancellation before promotion removes the candidate and preserves the last-known-good cached workbook and metadata.
 - Session revision jobs start the bounded revision agent. It creates a draft
@@ -131,7 +134,7 @@ If a runner does not check stop requests, cancellation is delayed.
 - Clinical jobs run input preflight before job creation.
 - Clinical assessment concurrency is explicitly scoped as `clinical:global`.
 - Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts, while unrelated root sessions can follow their configured policy independently.
-- Structured catalog update concurrency uses one shared catalog scope, so individual RxNav, LiverTox, DILIrank, and combined jobs cannot overlap while shared identity data are changing.
+- Structured catalog update concurrency uses one shared catalog scope, so individual RxNav, LiverTox, terminology, DILIrank, and combined jobs cannot overlap while shared identity data are changing.
 - Completed results include database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`.
 - These artifacts are persisted through the clinical session result payload rather than loose files.
 - Failed clinical results omit raw anamnesis, drug text, laboratory text, and patient image base64 content. Failure payloads expose generic error text plus `failure_metadata` for diagnostics.

@@ -11,7 +11,7 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
 )
 from services.clinical.drug_resolution.serialization import index_resolved_drugs
-from services.clinical.match_quality import classify_match_evidence
+from services.clinical.match_quality import accepted_link_type, classify_match_evidence
 from services.text.normalization import normalize_drug_query_name
 
 PROGRESS_SEQUENCE: list[tuple[str, float]] = [
@@ -79,17 +79,13 @@ def build_single_matched_drug_row(
     match_notes = resolved.get("match_notes") or []
     if not isinstance(match_notes, list):
         match_notes = []
-    match_confidence = resolved.get("match_confidence")
-    if match_confidence is not None:
-        try:
-            match_confidence = float(match_confidence)
-        except TypeError, ValueError:
-            match_confidence = None
+    terminology = resolved.get("terminology")
+    terminology = terminology if isinstance(terminology, dict) else {}
     match_quality = classify_match_evidence(
         match_status=resolved.get("match_status"),
-        match_reason=resolved.get("match_reason"),
-        match_confidence=match_confidence,
-        match_notes=match_notes,
+        terminology=terminology,
+        link_type=accepted_link_type(resolved),
+        has_excerpt=bool(resolved.get("extracted_excerpts")),
         missing_livertox=bool(resolved.get("missing_livertox", True)),
         ambiguous_match=bool(resolved.get("ambiguous_match", False)),
     )
@@ -103,12 +99,11 @@ def build_single_matched_drug_row(
         extraction_metadata = []
     return {
         "raw_drug_name": detected_name,
-        "drug_id": resolved.get("drug_id"),
+        "drug_id": terminology.get("drug_id") if terminology.get("accepted") else None,
         "matched_drug_name": matched_row.get("drug_name"),
         "nbk_id": matched_row.get("nbk_id"),
         "rxnorm_rxcui": rxnorm_rxcui,
         "rxcui": rxnorm_rxcui,
-        "match_confidence": match_confidence,
         "match_reason": resolved.get("match_reason"),
         "match_notes": match_notes,
         "match_status": resolved.get("match_status"),
@@ -116,16 +111,14 @@ def build_single_matched_drug_row(
         "evidence_warnings": match_quality["evidence_warnings"],
         "match_candidates": resolved.get("match_candidates", []),
         "chosen_candidate": resolved.get("chosen_candidate"),
-        "rejected_candidates": resolved.get("rejected_candidates", []),
         "resolution_decision": resolved.get("resolution_decision"),
-        "rxnav_candidates": resolved.get("rxnav_candidates", []),
+        "terminology": terminology or None,
         "livertox_candidates": resolved.get("livertox_candidates", []),
         "accepted_rxnav_rxcui": accepted_rxnav_rxcui,
         "accepted_livertox_nbk_id": resolved.get("accepted_livertox_nbk_id"),
         "accepted_livertox_name": resolved.get("accepted_livertox_name"),
         "requires_human_review": resolved.get("requires_human_review", False),
         "decision_status": resolved.get("decision_status"),
-        "rxnav_validation_status": resolved.get("rxnav_validation_status"),
         "missing_livertox": resolved.get("missing_livertox", True),
         "ambiguous_match": resolved.get("ambiguous_match", False),
         "regimen_group_ids": resolved.get("regimen_group_ids", []),

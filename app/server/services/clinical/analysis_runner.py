@@ -20,7 +20,7 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from services.clinical.match_quality import classify_match_evidence
+from services.clinical.match_quality import accepted_link_type, classify_match_evidence
 from services.clinical.drug_analysis import DrugAnalysisService
 from services.clinical.exposure_timeline import ExposureTimelineService
 from services.clinical.rag_support import RagSupportService
@@ -48,27 +48,13 @@ def emit_progress(
 ###############################################################################
 def livertox_payload_rank(payload: dict[str, Any]) -> int:
     status = str(payload.get("match_status") or "").strip().lower()
-    if status in {
-        "matched_with_excerpt",
-        "accepted_exact_livertox",
-        "accepted_rxnav_validated",
-        "accepted_livertox_without_rxnav",
-    }:
+    if status in {"accepted_verified", "accepted_probable"}:
         return 4
-    if status in {"matched_no_excerpt", "matched", "match"}:
+    if status == "missing_livertox":
         return 3
-    if status in {
-        "ambiguous",
-        "ambiguous_match",
-        "ambiguous_requires_review",
-    } or payload.get("ambiguous_match"):
+    if status == "ambiguous_requires_review" or payload.get("ambiguous_match"):
         return 2
-    if status in {
-        "missing",
-        "missing_match",
-        "missing_livertox",
-        "rejected_false_positive",
-    } or payload.get("missing_livertox"):
+    if status in {"unresolved", "rejected_false_positive"} or payload.get("missing_livertox"):
         return 1
     return 0
 
@@ -546,21 +532,17 @@ class AnalysisRunner:
             for note in livertox_data.get("match_notes", [])
             if str(note).strip()
         ]
-        match_confidence = livertox_data.get("match_confidence")
-        if match_confidence is not None:
-            try:
-                match_confidence = float(match_confidence)
-            except TypeError, ValueError:
-                match_confidence = None
         match_reason, match_notes = normalize_match_reason(
             livertox_data.get("match_reason"),
             match_notes,
         )
+        terminology = livertox_data.get("terminology")
+        terminology = terminology if isinstance(terminology, dict) else {}
         match_quality = classify_match_evidence(
             match_status=match_status,
-            match_reason=match_reason,
-            match_confidence=match_confidence,
-            match_notes=match_notes,
+            terminology=terminology,
+            link_type=accepted_link_type(livertox_data),
+            has_excerpt=bool(excerpts_list),
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
         )
@@ -595,9 +577,6 @@ class AnalysisRunner:
             ).strip()
             or None
         )
-        rxnav_validation_status = (
-            str(livertox_data.get("rxnav_validation_status") or "").strip() or None
-        )
         entry = DrugClinicalAssessment(
             drug_name=drug_entry.name,
             canonical_name=canonical_name,
@@ -605,13 +584,19 @@ class AnalysisRunner:
             extraction_metadata=extraction_metadata,
             source_provenance=source_provenance,
             rxnav_rxcui=rxnav_rxcui,
-            rxnav_validation_status=rxnav_validation_status,
+            terminology_status=terminology.get("status"),
+            terminology_method=terminology.get("method"),
+            terminology_source=terminology.get("source"),
+            resolved_ingredients=[
+                str(item.get("name"))
+                for item in terminology.get("ingredients") or []
+                if isinstance(item, dict) and item.get("name")
+            ],
             matched_livertox_row=matched_lvt_row,
             extracted_excerpts=excerpts_list,
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
             match_status=match_status,
-            match_confidence=match_confidence,
             match_reason=match_reason,
             match_notes=match_notes,
             evidence_quality=match_quality["evidence_quality"],

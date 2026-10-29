@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-10-27
+Last updated: 2026-10-29
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -128,6 +128,16 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - `POST /api/inspection/rxnav/jobs`
 - `GET /api/inspection/rxnav/jobs/{job_id}`
 - `DELETE /api/inspection/rxnav/jobs/{job_id}`
+- `GET /api/inspection/terminology/summary`
+- `GET /api/inspection/terminology/runs`
+- `GET /api/inspection/terminology/conflicts`
+- `POST /api/inspection/terminology/resolve`
+- `POST /api/inspection/terminology/aliases/confirm`
+- `POST /api/inspection/terminology/aliases/reject`
+- `GET /api/inspection/terminology/update-config`
+- `POST /api/inspection/terminology/jobs`
+- `GET /api/inspection/terminology/jobs/{job_id}`
+- `DELETE /api/inspection/terminology/jobs/{job_id}`
 - `GET /api/inspection/livertox`
 - `GET /api/inspection/livertox/{drug_id}/excerpt`
 - `DELETE /api/inspection/livertox/{drug_id}`
@@ -157,8 +167,9 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
-- DILIrank inspection is read-only at record level. `GET /api/inspection/dilirank` exposes the complete persisted FDA snapshot, including rows that are intentionally unlinked to the local canonical drug catalog. The update routes use the same centralized inspection job manager as RxNav, LiverTox, the combined structured-source workflow, and RAG. `redownload=true` forces a fresh FDA workbook; otherwise conditional HTTP metadata is used when a validated cache exists.
-- `POST /api/inspection/structured-sources/jobs` starts the dependency-aware `RxNav -> LiverTox -> DILIrank` sequence and returns child source state in the job result. RAG is intentionally excluded and remains independently controllable.
+- DILIrank inspection is read-only at record level. `GET /api/inspection/dilirank` exposes the complete persisted FDA snapshot, including rows that are intentionally unlinked to the local canonical drug catalog. The update routes use the same centralized inspection job manager as RxNav, LiverTox, terminology, the combined structured-source workflow, and RAG. `redownload=true` forces a fresh FDA workbook; otherwise conditional HTTP metadata is used when a validated cache exists.
+- `POST /api/inspection/structured-sources/jobs` starts the dependency-aware `RxNav -> LiverTox -> Terminology -> DILIrank` sequence and returns child source state in the job result. RAG is intentionally excluded and remains independently controllable.
+- Terminology routes: `summary` reports per-source versions, last runs, counts, license and attribution, open conflicts and fuzzy-index statistics; `resolve` is the try-it resolver (`allow_external` controls the RxNav fallback); `aliases/confirm` and `aliases/reject` store reviewer decisions as `reviewer` aliases (`404` for an unknown concept). `POST /api/inspection/rxnav/jobs` accepts only `force_full`; `POST /api/inspection/terminology/jobs` accepts `force_full`, `drugcentral_enabled`, `chembl_enabled` and `swissmedic_enabled`. See [drug_terminology.md](drug_terminology.md).
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
   persisted `timeline_model` role at start; provider/model controls are managed

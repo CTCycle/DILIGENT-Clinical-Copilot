@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-10-27
+Last updated: 2026-10-29
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -37,6 +37,7 @@ Important distinctions:
 - Human clinical review status is separate from LLM QA status.
 - Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, LiverTox matches, and linked FDA DILIrank identifiers are authoritative persisted evidence only within their documented source semantics.
 - A DILIrank category is a drug-level hepatotoxicity prior, not a patient-level causality score.
+- **Detected drugs** shows each entered name with its identity status: **Verified**, **Probable — review** (matched by spelling correction), **Ambiguous** (several candidate drugs, no evidence attached), or **Unresolved**. An arrow shows the resolved ingredient or combination. For an ambiguous name you can click the correct candidate to confirm it; the confirmation applies to future assessments and does not change the stored session.
 - Frontend-derived display fallbacks are labeled as **Display fallback** or **Not backend-confirmed**. These values are navigation aids only and must not be interpreted as RxNav, LiverTox, DILIrank, RUCAM, or backend-confirmed clinical evidence.
 
 ## Use Patient Timeline from a session
@@ -81,12 +82,14 @@ For LLM-generated timelines, events without preserved source evidence are not pa
 Open **Knowledge** from the sidebar.
 
 Expected capabilities:
-- data-source or table selection for RxNav, LiverTox, FDA DILIrank 2.0, and RAG
+- data-source or table selection for the Drug Catalog (RxNav), LiverTox, Terminology, FDA DILIrank 2.0, and RAG
 - refresh controls
 - record counts or metadata
 - table-style inspection
 - search, filter, or pagination where supported
 - embedding or data-update status where supported
+
+The **Terminology** view shows source coverage (concepts, resolvable aliases, verified products, linked LiverTox monographs), each source's last import, version, license and attribution, open cross-source conflicts, and recent import reports. Use **Resolve** to test how a drug name, brand, or abbreviation is identified; the result lists the status, method, source, ingredients, and candidates. **Confirm** and **Reject mapping** record a reviewer decision that applies to all future assessments. **Update Terminology** refreshes DrugCentral, ChEMBL, and Swissmedic; a source can be skipped for one run, and unchanged releases are skipped unless a full re-import is chosen.
 
 The **DILIrank** view is read-only. It shows FDA compound name, linked canonical drug when a safe deterministic link exists, LTKB ID, DILI concern class, severity class, labeling section, and source comment. `Unlinked` is an intentional state: it means the FDA row is preserved but is not eligible to contribute to clinical consultation. Do not infer a missing mapping manually from display similarity.
 
@@ -106,6 +109,8 @@ Some data sources or embeddings may require initialization or refresh through th
 ```text
 start_on_windows.ps1
 ```
+
+**Update all** refreshes RxNav (RxNorm Prescribable Content and curated aliases), LiverTox, Terminology, and DILIrank in that order. DrugCentral and ChEMBL data are licensed CC BY-SA and are downloaded to your local database by this update; they are never bundled with the application.
 
 DILIrank updates use the official FDA workbook. The default update may reuse a validated local workbook while checking HTTP freshness metadata; **Download fresh source** forces a new download. A downloaded candidate is validated before it replaces the last-known-good cache.
 

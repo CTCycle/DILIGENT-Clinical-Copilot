@@ -12,10 +12,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SessionStatus = Literal["successful", "failed"]
 DateFilterMode = Literal["before", "after", "exact"]
-InspectionUpdateTarget = Literal["rxnav", "livertox", "dilirank", "rag"]
+InspectionUpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
 InspectionUpdateJobType = Literal[
     "rxnav_update",
     "livertox_update",
+    "terminology_update",
     "dilirank_update",
     "structured_sources_update",
     "rag_update",
@@ -659,8 +660,15 @@ class InspectionUpdateConfigResponse(BaseModel):
 ###############################################################################
 class InspectionRxNavOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    rxnav_request_timeout: float | None = Field(default=None, ge=1.0, le=120.0)
-    rxnav_max_concurrency: int | None = Field(default=None, ge=1, le=64)
+    force_full: bool | None = None
+
+###############################################################################
+class InspectionTerminologyOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    force_full: bool | None = None
+    drugcentral_enabled: bool | None = None
+    chembl_enabled: bool | None = None
+    swissmedic_enabled: bool | None = None
 
 ###############################################################################
 class InspectionLiverToxOverrideRequest(BaseModel):
@@ -693,6 +701,9 @@ class InspectionStructuredSourcesUpdateRequest(BaseModel):
     rxnav: InspectionRxNavOverrideRequest = Field(default_factory=InspectionRxNavOverrideRequest)
     livertox: InspectionLiverToxOverrideRequest = Field(
         default_factory=InspectionLiverToxOverrideRequest
+    )
+    terminology: InspectionTerminologyOverrideRequest = Field(
+        default_factory=InspectionTerminologyOverrideRequest
     )
     dilirank: InspectionDiliRankOverrideRequest = Field(
         default_factory=InspectionDiliRankOverrideRequest

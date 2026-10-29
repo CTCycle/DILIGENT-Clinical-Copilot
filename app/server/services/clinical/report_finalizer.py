@@ -71,6 +71,9 @@ class ReportFinalizer:
             report_language=report_language,
         )
         sections: list[str] = []
+        identification = self.render_drug_identification_section(entries, report_language)
+        if identification:
+            sections.append(identification)
         if matched_sections:
             sections.append(
                 self.render_drug_assessment_section(
@@ -80,7 +83,7 @@ class ReportFinalizer:
             )
         if unresolved_section:
             sections.append(unresolved_section)
-        if not sections:
+        if not matched_sections and not unresolved_section:
             return None
 
         combined_report = "\n\n---\n\n".join(sections)
@@ -101,6 +104,44 @@ class ReportFinalizer:
         if bibliography:
             combined_report = f"{combined_report}\n\n{bibliography}"
         return combined_report
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def render_drug_identification_section(
+        entries: list[DrugClinicalAssessment],
+        language: str,
+    ) -> str | None:
+        """Entered name, resolved ingredients and identity status per drug."""
+        if not entries:
+            return None
+        lines = [
+            f"## {phrase('drug_identification', language)}",
+            "",
+            "| {} | {} | {} | {} |".format(
+                phrase("identification_entered_name", language),
+                phrase("identification_ingredients", language),
+                phrase("identification_status", language),
+                phrase("identification_source", language),
+            ),
+            "| --- | --- | --- | --- |",
+        ]
+        for entry in entries:
+            status = (entry.terminology_status or "unresolved").strip().lower()
+            status_key = f"identity_{status}" if status in {
+                "verified", "probable", "ambiguous", "unresolved"
+            } else "identity_unresolved"
+            ingredients = ", ".join(entry.resolved_ingredients) if status in {
+                "verified", "probable"
+            } and entry.resolved_ingredients else "—"
+            source = entry.terminology_source or "—"
+            cells = [
+                (entry.drug_name or "").replace("|", "/"),
+                ingredients.replace("|", "/"),
+                phrase(status_key, language),
+                source.replace("|", "/"),
+            ]
+            lines.append("| " + " | ".join(cells) + " |")
+        return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
     def render_drug_assessment_section(
@@ -322,17 +363,15 @@ class ReportFinalizer:
         self, entry: DrugClinicalAssessment, report_language: str = "en"
     ) -> str:
         status = (entry.match_status or "").strip().lower()
-        if status in {"ambiguous", "ambiguous_match"} or entry.ambiguous_match:
+        if status == "ambiguous_requires_review" or entry.ambiguous_match:
             candidates = (
                 ", ".join(entry.match_candidates)
                 if entry.match_candidates
                 else phrase("rucam_insufficient_data", report_language)
             )
             return f"{phrase('livertox_ambiguous', report_language)} {phrase('candidate_matches', report_language, candidates=candidates)} {phrase('manual_curation', report_language)}"
-        if status in {"missing", "missing_match"}:
+        if status in {"unresolved", "rejected_false_positive"}:
             return phrase("no_matching_record", report_language)
-        if status == "matched_no_excerpt":
-            return phrase("matched_no_excerpt", report_language)
         if entry.missing_livertox:
             return (
                 phrase("matched_no_excerpt", report_language)
@@ -430,11 +469,7 @@ class ReportFinalizer:
             ).strip()
             if name:
                 strategy = str(match.get("match_strategy") or "unknown").strip()
-                status = (
-                    "rxnav_validated"
-                    if match.get("rxnav_validated")
-                    else "rxnav_unvalidated"
-                )
+                status = str(match.get("terminology_status") or "unresolved").strip()
                 lines.append(f"- {name} ({strategy}, {status})")
         if len(lines) == 2:
             lines.append(phrase("not_available", language))
@@ -460,14 +495,7 @@ class ReportFinalizer:
     @staticmethod
     def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
         status = (entry.match_status or "").strip().lower()
-        return status in {
-            "accepted_exact_livertox",
-            "accepted_livertox_without_rxnav",
-            "accepted_rxnav_validated",
-            "matched",
-            "matched_with_excerpt",
-            "matched_no_excerpt",
-        }
+        return status in {"accepted_verified", "accepted_probable"}
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -15,9 +15,9 @@ describe('InspectionUpdateControlsComponent', () => {
       emitted = value;
     });
 
-    component.updateNumber('rxnav_max_concurrency', 80, 1, 64, true);
+    component.updateNumber('livertox_monograph_max_workers', 80, 1, 32, true);
 
-    expect(emitted).toEqual({ key: 'rxnav_max_concurrency', value: 64 });
+    expect(emitted).toEqual({ key: 'livertox_monograph_max_workers', value: 32 });
   });
 
   it('emits the selected archive handling mode', () => {
@@ -71,17 +71,18 @@ describe('InspectionUpdateAllModalComponent', () => {
         livertox_archive: 'livertox.tar.gz',
         redownload: false,
       },
-      rxnav: { rxnav_request_timeout: 30, rxnav_max_concurrency: 4 },
+      rxnav: { force_full: false },
+      terminology: { force_full: false, drugcentral_enabled: true, chembl_enabled: true, swissmedic_enabled: true },
       dilirank: { redownload: false },
     };
   }
 
   function configLoading(): InspectionUpdateAllConfigLoadingMap {
-    return { livertox: false, rxnav: false, dilirank: false };
+    return { livertox: false, rxnav: false, terminology: false, dilirank: false };
   }
 
   function configErrors(): InspectionUpdateAllConfigErrorMap {
-    return { livertox: null, rxnav: null, dilirank: null };
+    return { livertox: null, rxnav: null, terminology: null, dilirank: null };
   }
 
   function state(phase: InspectionUpdateAllState['phase'] = 'idle'): InspectionUpdateAllState {
@@ -94,24 +95,26 @@ describe('InspectionUpdateAllModalComponent', () => {
       targets: {
         livertox: { started: phase === 'running', jobId: phase === 'running' ? 'job-livertox' : null, status: phase === 'running' ? 'running' : null, progress: phase === 'running' ? 40 : 0, message: '', error: null },
         rxnav: { started: phase === 'running', jobId: phase === 'running' ? 'job-rxnav' : null, status: phase === 'running' ? 'running' : null, progress: phase === 'running' ? 44 : 0, message: '', error: null },
+        terminology: { started: phase === 'running', jobId: phase === 'running' ? 'job-terminology' : null, status: phase === 'running' ? 'running' : null, progress: phase === 'running' ? 41 : 0, message: '', error: null },
         dilirank: { started: phase === 'running', jobId: phase === 'running' ? 'job-dilirank' : null, status: phase === 'running' ? 'running' : null, progress: phase === 'running' ? 42 : 0, message: '', error: null },
       },
     };
   }
 
-  it('renders exactly the three structured-source tabs and shared controls', () => {
+  it('renders exactly the four structured-source tabs and shared controls', () => {
     const tabs = fixture.nativeElement.querySelectorAll('[role="tab"]');
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(4);
     expect(fixture.nativeElement.textContent).toContain('LiverTox');
     expect(fixture.nativeElement.textContent).toContain('RxNav');
     expect(fixture.nativeElement.textContent).toContain('DILIrank');
+    expect(fixture.nativeElement.textContent).toContain('Terminology');
     expect(Array.from(tabs).map((tab) => (tab as HTMLElement).textContent)).not.toContain('RAG');
     expect(fixture.nativeElement.querySelector('input[type="number"]')).not.toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Update all');
     const sourceProgressbars = fixture.nativeElement.querySelectorAll(
       '.inspection-update-all-source [role="progressbar"]',
     );
-    expect(sourceProgressbars).toHaveLength(3);
+    expect(sourceProgressbars).toHaveLength(4);
   });
 
   it('switches tabs and disables configuration/start controls while running', () => {

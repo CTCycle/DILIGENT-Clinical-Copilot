@@ -54,11 +54,10 @@ def test_search_pattern_escapes_like_wildcards() -> None:
 
 ###############################################################################
 def test_new_inspection_models_validate_shapes() -> None:
-    rxnav_request = InspectionRxNavOverrideRequest(
-        rxnav_request_timeout=10.0,
-        rxnav_max_concurrency=4,
-    )
-    assert rxnav_request.rxnav_max_concurrency == 4
+    rxnav_request = InspectionRxNavOverrideRequest(force_full=True)
+    assert rxnav_request.force_full is True
+    with pytest.raises(ValidationError):
+        InspectionRxNavOverrideRequest.model_validate({"rxnav_max_concurrency": 4})
 
     livertox_request = InspectionLiverToxOverrideRequest(
         livertox_archive="livertox-current.zip",

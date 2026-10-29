@@ -20,6 +20,7 @@ CANCELLABLE_JOB_TYPES = frozenset(
         "ollama_pull",
         "rxnav_update",
         "livertox_update",
+        "terminology_update",
         "dilirank_update",
         "structured_sources_update",
         "rag_update",

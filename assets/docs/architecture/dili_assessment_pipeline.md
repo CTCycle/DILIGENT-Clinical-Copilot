@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -222,43 +222,35 @@ Hospitalization counts only when the sentence names a liver-related reason, and
 transplant only when it is a liver transplant.
 
 ## Match Audit
-Drug matching uses a first-class local resolution decision layer. Extracted mentions are normalized once, regimen parents and components are preserved separately, RxNav candidates are built from the persisted RxNorm-backed catalog, LiverTox candidates are built from local monographs, and a deterministic policy decides whether a match can be accepted automatically.
+Drug identity comes from the database-backed terminology resolver described in [drug_terminology.md](drug_terminology.md). Extracted mentions are normalized once, regimen parents and components are preserved separately, each mention resolves to a terminology concept (exact alias, combination, curated variant, strict spelling gate, then the bounded RxNav fallback), and LiverTox evidence is attached only through explicit `drug_livertox_links` for an accepted identity.
 
-LiverTox and RxNav matching keeps raw extracted name, normalized name, matched LiverTox name, RxNorm RXCUI when available, RxNav validation status, match status, confidence, reason, candidates, rejected candidates, origins, raw mentions, extraction metadata, and the full `DrugResolutionDecision`.
+Each matched-drug payload keeps the raw extracted name, the resolved concept and ingredients, the full `terminology` object (status, method, matched alias, source and version, candidates, review reasons, strength support), the linked LiverTox candidates with their link type, the decision status and reasons, origins, raw mentions, extraction metadata, and the full `DrugResolutionDecision`. There is no confidence score; the terminology status is the identity signal.
 
-Candidate admission is intentionally high recall: structurally plausible medication labels are not discarded merely because they lack an exact local alias or recognized INN suffix. Exact, alias, normalized, structured ingredient/brand, and bounded unique spelling resolution run before a match is declared missing.
+Candidate admission is intentionally high recall: structurally plausible medication labels are not discarded merely because they lack an exact local alias or recognized INN suffix. A label that does not resolve stays explicit as `unresolved`.
 
 Before candidate selection and downstream RUCAM, retrieval, matching, and consultation, therapy and anamnesis mentions are deduplicated by normalized identity. Raw section entries remain available for audit, while the deduplicated artifact records origins, raw mentions, evidence snippets, and the selected clinical entry. When therapy and anamnesis give different start or stop dates for the same patient drug, `find_drug_date_conflicts` raises the blocking issue `drug_date_conflict` instead of silently keeping one entry.
 
 Candidate selection keeps a stopped exposure, including an anamnesis-only one, in the consultation set when its stop date is no more than 30 days before injury onset (the RUCAM 2016 bound for cholestatic or mixed injury) and its start is not after onset. Onset comes from the onset context, with the visit date as fallback. The historical penalty applies only to exposures outside that window.
 
-When a plausible mention remains unresolved, ambiguous, or low-confidence, the configured parser model may propose generic names, alternate names, or active ingredients in one structured batch. These proposals are candidate generation only. Every proposed identity is re-run through the local RxNav/LiverTox resolver, and no LiverTox evidence is accepted unless the local policy produces a unique accepted match. Unvalidated or ambiguous proposals remain unresolved and auditable. An accepted proposal is keyed by its LiverTox name, for example `valproate` for `Valproic acid`. Matched-drug payloads, the DILI evidence bundle and the match audit therefore look payloads up by raw mention as well (`index_resolved_drugs`).
+When a plausible mention remains unresolved or ambiguous, or has no linked monograph, the configured parser model may propose generic names, alternate names, or active ingredients in one structured batch. These proposals are candidate generation only. Each proposal is resolved again locally, and it is used only if it reaches a `verified` identity with a linked LiverTox monograph. Unvalidated or ambiguous proposals remain unresolved and auditable. An accepted payload is keyed by its resolved concept name, for example `acetaminophen` for `Dafalgan`. Matched-drug payloads, the DILI evidence bundle and the match audit therefore look payloads up by raw mention as well (`index_resolved_drugs`).
 
-A LiverTox brand or ingredient alias resolves to the chapter it names. Chapters that share a canonical key, such as `Penicillins (1st–4th Generation)`, are not all returned as ambiguous candidates. A query with a full chapter name selects that chapter, and the in-memory match cache is keyed by the full name for such shared keys, so an ambiguous class query (`Penicillins`) cannot shadow the evidence lookup for the accepted chapter.
+A combination concept without its own monograph is split into its ingredients so each keeps its own evidence; a combination monograph (for example Trimethoprim-Sulfamethoxazole) is reached through a `component_set` link.
 
-Resolution statuses are:
-- `accepted_exact_livertox`
-- `accepted_rxnav_validated`
-- `accepted_livertox_without_rxnav`
+Decision statuses are:
+- `accepted_verified`
+- `accepted_probable` (spelling-corrected; requires review)
+- `missing_livertox` (accepted identity, no linked monograph)
 - `ambiguous_requires_review`
-- `missing_rxnav`
-- `missing_livertox`
+- `unresolved`
 - `rejected_false_positive`
 
 An available LiverTox excerpt means evidence text is available for the accepted monograph. It is not treated as proof that a ranked or ambiguous candidate is clinically correct.
 
-Pipeline issues are emitted for missing LiverTox matches, ambiguous LiverTox matches, low-confidence matches, unvalidated RxNav aliases, and any accepted match that relies on a spelling correction (`livertox_match_spelling_corrected`, regardless of confidence).
+Pipeline issues are `drug_identity_unresolved`, `drug_identity_ambiguous` (with candidate names), `drug_identity_probable`, `drug_composition_unverified`, and `livertox_link_missing`. The final report begins with a "Drug identification" table listing each entered name, its resolved ingredients, identity status, and source.
 
-Before session persistence, `ClinicalKnowledgePreparation` resolves a stable
-`drug_id` for each matched mention using the catalog and match cache. The
-`ClinicalSessionRepository` then stores the resolved mention and its audit
-fields without learning aliases or writing knowledge-cache side effects.
-After the session is committed, the preparation service records high-confidence
-aliases, runtime observations, and match-cache evidence in its own repository
-transaction. This keeps clinical session persistence and catalog learning
-separately owned while retaining the same evidence trail.
+Before session persistence, the matched-drug payload carries the accepted concept as `drug_id`. `ClinicalSessionRepository` stores each mention with its terminology status and audit fields and never learns aliases. After the session is committed, `ClinicalKnowledgePreparation.record_drug_mention_observations` records mentions without an accepted identity as runtime vocabulary observations. Terminology aliases are created only by source imports, verified RxNav relations, and explicit reviewer decisions.
 
-DILIrank linking is a separate source-ingestion concern and does not add another clinical drug resolver. During DILIrank refresh, the FDA compound name first matches `drugs.canonical_name_norm`; only if no canonical match exists may a unique exact alias from trusted `livertox` or `rxnorm` aliases link the row. Session-observed or manual aliases are excluded from this path. Multiple alias candidates leave the DILIrank row unlinked rather than guessing.
+DILIrank linking is a separate source-ingestion concern and does not add another clinical drug resolver. During DILIrank refresh, the FDA compound name first matches `drugs.canonical_name_norm`; only if no canonical match exists may a unique exact `verified` or `confirmed` alias from trusted `livertox` or `rxnorm` aliases link the row. Session-observed or manual aliases are excluded from this path. Multiple alias candidates leave the DILIrank row unlinked rather than guessing.
 
 Per-drug clinical assessments carry claim envelopes and narrative limits. Claim review output distinguishes source-text claims, patient-record RUCAM claims, non-scoring RUCAM evidence, unsupported or unknown-source claims, and generated limitations so report consumers can see which statements require review.
 
@@ -357,4 +349,4 @@ not reuse the patient visit date as an invented exact event date.
 ## Testing Matrix
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
 
-Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, onset-ALP Hy's Law, DILIN severity with negation-aware events, patient-record RUCAM parsing, baseline-aware episode anchoring, EASL single-panel and bilirubin-combined qualification, recurrence-based rechallenge, range stop-date recovery, recently stopped anamnesis drugs, therapy/anamnesis date conflicts, LiverTox likelihood validation, spelling-correction match warnings, same-key LiverTox chapters, reference-range lab parsing, structured narrative claim checks, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.
+Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, onset-ALP Hy's Law, DILIN severity with negation-aware events, patient-record RUCAM parsing, baseline-aware episode anchoring, EASL single-panel and bilirubin-combined qualification, recurrence-based rechallenge, range stop-date recovery, recently stopped anamnesis drugs, therapy/anamnesis date conflicts, LiverTox likelihood validation, terminology identity warnings, explicit LiverTox link types, reference-range lab parsing, structured narrative claim checks, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.

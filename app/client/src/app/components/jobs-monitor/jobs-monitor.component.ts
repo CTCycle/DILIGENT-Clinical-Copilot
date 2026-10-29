@@ -13,6 +13,7 @@ const JOB_TYPE_INFO: Record<string, { name: string; kind: string }> = {
   ollama_pull: { name: 'Model download', kind: 'Download' },
   rxnav_update: { name: 'RxNav catalog update', kind: 'Knowledge update' },
   livertox_update: { name: 'LiverTox update', kind: 'Knowledge update' },
+  terminology_update: { name: 'Terminology update', kind: 'Knowledge update' },
   dilirank_update: { name: 'DILIrank update', kind: 'Knowledge update' },
   structured_sources_update: { name: 'Structured sources update', kind: 'Knowledge update' },
   rag_update: { name: 'RAG embeddings update', kind: 'Indexing' },

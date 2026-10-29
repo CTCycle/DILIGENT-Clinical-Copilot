@@ -3255,6 +3255,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(254, 202, 202, 0.6);
 }
 
+.inspection-status-chip.is-warning {
+  color: var(--color-status-warning-text);
+  background: var(--color-status-warning-bg);
+}
+
+.inspection-status-chip.is-neutral {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-alt);
+}
+
+.clinical-session-drug-identity,
+.clinical-session-drug-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: 2px;
+  font-size: var(--font-xs);
+}
+
+.clinical-session-drug-candidates .btn {
+  width: auto;
+  min-height: 0;
+  padding: 1px 8px;
+  font-size: var(--font-xs);
+}
+
 .inspection-empty-row {
   text-align: center !important;
   color: var(--color-text-muted);

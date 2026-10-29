@@ -4,400 +4,176 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
-import pandas as pd
 import pytest
+from sqlalchemy import delete, select
 
-from domain.clinical import (
-    DrugEntry,
-    DrugIdentityProposal,
-    DrugIdentityProposalBatch,
-    PatientDrugs,
-)
-from services.clinical.matches_core import LiverToxMatcher
+import services.clinical.preparation as preparation_module
+from domain.clinical import DrugEntry, PatientDrugs
+from repositories.context import RepositoryContext
+from repositories.knowledge_repository import KnowledgeRepository
+from repositories.schemas.knowledge import Drug
+from repositories.schemas.terminology import DrugLiverToxLink
+from repositories.terminology_repository import TerminologyRepository
 from services.clinical.preparation import ClinicalKnowledgePreparation
-from repository_fixtures import build_repository_graph
+from services.terminology.index import TerminologyIndexCache
+from services.terminology.resolver import ResolverSettings, TerminologyResolver
+from terminology_fixtures import build_context, build_sqlite_engine, seed_reference_terminology
+
 
 ###############################################################################
-def build_preparation() -> ClinicalKnowledgePreparation:
-    graph = build_repository_graph()
-    return ClinicalKnowledgePreparation(
-        knowledge_repository=graph.knowledge_repository,
-        drug_catalog_repository=graph.drug_catalog_repository,
-    )
+@pytest.fixture(scope="module")
+def seeded_context(tmp_path_factory) -> RepositoryContext:  # type: ignore[no-untyped-def]
+    context = build_context(build_sqlite_engine(tmp_path_factory.mktemp("clinical") / "t.db"))
+    seed_reference_terminology(context)
+    return context
+
 
 ###############################################################################
-def test_prepare_inputs_exposes_resolution_audit_payload() -> None:
-    frame = pd.DataFrame(
-        [
-            {
-                "nbk_id": "NBK100",
-                "drug_name": "Acetaminophen",
-                "excerpt": "Acetaminophen excerpt.",
-                "synonyms": "Tylenol",
-                "ingredient": "Acetaminophen",
-                "brand_name": "Tylenol",
-            }
-        ]
+@pytest.fixture
+def preparation(seeded_context: RepositoryContext, monkeypatch: pytest.MonkeyPatch) -> ClinicalKnowledgePreparation:
+    # Local-only resolution with an index private to this database.
+    monkeypatch.setattr(
+        preparation_module,
+        "build_terminology_resolver",
+        lambda lookup: TerminologyResolver(lookup, TerminologyIndexCache(), settings=ResolverSettings()),
     )
-    catalog = pd.DataFrame(
-        [
-            {
-                "rxcui": "161",
-                "term_type": "IN",
-                "raw_name": "Acetaminophen",
-                "name": "Acetaminophen",
-                "brand_names": "Tylenol",
-                "synonyms": '["Tylenol"]',
-            }
-        ]
-    )
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+    return ClinicalKnowledgePreparation(knowledge_repository=KnowledgeRepository(seeded_context))
 
+
+# -----------------------------------------------------------------------------
+def prepare(
+    preparation: ClinicalKnowledgePreparation,
+    names: list[str],
+    **kwargs: Any,
+) -> dict[str, dict[str, Any]]:
     prepared = asyncio.run(
         preparation.prepare_inputs(
-            PatientDrugs(entries=[DrugEntry(name="Tylenol", source="therapy")]),
+            PatientDrugs(entries=[DrugEntry(name=name, source="therapy") for name in names]),
             clinical_context="",
             pattern_score=None,
+            **kwargs,
         )
     )
-
     assert prepared is not None
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["resolution_decision"]
-    assert payload["rxnav_candidates"]
-    assert payload["livertox_candidates"]
-    assert payload["accepted_rxnav_rxcui"] == "161"
-    assert payload["accepted_livertox_nbk_id"] == "NBK100"
-    assert payload["requires_human_review"] is False
+    return prepared.resolved_drugs
+
+
+# -----------------------------------------------------------------------------
+def by_mention(resolved: dict[str, dict[str, Any]], mention: str) -> dict[str, Any]:
+    matches = [payload for payload in resolved.values() if mention in payload["raw_mentions"]]
+    assert matches, f"no payload for {mention}"
+    return min(matches, key=lambda payload: len(payload.get("regimen_components") or []) == 0)
+
 
 ###############################################################################
-@pytest.mark.parametrize(
-    ("extracted_name", "generic_name", "brand_name"),
-    [
-        ("Furadantin retard", "Nitrofurantoin", "Furadantin"),
-        ("Pregabalin Pfizer", "Pregabalin", "Pregabalin"),
-        ("Quviviq", "Daridorexant", "Quviviq"),
-        ("Xarelto", "Rivaroxaban", "Xarelto"),
-        ("Benerva", "Vitamin B1", "Benerva"),
-        ("Neurontin", "Gabapentin", "Neurontin"),
-    ],
-)
-def test_brand_and_qualified_names_resolve_through_catalog_normalization(
-    extracted_name: str,
-    generic_name: str,
-    brand_name: str,
+def test_prepare_inputs_links_verified_identities_to_their_monographs(
+    preparation: ClinicalKnowledgePreparation,
 ) -> None:
-    frame = pd.DataFrame(
-        [
-            {
-                "nbk_id": "NBK-BRAND",
-                "drug_name": generic_name,
-                "excerpt": f"{generic_name} excerpt.",
-                "synonyms": brand_name,
-                "ingredient": generic_name,
-                "brand_name": brand_name,
-            }
-        ]
-    )
-    catalog = pd.DataFrame(
-        [
-            {
-                "rxcui": "12345",
-                "term_type": "IN",
-                "raw_name": generic_name,
-                "name": generic_name,
-                "brand_names": brand_name,
-                "synonyms": f'["{brand_name}"]',
-            }
-        ]
-    )
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+    resolved = prepare(preparation, ["Lipitor", "Dafalgan", "HCTZ", "metformin 500mg", "Bactrim"])
 
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(entries=[DrugEntry(name=extracted_name, source="therapy")]),
-            clinical_context="",
-            pattern_score=None,
-        )
-    )
+    lipitor = by_mention(resolved, "Lipitor")
+    assert (lipitor["decision_status"], lipitor["accepted_livertox_name"]) == ("accepted_verified", "atorvastatin")
+    assert lipitor["terminology"]["matched_alias"] == "Lipitor"
+    assert "Atorvastatin LiverTox excerpt." in lipitor["knowledge_prompt"]
+    dafalgan = by_mention(resolved, "Dafalgan")
+    assert (dafalgan["drug_name"], dafalgan["terminology"]["source"]) == ("acetaminophen", "swissmedic")
+    # A verified identity without a monograph stays explicit instead of guessing.
+    for name in ("HCTZ", "metformin 500mg"):
+        assert by_mention(resolved, name)["decision_status"] == "missing_livertox"
+    # The combination monograph is reached through its component set.
+    bactrim = by_mention(resolved, "Bactrim")
+    assert bactrim["accepted_livertox_name"] == "Trimethoprim-Sulfamethoxazole"
+    assert bactrim["livertox_candidates"][0]["link_type"] == "component_set"
 
-    assert prepared is not None
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["accepted_livertox_nbk_id"] == "NBK-BRAND"
-    assert payload["match_confidence"] >= 0.9
 
 ###############################################################################
-def test_brand_qualified_duplicate_mentions_are_merged() -> None:
-    frame = pd.DataFrame(
-        [
-            {
-                "nbk_id": "NBK-PREGABALIN",
-                "drug_name": "Pregabalin",
-                "excerpt": "Pregabalin excerpt.",
-                "synonyms": "Pregabalin",
-                "ingredient": "Pregabalin",
-                "brand_name": "Pregabalin",
-            }
-        ]
-    )
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(frame)
+def test_combination_without_combination_monograph_keeps_components(
+    preparation: ClinicalKnowledgePreparation,
+    seeded_context: RepositoryContext,
+) -> None:
+    # Remove the combination monograph link so only components could apply.
+    with seeded_context.session_factory() as db_session:
+        combo = db_session.execute(
+            select(Drug.id).where(Drug.canonical_name == "amoxicillin / clavulanate")
+        ).scalar_one()
+        db_session.execute(delete(DrugLiverToxLink).where(DrugLiverToxLink.drug_id == combo))
+        db_session.commit()
+    try:
+        resolved = prepare(preparation, ["Augmentin"])
+    finally:
+        TerminologyRepository(seeded_context).rebuild_livertox_links()
 
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(
-                entries=[
-                    DrugEntry(name="Pregabalin", source="therapy"),
-                    DrugEntry(name="Pregabalin Pfizer", source="therapy"),
-                ]
-            ),
-            clinical_context="",
-            pattern_score=None,
-        )
-    )
+    payloads = [payload for payload in resolved.values() if "Augmentin" in payload["raw_mentions"]]
+    components = {payload["drug_name"] for payload in payloads if not payload["is_regimen_parent"]}
+    assert components == {"amoxicillin", "clavulanate"}
+    assert all(payload["regimen_components"] == ["amoxicillin", "clavulanate"] for payload in payloads)
 
-    assert prepared is not None
-    assert len(prepared.resolved_drugs) == 1
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["raw_mentions"] == ["Pregabalin", "Pregabalin Pfizer"]
 
 ###############################################################################
-def test_catalog_missing_medication_label_reaches_resolution_policy() -> None:
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(
-        pd.DataFrame(
-            [
-                {
-                    "nbk_id": "NBK-KNOWN",
-                    "drug_name": "Known Drug",
-                    "excerpt": "Known excerpt.",
-                    "synonyms": "",
-                    "ingredient": "Known Drug",
-                    "brand_name": "",
-                }
-            ]
-        )
-    )
+def test_spelling_and_lookalike_inputs_are_flagged_not_silently_accepted(
+    preparation: ClinicalKnowledgePreparation,
+) -> None:
+    resolved = prepare(preparation, ["amoxcillin", "hydroxazine", "Zurcal", "Augmentin"])
 
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(entries=[DrugEntry(name="OpaqueBrand", source="therapy")]),
-            clinical_context="",
-            pattern_score=None,
-        )
-    )
+    typo = by_mention(resolved, "amoxcillin")
+    assert typo["terminology"]["status"] == "probable"
+    lookalike = by_mention(resolved, "hydroxazine")
+    assert lookalike["decision_status"] == "ambiguous_requires_review"
+    assert lookalike["matched_livertox_row"] is None
+    assert {item["name"] for item in lookalike["terminology"]["candidates"]} == {"hydroxyzine", "hydralazine"}
 
-    assert prepared is not None
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["raw_mentions"] == ["OpaqueBrand"]
-    assert payload["decision_status"] == "missing_livertox"
-    assert payload["resolution_decision"]
+    codes = {issue.code for issue in preparation.build_match_audit_issues(resolved)}
+    assert {"drug_identity_ambiguous", "drug_composition_unverified"} <= codes
+
 
 ###############################################################################
-def test_two_edit_international_spelling_resolves_uniquely() -> None:
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(
-        pd.DataFrame(
-            [
-                {
-                    "nbk_id": "NBK-LOOP",
-                    "drug_name": "Loop Diuretics",
-                    "excerpt": "Loop diuretic excerpt.",
-                    "synonyms": "",
-                    "ingredient": "Torsemide",
-                    "brand_name": "",
-                }
-            ]
-        )
-    )
-
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(entries=[DrugEntry(name="Torasemid", source="therapy")]),
-            clinical_context="",
-            pattern_score=None,
-        )
-    )
-
-    assert prepared is not None
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["accepted_livertox_name"] == "Loop Diuretics"
-    assert payload["extracted_excerpts"] == ["Loop diuretic excerpt."]
-
-###############################################################################
-class IdentityClientStub:
+class FakeIdentityClient:
 
     # -------------------------------------------------------------------------
-    def __init__(self, batch: DrugIdentityProposalBatch) -> None:
-        self.batch = batch
+    def __init__(self, proposals: list[dict[str, Any]]) -> None:
+        self.proposals = proposals
         self.calls = 0
 
     # -------------------------------------------------------------------------
-    async def llm_structured_call(self, **kwargs):  # type: ignore[no-untyped-def]
-        assert kwargs["schema"] is DrugIdentityProposalBatch
+    async def llm_structured_call(self, **_kwargs: Any) -> dict[str, Any]:
         self.calls += 1
-        return self.batch
+        return {"proposals": self.proposals}
+
 
 ###############################################################################
-def test_llm_combination_identity_candidates_remain_ambiguous() -> None:
-    frame = pd.DataFrame(
+def test_llm_identity_is_used_only_after_verified_local_resolution(
+    preparation: ClinicalKnowledgePreparation,
+) -> None:
+    client = FakeIdentityClient(
         [
             {
-                "nbk_id": "NBK-VALERIAN",
-                "drug_name": "Valerian",
-                "excerpt": "Valerian excerpt.",
-                "synonyms": "",
-                "ingredient": "Valerian",
-                "brand_name": "",
+                "original_mention": "Sortis",
+                "proposed_canonical_name": "atorvastatin",
+                "confidence": 0.9,
+                "rationale": "Swiss atorvastatin brand.",
             },
             {
-                "nbk_id": "NBK-HOPS",
-                "drug_name": "Hops",
-                "excerpt": "Hops excerpt.",
-                "synonyms": "",
-                "ingredient": "Hops",
-                "brand_name": "",
+                "original_mention": "Mysterix",
+                "proposed_canonical_name": "mysterixamide",
+                "confidence": 0.4,
+                "rationale": "Unknown.",
             },
         ]
     )
-    client = IdentityClientStub(
-        DrugIdentityProposalBatch(
-            proposals=[
-                DrugIdentityProposal(
-                    original_mention="SleepBrand",
-                    proposed_canonical_name=None,
-                    ingredients=["Valerian", "Hops"],
-                    confidence=0.86,
-                    rationale="Known combination product ingredients.",
-                )
-            ]
-        )
-    )
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(frame)
 
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(entries=[DrugEntry(name="SleepBrand", source="therapy")]),
-            clinical_context="",
-            pattern_score=None,
-            identity_resolution_client=client,
-            identity_resolution_model="test-model",
-        )
+    resolved = prepare(
+        preparation,
+        ["Sortis", "Mysterix"],
+        identity_resolution_client=client,
+        identity_resolution_model="identity-model",
     )
 
-    assert prepared is not None
     assert client.calls == 1
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["decision_status"] == "ambiguous_requires_review"
-    assert payload["requires_human_review"] is True
-    assert set(payload["match_candidates"]) == {"Valerian", "Hops"}
-    assert payload["accepted_livertox_name"] is None
-
-###############################################################################
-def test_single_llm_identity_is_accepted_only_after_local_validation() -> None:
-    client = IdentityClientStub(
-        DrugIdentityProposalBatch(
-            proposals=[
-                DrugIdentityProposal(
-                    original_mention="InternationalName",
-                    proposed_canonical_name=None,
-                    alternate_names=["Acetaminophen"],
-                    ingredients=[],
-                    confidence=0.98,
-                    rationale="International generic synonym.",
-                )
-            ]
-        )
-    )
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(
-        pd.DataFrame(
-            [
-                {
-                    "nbk_id": "NBK-ACETAMINOPHEN",
-                    "drug_name": "Acetaminophen",
-                    "excerpt": "Acetaminophen excerpt.",
-                    "synonyms": "",
-                    "ingredient": "Acetaminophen",
-                    "brand_name": "",
-                }
-            ]
-        )
-    )
-
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(
-                entries=[DrugEntry(name="InternationalName", source="therapy")]
-            ),
-            clinical_context="",
-            pattern_score=None,
-            identity_resolution_client=client,
-            identity_resolution_model="test-model",
-        )
-    )
-
-    assert prepared is not None
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["accepted_livertox_name"] == "Acetaminophen"
-    assert payload["missing_livertox"] is False
-    assert payload["matched_livertox_row"]
-    assert "InternationalName" in payload["raw_mentions"]
-    assert payload["match_reason"] == "Exact normalized LiverTox primary name accepted"
-    assert payload["match_notes"] == [
-        "Exact normalized LiverTox primary name accepted",
-        "identity proposed by configured LLM",
-        "identity accepted only after unique local evidence resolution",
-    ]
-    assert payload["resolution_decision"]["reasons"] == payload["match_notes"]
-
-###############################################################################
-def test_unvalidated_llm_identity_remains_unresolved() -> None:
-    client = IdentityClientStub(
-        DrugIdentityProposalBatch(
-            proposals=[
-                DrugIdentityProposal(
-                    original_mention="OpaqueBrand",
-                    proposed_canonical_name="Invented Ingredient",
-                    ingredients=[],
-                    confidence=0.95,
-                    rationale="Proposed identity.",
-                )
-            ]
-        )
-    )
-    preparation = build_preparation()
-    preparation.livertox_matcher = LiverToxMatcher(
-        pd.DataFrame(
-            [
-                {
-                    "nbk_id": "NBK-KNOWN",
-                    "drug_name": "Known Drug",
-                    "excerpt": "Known excerpt.",
-                    "synonyms": "",
-                    "ingredient": "Known Drug",
-                    "brand_name": "",
-                }
-            ]
-        )
-    )
-
-    prepared = asyncio.run(
-        preparation.prepare_inputs(
-            PatientDrugs(entries=[DrugEntry(name="OpaqueBrand", source="therapy")]),
-            clinical_context="",
-            pattern_score=None,
-            identity_resolution_client=client,
-            identity_resolution_model="test-model",
-        )
-    )
-
-    assert prepared is not None
-    payload = next(iter(prepared.resolved_drugs.values()))
-    assert payload["decision_status"] == "missing_livertox"
-    assert payload["accepted_livertox_name"] is None
-    assert payload["identity_candidates"][0]["accepted_local_names"] == []
+    sortis = by_mention(resolved, "Sortis")
+    assert (sortis["decision_status"], sortis["accepted_livertox_name"]) == ("accepted_verified", "atorvastatin")
+    assert sortis["identity_candidates"][0]["source"] == "llm_candidate_local_validation"
+    unknown = by_mention(resolved, "Mysterix")
+    assert unknown["decision_status"] == "unresolved"
+    assert unknown["matched_livertox_row"] is None

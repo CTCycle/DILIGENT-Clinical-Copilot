@@ -5,77 +5,67 @@ from __future__ import annotations
 
 from typing import Any
 
+ACCEPTED_STATUSES = frozenset({"accepted_verified", "accepted_probable"})
+RELATED_FORM_LINKS = frozenset({"form_of_parent", "form_of_child"})
+
 ###############################################################################
 def classify_match_evidence(
     *,
     match_status: str | None,
-    match_reason: str | None,
-    match_confidence: float | None,
-    match_notes: list[Any] | None,
+    terminology: dict[str, Any] | None,
+    link_type: str | None,
+    has_excerpt: bool,
     missing_livertox: bool,
     ambiguous_match: bool,
 ) -> dict[str, Any]:
-    normalized_status = (match_status or "").strip().lower()
-    normalized_reason = (match_reason or "").strip().lower()
-    normalized_notes = [
-        str(note).strip() for note in (match_notes or []) if str(note).strip()
-    ]
-    notes = {note.lower() for note in normalized_notes}
-    warnings: list[str] = []
-
-    if ambiguous_match or normalized_status in {
-        "ambiguous",
-        "ambiguous_match",
-        "ambiguous_requires_review",
-    }:
+    status = (match_status or "").strip().lower()
+    identity = terminology or {}
+    if ambiguous_match or status == "ambiguous_requires_review":
         return {
             "evidence_quality": "ambiguous_match",
-            "evidence_warnings": [
-                "Multiple plausible local evidence matches require review."
-            ],
+            "evidence_warnings": ["Several drug identities are plausible and require review."],
         }
-
-    if normalized_status == "rejected_false_positive":
+    if status == "rejected_false_positive":
         return {
             "evidence_quality": "rejected_false_positive",
             "evidence_warnings": ["Extracted text was rejected as a non-drug match."],
         }
-
-    if normalized_status in {"missing", "missing_match", "missing_livertox"}:
+    if status == "unresolved" or not status:
         return {
             "evidence_quality": "missing_match",
-            "evidence_warnings": ["No local RxNav/LiverTox match was found."],
+            "evidence_warnings": ["No verified terminology identity was found."],
         }
-
-    if missing_livertox or normalized_status == "matched_no_excerpt":
-        warnings.append("Matched local drug record has no LiverTox excerpt.")
-
-    if "fallback_excerpt_from_related_monograph" in notes:
-        warnings.append(
-            "Evidence excerpt was borrowed from a related LiverTox monograph."
-        )
-        quality = "fallback_related_monograph"
-    elif (match_confidence is not None and float(match_confidence) < 1.0) or (
-        "alias" in normalized_reason or "spelling_correction" in normalized_reason
-    ):
-        warnings.append("Drug match is not a direct canonical match.")
+    if status == "missing_livertox" or missing_livertox:
+        return {
+            "evidence_quality": "missing_match",
+            "evidence_warnings": ["No LiverTox record is linked to the resolved drug."],
+        }
+    if status not in ACCEPTED_STATUSES:
+        return {
+            "evidence_quality": "unknown",
+            "evidence_warnings": ["Match evidence quality could not be determined from stored metadata."],
+        }
+    warnings: list[str] = []
+    if identity.get("status") == "probable":
+        warnings.append("Drug identity relies on a spelling correction and requires review.")
         quality = "weak_alias_or_class_match"
-    elif normalized_status in {
-        "matched_with_excerpt",
-        "accepted_exact_livertox",
-        "accepted_rxnav_validated",
-        "accepted_livertox_without_rxnav",
-    }:
-        quality = "direct_match_with_excerpt"
-    elif normalized_status in {"matched", "matched_no_excerpt", "match"}:
-        quality = "direct_match_no_excerpt" if missing_livertox else "direct_match"
+    elif link_type in RELATED_FORM_LINKS:
+        warnings.append("Evidence comes from the LiverTox record of a related salt or parent form.")
+        quality = "fallback_related_monograph"
     else:
-        quality = "unknown"
-        warnings.append(
-            "Match evidence quality could not be determined from stored metadata."
-        )
+        quality = "direct_match_with_excerpt" if has_excerpt else "direct_match_no_excerpt"
+    if not has_excerpt:
+        warnings.append("Matched LiverTox record has no excerpt.")
+    return {"evidence_quality": quality, "evidence_warnings": warnings}
 
-    return {
-        "evidence_quality": quality,
-        "evidence_warnings": warnings,
-    }
+
+# -----------------------------------------------------------------------------
+def accepted_link_type(payload: dict[str, Any]) -> str | None:
+    return next(
+        (
+            str(candidate.get("link_type"))
+            for candidate in payload.get("livertox_candidates") or []
+            if isinstance(candidate, dict) and candidate.get("accepted")
+        ),
+        None,
+    )

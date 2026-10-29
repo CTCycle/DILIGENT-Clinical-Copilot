@@ -189,12 +189,11 @@ class DrugIdentityResolution(BaseModel):
     source_section: str | None = None
     evidence_quote: str | None = None
     normalized_name: str | None = None
-    rxnav_candidates: list[Any] = Field(default_factory=list)
+    terminology_candidates: list[Any] = Field(default_factory=list)
     livertox_candidates: list[Any] = Field(default_factory=list)
     accepted_identity: str | None = None
-    identity_confidence: float | None = None
+    identity_status: str | None = None
     identity_reason: str | None = None
-    rejected_candidates: list[Any] = Field(default_factory=list)
     combination_components: list[str] = Field(default_factory=list)
     is_current_exposure: bool = False
     is_historical_exposure: bool = False
