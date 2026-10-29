@@ -4447,10 +4447,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .page-container.stitch-dili-page {
   max-width: none;
+  padding: 0;
   background: var(--app-background);
 }
 
 .stitch-dili-grid {
+  min-height: calc(100dvh - var(--app-chrome-height));
   background: transparent;
   gap: 0;
 }
@@ -4458,7 +4460,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stitch-dili-main.stitch-dili-workbench {
   background: transparent;
   border-right: 1px solid var(--color-divider);
-  padding-right: var(--space-2xl);
+  padding-inline: var(--space-2xl);
   box-shadow: none;
 }
 
