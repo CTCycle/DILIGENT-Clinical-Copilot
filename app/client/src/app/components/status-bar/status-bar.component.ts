@@ -87,7 +87,7 @@ export class StatusBarComponent implements OnDestroy {
     }
     return MODEL_ROLES.map(({ label, key }) => ({
       role: label,
-      model: (settings.useCloudServices ? settings.cloudModel : settings[key]) || null,
+      model: settings[key] || (settings.useCloudServices ? settings.cloudModel : null) || null,
     }));
   });
 
