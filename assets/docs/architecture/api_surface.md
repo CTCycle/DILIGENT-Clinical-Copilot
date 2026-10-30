@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -36,12 +36,34 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /api/clinical/jobs/{job_id}`
 - `DELETE /api/clinical/jobs/{job_id}`
 
-`POST /api/clinical/validate-input` includes optional `rag_readiness` metadata when evaluating a submission. It reports whether RAG was requested, whether the configured embedding backend is available, the backend and model names, and a user-safe reason when retrieval cannot start.
+`POST /api/clinical/validate-input` and `POST /api/clinical/jobs` accept the
+same session configuration:
+
+- `evidence_sources`: any of `livertox`, `dilirank`, `documents` (the indexed
+  document library). The default is `["livertox"]`; an explicit `[]` means LLM
+  knowledge only. Unknown values are rejected.
+- `model_overrides`: optional `text_extraction_model` and `clinical_model`
+  names that apply to that session only. They are validated against the
+  active provider's cached catalog and are never written to the persisted
+  model configuration.
+
+Preflight validates the exact configuration that will run. The response adds
+an `evidence_sources` list (`source`, `label`, `selected`, `available`,
+`message`) and keeps `rag_readiness` for the document library. Selecting
+`documents` while the embedding cache is unavailable is blocking (code from
+`rag_readiness`, field `evidence_sources`); an unimported DILIrank is the
+non-blocking `dilirank_unavailable`; an invalid override is the blocking
+`session_model_unavailable` (field `model_overrides`).
+
+Clinical job results expose the current pipeline step key in
+`result.progress_stage` (for example `drugs.resolving`,
+`evidence_lookup.selected`, `evidence_lookup.llm_only`) alongside
+`progress_message`; `GET /api/jobs` maps it to the job summary `phase`.
 
 The draft routes persist one opt-in DILI Agent working draft in the active
 configured database. `PUT` requires `expected_revision`, `expected_draft_key`,
-and a form containing only `patient_name`, `visit_date`, `clinical_input`, and
-`use_rag`. The text is preserved as submitted and is limited to 100,000
+and a form containing only `patient_name`, `visit_date`, and
+`clinical_input`. The text is preserved as submitted and is limited to 100,000
 characters. `GET` and successful writes return a snapshot with the UUID,
 revision, update time, and form (null when no recoverable draft exists).
 `DELETE` uses the revision and optional UUID as compare-and-swap tokens, clears

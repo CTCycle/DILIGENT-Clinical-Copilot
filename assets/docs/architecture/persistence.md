@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Relational Database
 
@@ -41,7 +41,6 @@ erDiagram
         string patient_name
         date visit_date
         text clinical_input
-        boolean use_rag
         datetime updated_at
     }
     CLINICAL_SESSION_RESULTS {
@@ -291,8 +290,10 @@ erDiagram
 - `clinical_input_drafts` is a fixed-ID singleton for the DILI Agent's one
   explicitly saved working draft. It is separate from clinical sessions,
   reports, revisions, and job records.
-- The draft contains only patient name, visit date, exact clinical input text,
-  and the per-run RAG choice. Patient images are excluded.
+- The draft contains only patient name, visit date, and exact clinical input
+  text. Patient images and session configuration (evidence sources, model
+  overrides) are excluded; the session configuration is stored in the
+  clinical session's `metadata_json` and run snapshot.
 - Draft reads and writes use the active configured SQLite or PostgreSQL
   database. The database can be remote when PostgreSQL is configured.
 - The browser does not store draft contents in `localStorage` or
