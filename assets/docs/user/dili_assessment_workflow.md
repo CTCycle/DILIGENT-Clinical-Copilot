@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-10-24
+Last updated: 2026-10-30
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -17,9 +17,9 @@ Typical input areas include:
 - notes or free-text clinical context
 - optional file upload where enabled
 - run or submit action
-- generated assessment output
+- a live progress indicator and a **View report** link
 
-On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the four-step tour of clinical input, patient name/date, RAG evidence, and review/run, or use **Open Settings** to choose a runtime and the four role models. The tour can be closed with its X button and reopened from header **Help**.
+On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the three-step tour of clinical input, patient name/date, and review/run, or use **Open Settings** to choose a runtime and the four role models. The tour can be closed with its X button and reopened from header **Help**.
 
 ## Enter Clinical Context
 Use clear, specific, structured text. Prefer input like:
@@ -43,16 +43,42 @@ Patient has liver issue. Check DILI.
 When available, include the laboratory-specific upper limits of normal, pretreatment or baseline liver chemistry, exact drug start and stop dates, follow-up liver chemistry after discontinuation, and explicit alternative-cause workup. These details materially affect case qualification, R-ratio interpretation, dechallenge, and causality review.
 
 ## Run The Assessment
-1. Review the entered information.
-2. Confirm the selected model configuration.
-3. Select the run or submit action.
-4. The application completes all pre-flight checks before starting backend processing or model calls.
-5. If blocking issues are listed, return to the input panel and correct them before retrying.
-6. If only warnings are listed, either return to update the input or explicitly continue with the stated limitations.
-7. If RAG is unavailable, continuing applies a no-RAG fallback only to the pending assessment. The saved RAG preference is unchanged.
-8. Wait for the progress indicator to finish. DILI runs can take a long time;
-   the browser request timeout is one hour and does not cancel the background
-   job.
+Select **Run DILI analysis**. A short setup dialog opens with four steps:
+**Preflight → Evidence Sources → Models → Review**. Nothing is sent to a model
+until you select **Start analysis**.
+
+1. **Preflight** runs the existing safety checks for the exact session
+   configuration. Blocking issues stop the setup; use **Fix in input** to jump
+   to the field, correct it, and reopen the dialog (it restarts at Preflight
+   and re-runs the checks). Warnings can be accepted.
+2. **Evidence Sources** chooses what the assessment may consult for this
+   session only: **LiverTox** (recommended, selected by default), **FDA
+   DILIrank 2.0**, and **Indexed documents** (your RAG library). Selecting none
+   runs on LLM knowledge only. Unticking LiverTox shows an accuracy warning:
+   its drug-level hepatotoxicity evidence is then removed from the causality
+   assessment as well as from the narrative. The selection is enforced by the
+   backend, and the report states which sources were used.
+3. **Models** shows the provider and the text-extraction and clinical models.
+   Overrides apply to this session only; **Restore defaults** returns to the
+   saved configuration. Settings are never changed from here.
+4. **Review** summarizes patient, visit date, input readiness, sources,
+   effective models, and the preflight result. If you changed a source or
+   model, the checks re-run before **Start analysis** is enabled. Start can
+   only be triggered once per run.
+
+**Cancel** closes the dialog without starting and keeps your input; your
+choices are kept until the analysis starts or you select **Clear all**.
+
+While the analysis runs, the progress panel in the right column shows the
+current pipeline stage (for example *Normalizing drug names* or *Retrieving
+evidence*), the step number, the backend message, and the elapsed time. It
+stays visible when the clinical text is enlarged. DILI runs can take a long
+time; the browser request timeout is one hour and does not cancel the
+background job. **Stop analysis** requests cancellation.
+
+Open **View report** at any time: while the job runs, the report page shows
+the same progress and fills in when the analysis completes.
+
 9. You may navigate to another page and return to the DILI Agent during the
    same browser session; the in-memory page state remains available. A full
    refresh resets input that was never saved as a draft. If an analysis is
@@ -63,8 +89,8 @@ When available, include the laboratory-specific upper limits of normal, pretreat
 
 Use **Save draft** when you want to keep an unfinished DILI Agent input. The
 first save is explicit; after it succeeds, later edits autosave. On a later
-visit, choose **Resume** to restore the saved patient name, visit date, exact
-clinical text, and RAG choice. The draft is not an assessment, clinical
+visit, choose **Resume** to restore the saved patient name, visit date, and
+exact clinical text. The draft is not an assessment, clinical
 session, report, or approval, and Resume does not run preflight or start a job.
 
 Drafts are stored in the currently configured SQLite or PostgreSQL database.
@@ -75,17 +101,22 @@ current form. Both ask for confirmation. An unsaved initial form still resets
 on refresh by design.
 
 Expected result:
-- the application submits structured clinical input to the backend
-- the backend uses the configured provider and model
-- the UI shows a generated DILI assessment or a clear error message
+- the application submits structured clinical input and the session
+  configuration to the backend
+- the backend uses the configured provider with any session model overrides
+- the report page shows the generated DILI assessment or a clear error message
 
-Choosing **Run without RAG** affects only the pending assessment. It does not disable the saved RAG configuration for future sessions.
+**Settings** controls the retrieval and reranking setup of the document
+library; the Evidence Sources step decides whether a given session uses it.
+If the library is selected but unavailable, the setup blocks until you
+deselect it or repair the cache. A selected source that is not imported
+(for example DILIrank) is reported as unavailable in the report, which is not a
+negative finding.
 
-The **Use RAG evidence** checkbox is deliberately per-assessment. **Settings** controls the retrieval and reranking setup; the checkbox decides whether this run requests indexed evidence. If the pre-flight check reports that RAG is unavailable, continuing applies the fallback only to that pending assessment.
-
-During Step 12, the progress message identifies whether vector retrieval is
-enabled. If evidence preparation exceeds its bounded runtime, the assessment
-continues without that prepared evidence and reports a warning for review.
+During evidence retrieval the progress message states whether selected
+sources are being consulted or retrieval is skipped (LLM knowledge only). If
+evidence preparation exceeds its bounded runtime, the assessment continues
+without that prepared evidence and reports a warning for review.
 
 If the run fails:
 - confirm backend health
@@ -95,6 +126,12 @@ If the run fails:
 - review backend console output for structured errors
 
 ## Review The Generated Report
+Reports open on a dedicated page (**View report** in the workspace, or
+**Open report** from a saved session in Clinical Sessions, `/report/:sessionId`).
+The header shows the patient, visit date, evidence sources, and models used
+(session overrides are tagged). **Back to workspace** returns to the
+unchanged input.
+
 Treat the report as a decision-support draft, not a final diagnosis.
 
 Review for:
@@ -149,7 +186,7 @@ If the report is incomplete or wrong:
 Agentic revisions are subject to the same deterministic clinical safety checks as the primary report before a revised report is persisted as successful. A revision cannot rely on LLM QA alone to override unresolved competing causes, unsupported Hy's Law assertions, overstated causality, LiverTox/RUCAM provenance conflicts, or rechallenge safeguards.
 
 ## Copy Or Export Output
-Use the available copy or export controls to move the report into the local workflow.
+Use **Copy**, **Expand**, and **Download** on the report page to move the report into the local workflow.
 
 Before reusing output:
 - verify dates
