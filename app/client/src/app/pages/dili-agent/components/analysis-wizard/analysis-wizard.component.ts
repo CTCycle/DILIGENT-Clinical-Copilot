@@ -174,7 +174,13 @@ export class AnalysisWizardComponent {
   constructor() {
     effect(() => {
       if (this.isOpen()) {
-        untracked(() => void this.modelConfigState.load().catch(() => undefined));
+        untracked(() => {
+          void this.modelConfigState.load().catch(() => undefined);
+          // The input changed since the last check: restart from preflight.
+          if (!this.formCurrent()) {
+            this.step.set('preflight');
+          }
+        });
       }
     });
     effect(() => {
