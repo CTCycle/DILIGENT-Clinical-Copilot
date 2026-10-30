@@ -290,10 +290,9 @@ app-root {
 }
 
 .stitch-dili-input-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-xl);
-  margin-top: var(--space-sm);
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
 .stitch-dili-card-title h2 {
@@ -327,7 +326,9 @@ app-root {
 }
 
 .stitch-dili-input-group--wide {
-  grid-column: 1 / -1;
+  display: flex;
+  flex: 1;
+  min-width: 0;
   position: relative;
 }
 
@@ -374,14 +375,12 @@ app-root {
   resize: vertical;
 }
 
-.stitch-dili-input-unified {
-  --clinical-input-default-height: min(72vh, 760px);
+.stitch-dili-workbench .stitch-dili-input-unified {
+  flex: 1;
   padding-right: calc(var(--space-lg) + 32px);
-  height: var(--clinical-input-default-height);
-  min-height: 280px;
-  max-height: calc(var(--clinical-input-default-height) * 2);
+  min-height: 320px;
+  max-height: none;
   resize: vertical;
-  transition: height 0.08s ease-out;
 }
 
 .stitch-dili-input-unified::placeholder {
@@ -398,8 +397,6 @@ app-root {
 }
 
 .stitch-dili-sidebar {
-  position: static;
-  top: auto;
   align-self: stretch;
   background: color-mix(in srgb, var(--color-brand-bg) 72%, var(--color-surface-alt));
   border-left: 0;
@@ -410,12 +407,13 @@ app-root {
 }
 
 .stitch-dili-page .stitch-dili-patient {
+  position: sticky;
+  top: var(--space-lg);
   background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   padding: 0;
-  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -489,8 +487,7 @@ app-root {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  margin-top: auto;
-  padding-top: var(--space-xl);
+  margin-top: var(--space-md);
 }
 
 .stitch-dili-clear {
@@ -2107,7 +2104,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   animation: slideUp 0.25s ease;
 }
 
-.modal-container.preflight-modal {
+.modal-container.analysis-wizard-modal {
   --modal-max-width: 760px;
   max-height: min(82vh, 780px);
   overflow: hidden;
@@ -2117,11 +2114,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   --modal-max-width: 640px;
 }
 
-.preflight-modal .modal-body {
+.analysis-wizard-modal .modal-body {
   min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
 }
 
 @keyframes slideUp {
@@ -3972,10 +3967,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(30, 41, 59, 0.92);
 }
 
-.stitch-dili-sidebar .stitch-dili-patient {
-  min-height: 100%;
-}
-
 .stitch-dili-inline-fields {
   margin-bottom: var(--space-xl);
 }
@@ -4521,11 +4512,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   cursor: not-allowed;
 }
 
-.stitch-dili-actions .stitch-dili-action-hint {
-  text-align: center;
-  color: var(--color-text-secondary);
-}
-
 .stitch-dili-clear {
   width: 100%;
 }
@@ -4706,7 +4692,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* DILI page: enlarge right-bottom texture while keeping it confined */
 .stitch-dili-sidebar {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   isolation: isolate;
   background:
     linear-gradient(90deg, rgba(241, 248, 244, 0.9) 0%, rgba(236, 245, 241, 0.72) 44%, rgba(236, 245, 241, 0.28) 100%);
