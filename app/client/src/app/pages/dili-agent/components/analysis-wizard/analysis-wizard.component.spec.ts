@@ -118,6 +118,23 @@ describe('AnalysisWizardComponent', () => {
     expect('use_rag' in payloads[0]).toBe(false);
   });
 
+  it('returns to preflight when reopened after the clinical input changed', async () => {
+    component.goTo(1);
+    fixture.componentRef.setInput('isOpen', false);
+    fixture.detectChanges();
+    responses.push(preflight([issue('blocking', 'visit_date_missing', 'visit_date')]));
+    appState.updateDiliAgent({
+      form: { patientName: 'P', visitDate: '', patientImageDataUrl: null, clinicalInput: 'text' },
+    });
+
+    fixture.componentRef.setInput('isOpen', true);
+    await settle();
+
+    expect(component.step()).toBe('preflight');
+    expect(payloads).toHaveLength(2);
+    expect(component.blockingCount()).toBe(1);
+  });
+
   it('labels LiverTox as recommended and warns when it is unticked, on both steps', async () => {
     component.goTo(1);
     fixture.detectChanges();
