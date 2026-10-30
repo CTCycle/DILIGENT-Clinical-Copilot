@@ -81,6 +81,8 @@ def build_single_matched_drug_row(
         match_notes = []
     terminology = resolved.get("terminology")
     terminology = terminology if isinstance(terminology, dict) else {}
+    evidence_status = resolved.get("evidence_status")
+    evidence_status = evidence_status if isinstance(evidence_status, dict) else {}
     match_quality = classify_match_evidence(
         match_status=resolved.get("match_status"),
         terminology=terminology,
@@ -88,6 +90,7 @@ def build_single_matched_drug_row(
         has_excerpt=bool(resolved.get("extracted_excerpts")),
         missing_livertox=bool(resolved.get("missing_livertox", True)),
         ambiguous_match=bool(resolved.get("ambiguous_match", False)),
+        livertox_selected=evidence_status.get("livertox") != "not_selected",
     )
     accepted_rxnav_rxcui = resolved.get("accepted_rxnav_rxcui")
     rxnorm_rxcui = matched_row.get("rxnorm_rxcui") or accepted_rxnav_rxcui
@@ -121,6 +124,7 @@ def build_single_matched_drug_row(
         "decision_status": resolved.get("decision_status"),
         "missing_livertox": resolved.get("missing_livertox", True),
         "ambiguous_match": resolved.get("ambiguous_match", False),
+        "evidence_status": evidence_status,
         "regimen_group_ids": resolved.get("regimen_group_ids", []),
         "is_regimen_parent": resolved.get("is_regimen_parent", False),
         "regimen_components": resolved.get("regimen_components", []),
