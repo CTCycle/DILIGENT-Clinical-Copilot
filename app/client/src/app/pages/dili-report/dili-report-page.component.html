@@ -1,0 +1,70 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<main class="page-container dili-report-page">
+  @if (pageState() !== 'empty') {
+    <header class="dili-report-header">
+      <div>
+        <a class="dili-report-back" routerLink="/">← Back to workspace</a>
+        <h1>{{ patientLabel() }}</h1>
+        <dl class="dili-report-meta">
+          @if (visitDate(); as date) {
+            <div><dt>Visit date</dt><dd>{{ date }}</dd></div>
+          }
+          @if (evidenceSources(); as sources) {
+            <div><dt>Evidence sources</dt><dd>{{ sources }}</dd></div>
+          }
+          @for (model of models(); track model.role) {
+            <div>
+              <dt>{{ model.role }} model</dt>
+              <dd>{{ model.name }}@if (model.overridden) { <span class="dili-report-tag">Override</span> }</dd>
+            </div>
+          }
+        </dl>
+      </div>
+    </header>
+  }
+
+  @switch (pageState()) {
+    @case ('running') {
+      <div class="dili-report-status">
+        <app-analysis-progress
+          [jobStatus]="vm().jobStatus"
+          [jobProgress]="vm().jobProgress"
+          [stage]="vm().jobStage"
+          [stageMessage]="vm().jobStageMessage"
+          [startedAtMs]="vm().jobStartedAtMs"
+          [lastProgressAtMs]="vm().jobLastProgressAtMs"
+        ></app-analysis-progress>
+        <p class="dili-report-note">The report appears here when the analysis completes.</p>
+      </div>
+    }
+    @case ('loading') {
+      <p class="dili-report-note" role="status">Loading report...</p>
+    }
+    @case ('error') {
+      <p class="dili-report-note is-error" role="alert">{{ loadError() }}</p>
+    }
+    @case ('interrupted') {
+      <div class="dili-report-status">
+        <app-analysis-progress
+          [jobStatus]="vm().jobStatus"
+          [jobProgress]="vm().jobProgress"
+          [errorMessage]="vm().message"
+        ></app-analysis-progress>
+        @if (vm().jobStatus === 'cancelled') {
+          <p class="dili-report-note">{{ vm().message }}</p>
+        }
+      </div>
+    }
+    @case ('completed') {
+      <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
+    }
+    @default {
+      <div class="dili-report-empty">
+        <h2>No report yet</h2>
+        <p>Run an analysis from the workspace, or open a stored report from Clinical Sessions.</p>
+        <a class="btn btn-secondary" routerLink="/">Back to workspace</a>
+      </div>
+    }
+  }
+</main>

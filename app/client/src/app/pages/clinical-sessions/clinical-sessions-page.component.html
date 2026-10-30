@@ -124,6 +124,7 @@
             <h2>{{ detail.patient_name || 'Unknown patient' }}</h2>
             <p>Session {{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}</p>
           </div>
+          <a class="toolbar-btn" [routerLink]="['/report', detail.session_id]">Open report</a>
         </div>
 
         <div class="clinical-session-tabs-row" data-guidance-target="clinical-session-tabs">

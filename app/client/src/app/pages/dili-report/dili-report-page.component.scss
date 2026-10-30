@@ -1,0 +1,97 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+.dili-report-page {
+  display: grid;
+  gap: var(--space-lg);
+  align-content: start;
+}
+
+.dili-report-header h1 {
+  margin: var(--space-xs) 0 var(--space-sm);
+  font-family: 'Manrope', 'Inter', sans-serif;
+  font-size: var(--font-2xl);
+  line-height: 1.15;
+}
+
+.dili-report-back {
+  color: var(--color-brand);
+  font-size: var(--font-sm);
+  text-decoration: none;
+}
+
+.dili-report-back:hover,
+.dili-report-back:focus-visible {
+  text-decoration: underline;
+}
+
+.dili-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-2xl);
+  margin: 0;
+}
+
+.dili-report-meta dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dili-report-meta dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.dili-report-tag {
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-status-info-border);
+  border-radius: 999px;
+  background: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.dili-report-status {
+  display: grid;
+  gap: var(--space-sm);
+  max-width: 480px;
+}
+
+.dili-report-note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.dili-report-note.is-error {
+  color: var(--color-status-error-text);
+}
+
+.dili-report-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+  padding: var(--space-2xl);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.dili-report-empty h2,
+.dili-report-empty p {
+  margin: 0;
+}
+
+.dili-report-empty p {
+  color: var(--color-text-secondary);
+}
+
+.dili-report-empty .btn {
+  width: auto;
+  text-decoration: none;
+}

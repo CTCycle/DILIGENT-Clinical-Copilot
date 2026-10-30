@@ -1,0 +1,21 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<section class="report-section">
+  <div class="report-shell" [class.is-full-page]="isExpanded()" [attr.aria-expanded]="isExpanded()">
+    <div class="report-toolbar">
+      <p class="report-toolbar-label">DILI Assessment</p>
+      <button class="toolbar-btn" type="button" (click)="copyReport()" [disabled]="!hasReport()">Copy</button>
+      <button class="toolbar-btn" type="button" (click)="toggleExpanded()" [disabled]="!hasReport()">
+        {{ isExpanded() ? 'Collapse' : 'Expand' }}
+      </button>
+      <button class="toolbar-btn" type="button" (click)="downloadReport()" [disabled]="!hasReport()">Download</button>
+    </div>
+    <div class="report-content" [class.is-expanded]="isExpanded()">
+      <article
+        id="rendered-report-content"
+        class="report-markdown inspection-excerpt-text"
+        [innerHTML]="rendered().html"
+      ></article>
+    </div>
+  </div>
+</section>
