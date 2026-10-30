@@ -4,6 +4,7 @@
 import { Routes } from '@angular/router';
 
 import { DiliAgentPageComponent } from './pages/dili-agent/dili-agent-page.component';
+import { DiliReportPageComponent } from './pages/dili-report/dili-report-page.component';
 import { DataInspectionPageComponent } from './pages/data-inspection/data-inspection-page.component';
 import { ClinicalSessionsPageComponent } from './pages/clinical-sessions/clinical-sessions-page.component';
 import { ModelConfigPageComponent } from './pages/model-config/model-config-page.component';
@@ -14,6 +15,8 @@ import { DatabaseSettingsComponent } from './pages/settings/components/database-
 
 export const routes: Routes = [
   { path: '', component: DiliAgentPageComponent, title: 'DILI Agent | DILIGENT' },
+  { path: 'report', component: DiliReportPageComponent, title: 'DILI Report | DILIGENT' },
+  { path: 'report/:sessionId', component: DiliReportPageComponent, title: 'DILI Report | DILIGENT' },
   { path: 'clinical-sessions', component: ClinicalSessionsPageComponent, title: 'Clinical Sessions | DILIGENT' },
   { path: 'data', component: DataInspectionPageComponent, title: 'Knowledge | DILIGENT' },
   { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
