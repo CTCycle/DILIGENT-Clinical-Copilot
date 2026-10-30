@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from pathlib import Path
 
 import pandas as pd
@@ -698,3 +699,142 @@ def test_report_source_attribution_includes_validated_rxnav_identity() -> None:
     assert ReportFinalizer.bibliography_source_label(assessment) == (
         "LiverTox; RxNav (RxCUI 12345); FDA DILIrank 2.0 (component-level)"
     )
+
+###############################################################################
+class _CountingDiliRankRepository:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, inner: DiliRankRepository) -> None:
+        self.inner = inner
+        self.lookups = 0
+
+    # -------------------------------------------------------------------------
+    def count_records(self) -> int:
+        return self.inner.count_records()
+
+    # -------------------------------------------------------------------------
+    def get_records_for_drug(self, drug_id: int) -> list[dict[str, Any]]:
+        self.lookups += 1
+        return self.inner.get_records_for_drug(drug_id)
+
+###############################################################################
+def _routing_fixture(
+    *, with_dilirank_records: bool = True
+) -> tuple[ClinicalKnowledgeComposer, _CountingDiliRankRepository, int]:
+    dilirank_repository, context = build_repository()
+    seed_drugs(context)
+    if with_dilirank_records:
+        dilirank_repository.replace_records(
+            [
+                {
+                    "ltkb_id": "LT00004",
+                    "compound_name": "Acetaminophen",
+                    "severity_class": 5,
+                    "label_section": "Warnings & precautions",
+                    "dili_concern": "vMost-DILI-concern",
+                }
+            ]
+        )
+    with context.session_factory() as db_session:
+        drug_id = int(
+            db_session.execute(
+                select(Drug.id).where(Drug.canonical_name_norm == "acetaminophen")
+            ).scalar_one()
+        )
+    composer = ClinicalKnowledgeComposer(
+        knowledge_repository=KnowledgeRepository(context)
+    )
+    counting = _CountingDiliRankRepository(dilirank_repository)
+    composer.dilirank_repository = counting  # type: ignore[assignment]
+    return composer, counting, drug_id
+
+###############################################################################
+def _resolved_acetaminophen(drug_id: int) -> dict[str, dict[str, Any]]:
+    return {
+        "acetaminophen": {
+            "matched_livertox_row": {
+                "drug_id": drug_id,
+                "drug_name": "Acetaminophen",
+                "likelihood_score": "A",
+                "agent_classification": "Analgesic",
+            },
+            "extracted_excerpts": ["LiverTox evidence."],
+        }
+    }
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("sources", "expected_status"),
+    [
+        ([], {"livertox": "not_selected", "dilirank": "not_selected"}),
+        (["livertox"], {"livertox": "retrieved", "dilirank": "not_selected"}),
+        (["dilirank"], {"livertox": "not_selected", "dilirank": "retrieved"}),
+        (["livertox", "dilirank"], {"livertox": "retrieved", "dilirank": "retrieved"}),
+    ],
+)
+def test_composer_consults_only_selected_sources(
+    sources: list[str], expected_status: dict[str, str]
+) -> None:
+    composer, dilirank, drug_id = _routing_fixture()
+    resolved = _resolved_acetaminophen(drug_id)
+
+    composer.enrich_resolved_drugs(resolved, EvidenceSelection.from_sources(sources))
+
+    payload = resolved["acetaminophen"]
+    assert payload["evidence_status"] == expected_status
+    assert payload["drug_id"] == drug_id
+    if "dilirank" in sources:
+        assert "vMost-DILI-concern" in payload["knowledge_prompt"]
+    else:
+        assert dilirank.lookups == 0
+        assert payload["dilirank_records"] == []
+        assert "DILIrank" not in payload["knowledge_prompt"]
+    if "livertox" in sources:
+        assert "LiverTox evidence." in payload["knowledge_prompt"]
+        assert payload["matched_livertox_row"]["likelihood_score"] == "A"
+    else:
+        # Identity survives; LiverTox evidence is withheld from every consumer.
+        assert payload["matched_livertox_row"] == {
+            "drug_id": drug_id,
+            "drug_name": "Acetaminophen",
+        }
+        assert payload["extracted_excerpts"] == []
+        assert "LiverTox" not in payload["knowledge_prompt"]
+    if not sources:
+        assert payload["knowledge_prompt"] == ""
+
+###############################################################################
+def test_composer_marks_selected_but_unimported_dilirank_as_unavailable() -> None:
+    composer, dilirank, drug_id = _routing_fixture(with_dilirank_records=False)
+    resolved = _resolved_acetaminophen(drug_id)
+
+    composer.enrich_resolved_drugs(
+        resolved, EvidenceSelection.from_sources(["dilirank"])
+    )
+
+    assert resolved["acetaminophen"]["evidence_status"]["dilirank"] == "unavailable"
+    assert dilirank.lookups == 0
+
+###############################################################################
+def test_report_labels_unconsulted_livertox_and_session_evidence_scope() -> None:
+    llm_only = DrugClinicalAssessment(
+        drug_name="Acetaminophen",
+        evidence_status={"livertox": "not_selected", "dilirank": "not_selected"},
+    )
+    assert ReportFinalizer.bibliography_source_label(llm_only) == (
+        "General model knowledge (no external source consulted)"
+    )
+
+    line = ReportFinalizer.render_evidence_sources_line(
+        EvidenceSelection.from_sources([]), unavailable_sources=[]
+    )
+    assert "LLM knowledge only" in line
+    assert "LiverTox was excluded" in line
+
+    line = ReportFinalizer.render_evidence_sources_line(
+        EvidenceSelection.from_sources(["livertox", "dilirank"]),
+        unavailable_sources=["dilirank"],
+    )
+    assert line.startswith("**Evidence sources**: LiverTox; FDA DILIrank 2.0.")
+    assert "not a negative finding" in line
+    assert "excluded" not in line
