@@ -1389,3 +1389,54 @@ def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:
         "openai",
         "gpt-4.1-mini",
     )
+
+###############################################################################
+def _cloud_snapshot() -> ModelConfigSnapshot:
+    return ModelConfigSnapshot(
+        use_cloud_models=True,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="gpt-4.1-mini",
+        text_extraction_model="gpt-4.1-mini",
+        revision_model="gpt-4.1-mini",
+        timeline_model="gpt-4.1-mini",
+    )
+
+###############################################################################
+def test_session_model_override_is_captured_only_in_the_run_snapshot(monkeypatch) -> None:
+    monkeypatch.setattr(
+        ModelConfigSerializer, "load_snapshot", lambda self: _cloud_snapshot()
+    )
+
+    def fail_save(self, **_updates: Any) -> None:
+        raise AssertionError("session overrides must not be persisted")
+
+    monkeypatch.setattr(ModelConfigSerializer, "save_snapshot", fail_save)
+
+    snapshot, _ = LLMRuntimeConfig.capture_run_snapshot(
+        evidence_sources=["dilirank"],
+        model_overrides={"clinical_model": "gpt-4.1"},
+    )
+
+    assert snapshot["clinical_model"] == "gpt-4.1"
+    assert snapshot["text_extraction_model"] == "gpt-4.1-mini"
+    assert snapshot["evidence_sources"] == ["dilirank"]
+    assert snapshot["model_overrides"] == {"clinical_model": "gpt-4.1"}
+    # Outside the capture context the persisted defaults apply again.
+    assert LLMRuntimeConfig.get_clinical_model() == "gpt-4.1-mini"
+    assert LLMRuntimeConfig.active_model_overrides() == {}
+
+###############################################################################
+def test_session_model_overrides_are_limited_to_known_clinical_roles(monkeypatch) -> None:
+    service = ModelConfigService(serializer=InMemorySerializer(_cloud_snapshot()))
+    monkeypatch.setattr(
+        service,
+        "known_provider_model_names",
+        lambda _provider: {"gpt-4.1", "gpt-4.1-mini"},
+    )
+
+    service.validate_session_model_overrides({"clinical_model": "gpt-4.1"})
+    with pytest.raises(ServiceValidationError, match="not available"):
+        service.validate_session_model_overrides({"clinical_model": "unknown-model"})
+    with pytest.raises(ServiceValidationError, match="cannot be overridden"):
+        service.validate_session_model_overrides({"revision_model": "gpt-4.1"})

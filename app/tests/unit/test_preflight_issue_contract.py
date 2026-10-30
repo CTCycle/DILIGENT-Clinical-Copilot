@@ -257,3 +257,8 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     assert rag_issue.field == "evidence_sources"
     assert rag_issue.continuation_allowed is False
     assert rag_issue.affected_section == "Evidence sources"
+    statuses = {status.source: status for status in result.evidence_sources}
+    assert set(statuses) == {"livertox", "dilirank", "documents"}
+    assert statuses["documents"].selected is True
+    assert statuses["documents"].available is False
+    assert statuses["livertox"].selected is False
