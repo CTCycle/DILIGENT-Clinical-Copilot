@@ -431,7 +431,7 @@ def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
         visit_date=date(2025, 1, 15),
-        use_rag=True,
+        evidence_sources=["documents"],
     )
 
     with pytest.raises(ServiceValidationError, match="Start Ollama and retry"):

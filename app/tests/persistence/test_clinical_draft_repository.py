@@ -61,7 +61,6 @@ def test_save_preserves_exact_text_across_repository_instances(persistence_engin
         patient_name="  Synthetic patient  ",
         visit_date=date(2026, 10, 23),
         clinical_input="  First line\r\n\r\n Second line\t ",
-        use_rag=True,
     )
     saved = _repository(persistence_engine).save_draft(form, 0, None)
     restored = _repository(persistence_engine).get_draft()
@@ -123,7 +122,6 @@ def test_discard_tombstone_clears_phi_and_rejects_delayed_save(persistence_engin
             patient_name="Synthetic patient",
             visit_date=date(2026, 10, 23),
             clinical_input="Synthetic clinical text\nsecond line",
-            use_rag=True,
         ),
         0,
         None,
@@ -139,7 +137,6 @@ def test_discard_tombstone_clears_phi_and_rejects_delayed_save(persistence_engin
         assert row.patient_name is None
         assert row.visit_date is None
         assert row.clinical_input is None
-        assert row.use_rag is False
         assert row.updated_at is None
 
     with pytest.raises(DraftConcurrencyError):

@@ -196,6 +196,16 @@ class RagReadiness(BaseModel):
     message: str | None = None
 
 ###############################################################################
+class EvidenceSourceStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["livertox", "dilirank", "documents"]
+    label: str
+    selected: bool
+    available: bool
+    message: str | None = None
+
+###############################################################################
 class ClinicalInputPreflightResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -206,3 +216,4 @@ class ClinicalInputPreflightResult(BaseModel):
     extraction_quality: dict[str, Any] = Field(default_factory=dict)
     deterministic_diagnostics: dict[str, Any] = Field(default_factory=dict)
     rag_readiness: RagReadiness | None = None
+    evidence_sources: list[EvidenceSourceStatus] = Field(default_factory=list)

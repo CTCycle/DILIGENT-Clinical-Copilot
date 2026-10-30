@@ -30,12 +30,12 @@ def check_rag_readiness(*, requested: bool) -> RagReadiness:
             "invalid": "rag_embedding_cache_invalid",
         }.get(cache_status, "rag_embedding_cache_invalid")
         message = {
-            "missing": "Reconnect and rebuild the RAG cache, or disable RAG for this assessment.",
-            "dependency_missing": "Reinstall the ONNX Runtime, Tokenizers, and NumPy dependencies, or disable RAG for this assessment.",
-            "invalid": "Remove the corrupted embedding cache and rebuild the RAG cache, or disable RAG for this assessment.",
+            "missing": "Reconnect and rebuild the RAG cache, or deselect Indexed documents for this assessment.",
+            "dependency_missing": "Reinstall the ONNX Runtime, Tokenizers, and NumPy dependencies, or deselect Indexed documents for this assessment.",
+            "invalid": "Remove the corrupted embedding cache and rebuild the RAG cache, or deselect Indexed documents for this assessment.",
         }.get(
             cache_status,
-            "Repair the embedding cache and rebuild RAG, or disable RAG for this assessment.",
+            "Repair the embedding cache and rebuild RAG, or deselect Indexed documents for this assessment.",
         )
         return RagReadiness(
             requested=True,

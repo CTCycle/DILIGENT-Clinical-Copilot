@@ -29,6 +29,7 @@ from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
     DrugClinicalAssessment,
+    EvidenceSelection,
     PatientData,
     PatientDrugs,
     PipelineIssue,
@@ -159,7 +160,7 @@ def _build_rag_reference_audit(
         )
     )
     return {
-        "rag_retrieval_enabled": bool(payload.use_rag),
+        "rag_retrieval_enabled": payload.evidence.documents,
         "rag_query_keys": sorted((rag_query or {}).keys(), key=str.casefold),
         "retrieved_references_by_drug": references_by_drug,
         "retrieved_reference_count": sum(
@@ -181,6 +182,25 @@ def _build_rag_reference_audit(
             report_language=report_language,
         ),
     }
+
+###############################################################################
+def _unavailable_evidence_sources(
+    evidence: EvidenceSelection,
+    prepared_inputs: Any,
+) -> list[str]:
+    """Selected sources that could not be consulted, so the report can tell
+    them apart from sources that were consulted and returned nothing."""
+    unavailable: list[str] = []
+    resolved = getattr(prepared_inputs, "resolved_drugs", None) or {}
+    if evidence.livertox and prepared_inputs is None:
+        unavailable.append("livertox")
+    if evidence.dilirank and any(
+        isinstance(payload, dict)
+        and (payload.get("evidence_status") or {}).get("dilirank") == "unavailable"
+        for payload in resolved.values()
+    ):
+        unavailable.append("dilirank")
+    return unavailable
 
 ###############################################################################
 def _validate_requested_provider_matches_runtime(
@@ -519,7 +539,7 @@ async def process_single_patient_workflow(
         issues=issues,
         progress_callback=progress_callback,
         stop_check=stop_check,
-        use_rag=payload.use_rag,
+        evidence=payload.evidence,
     )
     match_audit_issues: list[PipelineIssue] = []
     if prepared_inputs is not None:
@@ -644,6 +664,13 @@ async def process_single_patient_workflow(
         generated_report=generated_report,
         bundle=dili_evidence_bundle,
         fallback_text=phrase("narrative_fallback", report_language),
+        evidence_sources_line=ReportFinalizer.render_evidence_sources_line(
+            payload.evidence,
+            unavailable_sources=_unavailable_evidence_sources(
+                payload.evidence, prepared_inputs
+            ),
+            report_language=report_language,
+        ),
     )
     rag_reference_audit = _build_rag_reference_audit(
         payload=payload,
@@ -795,7 +822,8 @@ async def process_single_patient_workflow(
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
             "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
-            "use_rag": bool(payload.use_rag),
+            "evidence_sources": list(payload.evidence_sources),
+            "model_overrides": LLMRuntimeConfig.active_model_overrides(),
             "resolved_runtime": dict(service.resolved_runtime),
             "stage_elapsed_ms": dict(service.stage_elapsed_ms),
             "fallback_reasons": dict(service.fallback_reasons),
@@ -883,7 +911,10 @@ async def process_single_patient_workflow(
                 "patient_image_base64": patient_image_base64,
                 "session_timestamp": datetime.now(UTC),
                 "version": session_version,
-                "metadata": {"use_rag": bool(payload.use_rag)},
+                "metadata": {
+                    "evidence_sources": list(payload.evidence_sources),
+                    "model_overrides": LLMRuntimeConfig.active_model_overrides(),
+                },
                 "session_kind": "standard_assessment",
                 "hepatic_pattern": pattern_score.classification,
                 "anamnesis": payload.anamnesis,
@@ -949,6 +980,13 @@ def start_clinical_job_workflow(
     ):
         raise ServiceConflictError("Clinical analysis is already in progress")
 
+    model_overrides = (
+        request_payload.model_overrides.as_runtime_overrides()
+        if request_payload.model_overrides is not None
+        else {}
+    )
+    if model_overrides:
+        service.model_config_service.validate_session_model_overrides(model_overrides)
     service.apply_persisted_runtime_configuration()
     _validate_requested_provider_matches_runtime(request_payload)
     if LLMRuntimeConfig.is_cloud_enabled():
@@ -974,15 +1012,16 @@ def start_clinical_job_workflow(
     parse_result = service.validate_assessment_prerequisites_without_llm(
         request_payload
     )
-    rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
-    if request_payload.use_rag and not rag_readiness.available:
+    use_documents = request_payload.evidence.documents
+    rag_readiness = check_rag_readiness(requested=use_documents)
+    if use_documents and not rag_readiness.available:
         raise ServiceValidationError(
             [
                 {
                     "severity": "blocking",
                     "code": rag_readiness.reason_code or "rag_unavailable",
                     "message": rag_readiness.message or "RAG is unavailable.",
-                    "field": "use_rag",
+                    "field": "evidence_sources",
                 }
             ]
         )
@@ -1004,7 +1043,8 @@ def start_clinical_job_workflow(
             service.serialize_pipeline_issues(exc.issues)
         ) from exc
     runtime_snapshot, runtime_snapshot_hash = LLMRuntimeConfig.capture_run_snapshot(
-        use_rag=request_payload.use_rag
+        evidence_sources=list(request_payload.evidence_sources),
+        model_overrides=model_overrides,
     )
     job_id = service.job_manager.start_job(
         job_type=service.JOB_TYPE,

@@ -20,6 +20,7 @@ from domain.clinical.drug_resolution import (
 )
 from domain.clinical.entities import (
     DrugEntry,
+    EvidenceSelection,
     HepatotoxicityPatternScore,
     PatientDrugs,
     PipelineIssue,
@@ -92,6 +93,7 @@ class ClinicalKnowledgePreparation:
         *,
         clinical_context: str | None,
         pattern_score: HepatotoxicityPatternScore | None,
+        evidence: EvidenceSelection,
         progress_callback: Callable[[float], None] | None = None,
         identity_resolution_client: Any | None = None,
         identity_resolution_model: str | None = None,
@@ -118,7 +120,7 @@ class ClinicalKnowledgePreparation:
         self.emit_progress(progress_callback, 0.35)
         self.emit_progress(progress_callback, 0.65)
         self.emit_progress(progress_callback, 0.9)
-        self.knowledge_composer.enrich_resolved_drugs(resolved_drugs)
+        self.knowledge_composer.enrich_resolved_drugs(resolved_drugs, evidence)
         pattern_prompt = self.build_pattern_prompt(pattern_score)
         normalized_context = (clinical_context or "").strip()
 

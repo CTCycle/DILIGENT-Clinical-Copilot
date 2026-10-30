@@ -297,7 +297,7 @@ class ClinicalSessionService(
         self,
         *,
         session_detail: dict[str, Any],
-        use_rag: bool,
+        evidence_sources: list[str],
     ) -> tuple[
         ClinicalSessionRequest,
         ClinicalSectionExtractionResult | None,
@@ -335,7 +335,7 @@ class ClinicalSessionService(
                     anamnesis=section_extraction.anamnesis,
                     drugs=section_extraction.drugs,
                     laboratory_analysis=section_extraction.laboratory_analysis,
-                    use_rag=use_rag,
+                    evidence_sources=evidence_sources,
                 ),
                 section_extraction,
                 "persisted_section_extraction",
@@ -367,7 +367,7 @@ class ClinicalSessionService(
                         anamnesis=anamnesis,
                         drugs=drugs,
                         laboratory_analysis=laboratory_analysis,
-                        use_rag=use_rag,
+                        evidence_sources=evidence_sources,
                     ),
                     section_extraction,
                     "persisted_session_sections",
@@ -377,7 +377,7 @@ class ClinicalSessionService(
             name=session_detail.get("patient_name"),
             visit_date=session_detail.get("visit_date"),
             clinical_input=source_text,
-            use_rag=use_rag,
+            evidence_sources=evidence_sources,
         )
         preprocessed_request, section_extraction = await self.preprocess_unified_input(
             request
@@ -480,7 +480,7 @@ class ClinicalSessionService(
                 anamnesis=request_payload.anamnesis,
                 drugs=request_payload.drugs,
                 laboratory_analysis=request_payload.laboratory_analysis,
-                use_rag=request_payload.use_rag,
+                evidence_sources=request_payload.evidence_sources,
             )
             return PatientData.model_validate(payload_data)
         except ValidationError as exc:

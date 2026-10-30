@@ -46,9 +46,6 @@ class ClinicalInputDraft(Base):
     patient_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     visit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     clinical_input: Mapped[str | None] = mapped_column(Text, nullable=True)
-    use_rag: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("false")
-    )
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 ###############################################################################

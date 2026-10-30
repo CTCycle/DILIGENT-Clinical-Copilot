@@ -21,8 +21,92 @@ from domain.clinical.claims import ClinicalClaim, DrugClinicalNarrative
 from domain.clinical.sections import ClinicalSectionKey
 
 Comparator = Literal["<=", "<", ">=", ">"]
+EvidenceSource = Literal["livertox", "dilirank", "documents"]
+EVIDENCE_SOURCES: tuple[EvidenceSource, ...] = ("livertox", "dilirank", "documents")
+DEFAULT_EVIDENCE_SOURCES: tuple[EvidenceSource, ...] = ("livertox",)
+EVIDENCE_SOURCE_LABELS: dict[str, str] = {
+    "livertox": "LiverTox",
+    "dilirank": "FDA DILIrank 2.0",
+    "documents": "Indexed documents",
+}
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MAX_LAB_TEXT_LENGTH = 20000
+
+###############################################################################
+def normalize_evidence_sources(value: Any) -> list[str]:
+    """Deduplicate and order evidence sources canonically; unknown values are
+    left in place so the Literal validation rejects them."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        raise ValueError("evidence_sources must be a list of source names")
+    cleaned = [str(item).strip().lower() for item in value if str(item).strip()]
+    known = [source for source in EVIDENCE_SOURCES if source in cleaned]
+    unknown = [item for item in dict.fromkeys(cleaned) if item not in EVIDENCE_SOURCES]
+    return [*known, *unknown]
+
+###############################################################################
+@dataclass(frozen=True)
+class EvidenceSelection:
+    """Session-level evidence routing. Unselected sources are never queried."""
+
+    sources: tuple[EvidenceSource, ...] = DEFAULT_EVIDENCE_SOURCES
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_sources(cls, sources: Any) -> "EvidenceSelection":
+        normalized = normalize_evidence_sources(sources)
+        return cls(
+            tuple(source for source in EVIDENCE_SOURCES if source in normalized)
+        )
+
+    # -------------------------------------------------------------------------
+    @property
+    def livertox(self) -> bool:
+        return "livertox" in self.sources
+
+    # -------------------------------------------------------------------------
+    @property
+    def dilirank(self) -> bool:
+        return "dilirank" in self.sources
+
+    # -------------------------------------------------------------------------
+    @property
+    def documents(self) -> bool:
+        return "documents" in self.sources
+
+    # -------------------------------------------------------------------------
+    @property
+    def llm_only(self) -> bool:
+        return not self.sources
+
+###############################################################################
+class SessionModelOverrides(BaseModel):
+    """Model choices that apply only to one clinical session."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text_extraction_model: str | None = Field(default=None, max_length=200)
+    clinical_model: str | None = Field(default=None, max_length=200)
+
+    # -------------------------------------------------------------------------
+    @field_validator("text_extraction_model", "clinical_model", mode="before")
+    @classmethod
+    def strip_model_name(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+    # -------------------------------------------------------------------------
+    def as_runtime_overrides(self) -> dict[str, str]:
+        return {
+            key: value
+            for key, value in self.model_dump().items()
+            if isinstance(value, str) and value
+        }
 
 ###############################################################################
 class PatientData(BaseModel):
@@ -62,10 +146,24 @@ class PatientData(BaseModel):
         max_length=MAX_LAB_TEXT_LENGTH,
         description="Free-text laboratory section, potentially with dated values and ULN notes.",
     )
-    use_rag: bool = Field(
-        default=False,
-        description="Enables retrieval augmented generation during analysis.",
+    evidence_sources: list[EvidenceSource] = Field(
+        default_factory=lambda: list(DEFAULT_EVIDENCE_SOURCES),
+        description=(
+            "External evidence sources consulted during analysis. An empty list "
+            "means LLM knowledge only."
+        ),
     )
+
+    # -------------------------------------------------------------------------
+    @field_validator("evidence_sources", mode="before")
+    @classmethod
+    def normalize_sources(cls, value: Any) -> list[str]:
+        return normalize_evidence_sources(value)
+
+    # -------------------------------------------------------------------------
+    @property
+    def evidence(self) -> "EvidenceSelection":
+        return EvidenceSelection.from_sources(self.evidence_sources)
 
     # -------------------------------------------------------------------------
     @field_validator("name", "anamnesis", "drugs", "laboratory_analysis", mode="before")
@@ -155,7 +253,10 @@ class ClinicalSessionRequest(BaseModel):
     )
     clinical_input: str | None = Field(default=None, max_length=100000)
     anamnesis: str | None = Field(default=None, max_length=20000)
-    use_rag: bool = False
+    evidence_sources: list[EvidenceSource] = Field(
+        default_factory=lambda: list(DEFAULT_EVIDENCE_SOURCES)
+    )
+    model_overrides: SessionModelOverrides | None = None
     drugs: str | None = Field(default=None, max_length=20000)
     laboratory_analysis: str | None = Field(
         default=None, max_length=MAX_LAB_TEXT_LENGTH
@@ -180,6 +281,17 @@ class ClinicalSessionRequest(BaseModel):
         without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
         stripped = without_controls.strip()
         return stripped or None
+
+    # -------------------------------------------------------------------------
+    @field_validator("evidence_sources", mode="before")
+    @classmethod
+    def normalize_sources(cls, value: Any) -> list[str]:
+        return normalize_evidence_sources(value)
+
+    # -------------------------------------------------------------------------
+    @property
+    def evidence(self) -> "EvidenceSelection":
+        return EvidenceSelection.from_sources(self.evidence_sources)
 
     # -------------------------------------------------------------------------
     @field_validator("selected_model_providers", mode="before")
@@ -821,6 +933,7 @@ class DrugClinicalAssessment(BaseModel):
     missing_livertox: bool = Field(default=False)
     ambiguous_match: bool = Field(default=False)
     match_candidates: list[str] = Field(default_factory=list)
+    evidence_status: dict[str, str] = Field(default_factory=dict)
     suspension: DrugSuspensionContext = Field(
         default_factory=create_drug_suspension_context,
     )

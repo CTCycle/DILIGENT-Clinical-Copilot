@@ -18,7 +18,6 @@ def test_draft_contract_preserves_incomplete_and_multiline_input() -> None:
                 "patient_name": "  Synthetic patient  ",
                 "visit_date": None,
                 "clinical_input": "  First line\n\n Second line  ",
-                "use_rag": True,
             },
         }
     )

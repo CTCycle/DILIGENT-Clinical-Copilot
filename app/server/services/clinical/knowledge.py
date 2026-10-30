@@ -9,6 +9,7 @@ from common.prompts.clinical_context import (
     build_dilirank_knowledge_fragment,
     build_livertox_knowledge_fragment,
 )
+from domain.clinical.entities import EvidenceSelection
 from repositories import values as repository_values
 from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
@@ -16,6 +17,9 @@ from repositories.knowledge_repository import KnowledgeRepository
 from services.text.normalization import normalize_drug_query_name
 
 DILIRANK_PROVENANCE_KEY = "fda_dilirank_2"
+# Monograph fields that only identify the drug; every other field is LiverTox
+# evidence and is withheld when the session did not select LiverTox.
+LIVERTOX_IDENTITY_FIELDS = frozenset({"drug_id", "drug_name", "drug_name_norm"})
 
 ###############################################################################
 class ClinicalKnowledgeComposer:
@@ -38,29 +42,46 @@ class ClinicalKnowledgeComposer:
     def enrich_resolved_drugs(
         self,
         resolved_drugs: dict[str, dict[str, Any]],
+        evidence: EvidenceSelection,
     ) -> None:
+        """Attach knowledge from the session's selected sources only.
+
+        Drug identity (``drug_id``, terminology) is resolved regardless of the
+        selection; unselected sources are never queried and their evidence is
+        withheld, so downstream consumers see "not consulted" rather than a
+        negative finding.
+        """
+        dilirank_available = self._dilirank_available() if evidence.dilirank else False
         for payload in resolved_drugs.values():
             matched_row = payload.get("matched_livertox_row")
             drug_id = self._knowledge_drug_id(payload, matched_row)
             payload["drug_id"] = drug_id
+            if not evidence.livertox:
+                self._withhold_livertox_evidence(payload)
             if drug_id is None:
                 payload["dilirank_records"] = []
                 payload["knowledge_prompt"] = ""
+                payload["evidence_status"] = self._evidence_status(
+                    evidence,
+                    payload,
+                    dilirank_records=[],
+                    dilirank_available=dilirank_available,
+                )
                 payload["source_provenance"] = self._build_source_provenance(
                     payload
                 )
                 continue
             bundle = (
                 self.knowledge_repository.get_drug_knowledge_bundle(drug_id)
-                if isinstance(matched_row, dict)
+                if evidence.livertox and isinstance(matched_row, dict)
                 else {}
             )
             livertox_excerpt = self.select_livertox_excerpt(payload)
-            if not livertox_excerpt:
+            if evidence.livertox and not livertox_excerpt:
                 livertox_excerpt = str(bundle.get("livertox_excerpt") or "")
             dilirank_records = (
                 self.dilirank_repository.get_records_for_drug(drug_id)
-                if self.dilirank_repository is not None
+                if dilirank_available and self.dilirank_repository is not None
                 else []
             )
             payload["livertox_monographs"] = bundle.get("livertox_monographs") or []
@@ -69,10 +90,64 @@ class ClinicalKnowledgeComposer:
             payload["knowledge_prompt"] = self.build_combined_prompt_fragment(
                 livertox_excerpt=livertox_excerpt,
                 dilirank_records=dilirank_records,
+                evidence=evidence,
+            )
+            payload["evidence_status"] = self._evidence_status(
+                evidence,
+                payload,
+                dilirank_records=dilirank_records,
+                dilirank_available=dilirank_available,
             )
             payload["source_provenance"] = self._build_source_provenance(payload)
 
-        self._enrich_regimen_component_provenance(resolved_drugs)
+        if evidence.dilirank:
+            self._enrich_regimen_component_provenance(resolved_drugs, evidence)
+
+    # -------------------------------------------------------------------------
+    def _dilirank_available(self) -> bool:
+        return (
+            self.dilirank_repository is not None
+            and self.dilirank_repository.count_records() > 0
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _withhold_livertox_evidence(payload: dict[str, Any]) -> None:
+        matched_row = payload.get("matched_livertox_row")
+        if isinstance(matched_row, dict):
+            payload["matched_livertox_row"] = {
+                key: value
+                for key, value in matched_row.items()
+                if key in LIVERTOX_IDENTITY_FIELDS
+            }
+        payload["extracted_excerpts"] = []
+        payload["livertox_monographs"] = []
+        payload["accepted_livertox_match_has_excerpt"] = False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _evidence_status(
+        evidence: EvidenceSelection,
+        payload: dict[str, Any],
+        *,
+        dilirank_records: list[dict[str, Any]],
+        dilirank_available: bool,
+    ) -> dict[str, str]:
+        if not evidence.livertox:
+            livertox = "not_selected"
+        elif payload.get("extracted_excerpts") or payload.get("livertox_monographs"):
+            livertox = "retrieved"
+        else:
+            livertox = "no_record"
+        if not evidence.dilirank:
+            dilirank = "not_selected"
+        elif not dilirank_available:
+            dilirank = "unavailable"
+        elif dilirank_records:
+            dilirank = "retrieved"
+        else:
+            dilirank = "no_record"
+        return {"livertox": livertox, "dilirank": dilirank}
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -104,6 +179,7 @@ class ClinicalKnowledgeComposer:
     def _enrich_regimen_component_provenance(
         self,
         resolved_drugs: dict[str, dict[str, Any]],
+        evidence: EvidenceSelection,
     ) -> None:
         payload_by_normalized_name: dict[str, dict[str, Any]] = {}
         for key, payload in resolved_drugs.items():
@@ -193,7 +269,11 @@ class ClinicalKnowledgeComposer:
             payload["knowledge_prompt"] = self.build_combined_prompt_fragment(
                 livertox_excerpt=livertox_excerpt,
                 dilirank_records=all_records,
+                evidence=evidence,
             )
+            status = payload.get("evidence_status")
+            if isinstance(status, dict):
+                status["dilirank"] = "retrieved"
             payload["source_provenance"] = self._build_source_provenance(payload)
 
     # -------------------------------------------------------------------------
@@ -271,12 +351,15 @@ class ClinicalKnowledgeComposer:
         *,
         livertox_excerpt: str,
         dilirank_records: list[dict[str, Any]],
+        evidence: EvidenceSelection,
     ) -> str:
-        return "\n\n".join(
-            [
+        fragments: list[str] = []
+        if evidence.livertox:
+            fragments.append(
                 build_livertox_knowledge_fragment(
                     livertox_excerpt=livertox_excerpt.strip(),
-                ),
-                build_dilirank_knowledge_fragment(records=dilirank_records),
-            ]
-        )
+                )
+            )
+        if evidence.dilirank:
+            fragments.append(build_dilirank_knowledge_fragment(records=dilirank_records))
+        return "\n\n".join(fragments)

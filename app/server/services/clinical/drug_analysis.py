@@ -10,6 +10,10 @@ from datetime import date
 from typing import Any
 
 from common.prompts.clinical_assessment import (
+    EXTERNAL_EVIDENCE_CLINICAL_SYSTEM_PROMPT,
+    EXTERNAL_EVIDENCE_CLINICAL_USER_PROMPT,
+    EXTERNAL_EVIDENCE_REVISION_SYSTEM_PROMPT,
+    EXTERNAL_EVIDENCE_REVISION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
@@ -35,6 +39,11 @@ from services.clinical.livertox_likelihood import normalize_livertox_likelihood
 from services.llm.cloud import CloudLLMClient
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_client import OllamaClient
+
+LIVERTOX_NOT_SELECTED = "not_selected"
+NO_EXTERNAL_EVIDENCE_PROMPT = (
+    "No external evidence source was consulted for this drug in this session."
+)
 
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
@@ -105,7 +114,7 @@ class DrugAnalysisService:
         )
         rucam_block = self.format_rucam_prompt_block(rucam)
         user_prompt = build_livertox_drug_assessment_user_prompt(
-            revision=user_template == LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+            template=user_template,
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             report_language=self.escape_braces(report_language),
             canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
@@ -202,10 +211,20 @@ class DrugAnalysisService:
             pattern_summary=pattern_summary,
             metadata=metadata,
             rucam=rucam,
-            knowledge_prompt=knowledge_prompt,
+            knowledge_prompt=self.resolve_knowledge_prompt(
+                knowledge_prompt, livertox_status
+            ),
             report_language=report_language,
-            system_template=LIVERTOX_CLINICAL_SYSTEM_PROMPT,
-            user_template=LIVERTOX_CLINICAL_USER_PROMPT,
+            system_template=(
+                EXTERNAL_EVIDENCE_CLINICAL_SYSTEM_PROMPT
+                if livertox_status == LIVERTOX_NOT_SELECTED
+                else LIVERTOX_CLINICAL_SYSTEM_PROMPT
+            ),
+            user_template=(
+                EXTERNAL_EVIDENCE_CLINICAL_USER_PROMPT
+                if livertox_status == LIVERTOX_NOT_SELECTED
+                else LIVERTOX_CLINICAL_USER_PROMPT
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -242,11 +261,28 @@ class DrugAnalysisService:
             pattern_summary=pattern_summary,
             metadata=metadata,
             rucam=rucam,
-            knowledge_prompt=knowledge_prompt,
+            knowledge_prompt=self.resolve_knowledge_prompt(
+                knowledge_prompt, livertox_status
+            ),
             report_language=report_language,
-            system_template=LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT,
-            user_template=LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
+            system_template=(
+                EXTERNAL_EVIDENCE_REVISION_SYSTEM_PROMPT
+                if livertox_status == LIVERTOX_NOT_SELECTED
+                else LIVERTOX_REVISION_CLINICAL_SYSTEM_PROMPT
+            ),
+            user_template=(
+                EXTERNAL_EVIDENCE_REVISION_USER_PROMPT
+                if livertox_status == LIVERTOX_NOT_SELECTED
+                else LIVERTOX_REVISION_CLINICAL_USER_PROMPT
+            ),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_knowledge_prompt(knowledge_prompt: str, livertox_status: str) -> str:
+        if livertox_status == LIVERTOX_NOT_SELECTED and not knowledge_prompt.strip():
+            return NO_EXTERNAL_EVIDENCE_PROMPT
+        return knowledge_prompt
 
     # -------------------------------------------------------------------------
     @staticmethod

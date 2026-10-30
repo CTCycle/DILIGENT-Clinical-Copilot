@@ -238,6 +238,13 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def active_model_overrides(cls) -> dict[str, str]:
+        """Session-only model overrides recorded in the active run snapshot."""
+        value = (cls._runtime_override.get() or {}).get("model_overrides")
+        return dict(value) if isinstance(value, dict) else {}
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def get_text_extraction_model(cls) -> str:
         return (cls._load_snapshot().text_extraction_model or "").strip()
 
@@ -283,8 +290,32 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def capture_run_snapshot(cls, *, use_rag: bool) -> tuple[dict[str, object], str]:
-        """Capture the complete resolved runtime once for a clinical job."""
+    def capture_run_snapshot(
+        cls,
+        *,
+        evidence_sources: list[str],
+        model_overrides: dict[str, str] | None = None,
+    ) -> tuple[dict[str, object], str]:
+        """Capture the complete resolved runtime once for a clinical job.
+
+        Session-only model overrides are applied in this context only, so the
+        snapshot freezes the effective models without touching persisted
+        configuration or other runs.
+        """
+        with cls.override_for_run(model_overrides):
+            return cls._capture_run_snapshot(
+                evidence_sources=evidence_sources,
+                model_overrides=dict(model_overrides or {}),
+            )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _capture_run_snapshot(
+        cls,
+        *,
+        evidence_sources: list[str],
+        model_overrides: dict[str, str],
+    ) -> tuple[dict[str, object], str]:
         parser_provider, parser_model = cls.resolve_provider_and_model("parser")
         clinical_provider, clinical_model = cls.resolve_provider_and_model("clinical")
         revision_provider, revision_model = cls.resolve_provider_and_model("revision")
@@ -339,7 +370,8 @@ class LLMRuntimeConfig:
             "clinical_model": cls.get_clinical_model(),
             "reasoning_level": cls.get_reasoning_level().value,
             "ollama_seed": cls.get_ollama_seed(),
-            "use_rag": bool(use_rag),
+            "evidence_sources": list(evidence_sources),
+            "model_overrides": model_overrides,
             "rag_settings": cls._load_snapshot().rag_settings or {},
             "parser_provider": parser_provider,
             "parser_model": parser_model,

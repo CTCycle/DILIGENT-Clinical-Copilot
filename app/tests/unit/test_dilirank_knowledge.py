@@ -16,7 +16,7 @@ from sqlalchemy.pool import StaticPool
 
 from api.inspection.dilirank import InspectionDiliRankEndpoint
 from common.prompts.clinical_context import build_dilirank_knowledge_fragment
-from domain.clinical.entities import DrugClinicalAssessment
+from domain.clinical.entities import DrugClinicalAssessment, EvidenceSelection
 from repositories.context import RepositoryContext
 from repositories.dilirank_repository import (
     DILIRANK_IDENTIFIER_SYSTEM,
@@ -557,7 +557,7 @@ def test_clinical_composer_adds_linked_dilirank_evidence_and_provenance() -> Non
         }
     }
 
-    composer.enrich_resolved_drugs(resolved)
+    composer.enrich_resolved_drugs(resolved, EvidenceSelection.from_sources(["livertox", "dilirank"]))
 
     payload = resolved["acetaminophen"]
     assert payload["dilirank_records"][0]["ltkb_id"] == "LT00004"
@@ -633,7 +633,7 @@ def test_clinical_composer_scopes_component_dilirank_evidence_for_combinations()
         },
     }
 
-    composer.enrich_resolved_drugs(resolved)
+    composer.enrich_resolved_drugs(resolved, EvidenceSelection.from_sources(["livertox", "dilirank"]))
 
     parent_payload = resolved["amoxicillin clavulanate"]
     assert parent_payload["drug_id"] == parent_id

@@ -15,7 +15,6 @@ class ClinicalDraftForm(BaseModel):
     patient_name: str = Field(default="", max_length=200)
     visit_date: date | None = None
     clinical_input: str = Field(default="", max_length=100_000)
-    use_rag: bool = False
 
 
 class ClinicalDraftWrite(BaseModel):

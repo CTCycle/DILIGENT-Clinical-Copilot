@@ -386,7 +386,7 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
         anamnesis="Paziente con ittero.",
         drugs="Paracetamolo 1-0-0-0",
         laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
-        use_rag=True,
+        evidence_sources=["livertox", "dilirank", "documents"],
     )
 
     result = asyncio.run(

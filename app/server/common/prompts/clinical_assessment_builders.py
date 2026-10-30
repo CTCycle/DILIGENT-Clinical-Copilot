@@ -4,16 +4,14 @@
 from __future__ import annotations
 
 from common.prompts.clinical_assessment import (
-    LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
-    LIVERTOX_REVISION_CLINICAL_USER_PROMPT,
     LIVERTOX_REVISION_CONCLUSION_USER_PROMPT,
 )
 
 ###############################################################################
 def build_livertox_drug_assessment_user_prompt(
     *,
-    revision: bool,
+    template: str,
     drug_name: str,
     report_language: str,
     canonical_name: str,
@@ -33,11 +31,6 @@ def build_livertox_drug_assessment_user_prompt(
     metadata_block: str,
     livertox_score: str,
 ) -> str:
-    template = (
-        LIVERTOX_REVISION_CLINICAL_USER_PROMPT
-        if revision
-        else LIVERTOX_CLINICAL_USER_PROMPT
-    )
     return template.format(
         drug_name=drug_name,
         report_language=report_language,

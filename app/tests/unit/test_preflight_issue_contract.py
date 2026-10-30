@@ -243,7 +243,7 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
             visit_date=date(2026, 7, 17),
             clinical_input=None,
             selected_model_providers=["ollama"],
-            use_rag=True,
+            evidence_sources=["documents"],
         ),
         knowledge_repository=service.knowledge_repository,
         drug_catalog_repository=service.drug_catalog_repository,
@@ -251,9 +251,9 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
 
     rag_issue = next(
         issue
-        for issue in result.non_blocking_issues
+        for issue in result.blocking_issues
         if issue.code == "rag_ollama_unavailable"
     )
-    assert rag_issue.field == "use_rag"
-    assert rag_issue.continuation_allowed is True
-    assert rag_issue.affected_section == "RAG evidence"
+    assert rag_issue.field == "evidence_sources"
+    assert rag_issue.continuation_allowed is False
+    assert rag_issue.affected_section == "Evidence sources"

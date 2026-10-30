@@ -49,7 +49,6 @@ class ClinicalDraftRepository:
                         patient_name=form.patient_name,
                         visit_date=form.visit_date,
                         clinical_input=form.clinical_input,
-                        use_rag=form.use_rag,
                         updated_at=datetime.now(UTC),
                     )
                 )
@@ -71,7 +70,6 @@ class ClinicalDraftRepository:
                         patient_name=form.patient_name,
                         visit_date=form.visit_date,
                         clinical_input=form.clinical_input,
-                        use_rag=form.use_rag,
                         updated_at=datetime.now(UTC),
                     )
                 )
@@ -100,7 +98,6 @@ class ClinicalDraftRepository:
                         patient_name=None,
                         visit_date=None,
                         clinical_input=None,
-                        use_rag=False,
                         updated_at=None,
                     )
                 )
@@ -121,7 +118,6 @@ class ClinicalDraftRepository:
                         patient_name=None,
                         visit_date=None,
                         clinical_input=None,
-                        use_rag=False,
                         updated_at=None,
                     )
                 )
@@ -162,7 +158,6 @@ class ClinicalDraftRepository:
                 patient_name=row.patient_name or "",
                 visit_date=row.visit_date,
                 clinical_input=row.clinical_input or "",
-                use_rag=row.use_rag,
             )
             if row.is_active
             else None
