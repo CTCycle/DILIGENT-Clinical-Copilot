@@ -36,21 +36,34 @@ from services.llm.model_capabilities import (
 ###############################################################################
 class RoutedGatewayTransport(StructuredTransportMixin):
     _opencode_go_models_path = "/zen/go/v1/models"
-    _opencode_go_route_map_version = "2026-09-14"
+    _opencode_go_route_map_version = "2026-10-30"
     _cache: dict[str, tuple[datetime, list[CloudModelDescriptor]]] = {}
     _cache_ttl = timedelta(minutes=15)
     _opencode_go_route_maps: dict[str, dict[str, frozenset[str]]] = {
         "opencode_go": {
         "responses": frozenset(
             {
+                "grok-4.7",
                 "grok-4.6",
+                "gpt-6-luna",
                 "gpt-5.6-luna",
                 "muse-spark-1.3-contributor",
                 "muse-spark-1.2-contributor",
             }
         ),
+        # Gemini's native route is a per-model Google v1beta path; OpenCode Go
+        # documents that every text model is also served (translated) through
+        # the other APIs, so it is routed through chat completions.
         "chat/completions": frozenset(
             {
+                "beam-free",
+                "iceman-contributor-free",
+                "gemini-4-argon",
+                "step-5-preview",
+                "kimi-k3.1-pro",
+                "mimo-v2.6-flash",
+                "mimo-v2.6-pro",
+                "minimax-m3.1-flash",
                 "glm-5.3-flash",
                 "glm-5.3",
                 "glm-5.2",
@@ -73,6 +86,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
         ),
         "messages": frozenset(
             {
+                "claude-haiku-5-5",
                 "minimax-m3",
                 "minimax-m2.7",
                 "minimax-m2.5",
