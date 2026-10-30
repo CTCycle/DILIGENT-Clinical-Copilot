@@ -128,4 +128,31 @@ describe('DiliJobTrackerService', () => {
 
     tracker.clearJobState();
   });
+
+  it('stores the session id from a running job result and keeps it across later polls', () => {
+    const tracker = TestBed.inject(DiliJobTrackerService);
+    const applyJobStatus = (tracker as unknown as {
+      applyJobStatus: (status: Record<string, unknown>) => void;
+    }).applyJobStatus.bind(tracker);
+    const base = { job_id: 'job-1', job_type: 'clinical', error: null, version: 1 };
+
+    applyJobStatus({
+      ...base,
+      status: 'running',
+      progress: 80,
+      result: { progress_stage: 'report.generating', session_id: 42 },
+    });
+    applyJobStatus({
+      ...base,
+      status: 'running',
+      progress: 90,
+      result: { progress_stage: 'session.saving' },
+    });
+
+    expect(appState.state().diliAgent.sessionId).toBe(42);
+    expect(appState.state().diliAgent.jobStage).toBe('session.saving');
+
+    tracker.clearJobState();
+    expect(appState.state().diliAgent.sessionId).toBeNull();
+  });
 });

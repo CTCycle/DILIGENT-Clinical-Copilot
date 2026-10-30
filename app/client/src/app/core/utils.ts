@@ -1,7 +1,13 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { ClinicalFormState, ClinicalRequestPayload, RuntimeSettings } from "./models/types";
+import {
+  ClinicalFormState,
+  ClinicalRequestPayload,
+  EvidenceSourceId,
+  RuntimeSettings,
+  SessionModelOverrides,
+} from "./models/types";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -125,6 +131,8 @@ function resolveSelectedModelProviders(settings: RuntimeSettings): string[] {
 export function buildClinicalPayload(
   form: ClinicalFormState,
   settings: RuntimeSettings,
+  evidenceSources: readonly EvidenceSourceId[],
+  modelOverrides: SessionModelOverrides | null,
 ): ClinicalRequestPayload {
   return {
     name: sanitizeField(form.patientName),
@@ -132,7 +140,8 @@ export function buildClinicalPayload(
     clinical_input: sanitizeField(form.clinicalInput),
     selected_model_providers: resolveSelectedModelProviders(settings),
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
-    use_rag: form.useRag,
+    evidence_sources: [...evidenceSources],
+    model_overrides: modelOverrides,
   };
 }
 

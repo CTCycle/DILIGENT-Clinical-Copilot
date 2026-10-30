@@ -15,7 +15,7 @@ describe('AppStateService', () => {
     TestBed.configureTestingModule({});
   });
 
-  it('persists only the UI-local expansion preference', () => {
+  it('persists only the UI-local expansion preference and the report session id', () => {
     const service = TestBed.inject(AppStateService);
 
     service.updateDiliAgent({
@@ -27,11 +27,13 @@ describe('AppStateService', () => {
       message: 'Transient message',
       jobId: 'transient-job',
       isRunning: true,
+      sessionId: 42,
     });
     TestBed.flushEffects();
 
     expect(JSON.parse(localStorage.getItem(UI_STATE_KEY) || '{}')).toEqual({
       isExpanded: true,
+      sessionId: 42,
     });
   });
 
@@ -54,6 +56,7 @@ describe('AppStateService', () => {
   it('rehydrates the current UI preference without rehydrating runtime state', () => {
     localStorage.setItem(UI_STATE_KEY, JSON.stringify({
       isExpanded: true,
+      sessionId: 9,
       jobId: 'stale-job',
       isRunning: true,
       settings: { clinicalModel: 'stale-model' },
@@ -62,6 +65,7 @@ describe('AppStateService', () => {
     const service = TestBed.inject(AppStateService);
 
     expect(service.state().diliAgent.isExpanded).toBe(true);
+    expect(service.state().diliAgent.sessionId).toBe(9);
     expect(service.state().diliAgent.jobId).toBeNull();
     expect(service.state().diliAgent.isRunning).toBe(false);
   });

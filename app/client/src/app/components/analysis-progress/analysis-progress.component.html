@@ -1,0 +1,35 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<section class="analysis-progress" [attr.data-tone]="tone()" aria-label="Analysis progress">
+  <div class="analysis-progress-heading">
+    <strong>{{ phaseLabel() }}</strong>
+    @if (elapsed(); as elapsedLabel) {
+      <span class="analysis-progress-elapsed">{{ elapsedLabel }}</span>
+    }
+  </div>
+  <div
+    class="analysis-progress-track"
+    role="progressbar"
+    aria-label="Analysis progress"
+    [attr.aria-valuemin]="isIndeterminate() ? null : 0"
+    [attr.aria-valuemax]="isIndeterminate() ? null : 100"
+    [attr.aria-valuenow]="isIndeterminate() ? null : barValue()"
+    [attr.aria-valuetext]="phaseLabel()"
+  >
+    <div
+      class="analysis-progress-fill"
+      [class.is-indeterminate]="isIndeterminate()"
+      [style.width.%]="isIndeterminate() ? null : barValue()"
+    ></div>
+  </div>
+  @if (stepLabel(); as step) {
+    <p class="analysis-progress-step">{{ step }}</p>
+  }
+  <p class="analysis-progress-sr" aria-live="polite">{{ phaseLabel() }}</p>
+  @if (detail(); as message) {
+    <p class="analysis-progress-detail">{{ message }}</p>
+  }
+  @if (stalled()) {
+    <p class="analysis-progress-detail">This step is taking longer than expected; the analysis is still running.</p>
+  }
+</section>

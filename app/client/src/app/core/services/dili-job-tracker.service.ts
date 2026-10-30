@@ -3,7 +3,6 @@
 
 import { Injectable, inject } from '@angular/core';
 
-import { REPORT_EXPORT_FILENAME } from '../constants';
 import { ClinicalJobResult, JobStatus, JobStatusResponse } from '../models/types';
 import { AppStateService } from '../state/app-state.service';
 import {
@@ -14,7 +13,7 @@ import {
 } from './clinical-api';
 import { JobPollingService } from './job-polling.service';
 import { normalizeThrownError } from './http-api';
-import { createDownloadUrl, formatErrorMessage, formatUnknownError } from '../utils';
+import { formatErrorMessage, formatUnknownError } from '../utils';
 
 const POLL_WATCHDOG_MIN_STALE_MS = 15_000;
 const STALE_JOB_MESSAGE =
@@ -134,16 +133,15 @@ export class DiliJobTrackerService {
 
     persistClinicalJob(null);
     this.stopPolling();
-    this.revokeCurrentExportUrl();
     const now = Date.now();
     this.stateService.updateDiliAgent({
       message: '',
-      exportUrl: null,
       jobId: null,
       jobProgress: 0,
       jobStatus: null,
       jobStage: null,
       jobStageMessage: null,
+      sessionId: null,
       isStarting: true,
       isRunning: true,
       jobStartedAtMs: now,
@@ -177,7 +175,6 @@ export class DiliJobTrackerService {
       persistClinicalJob(null);
       this.stateService.updateDiliAgent({
         message: formatUnknownError(error, 'Unexpected error'),
-        exportUrl: null,
         jobId: null,
         jobProgress: 0,
         jobStatus: null,
@@ -207,28 +204,20 @@ export class DiliJobTrackerService {
   clearJobState(): void {
     persistClinicalJob(null);
     this.stopPolling();
-    this.revokeCurrentExportUrl();
     this.stateService.updateDiliAgent({
       message: '',
-      exportUrl: null,
       jobId: null,
       jobProgress: 0,
       jobStatus: null,
       jobStage: null,
       jobStageMessage: null,
+      sessionId: null,
       isStarting: false,
       isRunning: false,
       jobStartedAtMs: null,
       jobLastProgressAtMs: null,
       pollIntervalMs: null,
     });
-  }
-
-  revokeCurrentExportUrl(): void {
-    const currentExportUrl = this.stateService.state().diliAgent.exportUrl;
-    if (currentExportUrl) {
-      URL.revokeObjectURL(currentExportUrl);
-    }
   }
 
   private beginPolling(jobId: string, intervalMs: number, delayFirstPoll = false): void {
@@ -306,6 +295,10 @@ export class DiliJobTrackerService {
       status.result && typeof status.result.progress_message === 'string'
         ? status.result.progress_message
         : null;
+    const sessionId =
+      status.result && typeof status.result.session_id === 'number'
+        ? status.result.session_id
+        : null;
     const currentAgentState = this.stateService.state().diliAgent;
     const resolvedStage = terminalStatus ? status.status : stage ?? currentAgentState.jobStage;
     const resolvedStageMessage = terminalStatus
@@ -330,6 +323,7 @@ export class DiliJobTrackerService {
       jobStatus: status.status,
       jobStage: resolvedStage,
       jobStageMessage: resolvedStageMessage,
+      sessionId: sessionId ?? currentAgentState.sessionId,
       isStarting: false,
       isRunning: !terminalStatus,
       jobStartedAtMs: currentAgentState.jobStartedAtMs ?? now,
@@ -348,21 +342,17 @@ export class DiliJobTrackerService {
 
     if (status.status === 'completed') {
       const report = typeof status.result?.report === 'string' ? status.result.report : '';
-      this.revokeCurrentExportUrl();
       this.stateService.updateDiliAgent({
         message: report || '[INFO] Clinical analysis completed.',
-        exportUrl: report ? createDownloadUrl(report, REPORT_EXPORT_FILENAME) : null,
         pollIntervalMs: null,
       });
       return;
     }
 
-    this.revokeCurrentExportUrl();
     this.stateService.updateDiliAgent({
       message: status.status === 'failed'
         ? (status.error ? formatErrorMessage(status.error) : '[ERROR] Clinical analysis failed.')
         : '[INFO] Clinical analysis cancelled.',
-      exportUrl: null,
       pollIntervalMs: null,
     });
   }
@@ -382,14 +372,12 @@ export class DiliJobTrackerService {
       persistClinicalJob(null);
     }
     this.stopPolling();
-    this.revokeCurrentExportUrl();
     this.stateService.updateDiliAgent({
       message: isJobNotFoundError(message)
         ? STALE_JOB_MESSAGE
         : message.startsWith('[ERROR]')
           ? message
           : `[ERROR] ${message}`,
-      exportUrl: null,
       jobStatus: isJobNotFoundError(message) ? null : 'failed',
       jobId: isJobNotFoundError(message) ? null : this.stateService.state().diliAgent.jobId,
       jobStage: null,

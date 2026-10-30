@@ -26,7 +26,6 @@ const form: ClinicalFormState = {
   visitDate: '2026-10-23',
   patientImageDataUrl: 'data:image/png;base64,not-persisted',
   clinicalInput: '  First line\r\n\r\n second line\t ',
-  useRag: true,
 };
 
 function snapshot(revision: number, formValue: ClinicalFormState) {
@@ -38,7 +37,6 @@ function snapshot(revision: number, formValue: ClinicalFormState) {
       patient_name: formValue.patientName,
       visit_date: formValue.visitDate || null,
       clinical_input: formValue.clinicalInput,
-      use_rag: formValue.useRag,
     },
   };
 }
@@ -140,7 +138,6 @@ describe('ClinicalDraftService', () => {
         patient_name: form.patientName,
         visit_date: form.visitDate,
         clinical_input: form.clinicalInput,
-        use_rag: true,
       },
     });
     expect(JSON.stringify(putRequests[0])).not.toContain(

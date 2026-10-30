@@ -23,7 +23,6 @@ function formForDraft(form: ClinicalFormState): ClinicalDraftForm {
     patient_name: form.patientName,
     visit_date: form.visitDate || null,
     clinical_input: form.clinicalInput,
-    use_rag: form.useRag,
   };
 }
 
