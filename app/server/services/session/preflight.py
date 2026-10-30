@@ -17,10 +17,16 @@ from domain.clinical.entities import (
 from domain.clinical.robustness import (
     ClinicalInputPreflightIssue,
     ClinicalInputPreflightResult,
+    EvidenceSourceStatus,
+    RagReadiness,
 )
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
+from services.clinical.evidence_sources import (
+    check_evidence_sources,
+    dilirank_repository_for,
+)
 from services.llm.provider_factory import select_llm_provider
 from services.llm.provider_registry import provider_registry
 from services.retrieval.readiness import check_rag_readiness
@@ -157,22 +163,73 @@ def validate_clinical_input_preflight(
     knowledge_repository: KnowledgeRepository,
     drug_catalog_repository: DrugCatalogRepository,
 ) -> ClinicalInputPreflightResult:
+    overrides = (
+        request_payload.model_overrides.as_runtime_overrides()
+        if request_payload.model_overrides is not None
+        else {}
+    )
+    # Session-only model overrides are validated exactly as they will run.
+    with LLMRuntimeConfig.override_for_run(overrides):
+        return _validate_clinical_input_preflight(
+            service,
+            request_payload,
+            overrides=overrides,
+            knowledge_repository=knowledge_repository,
+            drug_catalog_repository=drug_catalog_repository,
+        )
+
+
+###############################################################################
+def _validate_clinical_input_preflight(
+    service: Any,
+    request_payload: ClinicalSessionRequest,
+    *,
+    overrides: dict[str, str],
+    knowledge_repository: KnowledgeRepository,
+    drug_catalog_repository: DrugCatalogRepository,
+) -> ClinicalInputPreflightResult:
     blocking: list[ClinicalInputPreflightIssue] = []
     non_blocking: list[ClinicalInputPreflightIssue] = []
-    service.apply_persisted_runtime_configuration()
-    runtime_settings = _runtime_settings()
     deterministic_diagnostics: dict[str, Any] = {}
-    rag_readiness = check_rag_readiness(requested=request_payload.use_rag)
-    if request_payload.use_rag and not rag_readiness.available:
-        non_blocking.append(
+    selection = request_payload.evidence
+    documents_readiness = check_rag_readiness(requested=True)
+    rag_readiness = (
+        documents_readiness
+        if selection.documents
+        else check_rag_readiness(requested=False)
+    )
+    evidence_statuses = check_evidence_sources(
+        selection,
+        knowledge_repository=knowledge_repository,
+        dilirank_repository=dilirank_repository_for(knowledge_repository),
+        documents_readiness=documents_readiness,
+    )
+    try:
+        if overrides:
+            service.model_config_service.validate_session_model_overrides(overrides)
+        service.apply_persisted_runtime_configuration()
+        runtime_settings = _runtime_settings()
+    except (ServiceValidationError, ValueError) as exc:
+        if not overrides:
+            raise
+        blocking.append(
             ClinicalInputPreflightIssue(
-                severity="non_blocking",
-                code=rag_readiness.reason_code or "rag_unavailable",
-                message=rag_readiness.message
-                or "RAG evidence retrieval is unavailable for this assessment.",
-                field="use_rag",
+                severity="blocking",
+                code="session_model_unavailable",
+                message=str(exc),
+                field="model_overrides",
             )
         )
+        return _result(
+            blocking,
+            non_blocking,
+            {},
+            {},
+            deterministic_diagnostics,
+            rag_readiness,
+            evidence_statuses,
+        )
+    _validate_evidence_sources(evidence_statuses, rag_readiness, blocking, non_blocking)
     _validate_ui_metadata(request_payload, blocking)
     _validate_provider_key(blocking)
     _validate_requested_provider(request_payload, blocking, runtime_settings)
@@ -197,6 +254,7 @@ def validate_clinical_input_preflight(
             extraction_quality,
             deterministic_diagnostics,
             rag_readiness,
+            evidence_statuses,
         )
     if len(clinical_input.split()) < 60:
         blocking.append(
@@ -239,6 +297,7 @@ def validate_clinical_input_preflight(
             extraction_quality,
             deterministic_diagnostics,
             rag_readiness,
+            evidence_statuses,
         )
     try:
         prepared = service.prepare_structured_clinical_input(
@@ -436,7 +495,39 @@ def validate_clinical_input_preflight(
         extraction_quality,
         deterministic_diagnostics,
         rag_readiness,
+        evidence_statuses,
     )
+
+###############################################################################
+def _validate_evidence_sources(
+    statuses: list[EvidenceSourceStatus],
+    rag_readiness: RagReadiness,
+    blocking: list[ClinicalInputPreflightIssue],
+    non_blocking: list[ClinicalInputPreflightIssue],
+) -> None:
+    for status in statuses:
+        if not status.selected or status.available:
+            continue
+        if status.source == "documents":
+            # Mirrors the start endpoint, which refuses unavailable retrieval.
+            blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="blocking",
+                    code=rag_readiness.reason_code or "rag_unavailable",
+                    message=status.message
+                    or "Indexed document retrieval is unavailable for this assessment.",
+                    field="evidence_sources",
+                )
+            )
+        elif status.source == "dilirank":
+            non_blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="non_blocking",
+                    code="dilirank_unavailable",
+                    message=status.message or "DILIrank is unavailable.",
+                    field="evidence_sources",
+                )
+            )
 
 ###############################################################################
 def _validate_knowledge_bases(
@@ -617,6 +708,7 @@ def _result(
     extraction_quality: dict[str, Any],
     deterministic_diagnostics: dict[str, Any],
     rag_readiness: Any,
+    evidence_statuses: list[EvidenceSourceStatus],
 ) -> ClinicalInputPreflightResult:
     return ClinicalInputPreflightResult(
         ready=not blocking,
@@ -626,6 +718,7 @@ def _result(
         extraction_quality=extraction_quality,
         deterministic_diagnostics=deterministic_diagnostics,
         rag_readiness=rag_readiness,
+        evidence_sources=evidence_statuses,
     )
 
 ###############################################################################
@@ -668,7 +761,8 @@ _FIELD_LABELS = {
     "laboratory_analysis": "Laboratory analysis",
     "selected_model_providers": "Model configuration",
     "session_storage": "Session storage",
-    "use_rag": "RAG evidence",
+    "evidence_sources": "Evidence sources",
+    "model_overrides": "Session models",
     "visit_date": "Visit date",
 }
 
@@ -680,6 +774,14 @@ _ISSUE_PRESENTATIONS: dict[str, tuple[str, str]] = {
     "anamnesis_regimen_lines_need_review": (
         "Medication history needs review",
         "Some historical medication details may be omitted or interpreted with uncertainty.",
+    ),
+    "dilirank_unavailable": (
+        "DILIrank data is unavailable",
+        "DILIrank will be reported as unavailable; this is not a negative finding.",
+    ),
+    "session_model_unavailable": (
+        "Selected model is unavailable",
+        "Choose a model from the active provider catalog or restore the defaults.",
     ),
     "clinical_input_missing": (
         "Clinical input is empty",

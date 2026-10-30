@@ -47,7 +47,6 @@ def test_draft_http_contract_validation_conflict_and_tombstone(
         "patient_name": "Synthetic draft patient",
         "visit_date": None,
         "clinical_input": "  first line\n\n second line  ",
-        "use_rag": True,
     }
     saved_response = api_context.put(
         "/api/clinical/draft",

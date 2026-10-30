@@ -39,7 +39,7 @@ def _build_clinical_job_payload() -> dict:
         ),
         "selected_model_providers": ["openai"],
         "patient_image_base64": None,
-        "use_rag": False,
+        "evidence_sources": ["livertox", "dilirank"],
     }
 
 ###############################################################################
@@ -58,7 +58,7 @@ def _build_variant_heading_payload() -> dict:
         ),
         "selected_model_providers": ["openai"],
         "patient_image_base64": None,
-        "use_rag": False,
+        "evidence_sources": ["livertox", "dilirank"],
     }
 
 ###############################################################################

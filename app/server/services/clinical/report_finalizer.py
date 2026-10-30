@@ -7,7 +7,9 @@ import re
 from typing import Any, Awaitable, Callable
 
 from domain.clinical.entities import (
+    EVIDENCE_SOURCE_LABELS,
     DrugClinicalAssessment,
+    EvidenceSelection,
     PatientLabTimeline,
     RagDocumentReference,
 )
@@ -200,7 +202,8 @@ class ReportFinalizer:
             f"**{title}**\n\n{clinical_commentary}\n\n"
             f"**RUCAM**: {localized_rucam}\n\n"
             f"**{phrase('report_label', report_language)}**\n\n{body}\n\n"
-            f"**{phrase('bibliography_source', report_language)}**: {self.bibliography_source_label(entry)}"
+            f"**{phrase('bibliography_source', report_language)}**: "
+            f"{self.bibliography_source_label(entry, report_language=report_language)}"
         ).strip()
 
     # -------------------------------------------------------------------------
@@ -495,7 +498,13 @@ class ReportFinalizer:
     @staticmethod
     def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
         status = (entry.match_status or "").strip().lower()
-        return status in {"accepted_verified", "accepted_probable"}
+        if status in {"accepted_verified", "accepted_probable"}:
+            return True
+        # Without LiverTox, an accepted terminology identity is assessable.
+        return (
+            status == "missing_livertox"
+            and entry.evidence_status.get("livertox") == "not_selected"
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -514,16 +523,29 @@ class ReportFinalizer:
     # -------------------------------------------------------------------------
     @classmethod
     def bibliography_source_label(
-        cls, entry: DrugClinicalAssessment | None = None
+        cls,
+        entry: DrugClinicalAssessment | None = None,
+        *,
+        report_language: str = "en",
     ) -> str:
-        sources = [
-            get_text_normalization_snapshot().knowledge_source_references.get(
-                "livertox", "LiverTox"
+        sources: list[str] = []
+        livertox_consulted = (
+            entry is None or entry.evidence_status.get("livertox") != "not_selected"
+        )
+        if livertox_consulted:
+            sources.append(
+                get_text_normalization_snapshot().knowledge_source_references.get(
+                    "livertox", "LiverTox"
+                )
             )
-        ]
+        has_dilirank = entry is not None and cls.has_dilirank_provenance(entry)
+        if not livertox_consulted and not has_dilirank and not (
+            entry is not None and entry.rag_references
+        ):
+            sources.append(phrase("model_knowledge_only", report_language))
         if entry is not None and cls.has_rxnav_provenance(entry):
             sources.append(f"RxNav (RxCUI {entry.rxnav_rxcui})")
-        if entry is not None and cls.has_dilirank_provenance(entry):
+        if has_dilirank and entry is not None:
             dilirank_label = DILIRANK_SOURCE_LABEL
             if any(
                 isinstance(item, dict)
@@ -535,6 +557,36 @@ class ReportFinalizer:
                 dilirank_label = f"{dilirank_label} (component-level)"
             sources.append(dilirank_label)
         return "; ".join(sources)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def render_evidence_sources_line(
+        evidence: EvidenceSelection,
+        *,
+        unavailable_sources: list[str],
+        report_language: str = "en",
+    ) -> str:
+        """Session-level statement of the evidence actually consulted."""
+        label = phrase("evidence_sources_label", report_language)
+        if evidence.llm_only:
+            segments = [phrase("evidence_llm_only", report_language)]
+        else:
+            segments = [
+                "; ".join(EVIDENCE_SOURCE_LABELS[source] for source in evidence.sources)
+                + "."
+            ]
+        segments.extend(
+            phrase(
+                "evidence_source_unavailable",
+                report_language,
+                source=EVIDENCE_SOURCE_LABELS[source],
+            )
+            for source in unavailable_sources
+            if source in evidence.sources
+        )
+        if not evidence.livertox:
+            segments.append(phrase("evidence_livertox_excluded", report_language))
+        return f"**{label}**: " + " ".join(segments)
 
     # -------------------------------------------------------------------------
     def build_rag_bibliography_section(

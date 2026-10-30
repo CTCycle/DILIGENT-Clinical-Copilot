@@ -14,6 +14,7 @@ from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
+    EvidenceSelection,
     HepatotoxicityPatternAssessment,
     LiverInjuryOnsetContext,
     PatientData,
@@ -641,7 +642,7 @@ class ClinicalSessionExtractionPipelineMixin:
     ) -> dict[str, str] | None:
         self.emit_progress(progress_callback, stage="rag_query_building", value=75.0)
         rag_query: dict[str, str] | None = None
-        if payload.use_rag:
+        if payload.evidence.documents:
             query_builder = DILIQueryBuilder(analysis_drugs)
             logger.info("RAG retrieval enabled for clinical consultation")
             rag_query = query_builder.build_dili_queries(
@@ -663,9 +664,11 @@ class ClinicalSessionExtractionPipelineMixin:
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
-        use_rag: bool,
+        evidence: EvidenceSelection,
     ) -> HepatoxPreparedInputs | None:
-        detail = "livertox_lookup.rag" if use_rag else "livertox_lookup.no_rag"
+        detail = (
+            "evidence_lookup.llm_only" if evidence.llm_only else "evidence_lookup.selected"
+        )
         self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
@@ -692,6 +695,7 @@ class ClinicalSessionExtractionPipelineMixin:
                     all_detected_drugs,
                     clinical_context=structured_context,
                     pattern_score=pattern_score,
+                    evidence=evidence,
                     progress_callback=livertox_progress_callback,
                     identity_resolution_client=getattr(
                         self.drugs_parser, "client", None

@@ -749,12 +749,15 @@ class DiliEvidenceBuilder:
         generated_report: str | None,
         bundle: DiliEvidenceBundle,
         fallback_text: str,
+        evidence_sources_line: str = "",
     ) -> str:
         body = (clinical_narrative or "").strip()
         if not body:
             body = (generated_report or "").strip()
         if not body:
             body = fallback_text.strip()
+        if evidence_sources_line:
+            body = f"{evidence_sources_line}\n\n{body}"
         summary = DiliEvidenceBuilder.render_user_summary(bundle)
         return f"{summary}\n\n---\n\n{body}".strip() if summary else body
 

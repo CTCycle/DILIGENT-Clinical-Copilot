@@ -466,6 +466,36 @@ class ModelConfigService:
         }
 
     # -------------------------------------------------------------------------
+    def validate_session_model_overrides(self, overrides: dict[str, str]) -> None:
+        """Check session-only role overrides against the cached catalog of the
+        active provider. Nothing is persisted."""
+        if not overrides:
+            return
+        snapshot = self.load_current_snapshot()
+        if snapshot.use_cloud_models:
+            provider = self.resolve_provider(snapshot.cloud_provider)
+            known_models = self.known_provider_model_names(provider)
+        else:
+            provider = "ollama"
+            known_models = self.known_local_model_names()
+        role_labels = {
+            "text_extraction_model": "text extraction",
+            "clinical_model": "clinical",
+        }
+        for field_name, model_name in overrides.items():
+            if field_name not in role_labels:
+                raise ServiceValidationError(
+                    f"'{field_name}' cannot be overridden for a clinical session."
+                )
+            if model_name == getattr(snapshot, field_name):
+                continue
+            if model_name not in known_models:
+                raise ServiceValidationError(
+                    f"Model '{model_name}' is not available from provider "
+                    f"'{provider}' for the {role_labels[field_name]} role."
+                )
+
+    # -------------------------------------------------------------------------
     def load_current_snapshot(self) -> ModelConfigSnapshot:
         """Load the canonical persisted configuration without changing it."""
         try:

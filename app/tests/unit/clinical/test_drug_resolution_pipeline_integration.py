@@ -11,6 +11,7 @@ from sqlalchemy import delete, select
 
 import services.clinical.preparation as preparation_module
 from domain.clinical import DrugEntry, PatientDrugs
+from domain.clinical.entities import EvidenceSelection
 from repositories.context import RepositoryContext
 from repositories.knowledge_repository import KnowledgeRepository
 from repositories.schemas.knowledge import Drug
@@ -53,6 +54,7 @@ def prepare(
             PatientDrugs(entries=[DrugEntry(name=name, source="therapy") for name in names]),
             clinical_context="",
             pattern_score=None,
+            evidence=EvidenceSelection.from_sources(["livertox", "dilirank"]),
             **kwargs,
         )
     )

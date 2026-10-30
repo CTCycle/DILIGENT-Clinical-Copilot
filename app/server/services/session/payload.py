@@ -166,7 +166,7 @@ class PayloadSanitizationService:
         anamnesis: str | None,
         drugs: str | None,
         laboratory_analysis: str | None,
-        use_rag: bool,
+        evidence_sources: list[str],
     ) -> dict[str, Any]:
         normalized_visit_date = normalize_visit_date(visit_date)
         return {
@@ -183,5 +183,5 @@ class PayloadSanitizationService:
             "anamnesis": sanitize_anamnesis_text(anamnesis),
             "drugs": sanitize_drugs_text(drugs),
             "laboratory_analysis": sanitize_laboratory_text(laboratory_analysis),
-            "use_rag": bool(use_rag),
+            "evidence_sources": list(evidence_sources),
         }

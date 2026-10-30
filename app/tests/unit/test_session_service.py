@@ -8,7 +8,11 @@ from datetime import date
 from types import SimpleNamespace
 import pytest
 from common.exceptions import ServiceValidationError
-from domain.clinical.entities import ClinicalSectionExtractionResult, ClinicalSessionRequest
+from domain.clinical.entities import (
+    ClinicalSectionExtractionResult,
+    ClinicalSessionRequest,
+    EvidenceSelection,
+)
 from domain.clinical.extras import HepatoxPreparedInputs
 from services.runtime.jobs import JobErrorSanitizer, get_job_manager
 from services.session.factory import build_clinical_session_service
@@ -491,7 +495,7 @@ def test_livertox_timeout_does_not_claim_knowledge_base_is_unavailable(
             issues=issues,
             progress_callback=None,
             stop_check=None,
-            use_rag=False,
+            evidence=EvidenceSelection.from_sources(["livertox", "dilirank"]),
         )
     )
 

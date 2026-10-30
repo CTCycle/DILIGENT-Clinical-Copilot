@@ -7,6 +7,8 @@ from typing import Any
 
 ACCEPTED_STATUSES = frozenset({"accepted_verified", "accepted_probable"})
 RELATED_FORM_LINKS = frozenset({"form_of_parent", "form_of_child"})
+# Statuses with an accepted drug identity, with or without a LiverTox record.
+IDENTITY_ACCEPTED_STATUSES = ACCEPTED_STATUSES | {"missing_livertox"}
 
 ###############################################################################
 def classify_match_evidence(
@@ -17,6 +19,7 @@ def classify_match_evidence(
     has_excerpt: bool,
     missing_livertox: bool,
     ambiguous_match: bool,
+    livertox_selected: bool = True,
 ) -> dict[str, Any]:
     status = (match_status or "").strip().lower()
     identity = terminology or {}
@@ -35,6 +38,14 @@ def classify_match_evidence(
             "evidence_quality": "missing_match",
             "evidence_warnings": ["No verified terminology identity was found."],
         }
+    if not livertox_selected and status in IDENTITY_ACCEPTED_STATUSES:
+        warnings = (
+            ["Drug identity relies on a spelling correction and requires review."]
+            if identity.get("status") == "probable"
+            else []
+        )
+        warnings.append("LiverTox was not consulted for this session.")
+        return {"evidence_quality": "livertox_not_selected", "evidence_warnings": warnings}
     if status == "missing_livertox" or missing_livertox:
         return {
             "evidence_quality": "missing_match",

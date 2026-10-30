@@ -11,6 +11,14 @@ from domain.clinical.entities import DrugRucamAssessment
 
 
 _EVIDENCE_QUALITY_LABELS = {
+    "livertox_not_selected": {
+        "en": "LiverTox not consulted for this session",
+        "it": "LiverTox non consultato per questa sessione",
+        "es": "LiverTox no consultado en esta sesión",
+        "fr": "LiverTox non consulté pour cette session",
+        "de": "LiverTox in dieser Sitzung nicht herangezogen",
+        "pt": "LiverTox não consultado nesta sessão",
+    },
     "direct_match_with_excerpt": {
         "en": "direct local match with supporting excerpt",
         "it": "corrispondenza locale diretta con estratto di supporto",
@@ -88,6 +96,11 @@ _PHRASES = {
         "not_available": "not available",
         "unknown": "unknown",
         "narrative_fallback": "Final report generated in fallback mode because clinical synthesis was unavailable. Manual specialist review is required.",
+        "evidence_sources_label": "Evidence sources",
+        "evidence_llm_only": "LLM knowledge only; no external evidence source was consulted.",
+        "evidence_livertox_excluded": "LiverTox was excluded for this session, so its drug-level hepatotoxicity evidence was not considered and the assessment may be less accurate.",
+        "evidence_source_unavailable": "{source} was selected but unavailable; this is not a negative finding.",
+        "model_knowledge_only": "General model knowledge (no external source consulted)",
     },
     "it": {
         "case_summary": "Sintesi del caso",
@@ -143,6 +156,11 @@ _PHRASES = {
         "not_available": "non disponibile",
         "unknown": "sconosciuta",
         "narrative_fallback": "Report finale generato in modalità di fallback perché la sintesi clinica non era disponibile. È richiesta revisione specialistica manuale.",
+        "evidence_sources_label": "Fonti di evidenza",
+        "evidence_llm_only": "Solo conoscenza del modello LLM; non è stata consultata alcuna fonte di evidenza esterna.",
+        "evidence_livertox_excluded": "LiverTox è stato escluso per questa sessione: le sue evidenze di epatotossicità a livello di farmaco non sono state considerate e la valutazione può risultare meno accurata.",
+        "evidence_source_unavailable": "{source} è stato selezionato ma non era disponibile; questo non costituisce un reperto negativo.",
+        "model_knowledge_only": "Conoscenza generale del modello (nessuna fonte esterna consultata)",
     },
     "es": {
         "case_summary": "Resumen del caso",
@@ -198,6 +216,11 @@ _PHRASES = {
         "not_available": "no disponible",
         "unknown": "desconocida",
         "narrative_fallback": "Informe final generado en modo de respaldo porque la síntesis clínica no estaba disponible. Se requiere revisión manual por especialista.",
+        "evidence_sources_label": "Fuentes de evidencia",
+        "evidence_llm_only": "Solo conocimiento del modelo LLM; no se consultó ninguna fuente de evidencia externa.",
+        "evidence_livertox_excluded": "LiverTox se excluyó en esta sesión, por lo que su evidencia de hepatotoxicidad a nivel de fármaco no se consideró y la evaluación puede ser menos precisa.",
+        "evidence_source_unavailable": "{source} se seleccionó pero no estaba disponible; esto no es un hallazgo negativo.",
+        "model_knowledge_only": "Conocimiento general del modelo (sin fuente externa consultada)",
     },
     "fr": {
         "case_summary": "Résumé du cas",
@@ -253,6 +276,11 @@ _PHRASES = {
         "not_available": "non disponible",
         "unknown": "inconnue",
         "narrative_fallback": "Rapport final généré en mode de repli car la synthèse clinique n'était pas disponible. Une revue spécialisée manuelle est requise.",
+        "evidence_sources_label": "Sources de preuves",
+        "evidence_llm_only": "Connaissances du modèle LLM uniquement ; aucune source de preuves externe n'a été consultée.",
+        "evidence_livertox_excluded": "LiverTox a été exclu pour cette session : ses données d'hépatotoxicité au niveau du médicament n'ont pas été prises en compte et l'évaluation peut être moins précise.",
+        "evidence_source_unavailable": "{source} a été sélectionné mais était indisponible ; il ne s'agit pas d'un résultat négatif.",
+        "model_knowledge_only": "Connaissances générales du modèle (aucune source externe consultée)",
     },
     "de": {
         "case_summary": "Fallzusammenfassung",
@@ -308,6 +336,11 @@ _PHRASES = {
         "not_available": "nicht verfügbar",
         "unknown": "unbekannt",
         "narrative_fallback": "Abschlussbericht im Fallback-Modus erstellt, weil die klinische Synthese nicht verfügbar war. Eine manuelle fachärztliche Prüfung ist erforderlich.",
+        "evidence_sources_label": "Evidenzquellen",
+        "evidence_llm_only": "Nur LLM-Modellwissen; es wurde keine externe Evidenzquelle herangezogen.",
+        "evidence_livertox_excluded": "LiverTox wurde für diese Sitzung ausgeschlossen; seine wirkstoffbezogene Hepatotoxizitätsevidenz wurde nicht berücksichtigt, und die Bewertung kann weniger genau sein.",
+        "evidence_source_unavailable": "{source} wurde ausgewählt, war aber nicht verfügbar; dies ist kein negativer Befund.",
+        "model_knowledge_only": "Allgemeines Modellwissen (keine externe Quelle herangezogen)",
     },
     "pt": {
         "case_summary": "Resumo do caso",
@@ -363,6 +396,11 @@ _PHRASES = {
         "not_available": "não disponível",
         "unknown": "desconhecida",
         "narrative_fallback": "Relatório final gerado em modo de fallback porque a síntese clínica não estava disponível. É necessária revisão manual por especialista.",
+        "evidence_sources_label": "Fontes de evidência",
+        "evidence_llm_only": "Apenas conhecimento do modelo LLM; nenhuma fonte de evidência externa foi consultada.",
+        "evidence_livertox_excluded": "O LiverTox foi excluído nesta sessão, pelo que a sua evidência de hepatotoxicidade ao nível do fármaco não foi considerada e a avaliação pode ser menos precisa.",
+        "evidence_source_unavailable": "{source} foi selecionado, mas estava indisponível; isto não é um achado negativo.",
+        "model_knowledge_only": "Conhecimento geral do modelo (nenhuma fonte externa consultada)",
     },
 }
 

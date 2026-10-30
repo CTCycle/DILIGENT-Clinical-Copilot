@@ -20,8 +20,12 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from services.clinical.match_quality import accepted_link_type, classify_match_evidence
-from services.clinical.drug_analysis import DrugAnalysisService
+from services.clinical.match_quality import (
+    IDENTITY_ACCEPTED_STATUSES,
+    accepted_link_type,
+    classify_match_evidence,
+)
+from services.clinical.drug_analysis import LIVERTOX_NOT_SELECTED, DrugAnalysisService
 from services.clinical.exposure_timeline import ExposureTimelineService
 from services.clinical.rag_support import RagSupportService
 from services.clinical.report_finalizer import ReportFinalizer
@@ -519,6 +523,16 @@ class AnalysisRunner:
             if raw_match_status is not None
             else None
         )
+        raw_evidence_status = livertox_data.get("evidence_status")
+        evidence_status = (
+            {str(key): str(value) for key, value in raw_evidence_status.items()}
+            if isinstance(raw_evidence_status, dict)
+            else {}
+        )
+        livertox_selected = evidence_status.get("livertox") != LIVERTOX_NOT_SELECTED
+        if not livertox_selected and match_status in IDENTITY_ACCEPTED_STATUSES:
+            # An unconsulted source is not a missing record.
+            missing_livertox = False
         match_candidates = []
         for candidate in livertox_data.get("match_candidates", []):
             if isinstance(candidate, dict):
@@ -545,6 +559,7 @@ class AnalysisRunner:
             has_excerpt=bool(excerpts_list),
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
+            livertox_selected=livertox_selected,
         )
         suspension = exposure_timeline.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
@@ -602,6 +617,7 @@ class AnalysisRunner:
             evidence_quality=match_quality["evidence_quality"],
             evidence_warnings=match_quality["evidence_warnings"],
             match_candidates=match_candidates,
+            evidence_status=evidence_status,
             suspension=suspension,
             rucam=rucam,
         )
@@ -614,6 +630,26 @@ class AnalysisRunner:
         )
         entry.claims = entry.narrative.claims
         return entry, knowledge_prompt, excerpts_list
+
+    # -------------------------------------------------------------------------
+    def resolve_llm_evidence(
+        self,
+        entry: DrugClinicalAssessment,
+        excerpts_list: list[str],
+    ) -> tuple[str, str] | None:
+        """Return ``(excerpt, livertox_status)`` for the per-drug LLM call, or
+        ``None`` when the drug gets the missing-evidence paragraph instead.
+
+        With LiverTox selected, a matched excerpt remains mandatory. Without it,
+        any drug with an accepted identity is assessed from the remaining
+        selected evidence or model knowledge.
+        """
+        if entry.evidence_status.get("livertox") == LIVERTOX_NOT_SELECTED:
+            return None if entry.missing_livertox else ("", LIVERTOX_NOT_SELECTED)
+        excerpt = self.rag_support.select_excerpt(excerpts_list)
+        if excerpt is None or entry.missing_livertox:
+            return None
+        return excerpt, "matched"
 
     # -------------------------------------------------------------------------
     async def prepare_drug_assessment(
@@ -641,13 +677,14 @@ class AnalysisRunner:
         )
         if entry.paragraph:
             return entry, None
-        excerpt = self.rag_support.select_excerpt(excerpts_list)
-        if excerpt is None or entry.missing_livertox:
+        llm_evidence = self.resolve_llm_evidence(entry, excerpts_list)
+        if llm_evidence is None:
             entry.missing_livertox = True
             entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(
                 entry
             )
             return entry, None
+        excerpt, livertox_status = llm_evidence
         rag_bundle = await self.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
         )
@@ -660,7 +697,7 @@ class AnalysisRunner:
             canonical_name=entry.canonical_name or drug_entry.name,
             origins=entry.origins,
             extraction_metadata=entry.extraction_metadata,
-            livertox_status="matched",
+            livertox_status=livertox_status,
             excerpt=excerpt,
             rag_context=rag_context,
             clinical_context=normalized_context,
@@ -700,13 +737,14 @@ class AnalysisRunner:
         )
         if entry.paragraph:
             return entry, None
-        excerpt = self.rag_support.select_excerpt(excerpts_list)
-        if excerpt is None or entry.missing_livertox:
+        llm_evidence = self.resolve_llm_evidence(entry, excerpts_list)
+        if llm_evidence is None:
             entry.missing_livertox = True
             entry.paragraph = self.report_finalizer.build_missing_excerpt_paragraph(
                 entry
             )
             return entry, None
+        excerpt, livertox_status = llm_evidence
         rag_bundle = await self.rag_support.fetch_rag_documents(
             rag_query, drug_entry.name or ""
         )
@@ -719,7 +757,7 @@ class AnalysisRunner:
             canonical_name=entry.canonical_name or drug_entry.name,
             origins=entry.origins,
             extraction_metadata=entry.extraction_metadata,
-            livertox_status="matched",
+            livertox_status=livertox_status,
             excerpt=excerpt,
             rag_context=rag_context,
             clinical_context=normalized_context,

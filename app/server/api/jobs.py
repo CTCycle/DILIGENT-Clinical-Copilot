@@ -42,7 +42,7 @@ def summarize_job(snapshot: dict[str, Any], *, now_mono: float, now_wall: float)
         job_status == "running" and progress > 0.0
     )
     completed_at = snapshot.get("completed_at")
-    phase = result.get("phase") or result.get("stage")
+    phase = result.get("phase") or result.get("stage") or result.get("progress_stage")
     message = result.get("progress_message") or result.get("message")
     return JobSummary(
         job_id=str(snapshot["job_id"]),

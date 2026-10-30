@@ -53,7 +53,7 @@ def dummy_clinical_payload() -> dict[str, Any]:
             "ALT 220 U/L with ULN 50, ALP 180 U/L with ULN 120, total "
             "bilirubin 2.4 mg/dL, INR 1.1, and hepatic pattern mixed."
         ),
-        "use_rag": False,
+        "evidence_sources": ["livertox", "dilirank"],
         "selected_model_providers": ["ollama"],
     }
 
