@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -256,14 +256,49 @@ Per-drug clinical assessments carry claim envelopes and narrative limits. Claim 
 
 The rendered per-drug report consolidates evidence-match status, the matched local record, evidence warnings, claim-review requirements, and RUCAM limitations into one localized clinical commentary. The structured claim and evidence fields remain unchanged in persisted audit data.
 
-## RAG Readiness
-Clinical preflight reports whether the configured RAG embedding backend is ready. When the active vector index depends on Ollama embeddings, Ollama and the configured embedding model must be available before a RAG-enabled job starts.
+## Session Evidence Sources
+Each clinical session carries `evidence_sources` (`livertox`, `dilirank`,
+`documents`; default `["livertox"]`, empty for LLM knowledge only). The
+selection is frozen in the run snapshot and stored in session metadata, and is
+enforced by the backend rather than the UI:
 
-If Ollama is unavailable, the DILI Agent offers three explicit choices: retry after starting Ollama, run the pending assessment once without RAG, or cancel. Running without RAG does not change the saved model configuration. Job submission repeats the readiness check to prevent a stale successful preflight from starting a RAG-enabled job after the dependency becomes unavailable.
+- `ClinicalKnowledgeComposer.enrich_resolved_drugs` is the single policy point.
+  Drug identity, terminology and `drug_id` are resolved regardless of the
+  selection (LiverTox identity links are still used for normalization).
+  Unselected sources are never queried.
+- Deselected LiverTox: excerpts and monographs are not loaded, and the matched
+  LiverTox row keeps only identity fields (`drug_id`, `drug_name`,
+  `drug_name_norm`). The likelihood grade and classifications are therefore
+  absent for RUCAM evidence notes, the deterministic causality synthesis and
+  the DILI evidence bundle. RUCAM arithmetic does not use the grade.
+- Each resolved drug records `evidence_status` per structured source:
+  `retrieved`, `no_record`, `unavailable` (selected but not imported) or
+  `not_selected`, so "not consulted" and "unavailable" are never presented as
+  negative findings.
+- With LiverTox selected, a matched excerpt is still required for the per-drug
+  LLM assessment. Without LiverTox, any drug with an accepted identity
+  (including `missing_livertox`) is assessed with dedicated prompts that forbid
+  LiverTox attribution and require general model knowledge to be labelled as
+  such when no external evidence is supplied.
+- `documents` gates the RAG query (`build_rag_query`); retrieval runs only
+  when selected.
+- The report states the session scope in an **Evidence sources** line placed
+  after the adjudication summary (selected sources or "LLM knowledge only",
+  any selected-but-unavailable source, and an accuracy note when LiverTox was
+  excluded). Per-drug bibliography lines list only consulted sources.
+
+Session-only model overrides (`text_extraction_model`, `clinical_model`) are
+applied through `LLMRuntimeConfig.override_for_run` while the run snapshot is
+captured, so the job, its persisted `runtime_snapshot` and the session's
+recorded models reflect the override while the persisted configuration and
+other runs are unaffected.
+
+## RAG Readiness
+Clinical preflight reports whether the configured RAG embedding backend is ready when the indexed document library is selected. Selecting it while the embedding cache is unavailable blocks the session in both preflight and job submission; the pre-analysis wizard lets the user deselect the source instead. This does not change the saved model configuration.
 
 If retrieval becomes unavailable after a job starts, the report continues safely without supporting RAG documents and records one aggregated pipeline warning listing the affected drugs.
 
-When RAG is enabled, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
+When the indexed document library is selected, retrieved text is used only as hidden model context. The final report bibliography lists compact references to retrieved documents by filename and page number only.
 
 RAG ingestion computes a SHA-256 fingerprint over the raw bytes of each
 supported input file. Only byte-identical files are grouped; semantic or
