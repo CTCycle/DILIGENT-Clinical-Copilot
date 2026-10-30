@@ -585,3 +585,57 @@ def test_failed_clinical_job_payload_omits_phi_by_default() -> None:
     assert counts["anamnesis"] > 0
     assert counts["drugs"] > 0
     assert counts["laboratory_analysis"] > 0
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("sources", "expected_line"),
+    [
+        ([], "LLM knowledge only"),
+        (["livertox"], "**Evidence sources**: LiverTox."),
+        (["dilirank"], "**Evidence sources**: FDA DILIrank 2.0."),
+        (["livertox", "dilirank"], "**Evidence sources**: LiverTox; FDA DILIrank 2.0."),
+    ],
+)
+def test_workflow_routes_and_records_session_evidence_sources(
+    sources: list[str], expected_line: str
+) -> None:
+    class RecordingService(FakeClinicalService):
+        lookup_evidence: Any = None
+
+        async def run_livertox_lookup(self, **kwargs: Any) -> None:
+            RecordingService.lookup_evidence = kwargs["evidence"]
+
+    service = RecordingService()
+    payload = PatientData(
+        name="Mario Rossi",
+        visit_date=date(2025, 5, 20),
+        anamnesis="Paziente con ittero.",
+        drugs="Paracetamolo 1-0-0-0",
+        laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
+        evidence_sources=sources,
+    )
+
+    result = asyncio.run(
+        process_single_patient_workflow(
+            service,
+            payload,
+            normalized_document=DocumentNormalizer().normalize(
+                "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
+            ),
+            report_mode="faithful_only",
+        ),
+    )
+
+    assert RecordingService.lookup_evidence.sources == tuple(sources)
+    assert result["final_report"].startswith("## DILI adjudication summary")
+    # The session payload is Italian, so the line is localized; source labels are not.
+    if sources:
+        assert expected_line.split(": ", 1)[1] in result["final_report"]
+    else:
+        assert "Solo conoscenza del modello LLM" in result["final_report"]
+    assert ("LiverTox è stato escluso" in result["final_report"]) is (
+        "livertox" not in sources
+    )
+    assert result["runtime_settings"]["evidence_sources"] == sources
+    saved = service.session_repository.saved_payload
+    assert saved["metadata"]["evidence_sources"] == sources
