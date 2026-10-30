@@ -11,6 +11,9 @@
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/commits"><img alt="Last commit" src="https://img.shields.io/github/last-commit/CTCycle/DILIGENT-Clinical-Copilot?style=flat-square"></a>
   <a href="https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases"><img src="https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?label=release" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="GPL 3.0 or later"></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Python-3.14%2B-3776AB" alt="Python 3.14 or newer">
   <img src="https://img.shields.io/badge/Angular-21-DD0031" alt="Angular 21">
   <a href="https://www.microsoft.com/windows"><img alt="Platform: Windows" src="https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white&style=flat-square"></a>
