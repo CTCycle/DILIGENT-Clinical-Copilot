@@ -113,7 +113,7 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     assert headers["x-opencode-session"]
     assert headers["User-Agent"] == "diligent-clinical-copilot/3.5.1"
     assert "clinical prompt" not in caplog.text
-    assert "route_source=documented_opencode_go_route@2026-09-14" in caplog.text
+    assert "route_source=documented_opencode_go_route@2026-10-30" in caplog.text
     assert "Cloud chat request attempted" in caplog.text
 
 ###############################################################################
@@ -255,6 +255,12 @@ def test_other_routed_gateways_keep_strict_catalog_requirement(
         ("mimo-v2.5-pro", "chat/completions"),
         ("hy4-preview", "chat/completions"),
         ("hy3", "chat/completions"),
+        ("beam-free", "chat/completions"),
+        ("iceman-contributor-free", "chat/completions"),
+        ("gemini-4-argon", "chat/completions"),
+        ("claude-haiku-5-5", "messages"),
+        ("grok-4.7", "responses"),
+        ("gpt-6-luna", "responses"),
     ],
 )
 def test_opencode_go_documented_route_matrix(
