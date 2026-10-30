@@ -1,0 +1,303 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: contents;
+}
+
+.wizard-stepper ol {
+  display: flex;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-lg);
+  padding: 0;
+  list-style: none;
+}
+
+.wizard-stepper li {
+  flex: 1 1 0;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.wizard-step:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-step[aria-current='step'] {
+  border-color: var(--color-brand);
+  background: var(--color-brand-bg);
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.wizard-step.is-complete .wizard-step-index {
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+}
+
+.wizard-step:focus-visible,
+.wizard-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.wizard-step-index {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-divider);
+  color: var(--color-text-primary);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.wizard-panel {
+  display: grid;
+  gap: var(--space-md);
+  min-height: 260px;
+  align-content: start;
+}
+
+.wizard-lede,
+.wizard-caption {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.wizard-preflight-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.wizard-preflight-head p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.wizard-badges,
+.wizard-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.wizard-inline-actions .btn,
+.wizard-restore {
+  width: auto;
+  flex: 0 1 auto;
+  justify-self: start;
+}
+
+.wizard-badge,
+.wizard-severity,
+.wizard-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 0 var(--space-sm);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.wizard-badge.is-blocking,
+.wizard-issue.is-blocking .wizard-severity {
+  color: var(--color-status-error-text);
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
+}
+
+.wizard-badge.is-warning,
+.wizard-issue.is-warning .wizard-severity {
+  color: var(--color-status-warning-text);
+  border-color: var(--color-status-warning-border);
+  background: var(--color-status-warning-bg);
+}
+
+.wizard-badge.is-success {
+  color: var(--color-status-success-text);
+  border-color: var(--color-status-success-border);
+  background: var(--color-status-success-bg);
+}
+
+.wizard-tag {
+  margin-left: var(--space-xs);
+  color: var(--color-status-info-text);
+  border-color: var(--color-status-info-border);
+  background: var(--color-status-info-bg);
+}
+
+.wizard-issues {
+  display: grid;
+  gap: var(--space-sm);
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.wizard-issue {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.wizard-issue.is-blocking {
+  border-left-color: var(--color-status-error-text);
+}
+
+.wizard-issue.is-warning {
+  border-left-color: var(--color-status-warning-border);
+}
+
+.wizard-issue h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-base);
+}
+
+.wizard-issue dl,
+.wizard-review,
+.wizard-provider {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.wizard-issue dl div,
+.wizard-review div,
+.wizard-provider div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.3fr) minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.wizard-issue dt,
+.wizard-review dt,
+.wizard-provider dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wizard-issue dd,
+.wizard-review dd,
+.wizard-provider dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.wizard-options,
+.wizard-models {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.wizard-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-md);
+  align-items: start;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.wizard-option input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+}
+
+.wizard-option > span {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.wizard-option strong {
+  font-size: var(--font-sm);
+}
+
+.wizard-option small {
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+}
+
+.wizard-source-unavailable {
+  color: var(--color-status-warning-text);
+}
+
+.wizard-notice {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-status-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-text);
+  font-size: var(--font-sm);
+  line-height: 1.45;
+}
+
+.wizard-notice.is-error {
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
+  color: var(--color-status-error-text);
+}
+
+.wizard-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.wizard-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.wizard-footer-spacer {
+  flex: 1;
+}
+
+.wizard-footer .btn {
+  width: auto;
+  flex: 0 1 auto;
+}
