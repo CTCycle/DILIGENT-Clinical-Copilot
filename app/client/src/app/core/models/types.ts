@@ -223,14 +223,12 @@ export type ClinicalFormState = {
   visitDate: string;
   patientImageDataUrl: string | null;
   clinicalInput: string;
-  useRag: boolean;
 };
 
 export type ClinicalDraftForm = {
   patient_name: string;
   visit_date: string | null;
   clinical_input: string;
-  use_rag: boolean;
 };
 
 export type ClinicalDraftSnapshot = {
@@ -246,13 +244,21 @@ export type ClinicalDraftWrite = {
   form: ClinicalDraftForm;
 };
 
+export type EvidenceSourceId = "livertox" | "dilirank" | "documents";
+
+export type SessionModelOverrides = {
+  text_extraction_model?: string | null;
+  clinical_model?: string | null;
+};
+
 export type ClinicalRequestPayload = {
   name: string | null;
   visit_date: { day: number; month: number; year: number } | null;
   clinical_input: string | null;
   selected_model_providers: string[];
   patient_image_base64?: string | null;
-  use_rag: boolean;
+  evidence_sources: EvidenceSourceId[];
+  model_overrides: SessionModelOverrides | null;
 };
 
 export type ClinicalSectionTemplateResponse = {
@@ -280,6 +286,15 @@ export type ClinicalInputPreflightResponse = {
   extraction_quality: Record<string, unknown>;
   deterministic_diagnostics: Record<string, unknown>;
   rag_readiness?: RagReadiness | null;
+  evidence_sources?: EvidenceSourceStatus[];
+};
+
+export type EvidenceSourceStatus = {
+  source: EvidenceSourceId;
+  label: string;
+  selected: boolean;
+  available: boolean;
+  message: string | null;
 };
 
 export type RagReadiness = {
@@ -319,6 +334,7 @@ export type ClinicalJobResult = {
   report?: string;
   progress_stage?: string;
   progress_message?: string;
+  session_id?: number;
   [key: string]: unknown;
 };
 

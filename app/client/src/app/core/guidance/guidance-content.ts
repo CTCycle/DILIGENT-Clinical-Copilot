@@ -4,13 +4,13 @@
 import { GuidedTourDefinition, TipDefinition } from './guidance.types';
 
 export const GUIDANCE_CONTENT_VERSION = 1;
-const DILI_ASSESSMENT_TOUR_VERSION = 2;
+const DILI_ASSESSMENT_TOUR_VERSION = 3;
 
 export const DILI_ASSESSMENT_TOUR: GuidedTourDefinition = {
   id: 'dili-assessment-tour',
   version: DILI_ASSESSMENT_TOUR_VERSION,
   title: 'Run a DILI assessment',
-  description: 'A short tour of the four controls that shape a first assessment.',
+  description: 'A short tour of the controls that shape a first assessment.',
   route: '/',
   steps: [
     {
@@ -26,15 +26,9 @@ export const DILI_ASSESSMENT_TOUR: GuidedTourDefinition = {
       preferredPlacement: 'left',
     },
     {
-      target: '[data-guidance-target="dili-rag-toggle"]',
-      title: 'Add indexed evidence when useful',
-      body: 'RAG adds references from the configured local index to this run. The checkbox only affects the assessment you are about to start.',
-      preferredPlacement: 'left',
-    },
-    {
       target: '[data-guidance-target="dili-review-run"]',
       title: 'Review, then run',
-      body: 'Run opens a pre-flight review first. Fix blocking items or continue only after accepting any warnings.',
+      body: 'Run opens a short setup: pre-flight checks, evidence sources, model overrides for this session, and a final review before the analysis starts.',
       preferredPlacement: 'top',
     },
   ],

@@ -42,12 +42,12 @@ export function resolvePathFromPage(page: PageId): string {
 export interface DiliAgentState {
   form: ClinicalFormState;
   message: string;
-  exportUrl: string | null;
   jobId: string | null;
   jobProgress: number;
   jobStatus: JobStatus | null;
   jobStage: string | null;
   jobStageMessage: string | null;
+  sessionId: number | null;
   isStarting: boolean;
   isRunning: boolean;
   isPulling: boolean;
@@ -65,17 +65,18 @@ export interface AppState {
 
 type PersistedDiliAgentUiState = {
   isExpanded: boolean;
+  sessionId: number | null;
 };
 
 const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   form: DEFAULT_FORM_STATE,
   message: '',
-  exportUrl: null,
   jobId: null,
   jobProgress: 0,
   jobStatus: null,
   jobStage: null,
   jobStageMessage: null,
+  sessionId: null,
   isStarting: false,
   isRunning: false,
   isPulling: false,
@@ -85,7 +86,7 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   pollIntervalMs: null,
 };
 
-function readPersistedDiliAgentUiState(): Pick<DiliAgentState, 'isExpanded'> | null {
+function readPersistedDiliAgentUiState(): Pick<DiliAgentState, 'isExpanded' | 'sessionId'> | null {
   if (!('localStorage' in globalThis)) {
     return null;
   }
@@ -100,23 +101,27 @@ function readPersistedDiliAgentUiState(): Pick<DiliAgentState, 'isExpanded'> | n
     if (typeof parsedState !== 'object' || parsedState === null) {
       return null;
     }
-    const isExpanded = (parsedState as Partial<PersistedDiliAgentUiState>).isExpanded;
+    const { isExpanded, sessionId } = parsedState as Partial<PersistedDiliAgentUiState>;
     if (typeof isExpanded !== 'boolean') {
       return null;
     }
-    return { isExpanded };
+    return {
+      isExpanded,
+      sessionId: typeof sessionId === 'number' && Number.isInteger(sessionId) ? sessionId : null,
+    };
   } catch {
     return null;
   }
 }
 
-function writePersistedDiliAgentState(isExpanded: boolean): void {
+function writePersistedDiliAgentState(isExpanded: boolean, sessionId: number | null): void {
   if (!('localStorage' in globalThis)) {
     return;
   }
 
   const persistedState: PersistedDiliAgentUiState = {
     isExpanded,
+    sessionId,
   };
 
   try {
@@ -152,7 +157,8 @@ export class AppStateService {
     });
 
     effect(() => {
-      writePersistedDiliAgentState(this.state().diliAgent.isExpanded);
+      const { isExpanded, sessionId } = this.state().diliAgent;
+      writePersistedDiliAgentState(isExpanded, sessionId);
     });
   }
 

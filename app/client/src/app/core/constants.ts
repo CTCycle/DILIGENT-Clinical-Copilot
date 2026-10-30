@@ -45,7 +45,6 @@ export const DEFAULT_FORM_STATE: ClinicalFormState = {
   visitDate: "",
   patientImageDataUrl: null,
   clinicalInput: "",
-  useRag: false,
 };
 
 export const REPORT_EXPORT_FILENAME = "clinical_report.md";

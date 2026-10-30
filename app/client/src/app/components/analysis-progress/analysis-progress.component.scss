@@ -1,0 +1,92 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: block;
+}
+
+.analysis-progress {
+  --progress-color: var(--color-brand);
+  position: relative;
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.analysis-progress[data-tone='failed'] {
+  --progress-color: var(--color-status-error-text);
+  border-color: var(--color-status-error-border);
+}
+
+.analysis-progress[data-tone='cancelled'] {
+  --progress-color: var(--color-status-warning-border);
+  border-color: var(--color-status-warning-border);
+}
+
+.analysis-progress-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+}
+
+.analysis-progress-elapsed,
+.analysis-progress-step,
+.analysis-progress-detail {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+}
+
+.analysis-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-divider);
+}
+
+.analysis-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--progress-color);
+  transition: width 0.4s ease;
+}
+
+.analysis-progress-fill.is-indeterminate {
+  width: 35%;
+  animation: analysis-progress-slide 1.4s ease-in-out infinite;
+}
+
+.analysis-progress-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes analysis-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analysis-progress-fill,
+  .analysis-progress-fill.is-indeterminate {
+    animation: none;
+    transition: none;
+  }
+}

@@ -246,7 +246,6 @@ describe('buildClinicalPayload', () => {
       visitDate: '2025-01-02',
       patientImageDataUrl: null,
       clinicalInput: 'test input',
-      useRag: false,
     };
     const settings: RuntimeSettings = {
       useCloudServices: true,
@@ -259,7 +258,7 @@ describe('buildClinicalPayload', () => {
       reasoning: 'off',
     };
 
-    const payload = buildClinicalPayload(form, settings);
+    const payload = buildClinicalPayload(form, settings, ['livertox'], null);
     expect(payload.selected_model_providers).toEqual(['openai']);
   });
 
@@ -269,7 +268,6 @@ describe('buildClinicalPayload', () => {
       visitDate: '2025-01-02',
       patientImageDataUrl: null,
       clinicalInput: 'test input',
-      useRag: false,
     };
     const settings: RuntimeSettings = {
       useCloudServices: false,
@@ -282,8 +280,38 @@ describe('buildClinicalPayload', () => {
       reasoning: 'off',
     };
 
-    const payload = buildClinicalPayload(form, settings);
+    const payload = buildClinicalPayload(form, settings, ['livertox'], null);
     expect(payload.selected_model_providers).toEqual(['ollama']);
+  });
+
+  it('carries the per-session evidence sources and model overrides, and no use_rag flag', () => {
+    const form: ClinicalFormState = {
+      patientName: 'John',
+      visitDate: '2025-01-02',
+      patientImageDataUrl: null,
+      clinicalInput: 'test input',
+    };
+    const settings: RuntimeSettings = {
+      useCloudServices: false,
+      provider: '',
+      cloudModel: null,
+      textExtractionModel: 'qwen3.5:9b',
+      clinicalModel: 'gpt-oss:20b',
+      revisionModel: 'gpt-oss:20b',
+      timelineModel: 'qwen3.5:9b',
+      reasoning: 'off',
+    };
+
+    const llmOnly = buildClinicalPayload(form, settings, [], null);
+    expect(llmOnly.evidence_sources).toEqual([]);
+    expect(llmOnly.model_overrides).toBeNull();
+    expect('use_rag' in llmOnly).toBe(false);
+
+    const overridden = buildClinicalPayload(form, settings, ['dilirank', 'documents'], {
+      clinical_model: 'other:7b',
+    });
+    expect(overridden.evidence_sources).toEqual(['dilirank', 'documents']);
+    expect(overridden.model_overrides).toEqual({ clinical_model: 'other:7b' });
   });
 });
 
