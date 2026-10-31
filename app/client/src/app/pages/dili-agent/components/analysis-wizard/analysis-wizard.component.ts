@@ -23,6 +23,7 @@ import { DiliJobTrackerService } from '../../../../core/services/dili-job-tracke
 import { AppStateService } from '../../../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
 import { buildClinicalPayload } from '../../../../core/utils';
+import { buildSectionPreviews, SourceSelection } from './section-preview';
 
 export type WizardStepId = 'preflight' | 'sources' | 'models' | 'review';
 type ModelRole = 'text_extraction_model' | 'clinical_model';
@@ -83,6 +84,7 @@ export class AnalysisWizardComponent {
   readonly cancelled = output<void>();
   readonly started = output<void>();
   readonly fixInput = output<string | null>();
+  readonly editSource = output<SourceSelection | null>();
 
   private readonly stateService = inject(AppStateService);
   private readonly modelConfigState = inject(ModelConfigStateService);
@@ -123,6 +125,9 @@ export class AnalysisWizardComponent {
     const result = this.result();
     return result ? [...result.blocking_issues, ...result.non_blocking_issues] : [];
   });
+  readonly sectionPreviews = computed(() =>
+    buildSectionPreviews(this.result()?.deterministic_diagnostics, this.form().clinicalInput),
+  );
   readonly blockingCount = computed(() => this.result()?.blocking_issues.length ?? 0);
   readonly warningCount = computed(() => this.result()?.non_blocking_issues.length ?? 0);
   readonly inputReady = computed(() => this.result() !== null && this.blockingCount() === 0);
@@ -269,6 +274,10 @@ export class AnalysisWizardComponent {
       return;
     }
     this.fixInput.emit(fields.map((field) => PREFLIGHT_FIELD_TARGETS[field]).find(Boolean) ?? null);
+  }
+
+  editInInput(selection: SourceSelection | null): void {
+    this.editSource.emit(selection);
   }
 
   async start(): Promise<void> {

@@ -50,7 +50,13 @@ until you select **Start analysis**.
 1. **Preflight** runs the existing safety checks for the exact session
    configuration. Blocking issues stop the setup; use **Fix in input** to jump
    to the field, correct it, and reopen the dialog (it restarts at Preflight
-   and re-runs the checks). Warnings can be accepted.
+   and re-runs the checks). Warnings can be accepted. Below the issues,
+   **What DILIGENT understood** shows the deterministic section split
+   (Anamnesis, Current therapy, Laboratory analysis) with each section's
+   heading basis, line range, and source excerpt; sections flagged for review
+   are expanded. **Edit in clinical input** closes the dialog and selects that
+   passage in the original text. This is a preliminary section assignment, not
+   the final clinical extraction.
 2. **Evidence Sources** chooses what the assessment may consult for this
    session only: **LiverTox** (recommended, selected by default), **FDA
    DILIrank 2.0**, and **Indexed documents** (your RAG library). Selecting none

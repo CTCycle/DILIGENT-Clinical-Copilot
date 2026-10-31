@@ -78,6 +78,35 @@
             </article>
           }
         </div>
+        @if (sectionPreviews().length) {
+          <section class="wizard-sections" data-testid="section-preview" aria-labelledby="wizard-sections-title">
+            <h3 id="wizard-sections-title">What DILIGENT understood</h3>
+            <p class="wizard-lede">Deterministic section preview. This is not the final clinical extraction.</p>
+            @for (section of sectionPreviews(); track section.key) {
+              <details class="wizard-section" [class.is-review]="section.requiresReview" [open]="section.requiresReview">
+                <summary>
+                  <span class="wizard-section-name">{{ section.label }}</span>
+                  <span class="wizard-section-meta">
+                    {{ section.basis }}@if (section.lines) { · {{ section.lines }}}
+                  </span>
+                  <span class="wizard-badge" [class.is-warning]="section.requiresReview" [class.is-success]="!section.requiresReview">
+                    {{ section.requiresReview ? 'Review' : 'Identified' }}
+                  </span>
+                </summary>
+                @if (section.excerpt) {
+                  <blockquote class="wizard-section-excerpt">{{ section.excerpt }}</blockquote>
+                } @else if (section.found) {
+                  <p class="wizard-section-meta">The source passage could not be located reliably.</p>
+                } @else {
+                  <p class="wizard-section-meta">No passage was assigned to this section.</p>
+                }
+                <button class="btn btn-secondary" type="button" (click)="editInInput(section.selection)">
+                  Edit in clinical input
+                </button>
+              </details>
+            }
+          </section>
+        }
       }
 
       @case ('sources') {

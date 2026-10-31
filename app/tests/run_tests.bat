@@ -176,6 +176,10 @@ echo [INFO] Backend URL : %APP_TEST_BACKEND_URL%
 echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
 echo.
 
+echo [STEP] Running PowerShell launcher cleanup safety fixtures...
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TESTS_DIR%\test_launcher_cleanup.ps1"
+if errorlevel 1 exit /b 1
+
 if "%NEED_FRONTEND%"=="1" (
   echo [INFO] Ensuring Playwright Chromium is installed in the canonical cache...
   "%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m playwright install chromium
