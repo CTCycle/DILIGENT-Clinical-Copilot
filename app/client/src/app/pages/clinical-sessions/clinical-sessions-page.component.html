@@ -461,42 +461,58 @@
 
         @if (activeSection() === 'revision') {
           <div class="clinical-session-panel clinical-session-revision-panel">
-            <div class="clinical-session-revision-header">
+            <header class="clinical-session-revision-header">
               <div>
-                <p class="clinical-session-panel-note">Create an auditable draft with the model assigned to the Revision role. Human review is required before clinical reliance.</p>
+                <h3>Revision draft</h3>
+                <p>Create an auditable draft with the model assigned to the Revision role. Human review is required before clinical reliance.</p>
               </div>
-            </div>
-            <label class="clinical-session-revision-instruction"><span>Revision instruction (optional)</span><textarea [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe a report issue or leave blank for a full review."></textarea></label>
-            <section class="clinical-session-revision-model-panel" aria-label="Configured Revision model">
-              <div class="clinical-session-revision-model-header">
-                <div>
-                  <h4>Configured Revision model</h4>
-                  <p>{{ revisionModelName() || 'No Revision model is configured.' }} · Changes are managed centrally.</p>
-                </div>
-                <a class="clinical-session-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
-              </div>
-              @if (revisionModelLoading()) { <p class="clinical-session-panel-note">Loading configured role...</p> }
-              <div class="clinical-session-actions clinical-session-revision-model-actions">
-                <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning() || !revisionModelName()">Start revision</button>
-                @if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }
-              </div>
-              @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
-            </section>
-            @if (revisionStatus()) { <p class="clinical-session-panel-note">{{ revisionStatus() }}</p> }
-            @if (revisionDraftReport()) {
-              <section class="clinical-session-revision-draft" aria-label="Generated Revision draft">
-                <div class="clinical-session-card-title"><span>Generated draft</span><small>Current report remains unchanged until a human decision.</small></div>
-                <div class="clinical-session-revision-draft-content" [innerHTML]="revisionDraftReportHtml()"></div>
+              <span class="clinical-session-revision-state">{{ revisionRunning() ? 'Running' : 'Ready' }}</span>
+            </header>
+            <div class="clinical-session-revision-layout">
+              <section class="clinical-session-revision-card" aria-label="Revision instruction">
+                <div class="clinical-session-revision-card-header"><h4>Instruction</h4><span>Optional</span></div>
+                <label class="clinical-session-revision-instruction">
+                  <textarea aria-label="Revision instruction (optional)" [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe a report issue or leave blank for a full review."></textarea>
+                </label>
               </section>
-             }
-             @if (revisionReviewAvailable()) { <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div> }
-             @if (revisionAuditVisible()) {
-               <app-clinical-session-revision-audit
-                 [steps]="revisionSteps()"
-                 [artifacts]="revisionArtifacts()"
-               />
-             }
-           </div>        }
+              <section class="clinical-session-revision-card clinical-session-revision-model-panel" aria-label="Configured Revision model">
+                <div class="clinical-session-revision-card-header"><h4>Revision model</h4><a class="clinical-session-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a></div>
+                <div class="clinical-session-revision-card-body">
+                  <span class="clinical-session-revision-eyebrow">Configured model</span>
+                  <strong class="clinical-session-revision-model-name">{{ revisionModelName() || 'No Revision model is configured.' }}</strong>
+                  <p>Changes are managed centrally.</p>
+                  @if (revisionModelLoading()) { <p class="clinical-session-panel-note">Loading configured role...</p> }
+                  @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
+                </div>
+                <div class="clinical-session-revision-card-footer">
+                  <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning() || !revisionModelName()">Start revision</button>
+                  @if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }
+                </div>
+              </section>
+            </div>
+            @if (revisionStatus()) { <p class="clinical-session-panel-note" role="status">{{ revisionStatus() }}</p> }
+            @if (revisionDraftReport()) {
+              <section class="clinical-session-revision-card clinical-session-revision-draft" aria-label="Generated Revision draft">
+                <div class="clinical-session-revision-card-header"><h4>Generated draft</h4><span>Current report remains unchanged until a human decision.</span></div>
+                <div class="clinical-session-revision-draft-content" [innerHTML]="revisionDraftReportHtml()"></div>
+                @if (revisionReviewAvailable()) {
+                  <div class="clinical-session-revision-card-footer clinical-session-revision-decision">
+                    <span>Human review required</span>
+                    <div class="clinical-session-actions"><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button></div>
+                  </div>
+                }
+              </section>
+            } @else if (revisionReviewAvailable()) {
+              <div class="clinical-session-actions"><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button></div>
+            }
+            @if (revisionAuditVisible()) {
+              <app-clinical-session-revision-audit
+                [steps]="revisionSteps()"
+                [artifacts]="revisionArtifacts()"
+              />
+            }
+          </div>
+        }
 
         @if (activeSection() === 'timeline' && selected(); as detail) {
           <app-clinical-session-timeline-workspace [session]="detail"></app-clinical-session-timeline-workspace>

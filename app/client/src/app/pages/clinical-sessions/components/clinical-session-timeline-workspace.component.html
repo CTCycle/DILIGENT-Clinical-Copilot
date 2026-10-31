@@ -1,14 +1,15 @@
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
 <div class="timeline-workspace">
-  <section class="timeline-models" aria-label="Timeline generation">
-    <div class="timeline-model-header" data-guidance-target="timeline-generation-controls">
+  <section class="timeline-card timeline-models" aria-label="Timeline generation">
+    <div class="timeline-card-header" data-guidance-target="timeline-generation-controls">
       <div>
         <h4>Generate a patient timeline</h4>
         <p>Uses the model assigned to the Timeline role in Settings.</p>
       </div>
     </div>
 
+    <div class="timeline-card-body">
     <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!modelConfigLoading()">Loading model options…</p>
     @if (modelConfigError()) {
       <p class="is-error" role="alert">{{ modelConfigError() }}</p>
@@ -20,6 +21,7 @@
       <strong>{{ selectedConfigurationLabel() }}</strong>
       <a class="timeline-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
     </div>
+    </div>
     <div class="timeline-model-actions">
       <button type="button" class="btn btn-primary" (click)="generateTimeline()" [disabled]="!canGenerate()">{{ generationRunning() ? 'Generating timeline…' : 'Generate Timeline' }}</button>
       @if (generationStatus()) { <p aria-live="polite">{{ generationStatus() }}</p> }
@@ -27,11 +29,15 @@
     </div>
   </section>
 
-  <section class="timeline-history" aria-label="Generated timelines">
-    <header>
+  <section class="timeline-card timeline-history" aria-label="Generated timelines">
+    <header class="timeline-card-header">
       <div><h4>Generated timelines</h4><p>Saved timelines are listed with their generation date, model, and evidence count.</p></div>
-      @if (timelineListLoading() && timelinePreviews().length) { <span aria-live="polite">Refreshing…</span> }
+      <div class="timeline-header-meta">
+        @if (timelineListLoading() && timelinePreviews().length) { <span aria-live="polite">Refreshing…</span> }
+        <span class="timeline-count">{{ sortedTimelinePreviews().length }} saved</span>
+      </div>
     </header>
+    <div class="timeline-card-body">
     @if (timelineListLoading() && !timelinePreviews().length && !generationJobId()) { <p>Loading timeline history…</p> }
     @else if (timelineListError()) { <p class="is-error" role="alert">{{ timelineListError() }}</p> }
     @else {
@@ -83,6 +89,7 @@
         </div>
       }
     }
+    </div>
   </section>
 </div>
 

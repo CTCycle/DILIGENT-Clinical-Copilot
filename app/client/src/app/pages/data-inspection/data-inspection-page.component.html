@@ -333,6 +333,7 @@
                   <thead>
                     <tr>
                       <th>Source</th>
+                      <th>Status</th>
                       <th>Last import</th>
                       <th>Version</th>
                       <th>Aliases</th>
@@ -347,11 +348,11 @@
                         <td [title]="source.last_error || ''">
                           @if (source.last_status) {
                             <span class="inspection-status-chip" [class.is-successful]="source.last_status === 'completed' || source.last_status === 'skipped'" [class.is-failed]="source.last_status === 'failed'" [class.is-neutral]="source.last_status !== 'completed' && source.last_status !== 'skipped' && source.last_status !== 'failed'">{{ source.last_status }}</span>
-                            {{ formatDateTime(source.last_finished_at) }}
                           } @else {
-                            Never imported
+                            —
                           }
                         </td>
+                        <td class="inspection-nowrap">{{ source.last_status ? formatDateTime(source.last_finished_at) : 'Never imported' }}</td>
                         <td [title]="source.last_completed_version || ''">{{ source.last_completed_version || '—' }}</td>
                         <td>{{ source.aliases | number }}</td>
                         <td>{{ source.products | number }}</td>

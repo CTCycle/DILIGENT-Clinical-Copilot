@@ -712,42 +712,152 @@
 }
 
 .clinical-session-revision-panel {
+  align-content: start;
   overflow-y: auto;
+  padding-right: 0;
 }
 
-.clinical-session-revision-model-panel {
-  display: grid;
-  gap: var(--space-md);
-  border-block: 1px solid var(--cs-border);
-  padding: var(--space-md) 0;
-}
-
-.clinical-session-revision-model-header {
+.clinical-session-revision-header {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: start;
   gap: var(--space-lg);
 }
 
-.clinical-session-revision-model-header h4 {
+.clinical-session-revision-header h3 {
   margin: 0;
-  color: var(--color-text-primary);
   font-size: var(--font-lg);
 }
 
-.clinical-session-revision-model-header p {
+.clinical-session-revision-header p {
   margin: var(--space-xs) 0 0;
-  color: var(--color-text-secondary);
+  color: var(--cs-muted);
   font-size: var(--font-sm);
 }
 
-.clinical-session-config-link {
+.clinical-session-revision-state {
   flex: 0 0 auto;
-  align-self: center;
+  border: 1px solid var(--cs-border-strong);
+  border-radius: 999px;
+  padding: 2px var(--space-md);
+  color: var(--cs-muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.clinical-session-revision-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: var(--space-lg);
+  align-items: stretch;
+}
+
+.clinical-session-revision-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--cs-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--cs-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.clinical-session-revision-card-header,
+.clinical-session-revision-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--cs-surface-alt);
+}
+
+.clinical-session-revision-card-header {
+  border-bottom: 1px solid var(--cs-border-strong);
+}
+
+.clinical-session-revision-card-header h4 {
+  margin: 0;
+  font-size: var(--font-base);
+}
+
+.clinical-session-revision-card-header > span {
+  color: var(--cs-faint);
+  font-size: var(--font-xs);
+}
+
+.clinical-session-revision-card-footer {
+  justify-content: flex-end;
+  margin-top: auto;
+  border-top: 1px solid var(--cs-border-strong);
+}
+
+.clinical-session-revision-card-body {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+}
+
+.clinical-session-revision-card-body p {
+  margin: 0;
+  color: var(--cs-muted);
+}
+
+.clinical-session-revision-eyebrow {
+  color: var(--cs-faint);
+  font-size: var(--font-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.clinical-session-revision-model-name {
+  font-size: var(--font-md);
+  overflow-wrap: anywhere;
+}
+
+.clinical-session-config-link {
   color: var(--color-brand);
   font-size: var(--font-xs);
   font-weight: 800;
   white-space: nowrap;
+}
+
+.clinical-session-revision-instruction {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+.clinical-session-revision-instruction textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 160px;
+  border: 0;
+  background: var(--cs-surface);
+  font: inherit;
+  padding: var(--space-lg);
+  resize: vertical;
+}
+
+.clinical-session-revision-draft {
+  border-color: var(--cs-success-border);
+}
+
+.clinical-session-revision-draft-content {
+  min-width: 0;
+  max-height: 480px;
+  overflow: auto;
+  padding: var(--space-lg);
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.clinical-session-revision-decision > span {
+  margin-right: auto;
+  color: var(--cs-warning-text);
+  font-size: var(--font-xs);
+  font-weight: 700;
 }
 
 .clinical-session-editor-source {
@@ -760,85 +870,6 @@
 
 .clinical-session-editor-rendered {
   min-height: 520px;
-}
-
-.clinical-session-revision-model-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--cs-border);
-}
-
-.clinical-session-revision-model-actions .btn-primary {
-  min-height: var(--control-height-sm);
-  padding: 0 var(--space-md);
-  font-size: var(--font-sm);
-  box-shadow: 0 4px 12px -8px color-mix(in srgb, var(--color-brand) 72%, transparent);
-  white-space: nowrap;
-}
-
-.clinical-session-revision-instruction {
-  display: grid;
-  gap: var(--space-xs);
-  width: 100%;
-  color: var(--color-text-primary);
-  font-size: var(--font-sm);
-  font-weight: 750;
-}
-
-.clinical-session-revision-instruction textarea {
-  width: 100%;
-  min-height: 240px;
-  border: 1px solid var(--cs-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font: inherit;
-  line-height: 1.55;
-  padding: var(--space-md);
-  resize: vertical;
-}
-
-.clinical-session-revision-draft {
-  display: grid;
-  gap: var(--space-md);
-  border: 1px solid var(--cs-success-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  padding: var(--space-lg);
-}
-
-.clinical-session-revision-draft .clinical-session-card-title {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-md);
-  align-items: baseline;
-  color: var(--color-text-primary);
-  font-weight: 800;
-}
-
-.clinical-session-revision-draft .clinical-session-card-title small {
-  color: var(--color-text-muted);
-  font-size: var(--font-xs);
-  font-weight: 600;
-}
-
-.clinical-session-revision-draft-content {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--color-text-primary);
-  line-height: 1.6;
-}
-
-@media (max-width: 720px) {
-  .clinical-session-revision-model-header {
-    flex-wrap: wrap;
-  }
-
-  .clinical-session-config-link {
-    align-self: flex-start;
-  }
 }
 
 .clinical-session-metadata-actions {
