@@ -970,7 +970,7 @@ class CloudLLMClient:
             user_prompt=user_prompt,
             format_instructions=format_instructions,
         )
-        raw = await self.chat(
+        result = await self.chat_result(
             model=resolved_model,
             messages=messages,
             format="json" if use_json_mode else None,
@@ -981,6 +981,14 @@ class CloudLLMClient:
             json_schema=schema.model_json_schema() if use_json_mode else None,
             cancel_check=cancel_check,
         )
+        if self._exhausted_output_budget(result):
+            # Reasoning can consume the whole output budget and leave no content;
+            # repairing that empty reply would only invent an empty result.
+            raise LLMError(
+                "The model exhausted its output token limit before producing "
+                "structured output; raise the LLM output token limit in Settings."
+            )
+        raw = self._normalize_content(result.content)
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
             parser=parser,
@@ -992,6 +1000,11 @@ class CloudLLMClient:
             max_repair_attempts=max_repair_attempts,
             cancel_check=cancel_check,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _exhausted_output_budget(result: Any) -> bool:
+        return result.finish_reason == "length" and not str(result.content or "").strip()
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1058,6 +1071,9 @@ class CloudLLMClient:
             try:
                 return parser.parse(text)
             except Exception as err:
+                if not (text or "").strip():
+                    # Repairing an empty reply only invents an empty result.
+                    raise RuntimeError("Structured output was empty") from err
                 if attempt >= max_repair_attempts:
                     logger.error(
                         "Structured parse failed after retries: schema=%s attempts=%s output_length=%s output_hash=%s error=%s",

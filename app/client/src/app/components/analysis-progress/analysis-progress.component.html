@@ -3,9 +3,14 @@
 <section class="analysis-progress" [attr.data-tone]="tone()" aria-label="Analysis progress">
   <div class="analysis-progress-heading">
     <strong>{{ phaseLabel() }}</strong>
-    @if (elapsed(); as elapsedLabel) {
-      <span class="analysis-progress-elapsed">{{ elapsedLabel }}</span>
-    }
+    <span class="analysis-progress-meta">
+      @if (stepLabel(); as step) {
+        <span class="analysis-progress-step" title="Pipeline phase">{{ step }}</span>
+      }
+      @if (elapsed(); as elapsedLabel) {
+        <span class="analysis-progress-elapsed">{{ elapsedLabel }}</span>
+      }
+    </span>
   </div>
   <div
     class="analysis-progress-track"
@@ -22,9 +27,6 @@
       [style.width.%]="isIndeterminate() ? null : barValue()"
     ></div>
   </div>
-  @if (stepLabel(); as step) {
-    <p class="analysis-progress-step">{{ step }}</p>
-  }
   <p class="analysis-progress-sr" aria-live="polite">{{ phaseLabel() }}</p>
   @if (detail(); as message) {
     <p class="analysis-progress-detail">{{ message }}</p>

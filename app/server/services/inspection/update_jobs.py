@@ -295,8 +295,13 @@ class DataInspectionUpdateJobRunner:
     ) -> dict[str, Any]:
         """Run the dependent structured sources in one cancellable job."""
 
-        targets = STRUCTURED_TARGETS
         override_values = dict(overrides or {})
+        include_terminology = override_values.get("include_terminology") is not False
+        targets = tuple(
+            target
+            for target in STRUCTURED_TARGETS
+            if include_terminology or target != "terminology"
+        )
         source_state: dict[str, dict[str, Any]] = {
             target: {
                 "status": "pending",
@@ -306,6 +311,13 @@ class DataInspectionUpdateJobRunner:
             }
             for target in targets
         }
+        if not include_terminology:
+            source_state["terminology"] = {
+                "status": "skipped",
+                "progress": 0.0,
+                "message": "Excluded from this run.",
+                "error": None,
+            }
         summaries: dict[str, Any] = {}
 
         def patch_job(progress: float, message: str) -> None:

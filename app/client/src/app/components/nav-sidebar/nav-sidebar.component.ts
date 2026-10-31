@@ -4,13 +4,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, EventEmitter, Output, QueryList, ViewChildren, inject } from '@angular/core';
 
+import { LucideCircleHelp } from '@lucide/angular';
+
 import { AppStateService, PageId } from '../../core/state/app-state.service';
 import { JobsMonitorComponent } from '../jobs-monitor/jobs-monitor.component';
 import { NotificationCenterComponent } from '../notification-center/notification-center.component';
 
 @Component({
   selector: 'app-nav-sidebar',
-  imports: [CommonModule, JobsMonitorComponent, NotificationCenterComponent],
+  imports: [CommonModule, JobsMonitorComponent, NotificationCenterComponent, LucideCircleHelp],
   templateUrl: './nav-sidebar.component.html',
   styleUrl: './nav-sidebar.component.scss',
 })

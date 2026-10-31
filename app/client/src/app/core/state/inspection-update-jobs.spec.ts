@@ -253,7 +253,12 @@ describe('InspectionUpdateJobResource', () => {
         target: 'dilirank',
         payload: { redownload: false },
       },
-    });
+    }, true);
+
+    resource.setIncludeTerminology(false);
+    expect(resource.selectedUpdateAllTargets()).toEqual(['livertox', 'rxnav', 'dilirank']);
+    await resource.startAll();
+    expect(tracker.startAll.mock.calls[1][1]).toBe(false);
   });
 });
 

@@ -157,6 +157,27 @@ class ClinicalSessionExtractionPipelineMixin:
                 structured_failure_kind=self.classify_structured_failure_kind(exc),
             )
             therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
+        if not therapy_drugs.entries and any(
+            self.drugs_parser.is_likely_medication_line(line)
+            for line in cleaned_therapy_text.splitlines()
+            if line.strip()
+        ):
+            message = (
+                "No medications could be extracted from a therapy section that "
+                "contains medication-like lines; the medication list needs manual review."
+            )
+            self.append_warning_issue(
+                issues,
+                code="therapy_extraction_empty",
+                message=message,
+                field="drugs",
+            )
+            self.note_stage_fallback(
+                "therapy_extraction",
+                issue_code="therapy_extraction_empty",
+                issue_message=message,
+                structured_failure_kind="empty_result",
+            )
         self.emit_progress(progress_callback, stage="drugs.extracting", value=23.0)
         self.run_stop_check(stop_check)
         return therapy_drugs

@@ -17,10 +17,11 @@ class DrugBlock:
     end: int
 
 
-BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•■]|\d+[.)])[ \t]*")
+BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•■]|\d+[.)](?=[ \t]))[ \t]*")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 _MAX_BLOCK_WORDS = 8
 _MAX_BLOCK_CHARS = 80
+_NEW_SENTENCE_LINE_RE = re.compile(r"\n[ \t]*(?=[A-ZÀ-ÖØ-Þ])")
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<!\d)[;:]|(?<!\d)\.(?=\s|$)")
 
 ###############################################################################
@@ -110,7 +111,11 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
                 if index + 1 < len(bullet_matches)
                 else len(source)
             )
-            raw = _truncate_at_sentence_boundary(source[start:end].strip())
+            body = source[start:end].strip()
+            new_sentence = _NEW_SENTENCE_LINE_RE.search(body)
+            if new_sentence:
+                body = body[: new_sentence.start()].rstrip()
+            raw = _truncate_at_sentence_boundary(body)
             if raw:
                 blocks.append(DrugBlock(text=raw, start=start, end=start + len(raw)))
         return blocks or [DrugBlock(text=source.strip(), start=0, end=len(source))]

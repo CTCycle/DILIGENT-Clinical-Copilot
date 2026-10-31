@@ -89,6 +89,7 @@ instead.
   - PostgreSQL password protected with Windows DPAPI; no application settings
 - `application_configuration` database singleton
   - job polling interval
+  - LLM output token limit (general, applies to all models; default 32768, capped by a smaller model-reported maximum)
   - model/provider selections and access-key references
   - complete RAG settings
   - ingestion, session pipeline, language detection, matcher, integration,

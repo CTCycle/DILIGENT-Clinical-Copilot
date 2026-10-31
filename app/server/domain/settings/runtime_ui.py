@@ -34,10 +34,12 @@ class _PatchModel(_StrictModel):
 ###############################################################################
 class GeneralRuntimeSettings(_StrictModel):
     polling_interval: float = Field(gt=0.0, le=60.0)
+    llm_output_token_limit: int = Field(ge=256, le=1_000_000)
 
 ###############################################################################
 class GeneralRuntimeSettingsPatch(_PatchModel):
     polling_interval: float | None = Field(default=None, gt=0.0, le=60.0)
+    llm_output_token_limit: int | None = Field(default=None, ge=256, le=1_000_000)
 
 ###############################################################################
 class DataRuntimeSettings(_StrictModel):
@@ -231,7 +233,9 @@ class RuntimeSettingsStateResponse(_StrictModel):
 
 
 RUNTIME_SETTINGS_DEFAULTS = RuntimeSettingsValues(
-    general=GeneralRuntimeSettings(polling_interval=1.0),
+    general=GeneralRuntimeSettings(
+        polling_interval=1.0, llm_output_token_limit=32768
+    ),
     data=DataRuntimeSettings(
         drug_name_min_length=3,
         drug_name_max_length=200,

@@ -54,6 +54,7 @@ class FastAPISettings(BaseModel):
 class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     polling_interval: float = Field(gt=0)
+    llm_output_token_limit: int = Field(default=32768, ge=256, le=1_000_000)
 
 ###############################################################################
 class DatabaseSettings(BaseModel):

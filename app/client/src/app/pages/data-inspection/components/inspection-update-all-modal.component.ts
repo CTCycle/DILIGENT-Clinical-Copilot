@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 import {
   INSPECTION_UPDATE_ALL_TARGETS,
@@ -31,15 +31,27 @@ type InspectionUpdateAllConfigChange = {
     <app-modal-shell
       [isOpen]="isOpen()"
       title="Update All Sources"
-      subtitle="Configure LiverTox, RxNav, and DILIrank together. RAG updates remain separate."
+      subtitle="Configure the structured sources and run them together in order. RAG updates remain separate."
       dialogClassName="modal-container inspection-modal inspection-update-all-modal"
       [footer]="true"
       closeLabel="Close all sources update dialog"
       (close)="close.emit()"
     >
       <div class="inspection-update-all">
+        <label class="inspection-update-all-option">
+          <input
+            type="checkbox"
+            [checked]="includeTerminology()"
+            [disabled]="isRunning()"
+            (change)="includeTerminologyChange.emit($any($event.target).checked)"
+          />
+          <span>
+            <strong>Include terminology mapping</strong>
+            <small>Refreshes drug name normalization (RxNorm aliases, DrugCentral, ChEMBL, Swissmedic) after LiverTox. Turn off for a faster run; existing mappings are kept.</small>
+          </span>
+        </label>
         <div class="inspection-update-all-tabs" role="tablist" aria-label="Structured data sources">
-          @for (target of targets; track target) {
+          @for (target of visibleTargets(); track target) {
             <button
               type="button"
               class="inspection-update-all-tab"
@@ -113,7 +125,7 @@ type InspectionUpdateAllConfigChange = {
           </div>
 
           <div class="inspection-update-all-source-list" aria-label="Source update status">
-            @for (target of targets; track target) {
+            @for (target of visibleTargets(); track target) {
               <div class="inspection-update-all-source" [class.is-failed]="targetState(target).status === 'failed' || !!targetState(target).error">
                 <div class="inspection-update-all-source-heading">
                   <strong>{{ targetLabel(target) }}</strong>
@@ -173,6 +185,29 @@ type InspectionUpdateAllConfigChange = {
       display: flex;
       flex-direction: column;
       gap: var(--space-md);
+    }
+
+    .inspection-update-all-option {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      cursor: pointer;
+    }
+
+    .inspection-update-all-option input {
+      margin-top: 3px;
+      accent-color: var(--color-brand-ui);
+    }
+
+    .inspection-update-all-option span {
+      display: grid;
+      gap: 2px;
+    }
+
+    .inspection-update-all-option small {
+      color: var(--color-text-muted);
+      font-size: var(--font-xs);
+      line-height: 1.4;
     }
 
     .inspection-update-all-tabs {
@@ -349,7 +384,13 @@ type InspectionUpdateAllConfigChange = {
   `,
 })
 export class InspectionUpdateAllModalComponent {
-  readonly targets = INSPECTION_UPDATE_ALL_TARGETS;
+  readonly includeTerminology = input(true);
+  readonly includeTerminologyChange = output<boolean>();
+  readonly visibleTargets = computed(() =>
+    INSPECTION_UPDATE_ALL_TARGETS.filter(
+      (target) => target !== 'terminology' || this.includeTerminology(),
+    ),
+  );
   readonly isOpen = input(false);
   readonly activeTarget = input.required<InspectionUpdateAllTarget>();
   readonly configs = input.required<InspectionUpdateAllConfigMap>();
@@ -426,20 +467,20 @@ export class InspectionUpdateAllModalComponent {
   }
 
   onTabKeydown(event: KeyboardEvent, target: InspectionUpdateAllTarget): void {
-    const currentIndex = this.targets.indexOf(target);
+    const currentIndex = this.visibleTargets().indexOf(target);
     if (currentIndex < 0) return;
     let nextIndex: number | null = null;
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      nextIndex = (currentIndex + 1) % this.targets.length;
+      nextIndex = (currentIndex + 1) % this.visibleTargets().length;
     } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      nextIndex = (currentIndex - 1 + this.targets.length) % this.targets.length;
+      nextIndex = (currentIndex - 1 + this.visibleTargets().length) % this.visibleTargets().length;
     } else if (event.key === 'Home') {
       nextIndex = 0;
     } else if (event.key === 'End') {
-      nextIndex = this.targets.length - 1;
+      nextIndex = this.visibleTargets().length - 1;
     }
     if (nextIndex === null) return;
     event.preventDefault();
-    this.targetChange.emit(this.targets[nextIndex]);
+    this.targetChange.emit(this.visibleTargets()[nextIndex]);
   }
 }

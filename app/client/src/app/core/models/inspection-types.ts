@@ -20,7 +20,7 @@ export type InspectionUpdateJobResult = {
 };
 
 export type InspectionStructuredSourceJobState = {
-  status: JobStatus;
+  status: JobStatus | "skipped";
   progress: number;
   message: string;
   error: string | null;
@@ -336,6 +336,7 @@ export type InspectionStructuredSourcesUpdateRequest = {
   livertox: InspectionLiverToxOverrideRequest;
   terminology: InspectionTerminologyOverrideRequest;
   dilirank: InspectionDiliRankUpdateRequest;
+  include_terminology?: boolean;
 };
 
 export type InspectionUpdateAllStartRequestMap = {
@@ -364,6 +365,7 @@ export type InspectionUpdateAllPhase =
 
 export type InspectionUpdateAllTargetState = {
   started: boolean;
+  skipped?: boolean;
   jobId: string | null;
   status: JobStatus | null;
   progress: number;

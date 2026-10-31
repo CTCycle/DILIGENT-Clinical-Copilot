@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -60,7 +61,11 @@ def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> N
         calls.append(kwargs)
         return next(responses)
 
+    async def fake_chat_result(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(content=await fake_chat(**kwargs), finish_reason="stop")
+
     client.chat = fake_chat  # type: ignore[method-assign]
+    client.chat_result = fake_chat_result  # type: ignore[method-assign]
 
     result = asyncio.run(
         client.llm_structured_call(
@@ -104,7 +109,11 @@ def test_structured_repair_recovers_from_truncated_patient_drugs_payload() -> No
         calls.append(kwargs)
         return next(responses)
 
+    async def fake_chat_result(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(content=await fake_chat(**kwargs), finish_reason="stop")
+
     client.chat = fake_chat  # type: ignore[method-assign]
+    client.chat_result = fake_chat_result  # type: ignore[method-assign]
 
     result = asyncio.run(
         client.llm_structured_call(
@@ -279,7 +288,7 @@ def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
             provider_detail="unsupported schema",
         )
 
-    monkeypatch.setattr(client, "chat", fail_chat)
+    monkeypatch.setattr(client, "chat_result", fail_chat)
 
     with pytest.raises(LLMError, match="Cloud provider returned HTTP 400"):
         asyncio.run(
@@ -287,6 +296,32 @@ def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
                 model="gpt-5.6",
                 system_prompt="Return JSON",
                 user_prompt="ok",
+                schema=Payload,
+            )
+        )
+
+###############################################################################
+def test_structured_call_fails_instead_of_repairing_an_exhausted_output_budget() -> None:
+
+    ###############################################################################
+    class Payload(BaseModel):
+        ok: bool
+
+    client = CloudLLMClient.__new__(CloudLLMClient)
+    client.provider = "opencode_go"
+    client.default_model = "beam-free"
+
+    async def fake_chat_result(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(content="", finish_reason="length")
+
+    client.chat_result = fake_chat_result  # type: ignore[method-assign]
+
+    with pytest.raises(LLMError):
+        asyncio.run(
+            client.llm_structured_call(
+                model="beam-free",
+                system_prompt="Return the requested object.",
+                user_prompt="Review this synthetic case.",
                 schema=Payload,
             )
         )

@@ -314,3 +314,85 @@
   font-size: var(--font-sm);
   font-weight: 700;
 }
+
+.inspection-toolbar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.inspection-toolbar-heading .inspection-toolbar-eyebrow {
+  margin: 0;
+}
+
+.inspection-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.inspection-help-btn:hover,
+.inspection-help-btn:focus-visible {
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+}
+
+.inspection-help-btn:focus-visible {
+  outline: 2px solid var(--color-brand-light);
+  outline-offset: 1px;
+}
+
+.inspection-toolbar-group {
+  margin-top: var(--space-sm);
+  padding-left: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inspection-job-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.inspection-job-id {
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+}
+
+.inspection-job-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.inspection-job-badge[data-tone='running'] {
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+}
+
+.inspection-job-badge[data-tone='completed'] {
+  background: var(--color-status-success-bg, var(--color-brand-bg));
+  color: var(--color-status-success-text, var(--color-brand));
+}
+
+.inspection-job-badge[data-tone='failed'] {
+  background: var(--color-status-error-bg, var(--color-surface-alt));
+  color: var(--color-status-error-text);
+}

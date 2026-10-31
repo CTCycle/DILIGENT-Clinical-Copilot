@@ -14,6 +14,8 @@ import {
 const STALL_THRESHOLD_MS = 600_000;
 const TICK_MS = 1000;
 
+const BACKEND_STEP_PREFIX = /^Step\s+\d+\s*(?:\/|of)\s*\d+\s*:\s*/i;
+
 @Component({
   selector: 'app-analysis-progress',
   templateUrl: './analysis-progress.component.html',
@@ -57,7 +59,7 @@ export class AnalysisProgressComponent {
   readonly stepLabel = computed(() => {
     const index = this.phaseIndex();
     return this.tone() === 'running' && index !== null
-      ? `Step ${index + 1} of ${this.phaseCount}`
+      ? `${index + 1}/${this.phaseCount}`
       : null;
   });
   readonly elapsed = computed(() => {
@@ -73,7 +75,7 @@ export class AnalysisProgressComponent {
     if (this.tone() !== 'running') {
       return null;
     }
-    const message = this.stageMessage();
+    const message = this.stageMessage()?.replace(BACKEND_STEP_PREFIX, '').trim();
     if (!message) {
       return null;
     }

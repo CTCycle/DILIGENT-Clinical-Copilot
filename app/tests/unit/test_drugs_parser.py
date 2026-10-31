@@ -1032,6 +1032,21 @@ def test_wrapped_bullet_continuation_attached() -> None:
     assert "al mattino" in blocks[0].text
 
 ###############################################################################
+def test_wrapped_date_line_is_not_a_numbered_bullet_and_narrative_is_cut() -> None:
+    text = (
+        "- Co-Amoxi 1200mgx3/die 30.12.2024 - 03.01.2025 (per sospetta\n"
+        "colecistite, in normalizzazione il\n"
+        "31.12.2024)\n"
+        "- Cefepime 2gx3/die dal 19.02.2025 per polmonite\n"
+        "Nuovo rialzo degli indici epatici riscontrato in data 17.02.2025.\n"
+        "\u25a0 Aldactone 50 mg cpr 1-0-0-0 per os"
+    )
+    blocks = isolate_drug_blocks(text)
+    assert len(blocks) == 3
+    assert not any(block.text.startswith("31.12.2024") for block in blocks)
+    assert "Nuovo rialzo" not in blocks[1].text
+
+###############################################################################
 def test_free_prose_returns_single_block() -> None:
     text = "Paziente in terapia cronica senza dettagli posologici specifici."
     blocks = isolate_drug_blocks(text)

@@ -143,6 +143,30 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(component.loading()).toBe(false);
   });
 
+  it('refreshes the list from the refresh button while keeping query, filter and selection', async () => {
+    const urls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/inspection/sessions?')) {
+        urls.push(url);
+        return jsonResponse({ items: [sessionItem(2)], total: 1, offset: 0, limit: 100 });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    component.selected.set(sessionDetail(2));
+    component.updateQuery('venditti');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button[aria-label="Refresh sessions"]') as HTMLButtonElement;
+    button.click();
+    await fixture.whenStable();
+
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain('search=venditti');
+    expect(component.query()).toBe('venditti');
+    expect(component.selected()?.session_id).toBe(2);
+  });
+
   it('ignores a stale session detail response after navigation', async () => {
     const firstResponse = deferred<Response>();
     const secondResponse = deferred<Response>();

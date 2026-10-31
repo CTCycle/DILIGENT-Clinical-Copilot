@@ -708,6 +708,7 @@ class InspectionStructuredSourcesUpdateRequest(BaseModel):
     dilirank: InspectionDiliRankOverrideRequest = Field(
         default_factory=InspectionDiliRankOverrideRequest
     )
+    include_terminology: bool | None = None
 
 ###############################################################################
 class InspectionRagUpdateRequest(BaseModel):

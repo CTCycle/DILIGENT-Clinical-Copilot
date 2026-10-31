@@ -87,6 +87,41 @@ def test_structured_sources_run_in_dependency_order() -> None:
     assert jobs.get_job_status(job_id)["progress"] == 100
 
 ###############################################################################
+def test_structured_sources_can_exclude_terminology() -> None:
+    jobs = JobManager()
+    runner = build_runner(jobs)
+    job_id = make_job(jobs)
+    calls: list[str] = []
+
+    def child(target: str):
+        def run(
+            _job_id: str,
+            _overrides: dict[str, Any],
+            *,
+            progress_callback,
+            report_phase: bool,
+        ) -> dict[str, Any]:
+            calls.append(target)
+            progress_callback(100, f"{target} complete")
+            return {"summary": {}}
+
+        return run
+
+    runner.run_rxnav_update_job = child("rxnav")  # type: ignore[method-assign]
+    runner.run_livertox_update_job = child("livertox")  # type: ignore[method-assign]
+    runner.run_terminology_update_job = child("terminology")  # type: ignore[method-assign]
+    runner.run_dilirank_update_job = child("dilirank")  # type: ignore[method-assign]
+
+    result = runner.run_structured_sources_update_job(
+        job_id, {"include_terminology": False}
+    )
+
+    assert calls == ["rxnav", "livertox", "dilirank"]
+    assert result["sources"]["terminology"]["status"] == "skipped"
+    assert result["sources"]["dilirank"]["status"] == "completed"
+    assert jobs.get_job_status(job_id)["progress"] == 100
+
+###############################################################################
 def test_structured_sources_cancellation_does_not_start_following_sources() -> None:
     jobs = JobManager()
     runner = build_runner(jobs)

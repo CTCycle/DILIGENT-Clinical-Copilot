@@ -55,7 +55,7 @@ are defined by typed application models.
 
 | Category | Ownership | Controls |
 | --- | --- | --- |
-| General | Jobs | Polling interval |
+| General | Jobs | Polling interval and the LLM output token limit (reasoning tokens count toward it) |
 | Models | Application configuration | Provider, access-key workflow, model roles, reasoning, and the complete RAG payload |
 | Data Processing | Ingestion, session pipeline, language detection | Drug-name limits, batch/concurrency limits, and clinical language thresholds |
 | Integrations | Runtime integrations | NCBI/LiverTox contact and download/archive/worker controls, RxNav request timeout, terminology download timeout, and the DrugCentral (connection), ChEMBL (clinical phase), and Swissmedic source switches |

@@ -46,6 +46,33 @@ describe('InspectionUpdateControlsComponent', () => {
   });
 });
 
+describe('InspectionUpdateControlsComponent terminology', () => {
+  it('summarises the selected terminology sources and emits checkbox changes', async () => {
+    await TestBed.configureTestingModule({ imports: [InspectionUpdateControlsComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(InspectionUpdateControlsComponent);
+    fixture.componentRef.setInput('target', 'terminology');
+    fixture.componentRef.setInput('config', {
+      force_full: false,
+      drugcentral_enabled: true,
+      chembl_enabled: false,
+      swissmedic_enabled: false,
+    });
+    fixture.detectChanges();
+    const emitted: Array<{ key: string; value: unknown }> = [];
+    fixture.componentInstance.configChange.subscribe((change) => emitted.push(change));
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Will update: RxNorm, DrugCentral, curated aliases');
+    const boxes = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    expect(boxes).toHaveLength(3);
+    boxes[1].click();
+    expect(emitted).toEqual([{ key: 'chembl_enabled', value: true }]);
+    const radios = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="radio"]');
+    radios[1].click();
+    expect(emitted.at(-1)).toEqual({ key: 'force_full', value: true });
+  });
+});
+
 describe('InspectionUpdateAllModalComponent', () => {
   let fixture: ComponentFixture<InspectionUpdateAllModalComponent>;
 
@@ -139,5 +166,19 @@ describe('InspectionUpdateAllModalComponent', () => {
     expect(cancelButton.disabled).toBe(false);
     expect(fixture.nativeElement.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('42');
     expect(fixture.nativeElement.querySelector('[aria-label="RxNav update progress"]')?.getAttribute('aria-valuenow')).toBe('44');
+  });
+
+  it('hides the terminology tab and status when terminology is excluded', () => {
+    const changes: boolean[] = [];
+    fixture.componentInstance.includeTerminologyChange.subscribe((value) => changes.push(value));
+    const checkbox = fixture.nativeElement.querySelector('.inspection-update-all-option input') as HTMLInputElement;
+    checkbox.click();
+    expect(changes).toEqual([false]);
+
+    fixture.componentRef.setInput('includeTerminology', false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('[role="tab"]')).toHaveLength(3);
+    expect(fixture.nativeElement.querySelector('#inspection-update-all-tab-terminology')).toBeNull();
   });
 });

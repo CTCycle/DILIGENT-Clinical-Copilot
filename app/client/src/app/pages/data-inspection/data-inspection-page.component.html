@@ -3,9 +3,25 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <section class="inspection-layout">
     <aside class="inspection-toolbar" aria-label="Knowledge sources">
-      <p class="inspection-toolbar-eyebrow">Sources</p>
+      <div class="inspection-toolbar-heading">
+        <p class="inspection-toolbar-eyebrow">Sources</p>
+        <button
+          type="button"
+          class="inspection-help-btn"
+          aria-label="Open Knowledge help"
+          title="How the Knowledge sources work"
+          (click)="knowledgeHelpOpen.set(true)"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7" /><path d="M12 17h.01" />
+          </svg>
+        </button>
+      </div>
       <div class="inspection-toolbar-list" role="tablist" aria-label="Inspection datasets" aria-orientation="vertical">
-        @for (view of inspectionViews; track view.id) {
+        @for (view of inspectionViews; track view.id; let i = $index) {
+          @if (i > 0 && inspectionViews[i - 1].group !== view.group) {
+            <span class="inspection-toolbar-group" role="presentation">{{ view.group }}</span>
+          }
           <button
             type="button"
             class="inspection-toolbar-item"
@@ -735,6 +751,8 @@
     [state]="updateAllState()"
     [canStart]="updateAllCanStart()"
     [validationError]="updateAllValidationError()"
+    [includeTerminology]="includeTerminology()"
+    (includeTerminologyChange)="setIncludeTerminology($event)"
     (close)="closeUpdateAllModal()"
     (targetChange)="changeUpdateAllTarget($event)"
     (configChange)="updateUpdateAllConfig($event)"
@@ -742,6 +760,8 @@
     (start)="startUpdateAll()"
     (cancel)="cancelUpdateAll()"
   />
+
+  <app-knowledge-help [isOpen]="knowledgeHelpOpen()" (close)="knowledgeHelpOpen.set(false)" />
 
   <app-modal-shell
     [isOpen]="!!activeUpdateTarget()"
@@ -773,17 +793,31 @@
             (configChange)="updateUpdateConfig($event)"
           />
         }
-        <div class="inspection-job-panel">
-          <p class="inspection-job-message">Job ID: {{ updateJobId() || 'Not started' }}</p>
-          <div class="inspection-job-bar-track"><div class="inspection-job-bar-fill" [style.width.%]="updateProgress()"></div></div>
+        <div class="inspection-job-panel" aria-live="polite">
+          <div class="inspection-job-status-row">
+            <span class="inspection-job-badge" [attr.data-tone]="updateStatus().tone">{{ updateStatus().label }}</span>
+            <span class="inspection-job-id">Job {{ updateJobId() || 'not started' }}</span>
+          </div>
+          <div
+            class="inspection-job-bar-track"
+            role="progressbar"
+            aria-label="Update progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-valuenow]="updateProgress()"
+          ><div class="inspection-job-bar-fill" [style.width.%]="updateProgress()"></div></div>
           <p class="inspection-job-message">{{ updateMessage() || 'Ready to start.' }}</p>
           @if (updateError()) { <p class="inspection-error-text">{{ updateError() }}</p> }
         </div>
       }
     </div>
     <div modal-footer class="inspection-pager-actions inspection-update-actions">
-      <button class="btn btn-primary inspection-mini-btn" type="button" (click)="startUpdateJob()" [disabled]="updateRunning()">Start Update</button>
-      <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="cancelUpdateJob()" [disabled]="!updateRunning()">Cancel</button>
+      @if (updateRunning()) {
+        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="cancelUpdateJob()">Stop update</button>
+      } @else {
+        <button class="btn btn-primary inspection-mini-btn" type="button" (click)="startUpdateJob()" [disabled]="updateLoading()">Start Update</button>
+        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="closeUpdateModal()">Close</button>
+      }
     </div>
   </app-modal-shell>
 </main>

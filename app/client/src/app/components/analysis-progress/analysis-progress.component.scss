@@ -90,3 +90,10 @@
     transition: none;
   }
 }
+
+.analysis-progress-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  font-variant-numeric: tabular-nums;
+}

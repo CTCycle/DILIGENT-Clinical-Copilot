@@ -9,7 +9,7 @@ from decimal import Decimal
 from playwright.sync_api import Page, expect
 
 OPERATIONAL_FIELDS = {
-    "general": ["polling_interval"],
+    "general": ["polling_interval", "llm_output_token_limit"],
     "data": [
         "drug_name_min_length",
         "drug_name_max_length",

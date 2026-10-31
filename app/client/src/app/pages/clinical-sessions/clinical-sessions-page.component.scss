@@ -58,30 +58,10 @@
 
 .clinical-sessions-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: var(--space-sm);
   align-items: center;
   margin-bottom: var(--space-sm);
-}
-
-.clinical-sessions-search input {
-  min-width: 0;
-  width: 100%;
-  min-height: var(--control-height-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-base);
-}
-
-.clinical-sessions-search .btn {
-  min-height: var(--control-height-sm);
-  height: var(--control-height-sm);
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-base);
 }
 
 .clinical-sessions-filters {
@@ -386,9 +366,10 @@
 
 .clinical-session-preview {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.8fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-md);
-  align-items: start;
+  align-items: stretch;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -405,31 +386,34 @@
 .clinical-session-preview-main {
   height: 100%;
   // Let the narrative scrollbar sit over the divider between the two panes.
-  margin-inline-end: calc(-1 * var(--space-md));
-  position: relative;
-  z-index: 1;
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 
 .clinical-session-preview-side {
+  align-content: start;
+  grid-auto-rows: max-content;
+  gap: var(--space-xl);
+  overflow-x: hidden;
   overflow-y: auto;
   border-inline-start: 1px solid var(--cs-section-divider);
   padding-inline-start: var(--space-lg);
-  padding-right: 2px;
+  padding-right: var(--space-xs);
 }
 
 .clinical-session-preview-card {
-  border-top: 1px solid var(--cs-section-divider);
-  padding: var(--space-md) 0 0;
   min-width: 0;
-  min-height: 0;
-  overflow: hidden;
 }
 
-.clinical-session-preview-main > .clinical-session-preview-card:first-child,
-.clinical-session-preview-side > .clinical-session-preview-card:first-child {
-  border-top: 0;
-  padding-top: 0;
+.clinical-session-preview-main .clinical-session-preview-card {
+  min-height: 0;
+}
+
+.clinical-session-preview-side .clinical-session-preview-card h3 {
+  color: var(--cs-muted);
+  font-size: var(--font-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .clinical-session-preview-card h3 {
@@ -463,6 +447,7 @@
   height: 100%;
   min-width: 0;
   overflow: auto;
+  padding-right: var(--space-sm);
   color: var(--cs-text);
   font: 13px/1.55 "Inter", "Segoe UI", sans-serif;
 }
@@ -484,9 +469,12 @@
 }
 
 :host ::ng-deep .clinical-session-preview-content :is(h2, h3) {
-  margin-top: var(--space-lg);
-  border-top: 1px solid var(--cs-section-divider);
-  padding-top: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+:host ::ng-deep .clinical-session-preview-content hr {
+  margin: 0;
+  border: 0;
 }
 
 :host ::ng-deep .clinical-session-preview-content h1 {
@@ -494,6 +482,7 @@
 }
 
 :host ::ng-deep .clinical-session-preview-content h2 {
+  color: var(--color-brand);
   font-size: var(--font-lg);
 }
 
@@ -543,13 +532,13 @@
 
 .clinical-session-drug-evidence-table th,
 .clinical-session-drug-evidence-table td {
-  border-bottom: 1px solid var(--cs-border);
-  padding: 7px 5px;
+  padding: 8px 5px;
   text-align: left;
   vertical-align: top;
 }
 
 .clinical-session-drug-evidence-table th {
+  border-bottom: 1px solid var(--cs-border);
   color: var(--cs-faint);
   font-size: var(--font-xs);
   font-weight: 800;
@@ -671,6 +660,7 @@
 
 .clinical-session-lab-table-wrap {
   margin-top: var(--space-sm);
+  overflow-x: auto;
 }
 
 .clinical-session-lab-table {
@@ -682,13 +672,13 @@
 
 .clinical-session-lab-table th,
 .clinical-session-lab-table td {
-  border-bottom: 1px solid var(--cs-border);
-  padding: 6px 5px;
+  padding: 7px 5px;
   text-align: left;
   vertical-align: top;
 }
 
 .clinical-session-lab-table th {
+  border-bottom: 1px solid var(--cs-border);
   color: var(--cs-faint);
   font-weight: 800;
 }

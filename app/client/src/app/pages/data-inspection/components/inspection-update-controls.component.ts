@@ -35,33 +35,55 @@ export type InspectionUpdateFieldChange = {
       }
 
       @if (target === 'terminology') {
-        <div class="inspection-update-field-grid">
-          <label class="inspection-update-field">
-            <span>Refresh mode</span>
-            <select
-              [ngModel]="booleanValue('force_full', false) ? 'full' : 'incremental'"
-              (ngModelChange)="updateBoolean('force_full', $event === 'full')"
-              [disabled]="disabled"
-            >
-              <option value="incremental">Skip unchanged releases</option>
-              <option value="full">Force full re-import</option>
-            </select>
-            <small>Unchanged source versions are skipped unless a full re-import is forced.</small>
-          </label>
-          @for (source of terminologySources; track source.key) {
-            <label class="inspection-update-field">
-              <span>{{ source.label }}</span>
-              <select
-                [ngModel]="booleanValue(source.key, true) ? 'on' : 'off'"
-                (ngModelChange)="updateBoolean(source.key, $event === 'on')"
-                [disabled]="disabled"
-              >
-                <option value="on">Include</option>
-                <option value="off">Skip this run</option>
-              </select>
-              <small>{{ source.hint }}</small>
-            </label>
-          }
+        <div class="inspection-update-terminology">
+          <div class="inspection-update-field">
+            <span id="terminology-refresh-mode">Refresh mode</span>
+            <div class="inspection-segmented" role="radiogroup" aria-labelledby="terminology-refresh-mode">
+              <label [class.is-selected]="!booleanValue('force_full', false)">
+                <input
+                  type="radio"
+                  name="terminology-refresh-mode"
+                  [checked]="!booleanValue('force_full', false)"
+                  [disabled]="disabled"
+                  (change)="updateBoolean('force_full', false)"
+                />
+                Skip unchanged
+              </label>
+              <label [class.is-selected]="booleanValue('force_full', false)">
+                <input
+                  type="radio"
+                  name="terminology-refresh-mode"
+                  [checked]="booleanValue('force_full', false)"
+                  [disabled]="disabled"
+                  (change)="updateBoolean('force_full', true)"
+                />
+                Full re-import
+              </label>
+            </div>
+            <small>Unchanged source versions are skipped unless a full re-import is chosen.</small>
+          </div>
+
+          <fieldset class="inspection-update-sources" [disabled]="disabled">
+            <legend>Sources to update</legend>
+            <p class="inspection-update-source-fixed">
+              <strong>RxNorm and curated aliases</strong>
+              <small>Always included. Public domain (NLM) and project-maintained.</small>
+            </p>
+            @for (source of terminologySources; track source.key) {
+              <label class="inspection-update-source">
+                <input
+                  type="checkbox"
+                  [checked]="booleanValue(source.key, true)"
+                  (change)="updateBoolean(source.key, $any($event.target).checked)"
+                />
+                <span>
+                  <strong>{{ source.label }}</strong>
+                  <small>{{ source.hint }}</small>
+                </span>
+              </label>
+            }
+          </fieldset>
+          <p class="inspection-update-summary" aria-live="polite">Will update: {{ terminologySummary() }}</p>
         </div>
       }
 
@@ -188,6 +210,114 @@ export type InspectionUpdateFieldChange = {
       line-height: 1.4;
     }
 
+    .inspection-update-terminology {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .inspection-segmented {
+      display: inline-flex;
+      width: fit-content;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .inspection-segmented label {
+      position: relative;
+      padding: 6px var(--space-md);
+      background: var(--color-surface);
+      color: var(--color-text-secondary);
+      font-size: var(--font-sm);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .inspection-segmented label + label {
+      border-left: 1px solid var(--color-border);
+    }
+
+    .inspection-segmented label.is-selected {
+      background: var(--color-brand-bg);
+      color: var(--color-brand);
+    }
+
+    .inspection-segmented label:has(input:focus-visible) {
+      outline: var(--focus-ring);
+      outline-offset: -2px;
+    }
+
+    .inspection-segmented input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .inspection-update-sources {
+      display: grid;
+      gap: var(--space-sm);
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .inspection-update-sources legend {
+      margin-bottom: var(--space-xs);
+      padding: 0;
+      color: var(--color-text-primary);
+      font-size: var(--font-sm);
+      font-weight: 700;
+    }
+
+    .inspection-update-source,
+    .inspection-update-source-fixed {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      margin: 0;
+    }
+
+    .inspection-update-source-fixed {
+      flex-direction: column;
+      gap: 2px;
+      padding-left: 24px;
+    }
+
+    .inspection-update-source {
+      cursor: pointer;
+    }
+
+    .inspection-update-source input {
+      margin-top: 3px;
+      accent-color: var(--color-brand-ui);
+    }
+
+    .inspection-update-source span {
+      display: grid;
+      gap: 2px;
+    }
+
+    .inspection-update-source strong,
+    .inspection-update-source-fixed strong {
+      font-size: var(--font-sm);
+    }
+
+    .inspection-update-source small,
+    .inspection-update-source-fixed small {
+      color: var(--color-text-muted);
+      font-size: var(--font-xs);
+      line-height: 1.4;
+    }
+
+    .inspection-update-summary {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--font-xs);
+    }
+
     @media (max-width: 760px) {
       .inspection-update-field-grid {
         grid-template-columns: 1fr;
@@ -210,6 +340,13 @@ export class InspectionUpdateControlsComponent {
   @Input() config: Record<string, unknown> | null = null;
   @Input() disabled = false;
   @Output() readonly configChange = new EventEmitter<InspectionUpdateFieldChange>();
+
+  terminologySummary(): string {
+    const names = ['RxNorm', ...this.terminologySources
+      .filter((source) => this.booleanValue(source.key, true))
+      .map((source) => source.label), 'curated aliases'];
+    return names.join(', ');
+  }
 
   numberValue(key: string, fallback: number): number {
     const value = this.config?.[key];

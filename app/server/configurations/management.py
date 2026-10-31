@@ -231,7 +231,13 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     polling_interval = coerce_float(payload.get("polling_interval"), 1.0)
     if polling_interval <= 0:
         polling_interval = 1.0
-    return JobsSettings(polling_interval=polling_interval)
+    llm_output_token_limit = min(
+        max(coerce_int(payload.get("llm_output_token_limit"), 32768), 256), 1_000_000
+    )
+    return JobsSettings(
+        polling_interval=polling_interval,
+        llm_output_token_limit=llm_output_token_limit,
+    )
 
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:

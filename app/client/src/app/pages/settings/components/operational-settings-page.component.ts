@@ -77,6 +77,17 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
         step: 0.25,
         unit: 'seconds',
       },
+      {
+        key: 'llm_output_token_limit',
+        label: 'LLM output token limit',
+        help: 'Maximum tokens a model may generate per request, including reasoning. Raise it if a model returns empty or truncated output. A smaller maximum reported by the model still applies.',
+        scope: 'LLM runtime',
+        kind: 'number',
+        min: 256,
+        max: 1000000,
+        step: 256,
+        unit: 'tokens',
+      },
     ],
   },
   data: {

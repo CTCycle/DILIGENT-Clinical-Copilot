@@ -334,8 +334,9 @@ app-root {
 
 .stitch-dili-draft-save {
   position: absolute;
-  right: var(--space-md);
-  bottom: var(--space-md);
+  top: var(--space-sm);
+  right: calc(var(--space-md) + 14px);
+  z-index: 1;
   display: inline-grid;
   place-items: center;
   width: 32px;
@@ -377,7 +378,7 @@ app-root {
 
 .stitch-dili-workbench .stitch-dili-input-unified {
   flex: 1;
-  padding-right: calc(var(--space-lg) + 32px);
+  padding-right: calc(var(--space-lg) + 46px);
   min-height: 320px;
   max-height: none;
   resize: vertical;
@@ -6071,4 +6072,47 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     grid-column: 2;
     justify-self: start;
   }
+}
+
+.clinical-sessions-search .clinical-sessions-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height-sm);
+  padding: 0;
+}
+
+.clinical-sessions-refresh.is-loading svg {
+  animation: clinical-sessions-spin 0.9s linear infinite;
+}
+
+@keyframes clinical-sessions-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clinical-sessions-refresh.is-loading svg {
+    animation: none;
+  }
+}
+
+.clinical-sessions-search input {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-base);
+}
+
+.clinical-sessions-search .btn {
+  min-height: var(--control-height-sm);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-base);
 }

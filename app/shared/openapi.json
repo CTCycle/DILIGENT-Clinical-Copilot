@@ -5730,12 +5730,19 @@
             "maximum": 60.0,
             "exclusiveMinimum": 0.0,
             "title": "Polling Interval"
+          },
+          "llm_output_token_limit": {
+            "type": "integer",
+            "maximum": 1000000,
+            "minimum": 256,
+            "title": "Llm Output Token Limit"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "polling_interval"
+          "polling_interval",
+          "llm_output_token_limit"
         ],
         "title": "GeneralRuntimeSettings"
       },
@@ -5753,6 +5760,19 @@
               }
             ],
             "title": "Polling Interval"
+          },
+          "llm_output_token_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000,
+                "minimum": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Output Token Limit"
           }
         },
         "additionalProperties": false,

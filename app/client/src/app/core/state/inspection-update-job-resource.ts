@@ -262,6 +262,7 @@ export class InspectionUpdateJobResource {
   readonly updateAllConfigLoading = signal<InspectionUpdateAllConfigLoadingMap>(initialUpdateAllConfigLoadingMap());
   readonly updateAllConfigErrors = signal<InspectionUpdateAllConfigErrorMap>(initialUpdateAllConfigErrorMap());
   readonly updateAllValidationError = signal<string | null>(null);
+  readonly includeTerminology = signal(true);
   readonly activeTarget = signal<InspectionUpdateTarget | null>(null);
   readonly updateConfig = signal<Record<string, unknown> | null>(null);
   readonly updateLoading = signal(false);
@@ -271,12 +272,17 @@ export class InspectionUpdateJobResource {
   readonly updateMessage = signal('');
   readonly updateError = signal<string | null>(null);
   readonly updateAllRunning = computed(() => isUpdateAllRunning(this.updateAllState()));
+  readonly selectedUpdateAllTargets = computed(() =>
+    INSPECTION_UPDATE_ALL_TARGETS.filter(
+      (target) => target !== 'terminology' || this.includeTerminology(),
+    ),
+  );
   readonly updateAllCanStart = computed(() => {
     const configs = this.updateAllConfigs();
     const loading = this.updateAllConfigLoading();
     const errors = this.updateAllConfigErrors();
     const trackerStates = this.tracker?.targetState();
-    return INSPECTION_UPDATE_ALL_TARGETS.every(
+    return this.selectedUpdateAllTargets().every(
       (target) => configs[target] !== null && !loading[target] && !errors[target],
     ) && !this.updateAllRunning() && !INSPECTION_UPDATE_ALL_TARGETS.some(
       (target) => trackerStates?.[target].running,
@@ -427,7 +433,7 @@ export class InspectionUpdateJobResource {
       return;
     }
     this.updateAllValidationError.set(null);
-    await this.tracker.startAll(this.buildUpdateAllStartRequests());
+    await this.tracker.startAll(this.buildUpdateAllStartRequests(), this.includeTerminology());
   }
 
   async cancelAll(): Promise<void> {
@@ -435,6 +441,11 @@ export class InspectionUpdateJobResource {
       return;
     }
     await this.tracker.cancelAll();
+  }
+
+  setIncludeTerminology(value: boolean): void {
+    this.includeTerminology.set(value);
+    this.updateAllValidationError.set(null);
   }
 
   closeAll(): void {
@@ -445,15 +456,16 @@ export class InspectionUpdateJobResource {
     const configs = this.updateAllConfigs();
     const loading = this.updateAllConfigLoading();
     const errors = this.updateAllConfigErrors();
-    const loadingTarget = INSPECTION_UPDATE_ALL_TARGETS.find((target) => loading[target]);
+    const selected = this.selectedUpdateAllTargets();
+    const loadingTarget = selected.find((target) => loading[target]);
     if (loadingTarget) {
       return 'Wait for all source configurations to finish loading.';
     }
-    const failedTarget = INSPECTION_UPDATE_ALL_TARGETS.find((target) => errors[target]);
+    const failedTarget = selected.find((target) => errors[target]);
     if (failedTarget) {
       return 'Resolve the source configuration errors before starting the combined update.';
     }
-    const missingTarget = INSPECTION_UPDATE_ALL_TARGETS.find((target) => configs[target] === null);
+    const missingTarget = selected.find((target) => configs[target] === null);
     if (missingTarget) {
       return 'Load configuration for all three sources before starting the combined update.';
     }

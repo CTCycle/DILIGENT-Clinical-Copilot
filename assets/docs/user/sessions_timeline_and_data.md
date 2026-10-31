@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-10-29
+Last updated: 2026-10-31
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -110,7 +110,9 @@ Some data sources or embeddings may require initialization or refresh through th
 start_on_windows.ps1
 ```
 
-**Update all** refreshes RxNav (RxNorm Prescribable Content and curated aliases), LiverTox, Terminology, and DILIrank in that order. DrugCentral and ChEMBL data are licensed CC BY-SA and are downloaded to your local database by this update; they are never bundled with the application.
+The Knowledge sidebar groups Drug Catalog, LiverTox and DILIrank under *Knowledge sources*, Terminology under *Mapping*, and RAG under *Retrieval*; the **?** button beside *Sources* opens a Knowledge help dialog covering sources, updates, terminology mapping, dependencies and update status. In Clinical Sessions the refresh icon beside Search reloads the persisted sessions while keeping the query, filters and selection.
+
+**Update all** refreshes RxNav (RxNorm Prescribable Content and curated aliases), LiverTox, Terminology, and DILIrank in that order. DrugCentral and ChEMBL data are licensed CC BY-SA and are downloaded to your local database by this update; they are never bundled with the application. The Update all dialog has an **Include terminology mapping** checkbox (on by default); clearing it skips terminology for that run and shows it as excluded. The Terminology update dialog uses a segmented refresh mode (skip unchanged or full re-import) and a checkbox per source (DrugCentral, ChEMBL, Swissmedic) with purpose and licence notes.
 
 DILIrank updates use the official FDA workbook. The default update may reuse a validated local workbook while checking HTTP freshness metadata; **Download fresh source** forces a new download. A downloaded candidate is validated before it replaces the last-known-good cache.
 

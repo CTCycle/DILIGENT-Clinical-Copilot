@@ -184,6 +184,7 @@ class RuntimeSettingsService:
         return RuntimeSettingsValues(
             general=GeneralRuntimeSettings(
                 polling_interval=settings.jobs.polling_interval,
+                llm_output_token_limit=settings.jobs.llm_output_token_limit,
             ),
             data=DataRuntimeSettings(
                 drug_name_min_length=settings.ingestion.drug_name_min_length,

@@ -17,7 +17,8 @@ from domain.llm.providers import (
     ToolCallMode,
 )
 from domain.model_configs import ReasoningLevel
-from services.llm.generation_policy import GenerationPolicy
+from configurations.startup import get_server_settings
+from services.llm.generation_policy import GenerationPolicy, GenerationPurpose
 
 CapabilitySource = Literal[
     "exact_model",
@@ -689,11 +690,16 @@ def resolve_effective_inference_config(
         if effective_context_limit is not None
         else None
     )
+    # The general setting replaces the per-purpose defaults so models that spend
+    # output tokens on reasoning are not cut off before producing content.
+    configured_limit = get_server_settings().jobs.llm_output_token_limit
     output_token_limit = (
-        min(policy.output_token_limit, capabilities.output_token_limit)
-        if capabilities.output_token_limit is not None
-        else policy.output_token_limit
+        policy.output_token_limit
+        if policy.purpose is GenerationPurpose.CONNECTIVITY_CHECK
+        else max(policy.output_token_limit, configured_limit)
     )
+    if capabilities.output_token_limit is not None:
+        output_token_limit = min(output_token_limit, capabilities.output_token_limit)
     effective_temperature = (
         policy.temperature
         if capabilities.supports_temperature

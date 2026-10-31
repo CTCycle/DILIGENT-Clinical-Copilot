@@ -63,21 +63,22 @@ describe('AnalysisProgressComponent', () => {
       jobStatus: 'running',
       jobProgress: 30,
       stage: 'drugs.resolving',
-      stageMessage: 'Resolving drug names',
+      stageMessage: 'Step 4/15: Resolving drug names',
     });
 
     expect(bar().getAttribute('aria-valuenow')).toBe('30');
     expect(text()).toContain('Normalizing drug names');
-    expect(text()).toContain('Step 3 of 8');
+    expect(text()).toContain('3/8');
     expect(text()).toContain('Resolving drug names');
     expect(text()).not.toContain('30%');
+    expect(text()).not.toContain('Step');
   });
 
   it('keeps the current phase when an unknown key arrives', () => {
     set({ jobStatus: 'running', jobProgress: 54, stage: 'pattern.assessing' });
     set({ stage: 'something.new' });
 
-    expect(text()).toContain('Step 5 of 8');
+    expect(text()).toContain('5/8');
   });
 
   it.each([

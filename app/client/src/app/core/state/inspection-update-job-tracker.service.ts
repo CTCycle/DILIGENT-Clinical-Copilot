@@ -84,6 +84,18 @@ function initialUpdateAllTargetState(): InspectionUpdateAllTargetState {
   };
 }
 
+function skippedUpdateAllTargetState(): InspectionUpdateAllTargetState {
+  return {
+    started: true,
+    skipped: true,
+    jobId: null,
+    status: 'completed',
+    progress: 0,
+    message: 'Excluded from this run.',
+    error: null,
+  };
+}
+
 function initialUpdateAllState(): InspectionUpdateAllState {
   return {
     runId: null,
@@ -193,7 +205,10 @@ export class InspectionUpdateJobTrackerService {
     }
   }
 
-  async startAll(requests: InspectionUpdateAllStartRequestMap): Promise<void> {
+  async startAll(
+    requests: InspectionUpdateAllStartRequestMap,
+    includeTerminology = true,
+  ): Promise<void> {
     const current = this.updateAllState();
     if (UPDATE_ALL_ACTIVE_PHASES.has(current.phase)) {
       throw new Error('All source updates are already running.');
@@ -206,14 +221,18 @@ export class InspectionUpdateJobTrackerService {
     const initialTargets = {
       livertox: initialUpdateAllTargetState(),
       rxnav: initialUpdateAllTargetState(),
-      terminology: initialUpdateAllTargetState(),
+      terminology: includeTerminology
+        ? initialUpdateAllTargetState()
+        : skippedUpdateAllTargetState(),
       dilirank: initialUpdateAllTargetState(),
     } satisfies Record<InspectionUpdateAllTarget, InspectionUpdateAllTargetState>;
     this.updateAllState.set({
       runId,
       phase: 'starting',
       progress: 0,
-      message: 'Starting the RxNav, LiverTox, terminology, and DILIrank update sequence.',
+      message: includeTerminology
+        ? 'Starting the RxNav, LiverTox, terminology, and DILIrank update sequence.'
+        : 'Starting the RxNav, LiverTox, and DILIrank update sequence.',
       cancelRequested: false,
       targets: initialTargets,
     });
@@ -228,6 +247,7 @@ export class InspectionUpdateJobTrackerService {
       livertox: requests.livertox.payload,
       terminology: requests.terminology.payload,
       dilirank: requests.dilirank.payload,
+      ...(includeTerminology ? {} : { include_terminology: false }),
     };
     try {
       const started = await startInspectionStructuredSourcesUpdateJob(payload);
@@ -335,7 +355,7 @@ export class InspectionUpdateJobTrackerService {
         targets: Object.fromEntries(
           INSPECTION_UPDATE_ALL_TARGETS.map((target) => [
             target,
-            {
+            state.targets[target].skipped ? state.targets[target] : {
               ...state.targets[target],
               started: true,
               jobId: started.job_id,
@@ -369,13 +389,15 @@ export class InspectionUpdateJobTrackerService {
       targets: Object.fromEntries(
         INSPECTION_UPDATE_ALL_TARGETS.map((target) => [
           target,
-          {
-            ...state.targets[target],
-            started: true,
-            jobId: snapshot.job_id,
-            status: (sourceSnapshots?.[target]?.status || fallbackStatus) as JobStatus,
-            error: sourceSnapshots?.[target]?.error || snapshot.error,
-          },
+          sourceSnapshots?.[target]?.status === 'skipped'
+            ? { ...skippedUpdateAllTargetState(), jobId: snapshot.job_id }
+            : {
+              ...state.targets[target],
+              started: true,
+              jobId: snapshot.job_id,
+              status: (sourceSnapshots?.[target]?.status || fallbackStatus) as JobStatus,
+              error: sourceSnapshots?.[target]?.error || snapshot.error,
+            },
         ]),
       ) as InspectionUpdateAllState['targets'],
     }));
@@ -383,6 +405,7 @@ export class InspectionUpdateJobTrackerService {
     let applied = false;
     for (const target of INSPECTION_UPDATE_ALL_TARGETS) {
       const source = sourceSnapshots?.[target];
+      if (source?.status === 'skipped') continue;
       const status = (source?.status || fallbackStatus) as JobStatus;
       const progress = source?.progress ?? (
         status === 'completed' ? 100 : status === 'pending' ? 0 : snapshot.progress
@@ -618,7 +641,9 @@ export class InspectionUpdateJobTrackerService {
   private syncUpdateAllState(): void {
     const current = this.updateAllState();
     if (!current.runId) return;
-    const targets = INSPECTION_UPDATE_ALL_TARGETS.map((target) => current.targets[target]);
+    const targets = INSPECTION_UPDATE_ALL_TARGETS
+      .map((target) => current.targets[target])
+      .filter((target) => !target.skipped);
     const allTerminal = targets.every((target) => target.status !== null && TERMINAL.has(target.status));
     const anyFailed = targets.some((target) => target.status === 'failed' || !!target.error);
     const anyCancelled = targets.some((target) => target.status === 'cancelled');

@@ -135,4 +135,19 @@ def test_effective_config_never_steals_reserved_generation_capacity() -> None:
 
     assert effective.input_budget == 0
     assert effective.context_selection_report["overflow_tokens"] == 4096
-    assert effective.output_token_limit == policy.output_token_limit
+    assert effective.output_token_limit >= policy.output_token_limit
+
+###############################################################################
+def test_general_output_token_limit_overrides_policy_default() -> None:
+    policy = resolve_generation_policy(
+        purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+        provider="opencode_go",
+        model="beam-free",
+    )
+    capabilities = resolve_model_capabilities(provider="opencode_go", model="beam-free")
+
+    effective = resolve_effective_inference_config(
+        policy=policy, capabilities=capabilities
+    )
+
+    assert policy.output_token_limit < effective.output_token_limit

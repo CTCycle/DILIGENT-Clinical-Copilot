@@ -260,7 +260,7 @@ describe('DataInspectionPageComponent folder selection', () => {
         target: 'dilirank',
         payload: { redownload: true },
       },
-    });
+    }, true);
     expect(tracker.startAll.mock.calls[0][0]).not.toHaveProperty('rag');
   });
 

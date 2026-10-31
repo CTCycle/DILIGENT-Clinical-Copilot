@@ -17,6 +17,18 @@
           (keydown.enter)="loadSessions()"
         />
         <button class="btn btn-secondary" type="button" (click)="loadSessions()">Search</button>
+        <button
+          class="btn btn-secondary clinical-sessions-refresh"
+          type="button"
+          title="Refresh sessions"
+          aria-label="Refresh sessions"
+          [class.is-loading]="loading()"
+          [attr.aria-busy]="loading()"
+          [disabled]="loading()"
+          (click)="loadSessions()"
+        >
+          <svg lucideRefreshCw size="16" aria-hidden="true"></svg>
+        </button>
       </div>
       <div class="clinical-sessions-filters" aria-label="Session filters">
         <nav class="clinical-sessions-filter-nav" aria-label="Session status">

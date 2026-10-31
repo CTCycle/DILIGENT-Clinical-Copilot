@@ -91,31 +91,37 @@ import {
   InspectionUpdateFieldChange,
 } from './components/inspection-update-controls.component';
 import { InspectionUpdateAllModalComponent } from './components/inspection-update-all-modal.component';
+import { KnowledgeHelpComponent } from './components/knowledge-help.component';
 
 const INSPECTION_VIEWS: InspectionViewOption[] = [
   {
     id: 'rxnav',
     label: 'Drug Catalog',
+    group: 'Knowledge sources',
     iconPath: 'M7.5 3.75h9a2.25 2.25 0 0 1 2.25 2.25v12a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25V6a2.25 2.25 0 0 1 2.25-2.25Z M9 8.25h6 M9 12h6 M9 15.75h3',
   },
   {
     id: 'livertox',
     label: 'LiverTox',
+    group: 'Knowledge sources',
     iconPath: 'M8.25 4.5h7.5 M10.5 4.5v5.25l-3.75 7.5a2.25 2.25 0 0 0 2.01 3.25h6.48a2.25 2.25 0 0 0 2.01-3.25l-3.75-7.5V4.5 M8.5 15h7',
-  },
-  {
-    id: 'terminology',
-    label: 'Terminology',
-    iconPath: 'M4.5 6.75h6 M4.5 12h4.5 M4.5 17.25h6 M15.75 9.75a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 8.25l2.25 2.25 M13.5 14.25h6v6h-6z',
   },
   {
     id: 'dilirank',
     label: 'DILIrank',
+    group: 'Knowledge sources',
     iconPath: 'M12 3 4.5 6v5.25c0 4.15 2.9 7.97 7.5 9.75 4.6-1.78 7.5-5.6 7.5-9.75V6L12 3Z M9 12h6 M12 9v6',
+  },
+  {
+    id: 'terminology',
+    label: 'Terminology',
+    group: 'Mapping',
+    iconPath: 'M4.5 6.75h6 M4.5 12h4.5 M4.5 17.25h6 M15.75 9.75a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 8.25l2.25 2.25 M13.5 14.25h6v6h-6z',
   },
   {
     id: 'rag',
     label: 'RAG',
+    group: 'Retrieval',
     iconPath: 'M5.25 6.75c0-1.24 2.99-2.25 6.75-2.25s6.75 1.01 6.75 2.25-2.99 2.25-6.75 2.25-6.75-1.01-6.75-2.25Z M5.25 6.75v5.25c0 1.24 2.99 2.25 6.75 2.25s6.75-1.01 6.75-2.25V6.75 M5.25 12v5.25c0 1.24 2.99 2.25 6.75 2.25s6.75-1.01 6.75-2.25V12',
   },
 ];
@@ -145,6 +151,7 @@ const RAG_SUMMARY_FIELDS: ReadonlyArray<{
     InspectionUpdateControlsComponent,
     InspectionProgressButtonComponent,
     InspectionUpdateAllModalComponent,
+    KnowledgeHelpComponent,
   ],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
@@ -314,6 +321,17 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateProgress = this.updateJob.updateProgress;
   readonly updateMessage = this.updateJob.updateMessage;
   readonly updateError = this.updateJob.updateError;
+  readonly updateStatus = computed<{ label: string; tone: string }>(() => {
+    const error = this.updateError();
+    if (this.updateRunning()) return { label: 'Running', tone: 'running' };
+    if (error) {
+      return /cancel/i.test(error)
+        ? { label: 'Cancelled', tone: 'cancelled' }
+        : { label: 'Failed', tone: 'failed' };
+    }
+    if (this.updateJobId()) return { label: 'Completed', tone: 'completed' };
+    return { label: 'Ready', tone: 'ready' };
+  });
   readonly updateTargetState = this.updateJob.targetState;
   readonly updateAllModalOpen = signal(false);
   readonly updateAllActiveTarget = signal<InspectionUpdateAllTarget>('livertox');
@@ -323,6 +341,8 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateAllConfigErrors = this.updateJob.updateAllConfigErrors;
   readonly updateAllValidationError = this.updateJob.updateAllValidationError;
   readonly updateAllRunning = this.updateJob.updateAllRunning;
+  readonly includeTerminology = this.updateJob.includeTerminology;
+  readonly knowledgeHelpOpen = signal(false);
   readonly updateAllCanStart = this.updateJob.updateAllCanStart;
   readonly updateAllButtonDisabled = computed(() =>
     this.updateAllRunning() || INSPECTION_UPDATE_ALL_TARGETS.some(
@@ -795,6 +815,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   async retryUpdateAllConfig(target: InspectionUpdateAllTarget): Promise<void> {
     await this.updateJob.openAll();
     this.updateAllActiveTarget.set(target);
+  }
+
+  setIncludeTerminology(value: boolean): void {
+    this.updateJob.setIncludeTerminology(value);
+    if (!value && this.updateAllActiveTarget() === 'terminology') {
+      this.updateAllActiveTarget.set('livertox');
+    }
   }
 
   async startUpdateAll(): Promise<void> {

@@ -11,6 +11,7 @@ import {
   LucideHeartPulse,
   LucideImage,
   LucidePill,
+  LucideRefreshCw,
   LucideTrash2,
 } from '@lucide/angular';
 
@@ -128,6 +129,7 @@ function selectPersistedRevision(
     LucideHeartPulse,
     LucideImage,
     LucidePill,
+    LucideRefreshCw,
     LucideTrash2,
   ],
   templateUrl: './clinical-sessions-page.component.html',
