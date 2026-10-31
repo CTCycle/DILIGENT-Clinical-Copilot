@@ -16,11 +16,14 @@ param(
     [string]$DesktopTarget = 'All',
     [switch]$OfflineWebView2,
     [switch]$AllDesktopReleases,
+    [switch]$DryRun,
     [switch]$AllowDirtyTree
 )
 
 $ErrorActionPreference = 'Stop'
 $script:RepoRoot = $PSScriptRoot
+$script:CleanupModulePath = Join-Path $PSScriptRoot 'app/scripts/launcher_cleanup.psm1'
+Import-Module -Name $script:CleanupModulePath -Force
 $script:RuntimesDir = Join-Path $RepoRoot 'runtimes'
 $script:PythonDir = Join-Path $RuntimesDir 'python'
 $script:PythonExe = Join-Path $PythonDir 'python.exe'
@@ -1757,34 +1760,143 @@ function Confirm-DestructiveAction([string]$Description) {
     return $true
 }
 
-function Remove-ApplicationLogs {
-    if (-not (Confirm-DestructiveAction 'remove application log files')) { return }
-    $logDir = Join-Path $RuntimeCacheDir 'logs'
-    if (-not (Test-Path -LiteralPath $logDir)) {
-        Write-Info "Log directory does not exist: $logDir"
-        return
+function Get-DiligentLocalAppRoot {
+    if ([string]::IsNullOrWhiteSpace([string]$env:LOCALAPPDATA)) { return $null }
+    return [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'DILIGENT'))
+}
+
+function Get-DiligentDataRoots {
+    $roots = [Collections.Generic.List[string]]::new()
+    $sourceValue = if ($env:DILIGENT_DATA_PATH) { [string]$env:DILIGENT_DATA_PATH } else { 'data' }
+    [void]$roots.Add((Resolve-LauncherPath -Path $sourceValue))
+    $localAppRoot = Get-DiligentLocalAppRoot
+    if ($localAppRoot) { [void]$roots.Add((Join-Path $localAppRoot 'data')) }
+    return @($roots | ForEach-Object { [IO.Path]::GetFullPath($_) } | Select-Object -Unique)
+}
+
+function Get-DiligentAllowedRoots {
+    param([string[]]$AdditionalRoots = @())
+    $roots = [Collections.Generic.List[string]]::new()
+    [void]$roots.Add([IO.Path]::GetFullPath($RepoRoot))
+    $localAppRoot = Get-DiligentLocalAppRoot
+    if ($localAppRoot) { [void]$roots.Add($localAppRoot) }
+    foreach ($root in $AdditionalRoots) {
+        if (-not [string]::IsNullOrWhiteSpace($root)) { [void]$roots.Add([IO.Path]::GetFullPath($root)) }
     }
-    $logs = @(Get-ChildItem -LiteralPath $logDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
-        Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
-    if ($logs.Count -eq 0) {
-        Write-Info 'No application log files found'
-        return
-    }
-    $skipped = 0
-    $progressId = Start-LauncherProgress -Activity 'DILIGENT: remove application logs' -Status "0 of $($logs.Count) files"
-    try {
-        for ($index = 0; $index -lt $logs.Count; $index++) {
-            $log = $logs[$index]
-            Update-LauncherProgress -Id $progressId -Activity 'DILIGENT: remove application logs' -Status "$($index + 1) of $($logs.Count): $($log.Name)" -PercentComplete ([int](($index + 1) * 100 / $logs.Count))
-            if (-not (Remove-PathSafely -Path $log.FullName)) {
-                $skipped++
-            }
+    return @($roots | Select-Object -Unique)
+}
+
+function Get-DiligentMsiProducts {
+    $uninstallRoots = @(
+        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKCU:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+    )
+    $entries = [Collections.Generic.List[object]]::new()
+    foreach ($uninstallRoot in $uninstallRoots) {
+        if (-not (Test-Path -LiteralPath $uninstallRoot)) { continue }
+        try { $keys = @(Get-ChildItem -LiteralPath $uninstallRoot -ErrorAction Stop) }
+        catch { Write-Info "Could not inspect MSI uninstall registrations at '$uninstallRoot': $($_.Exception.Message)"; continue }
+        foreach ($key in $keys) {
+            try { [void]$entries.Add((Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction Stop)) }
+            catch { Write-Info "Could not inspect MSI registration '$($key.PSChildName)': $($_.Exception.Message)" }
         }
     }
-    finally {
-        Complete-LauncherProgress $progressId
+    return @(Select-DiligentMsiProducts -RegistryEntries $entries.ToArray())
+}
+
+function Write-DiligentCleanupPlan {
+    param([Parameter(Mandatory = $true)][pscustomobject]$Plan)
+    Write-Host '[PLAN] Resolved cleanup targets:' -ForegroundColor Cyan
+    foreach ($item in $Plan.Items) { Write-Host "  [$($item.Label)] $($item.Path)" -ForegroundColor Gray }
+    foreach ($item in $Plan.InitialResults) {
+        $color = if ($item.Status -eq 'Failed') { [ConsoleColor]::Red } else { [ConsoleColor]::Yellow }
+        Write-Host "  [$($item.Status)] $($item.Path): $($item.Message)" -ForegroundColor $color
     }
-    Write-Ok "Removed $($logs.Count - $skipped) application log file(s); skipped $skipped locked or inaccessible file(s)"
+    if ($Plan.Items.Count -eq 0 -and $Plan.InitialResults.Count -eq 0) { Write-Info 'No matching cleanup targets were found.' }
+}
+
+function Write-DiligentCleanupResult {
+    param([Parameter(Mandatory = $true)][pscustomobject]$Result)
+    if ($Result.DryRun) {
+        Write-Ok "Dry run: $($Result.Planned.Count) item(s) would be removed; no files were changed."
+    } else {
+        Write-Info "Cleanup result: $($Result.Cleaned.Count) cleaned, $($Result.Skipped.Count) skipped, $($Result.Failed.Count) failed, $($Result.Preserved.Count) preserved."
+        foreach ($item in $Result.Results | Where-Object Status -eq 'Cleaned') {
+            Write-Host "  [Cleaned] $($item.Path)" -ForegroundColor Green
+        }
+    }
+    foreach ($item in $Result.Results | Where-Object { $_.Status -in @('Skipped', 'Failed') }) {
+        $color = if ($item.Status -eq 'Failed') { [ConsoleColor]::Red } else { [ConsoleColor]::Yellow }
+        Write-Host "  [$($item.Status)] $($item.Path): $($item.Message)" -ForegroundColor $color
+    }
+    foreach ($item in $Result.Results | Where-Object Status -eq 'Preserved') {
+        Write-Host "  [Preserved] $($item.Path)" -ForegroundColor DarkGray
+    }
+}
+
+function Get-DiligentSourceProcessIds {
+    Import-DotEnv
+    $backendPort = if ($env:FASTAPI_PORT) { [int]$env:FASTAPI_PORT } else { 7690 }
+    $frontendPort = if ($env:UI_PORT) { [int]$env:UI_PORT } else { 9847 }
+    $records = @(Get-ApplicationProcessRecords -BackendPort $backendPort -FrontendPort $frontendPort)
+    return @($records | ForEach-Object { [int]$_.ProcessId } | Sort-Object -Unique)
+}
+
+function Assert-DiligentStoppedForCleanup {
+    $processIds = [Collections.Generic.HashSet[int]]::new()
+    foreach ($processId in @(Get-DiligentSourceProcessIds)) { [void]$processIds.Add([int]$processId) }
+    $knownNames = @('DILIGENTBackend.exe', 'diligent-desktop.exe', 'DILIGENT Clinical Copilot.exe')
+    try {
+        foreach ($process in Get-CimInstance -ClassName Win32_Process -ErrorAction Stop) {
+            $processId = [int]$process.ProcessId
+            if ($processId -ne $PID -and [string]$process.Name -in $knownNames) { [void]$processIds.Add($processId) }
+        }
+    } catch { throw "Could not verify that packaged DILIGENT processes are stopped: $($_.Exception.Message). No cleanup was started." }
+    if ($processIds.Count -gt 0) {
+        $ids = @($processIds | Sort-Object) -join ', '
+        throw "DILIGENT process(es) are still running (PID $ids). Close the application and source-mode servers, then retry. No cleanup was started."
+    }
+}
+
+function Invoke-DiligentMaintenanceCleanup {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Targets,
+        [Parameter(Mandatory = $true)][string]$Description,
+        [string[]]$AllowedRoots = @(),
+        [switch]$SkipProcessCheck
+    )
+    $plan = New-DiligentCleanupPlan -Targets $Targets -AllowedRoots (Get-DiligentAllowedRoots -AdditionalRoots $AllowedRoots)
+    Write-DiligentCleanupPlan -Plan $plan
+    if ($DryRun) {
+        $dryResult = Invoke-DiligentCleanupPlan -Plan $plan -DryRun
+        Write-DiligentCleanupResult -Result $dryResult
+        return $dryResult
+    }
+    if (-not $SkipProcessCheck) { Assert-DiligentStoppedForCleanup }
+    if (-not (Confirm-DestructiveAction $Description)) { return $null }
+    if (-not $SkipProcessCheck) { Assert-DiligentStoppedForCleanup }
+    $result = Invoke-DiligentCleanupPlan -Plan $plan
+    Write-DiligentCleanupResult -Result $result
+    if ($result.Failed.Count -gt 0) { throw "Cleanup was incomplete: $($result.Failed.Count) target(s) failed. Review the paths above and retry." }
+    return $result
+}
+
+function Remove-ApplicationLogs {
+    $targets = [Collections.Generic.List[object]]::new()
+    $directories = @((Join-Path $RuntimeCacheDir 'logs'))
+    foreach ($dataRoot in @(Get-DiligentDataRoots)) { $directories += Join-Path $dataRoot 'cache\logs' }
+    foreach ($directory in @($directories | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $directory -PathType Container)) { continue }
+        try {
+            foreach ($log in Get-ChildItem -LiteralPath $directory -File -Force -ErrorAction Stop | Where-Object { $_.Name -match '(?i)\.log(?:\.\d+)?$' }) {
+                [void]$targets.Add([pscustomobject]@{ Path = $log.FullName; Label = 'Application log' })
+            }
+        } catch { [void]$targets.Add([pscustomobject]@{ Path = $directory; Label = 'Application log scan failed'; KeepRoot = $true; PlanError = $_.Exception.Message }) }
+    }
+    if ($targets.Count -eq 0) { Write-Info 'No application log files were found.'; return }
+    Invoke-DiligentMaintenanceCleanup -Targets $targets.ToArray() -Description 'remove application log files' -AllowedRoots (Get-DiligentDataRoots) | Out-Null
 }
 
 function Remove-LauncherPath {
@@ -1941,50 +2053,48 @@ function Remove-CacheContents {
 }
 
 function Clear-ApplicationCache {
-    if (-not (Confirm-DestructiveAction 'clear development caches and test artifacts')) { return }
-    New-Item -ItemType Directory -Path $RuntimeCacheDir -Force | Out-Null
-    $gitkeep = Join-Path $RuntimeCacheDir '.gitkeep'
-    if (-not (Test-Path -LiteralPath $gitkeep -PathType Leaf)) {
-        New-Item -ItemType File -Path $gitkeep -Force | Out-Null
-    }
-    $skipped = 0
-    $skipped += Remove-CacheContents -RootPath $RuntimeCacheDir
-    if ($skipped -gt 0) {
-        Write-Info "$skipped cache entr$(if ($skipped -eq 1) { 'y' } else { 'ies' }) could not be removed; rerun as administrator to remove locked entries"
-    }
-    Write-Ok 'Development caches and test artifacts cleared from runtimes/cache'
+    Import-DotEnv
+    $targets = @(Get-DiligentCacheTargets -RepoRoot $RepoRoot -LocalAppData $env:LOCALAPPDATA -DataRoots (Get-DiligentDataRoots))
+    Invoke-DiligentMaintenanceCleanup -Targets $targets -Description 'clear application caches and regenerable build output' -AllowedRoots (Get-DiligentDataRoots) | Out-Null
 }
 
 function Uninstall-Application {
-    if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, and build outputs')) { return }
-    $targets = @(
-        $RuntimesDir,
-        $VenvDir,
-        (Join-Path $RepoRoot '.venv'),
-        (Join-Path $ClientDir 'node_modules'),
-        (Join-Path $ClientDir 'dist')
-    ) | Select-Object -Unique
-    $skipped = 0
-    $progressId = Start-LauncherProgress -Activity 'DILIGENT: uninstall application' -Status "0 of $($targets.Count) paths"
-    try {
-        for ($index = 0; $index -lt $targets.Count; $index++) {
-            $target = $targets[$index]
-            if (Test-Path -LiteralPath $target) {
-                Update-LauncherProgress -Id $progressId -Activity 'DILIGENT: uninstall application' -Status "$($index + 1) of $($targets.Count): $target" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $targets.Count)))
-                if (-not (Remove-PathSafely -Path $target -Recurse)) {
-                    $skipped++
-                }
-            }
-        }
+    Import-DotEnv
+    $dataRoots = @(Get-DiligentDataRoots)
+    $products = @(Get-DiligentMsiProducts)
+    $targets = @(Get-DiligentUninstallTargets -RepoRoot $RepoRoot -LocalAppData $env:LOCALAPPDATA -DataRoots $dataRoots)
+    $plan = New-DiligentCleanupPlan -Targets $targets -AllowedRoots (Get-DiligentAllowedRoots -AdditionalRoots $dataRoots)
+    Write-DiligentCleanupPlan -Plan $plan
+    Write-Host '[PLAN] Registered DILIGENT MSI products:' -ForegroundColor Cyan
+    if ($products.Count -eq 0) { Write-Info 'No matching DILIGENT Clinical Copilot MSI registration was found.' }
+    foreach ($product in $products) {
+        $location = if ($product.InstallLocation) { "; install location: $($product.InstallLocation)" } else { '' }
+        Write-Host "  [$($product.DisplayName)] $($product.ProductCode)$location" -ForegroundColor Gray
     }
-    finally {
-        Complete-LauncherProgress $progressId
+    if ($DryRun) {
+        $dryResult = Invoke-DiligentCleanupPlan -Plan $plan -DryRun
+        Write-DiligentCleanupResult -Result $dryResult
+        Write-Ok 'Dry run: registered MSI products and listed files were left unchanged.'
+        return
     }
+    Assert-DiligentStoppedForCleanup
+    if (-not (Confirm-DestructiveAction 'uninstall DILIGENT MSI products and remove launcher-managed runtimes, caches, logs, dependencies, and build outputs')) { return }
+    Assert-DiligentStoppedForCleanup
 
-    if ($skipped -gt 0) {
-        Write-Warning "$skipped uninstall target(s) could not be removed."
+    $msiFailures = [Collections.Generic.List[string]]::new()
+    foreach ($product in $products) {
+        $outcome = Invoke-DiligentMsiUninstall -Product $product
+        if (-not $outcome.Success) { [void]$msiFailures.Add("$($product.DisplayName) $($product.ProductCode) ($($outcome.Message))") }
+        elseif ($outcome.RestartRequired) { Write-Info "Uninstalled $($product.DisplayName); Windows reports that a restart is required." }
+        else { Write-Ok "Uninstalled $($product.DisplayName)." }
     }
-    Write-Ok 'Application runtimes, dependencies, and build outputs removed where permitted. Dependency lockfiles and user data were preserved.'
+    $result = Invoke-DiligentCleanupPlan -Plan $plan
+    Write-DiligentCleanupResult -Result $result
+    foreach ($failure in $msiFailures) { Write-Fatal "MSI uninstall failed: $failure" }
+    if ($result.Failed.Count -gt 0 -or $msiFailures.Count -gt 0) {
+        throw "Uninstall was incomplete: $($result.Failed.Count) filesystem target(s) and $($msiFailures.Count) MSI product(s) failed. Persistent user data was preserved."
+    }
+    Write-Ok 'DILIGENT MSI registrations, launcher runtimes, generated outputs, packaged caches, and application logs were removed. Persistent user data and source files were preserved.'
 }
 
 function Resolve-LauncherPath {
@@ -1997,144 +2107,70 @@ function Resolve-LauncherPath {
     return [IO.Path]::GetFullPath((Join-Path $RepoRoot $expandedPath))
 }
 
-function Get-TrackedApplicationFilesUnderPath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
-    if ($null -eq $gitCommand) {
-        return [pscustomobject]@{ Available = $false; Files = @() }
-    }
-
-    $repositoryRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
-    $candidate = [IO.Path]::GetFullPath($Path)
-    $repositoryPrefix = "$repositoryRoot\"
-    if (-not $candidate.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        return [pscustomobject]@{ Available = $true; Files = @() }
-    }
-
-    $relativePath = $candidate.Substring($repositoryPrefix.Length).Replace('\', '/')
-    if ([string]::IsNullOrWhiteSpace($relativePath)) {
-        return [pscustomobject]@{ Available = $false; Files = @() }
-    }
-    $tracked = @(& $gitCommand.Source -C $RepoRoot ls-files -- $relativePath "$relativePath/**" 2>$null)
-    if ($LASTEXITCODE -ne 0) {
-        return [pscustomobject]@{ Available = $false; Files = @() }
-    }
-    $trackedFiles = @($tracked | ForEach-Object {
-        $relativeFile = ([string]$_).Trim()
-        if (-not [string]::IsNullOrWhiteSpace($relativeFile)) {
-            [IO.Path]::GetFullPath((Join-Path $RepoRoot ($relativeFile -replace '/', '\')))
-        }
-    })
-    return [pscustomobject]@{ Available = $true; Files = $trackedFiles }
-}
-
-function Remove-UserDataPath {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Label
-    )
-
-    try {
-        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-    } catch {
-        if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
-            return [pscustomobject]@{ Removed = 0; Skipped = 0 }
-        }
-        Write-Info "${Label}: path was inaccessible; nothing was removed ($($_.Exception.Message))"
-        return [pscustomobject]@{ Removed = 0; Skipped = 1 }
-    }
-
-    $trackedFiles = @()
-    $repositoryRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
-    if ($item.FullName.Equals($repositoryRoot, [StringComparison]::OrdinalIgnoreCase) -or
-        $item.FullName.StartsWith("$repositoryRoot\", [StringComparison]::OrdinalIgnoreCase)) {
-        $tracking = Get-TrackedApplicationFilesUnderPath -Path $item.FullName
-        if (-not $tracking.Available) {
-            Write-Info "${Label}: tracked-file verification was unavailable; nothing was removed."
-            return [pscustomobject]@{ Removed = 0; Skipped = 1 }
-        }
-        $trackedFiles = @($tracking.Files)
-    }
-
-    $result = Remove-LauncherPath -Path $item.FullName -KeepRoot:$item.PSIsContainer `
-        -PreserveNames @('.gitkeep') -PreservePaths $trackedFiles -Activity "DILIGENT: remove $Label"
-    foreach ($preservedPath in @($result.PreservedEntries)) {
-        Write-Info "Preserved application file: $preservedPath"
-    }
-    if ($result.Skipped -gt 0 -or $result.EnumerationErrors.Count -gt 0) {
-        Write-Info "${Label}: removed $($result.Removed) item(s); skipped or preserved $($result.Skipped + $result.EnumerationErrors.Count) item(s)"
-    }
-    return [pscustomobject]@{
-        Removed = $result.Removed
-        Skipped = $result.Skipped + $result.EnumerationErrors.Count
-    }
-}
-
 function Remove-AllData {
     Import-DotEnv
-    if (-not (Confirm-DestructiveAction 'remove all local user data')) { return }
+    $dataRoots = @(Get-DiligentDataRoots)
+    $targets = [Collections.Generic.List[object]]::new()
+    $additionalRoots = [Collections.Generic.List[string]]::new()
+    $externalDatabase = $false
+    $configWarnings = [Collections.Generic.List[string]]::new()
+    [void]$targets.Add([pscustomobject]@{ Path = $EnvFile; Label = 'Source-mode local settings' })
 
-    $dataPathValue = if ($env:DILIGENT_DATA_PATH) { $env:DILIGENT_DATA_PATH } else { 'data' }
-    $dataPath = Resolve-LauncherPath -Path $dataPathValue
-    $databaseConfigPath = Join-Path $dataPath 'database_config.json'
-    $databasePath = Join-Path $dataPath 'database.db'
-    if (Test-Path -LiteralPath $databaseConfigPath) {
-        try {
-            $databaseConfig = Get-Content -LiteralPath $databaseConfigPath -Raw | ConvertFrom-Json
-            if ($databaseConfig.database.backend -eq 'sqlite' -and $databaseConfig.database.sqlite_path) {
-                $databasePath = Resolve-LauncherPath -Path $databaseConfig.database.sqlite_path
-            }
-            elseif ($databaseConfig.database.backend -eq 'postgresql') {
-                $databasePath = $null
+    foreach ($dataRoot in $dataRoots) {
+        [void]$additionalRoots.Add($dataRoot)
+        foreach ($target in @(
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'database_config.json'); Label = 'Database connection settings' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'access-key-material.json'); Label = 'Access-key material' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'settings/.env'); Label = 'Packaged local settings' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'sources/archives'); Label = 'Downloaded source archives' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'sources/documents'); Label = 'User source documents' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'sources/vectors'); Label = 'Generated vector index' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'exports'); Label = 'User exports' },
+            [pscustomobject]@{ Path = (Join-Path $dataRoot 'state'); Label = 'Runtime state' }
+        )) { [void]$targets.Add($target) }
+
+        $databaseConfigPath = Join-Path $dataRoot 'database_config.json'
+        $sqlitePath = Join-Path $dataRoot 'database.db'
+        if (Test-Path -LiteralPath $databaseConfigPath -PathType Leaf) {
+            try {
+                $databaseConfig = Get-Content -LiteralPath $databaseConfigPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                $databaseSettings = $databaseConfig.database
+                if ($databaseSettings.backend -eq 'postgresql') {
+                    $externalDatabase = $true
+                    $sqlitePath = $null
+                } elseif ($databaseSettings.sqlite_path) {
+                    $configuredPath = [Environment]::ExpandEnvironmentVariables(([string]$databaseSettings.sqlite_path).Trim())
+                    $sqlitePath = if ([IO.Path]::IsPathRooted($configuredPath)) { [IO.Path]::GetFullPath($configuredPath) } else { [IO.Path]::GetFullPath((Join-Path $dataRoot $configuredPath)) }
+                }
+            } catch {
+                [void]$configWarnings.Add("Could not read '$databaseConfigPath'; the SQLite database was preserved. $($_.Exception.Message)")
+                $sqlitePath = $null
             }
         }
-        catch {
-            Write-Info 'Database configuration could not be read; local data cleanup will preserve the database file.'
-            $databasePath = $null
+        if ($sqlitePath) {
+            $databaseDirectory = [IO.Path]::GetDirectoryName($sqlitePath)
+            if ($databaseDirectory) { [void]$additionalRoots.Add($databaseDirectory) }
+            foreach ($databaseTarget in @($sqlitePath, "$sqlitePath-wal", "$sqlitePath-shm", "$sqlitePath-journal")) {
+                [void]$targets.Add([pscustomobject]@{ Path = $databaseTarget; Label = 'Configured SQLite database and sidecar' })
+            }
         }
     }
-    $keyMaterialPath = if ($env:DILIGENT_ACCESS_KEY_MATERIAL_FILE) {
-        Resolve-LauncherPath -Path $env:DILIGENT_ACCESS_KEY_MATERIAL_FILE
-    }
-    else {
-        Join-Path $dataPath 'access-key-material.json'
-    }
 
-    $targets = @(
-        [pscustomobject]@{ Path = $EnvFile; Label = 'local settings' },
-        [pscustomobject]@{ Path = $databaseConfigPath; Label = 'database connection settings' },
-        [pscustomobject]@{ Path = $keyMaterialPath; Label = 'access-key material' },
-        [pscustomobject]@{ Path = (Join-Path $RuntimeCacheDir 'logs'); Label = 'application logs' },
-        [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/archives'); Label = 'downloaded source archives' },
-        [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/documents'); Label = 'user source documents' },
-        [pscustomobject]@{ Path = (Join-Path $dataPath 'sources/vectors'); Label = 'generated vector index' },
-        [pscustomobject]@{ Path = (Join-Path $dataPath 'exports'); Label = 'user exports' },
-        [pscustomobject]@{ Path = (Join-Path $dataPath 'state'); Label = 'runtime state' }
-    )
-    if ($databasePath) {
-        $targets += @(
-            [pscustomobject]@{ Path = $databasePath; Label = 'SQLite database' },
-            [pscustomobject]@{ Path = ('{0}-wal' -f $databasePath); Label = 'SQLite write-ahead log' },
-            [pscustomobject]@{ Path = ('{0}-shm' -f $databasePath); Label = 'SQLite shared-memory file' }
-        )
+    $localAppRoot = Get-DiligentLocalAppRoot
+    if ($localAppRoot) {
+        [void]$targets.Add([pscustomobject]@{ Path = (Join-Path $localAppRoot 'data/cache/logs'); Label = 'Packaged application logs' })
     }
+    if ($env:DILIGENT_ACCESS_KEY_MATERIAL_FILE) {
+        $keyPath = Resolve-LauncherPath -Path $env:DILIGENT_ACCESS_KEY_MATERIAL_FILE
+        [void]$targets.Add([pscustomobject]@{ Path = $keyPath; Label = 'Configured access-key material' })
+        $keyDirectory = [IO.Path]::GetDirectoryName($keyPath)
+        if ($keyDirectory) { [void]$additionalRoots.Add($keyDirectory) }
+    }
+    [void]$targets.Add([pscustomobject]@{ Path = (Join-Path $RuntimeCacheDir 'logs'); Label = 'Source-mode application logs' })
 
-    $removed = 0
-    $skipped = 0
-    foreach ($target in $targets) {
-        $result = Remove-UserDataPath -Path $target.Path -Label $target.Label
-        $removed += $result.Removed
-        $skipped += $result.Skipped
-    }
-
-    if ($null -eq $databasePath) {
-        Write-Info 'External database mode is configured; no external database was modified.'
-    }
-    if ($skipped -gt 0) {
-        Write-Info "$skipped item(s) were preserved or could not be removed. Review the messages above before restarting."
-    }
-    Write-Ok "All removable local user data was cleared ($removed item(s) removed); application files were preserved"
+    foreach ($warning in $configWarnings) { Write-Info $warning }
+    if ($externalDatabase) { Write-Info 'PostgreSQL is configured; its remote database contents will not be modified.' }
+    Invoke-DiligentMaintenanceCleanup -Targets $targets.ToArray() -AllowedRoots ($additionalRoots.ToArray()) -Description 'remove all local DILIGENT user data' | Out-Null
 }
 
 # ============================================================
@@ -2714,10 +2750,10 @@ function Get-MainMenuEntries {
         [pscustomobject]@{ Section = 'SOURCE CONTROL'; Label = 'Update application'; Description = 'Pull latest changes from origin/main'; Key = 'Update'; Destructive = $false }
         [pscustomobject]@{ Section = 'BUILD & DISTRIBUTION'; Label = 'Create release artifacts'; Description = 'Choose package, manifest, or all'; Key = 'CreateRelease'; Destructive = $false }
         [pscustomobject]@{ Section = 'BUILD & DISTRIBUTION'; Label = 'Remove release artifacts'; Description = 'Choose artifact(s) or all versions'; Key = 'RemoveRelease'; Destructive = $true }
-        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove logs'; Description = 'Delete application logs'; Key = 'Logs'; Destructive = $true }
-        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Clear cache'; Description = 'Remove temporary caches'; Key = 'Cache'; Destructive = $true }
-        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove all data'; Description = 'Delete local user data only'; Key = 'AllData'; Destructive = $true }
-        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Uninstall application'; Description = 'Remove generated dependencies'; Key = 'Uninstall'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove logs'; Description = 'Delete source and packaged logs'; Key = 'Logs'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Clear cache'; Description = 'Remove caches + regenerable output'; Key = 'Cache'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove all data'; Description = 'Preview and remove persistent local data'; Key = 'AllData'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Uninstall application'; Description = 'Remove MSI + generated files; preserve data'; Key = 'Uninstall'; Destructive = $true }
         [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Kill all application processes'; Description = 'Stop backend, frontend, and wrappers'; Key = 'KillApplicationProcesses'; Destructive = $true }
         [pscustomobject]@{ Section = 'EXIT'; Label = 'Exit'; Description = 'Close launcher'; Key = 'Exit'; Destructive = $false }
     )

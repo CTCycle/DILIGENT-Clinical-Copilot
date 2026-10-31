@@ -22,6 +22,7 @@ import { AppStateService } from '../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { formatUnknownError, normalizeVisitDateInput } from '../../core/utils';
 import { AnalysisWizardComponent } from './components/analysis-wizard/analysis-wizard.component';
+import { SourceSelection } from './components/analysis-wizard/section-preview';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const CLINICAL_INPUT_TEMPLATE_FALLBACK = `Chief concern:
@@ -174,6 +175,17 @@ export class DiliAgentPageComponent {
   fixInput(targetId: string | null): void {
     this.closeWizard();
     globalThis.setTimeout(() => document.getElementById(targetId ?? 'clinical-input')?.focus());
+  }
+
+  editSource(selection: SourceSelection | null): void {
+    this.closeWizard();
+    globalThis.setTimeout(() => {
+      const input = document.getElementById('clinical-input') as HTMLTextAreaElement | null;
+      input?.focus();
+      if (input && selection && selection.end <= input.value.length) {
+        input.setSelectionRange(selection.start, selection.end);
+      }
+    });
   }
 
   async stopSession(): Promise<void> {

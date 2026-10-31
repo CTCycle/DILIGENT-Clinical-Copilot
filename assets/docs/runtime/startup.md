@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-10-27
+Last updated: 2026-10-31
 
 ## Recommended Local Startup
 On Windows, use:
@@ -34,12 +34,27 @@ deleted and recreated without affecting settings, databases, source documents,
 vectors, or user exports. Packaged desktop mode uses the equivalent writable
 `%LOCALAPPDATA%\DILIGENT\data\cache` root.
 
-All launcher recursive cleanup uses the local `Remove-LauncherPath` contract:
-targets are normalized, recursively inventoried, filtered for tracked files and
-sentinels, removed one entry at a time deepest-first, and reported with planned,
-removed, preserved, skipped, and enumeration-error results. Strict staging and
-setup cleanup raises after reporting incomplete removal; user-facing cleanup is
-best effort.
+Launcher maintenance cleanup uses the shared `app/scripts/launcher_cleanup.psm1`
+plan. It resolves and previews allowlisted paths before confirmation, avoids
+traversing symbolic links and junctions, rechecks entries before removal, and
+reports cleaned, skipped, failed, and preserved paths. Cleanup actions are
+anchored to the launcher's repository path, so they work from any current
+directory. Use `-DryRun` to inspect a cleanup without changing files:
+
+```powershell
+.\start_on_windows.ps1 -Action ClearCache -DryRun
+.\start_on_windows.ps1 -Action Uninstall -DryRun
+.\start_on_windows.ps1 -Action RemoveAllData -DryRun
+```
+
+`ClearCache` removes recognized Python, Angular/Vite, Cargo/Tauri, test, and
+coverage caches plus regenerable frontend output. It leaves logs for the
+separate **Remove logs** action. `Uninstall` removes launcher-managed runtimes,
+dependencies, generated output, packaged runtime/cache state, and a registered
+DILIGENT MSI; it preserves databases, settings, source documents, vectors,
+exports, and access-key material. **Remove all data** previews and asks for
+confirmation before removing those persistent local files. An external
+PostgreSQL database is never modified.
 
 Database connection settings are loaded from `<data-root>/database_config.json`
 before the backend initializes its repository. This file contains only the
