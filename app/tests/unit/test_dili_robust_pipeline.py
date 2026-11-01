@@ -277,8 +277,8 @@ def test_audit_exposes_failed_no_rechallenge_gate() -> None:
 ###############################################################################
 def test_revision_routes_report_missing_resources_without_501() -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
-        session_id = 1
-        version_id = 1
+        session_id = 999_999
+        version_id = 999_999
         pipeline_run_id = "pipe-1"
         job_id = "job-1"
 

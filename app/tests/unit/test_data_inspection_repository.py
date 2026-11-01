@@ -122,7 +122,7 @@ def test_session_list_filters_and_search() -> None:
         repository_graph,
         patient_name="Alice Example",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="Alpha report",
         anamnesis="Mild alpha finding",
     )
@@ -157,7 +157,7 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search=None,
-        status_filter="successful",
+        status_filter="completed",
         date_mode=None,
         filter_date=None,
         offset=0,
@@ -213,7 +213,7 @@ def test_session_list_filters_and_search() -> None:
     assert total == 1
     assert items[0]["patient_name"] == "Carol Archive"
 
-    for status_filter, expected_total in (("failed", 1), ("successful", 0)):
+    for status_filter, expected_total in (("failed", 1), ("completed", 0)):
         _, total = repository_graph.clinical_session_repository.list_sessions(
             search="bob",
             status_filter=status_filter,
@@ -287,7 +287,7 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
         {
             "patient_name": "Audit Patient",
             "session_timestamp": datetime(2025, 1, 4, 8, 30, tzinfo=timezone.utc),
-            "session_status": "successful",
+            "session_status": "completed",
             "anamnesis": "Original anamnesis",
             "drugs": "acetaminophen",
             "final_report": "Original report",
@@ -332,7 +332,7 @@ def test_manual_report_edit_without_metadata_preserves_session_metadata() -> Non
         {
             "patient_name": "Metadata Patient",
             "session_timestamp": datetime(2025, 1, 4, 8, 30, tzinfo=timezone.utc),
-            "session_status": "successful",
+            "session_status": "completed",
             "anamnesis": "Original anamnesis",
             "drugs": "acetaminophen",
             "final_report": "Original report",
@@ -405,7 +405,7 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         clinical_session = ClinicalSession(
             patient_name="Drug Link",
             session_timestamp=datetime(2025, 1, 4, 10, 0),
-            session_status="successful",
+            session_status="completed",
         )
         db_session.add(clinical_session)
         db_session.flush()
@@ -660,7 +660,7 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
         repository_graph,
         patient_name="Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="Timeline report",
         anamnesis="Symptoms started in January 2025.",
     )
@@ -733,7 +733,7 @@ def test_timeline_generation_marks_fallback_payload() -> None:
         repository_graph,
         patient_name="Fallback Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="Fallback timeline report",
         anamnesis="Symptoms started on 2025-01-17.",
     )
@@ -795,7 +795,7 @@ def test_empty_model_timeline_with_source_persists_deterministic_fallback() -> N
         repository_graph,
         patient_name="Empty Extraction Timeline Patient",
         timestamp=datetime(2025, 1, 17, 8, 30, tzinfo=timezone.utc),
-        status="successful",
+        status="completed",
         report="Empty extraction timeline report",
         anamnesis="Symptoms started on 2025-01-17.",
         drugs="Acetaminophen was taken in 2025-01.",
@@ -847,7 +847,7 @@ def test_timeline_generation_persists_classified_provider_fallback(
         repository_graph,
         patient_name="Classified Failure Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc),
-        status="successful",
+        status="completed",
         report="Synthetic fallback test report",
         anamnesis="Symptoms started on 2025-01-17.",
     )
@@ -961,7 +961,7 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
         repository_graph,
         patient_name="Stable Runtime Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="Stable runtime report",
         anamnesis="Stable runtime context.",
         payload={
@@ -1012,7 +1012,7 @@ def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor(
         repository_graph,
         patient_name="OpenCode Go Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="OpenCode Go timeline report",
         anamnesis="OpenCode Go timeline context.",
         payload={
@@ -1058,7 +1058,7 @@ def test_timeline_generation_records_effective_local_provider_provenance() -> No
         repository_graph,
         patient_name="Local Ollama Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc),
-        status="successful",
+        status="completed",
         report="Local Ollama timeline report",
         anamnesis="Local Ollama timeline context.",
         payload={
@@ -1111,7 +1111,7 @@ def test_session_payload_timeline_is_not_read_as_history_record() -> None:
         repository_graph,
         patient_name="Payload Timeline Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="Payload timeline report",
         anamnesis="Payload timeline context.",
         payload={"patient_timeline": payload_timeline.model_dump(mode="json")},
@@ -1151,7 +1151,7 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
         repository_graph,
         patient_name="Timeline Snapshot Patient",
         timestamp=datetime(2025, 1, 1, 8, 30),
-        status="successful",
+        status="completed",
         report="Timeline snapshot report",
         anamnesis="Symptoms started in January 2025.",
     )
@@ -1199,7 +1199,7 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
         repository_graph,
         patient_name="Synthetic Timeline Cancellation",
         timestamp=datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc),
-        status="successful",
+        status="completed",
         report="Synthetic cancellation report",
         anamnesis="Synthetic timeline extraction is cancellable.",
     )
@@ -1311,7 +1311,7 @@ def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() ->
         repository_graph,
         patient_name="Synthetic Timeline Persistence Failure",
         timestamp=datetime(2025, 1, 17, 9, 0, tzinfo=timezone.utc),
-        status="successful",
+        status="completed",
         report="Synthetic persistence failure report",
         anamnesis="Symptoms began on 2025-01-17.",
     )

@@ -44,6 +44,13 @@ def summarize_job(snapshot: dict[str, Any], *, now_mono: float, now_wall: float)
     completed_at = snapshot.get("completed_at")
     phase = result.get("phase") or result.get("stage") or result.get("progress_stage")
     message = result.get("progress_message") or result.get("message")
+    scope_key = str(snapshot.get("scope_key") or "")
+    session_id = (
+        int(scope_key.removeprefix("clinical:"))
+        if snapshot["job_type"] == "clinical"
+        and scope_key.removeprefix("clinical:").isdigit()
+        else None
+    )
     return JobSummary(
         job_id=str(snapshot["job_id"]),
         job_type=str(snapshot["job_type"]),
@@ -59,6 +66,7 @@ def summarize_job(snapshot: dict[str, Any], *, now_mono: float, now_wall: float)
             else None
         ),
         stop_requested=bool(snapshot.get("stop_requested")),
+        session_id=session_id,
         cancellable=(
             snapshot["job_type"] in CANCELLABLE_JOB_TYPES
             and job_status in ACTIVE_STATUSES

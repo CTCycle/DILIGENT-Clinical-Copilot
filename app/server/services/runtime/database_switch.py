@@ -30,7 +30,10 @@ from repositories.database.initializer import ensure_database_ready
 from repositories.database.postgres import PostgresRepository
 from repositories.database.session import get_default_repository
 from repositories.database.sqlite import SQLiteRepository
+from repositories.clinical_session_repository import ClinicalSessionRepository
+from repositories.context import RepositoryContext
 from services.runtime.jobs import get_job_manager
+from services.session.scheduler import get_clinical_scheduler
 
 
 class DatabaseSwitchBusyError(RuntimeError):
@@ -136,6 +139,13 @@ class DatabaseRuntimeManager:
             previous_configuration = load_database_configuration()
             previous_repository = get_default_repository()
             job_manager = get_job_manager()
+            # Queued sessions belong to the active database and would stall there.
+            if ClinicalSessionRepository(RepositoryContext.create()).count_sessions_with_status(
+                "queued", "running"
+            ):
+                raise DatabaseSwitchBusyError(
+                    "DILI analyses are queued or running. Wait for them to finish or cancel them and retry."
+                )
             if not job_manager.begin_database_switch():
                 raise DatabaseSwitchBusyError(
                     "A background job is pending or running. Wait for it to finish and retry."
@@ -168,6 +178,7 @@ class DatabaseRuntimeManager:
                 _rebind_database_services()
                 _invalidate_database_snapshots()
                 previous_repository.engine.dispose()
+                get_clinical_scheduler().reconcile_interrupted()
                 return DatabaseSwitchResponse(
                     active_backend=configuration.backend,
                     message=(
@@ -208,6 +219,8 @@ class DatabaseRuntimeManager:
             finally:
                 self.request_gate.end_switch()
                 job_manager.end_database_switch()
+                # Admit sessions queued in whichever database is now active.
+                get_clinical_scheduler().dispatch()
 
 
 def _create_repository(configuration: DatabaseConfiguration):

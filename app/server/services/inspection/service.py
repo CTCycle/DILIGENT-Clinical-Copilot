@@ -12,6 +12,7 @@ from string import ascii_uppercase
 from threading import Lock
 from typing import Any, Literal
 
+from common.exceptions import ServiceConflictError
 from common.paths import VECTOR_DB_PATH
 from common.embedding.manifest import read_active_collection_name
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
@@ -20,6 +21,7 @@ from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
+from repositories.values import ACTIVE_SESSION_STATUSES
 from repositories.dilirank_repository import DiliRankRepository
 from repositories.terminology_repository import TerminologyRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
@@ -165,6 +167,7 @@ class DataInspectionService(
         filter_date: date | None,
         offset: int,
         limit: int,
+        sort: str | None = None,
     ) -> dict[str, Any]:
         items, total = self.clinical_session_repository.list_sessions(
             search=search,
@@ -173,6 +176,7 @@ class DataInspectionService(
             filter_date=filter_date,
             offset=offset,
             limit=limit,
+            sort=sort,
         )
         return {
             "items": items,
@@ -265,6 +269,9 @@ class DataInspectionService(
         edited_by: str | None,
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
+        state = self.clinical_session_repository.get_session_state(session_id)
+        if state is not None and not state["has_report"]:
+            raise ServiceConflictError("Only a session with a report can be edited.")
         updated = self.session_revision_repository.update_current_report_text_with_manual_audit(
             session_id,
             report_text=report_text,
@@ -330,6 +337,11 @@ class DataInspectionService(
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
+        state = self.clinical_session_repository.get_session_state(session_id)
+        if state is not None and state["status"] in ACTIVE_SESSION_STATUSES:
+            raise ServiceConflictError(
+                "Cancel this analysis before deleting its session."
+            )
         self.session_revision_repository.delete_session_revisions(session_id)
         return self.clinical_session_repository.delete_session(session_id)
 
@@ -942,10 +954,9 @@ class DataInspectionService(
         )
         if payload is None:
             return None
-        result = payload.get("result")
-        if isinstance(result, dict) and result.get("session_id") is not None:
-            if int(result["session_id"]) != int(session_id):
-                return None
+        # Ownership is the job's admission scope, known from creation onward.
+        if payload.get("scope_key") != f"session_timeline:{int(session_id)}":
+            return None
         return payload
 
     # -------------------------------------------------------------------------

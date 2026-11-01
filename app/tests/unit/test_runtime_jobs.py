@@ -9,7 +9,6 @@ import time
 import pytest
 from services.runtime.jobs import JobManager
 from services.runtime.state import JobState
-from services.session.session_service import ClinicalSessionService
 
 ###############################################################################
 def accepts_named_job_id(job_id: str) -> dict[str, object]:
@@ -22,37 +21,6 @@ def accepts_kwargs(**kwargs: object) -> dict[str, object]:
 ###############################################################################
 def accepts_no_job_id() -> dict[str, object]:
     return {}
-
-###############################################################################
-class _SnapshotCancelManager:
-
-    # -------------------------------------------------------------------------
-    def get_job_status(self, job_id: str) -> dict[str, object]:
-        return {
-            "job_id": job_id,
-            "job_type": "clinical",
-            "status": "running",
-            "progress": 0.5,
-        }
-
-    # -------------------------------------------------------------------------
-    def cancel_job(self, job_id: str) -> dict[str, object]:
-        return {
-            "job_id": job_id,
-            "job_type": "clinical",
-            "status": "running",
-            "progress": 0.5,
-        }
-
-###############################################################################
-def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> None:
-    service = ClinicalSessionService.__new__(ClinicalSessionService)
-    service.job_manager = _SnapshotCancelManager()
-
-    response = service.cancel_clinical_job("job-123")
-
-    assert response.success is True
-    assert response.job_id == "job-123"
 
 ###############################################################################
 @pytest.mark.parametrize(

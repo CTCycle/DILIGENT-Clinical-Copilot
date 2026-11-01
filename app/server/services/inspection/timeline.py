@@ -23,9 +23,32 @@ from services.inspection.normalization import (
     normalize_text,
 )
 from services.inspection.runtime import coerce_optional_str
+from services.session.text_section_parser import parse_initial_text_sections
 
 ###############################################################################
 T = TypeVar("T")
+
+###############################################################################
+def with_input_sections(source: dict[str, Any]) -> dict[str, Any]:
+    """Derive section text from the raw input when no analysis has split it.
+
+    Drafts and analyses that stopped before extraction keep only the
+    clinician-entered text; the deterministic section split is enough for a
+    timeline and never runs a model.
+    """
+    section_keys = ("anamnesis", "drugs", "laboratory_analysis")
+    if any(normalize_text(source.get(key)) for key in section_keys):
+        return source
+    raw_input = source.get("clinical_input")
+    if not isinstance(raw_input, str) or not raw_input.strip():
+        return source
+    parsed = parse_initial_text_sections(raw_input).sections
+    derived = {
+        key: parsed[key].text.strip() for key in section_keys if key in parsed
+    }
+    if not any(derived.values()):
+        derived["anamnesis"] = raw_input.strip()
+    return {**source, **derived}
 
 ###############################################################################
 class TimelineGenerationCancelled(Exception):
@@ -414,7 +437,12 @@ class InspectionTimelineMixin:
             self.timeline_generation_inflight.add(safe_session_id)
         if not force_regenerate:
             cached = self.get_session_timeline(session_id)
-            if cached is not None:
+            if (
+                cached is not None
+                and self.session_timeline_repository.is_latest_timeline_current(
+                    session_id
+                )
+            ):
                 _raise_if_stopped(stop_check)
                 with self.timeline_generation_lock:
                     self.timeline_generation_inflight.discard(safe_session_id)
@@ -428,6 +456,7 @@ class InspectionTimelineMixin:
                 )
                 if source is None:
                     return None
+            source = with_input_sections(source)
             _raise_if_stopped(stop_check)
             # Budget every extractor attempt so retryable failures can be retried;
             # the cap stays below the client's 360 s job polling deadline.
@@ -540,6 +569,7 @@ class InspectionTimelineMixin:
             persisted = self.session_timeline_repository.create_session_timeline_record(
                 session_id,
                 timeline.model_dump(mode="json"),
+                source_text_hash=source.get("source_text_hash"),
             )
             with self.timeline_generation_lock:
                 self.timeline_generation_cooldown_until.pop(safe_session_id, None)

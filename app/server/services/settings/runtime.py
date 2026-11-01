@@ -14,6 +14,7 @@ from configurations.management import (
     environment_snapshot_from_os_env,
 )
 from configurations.startup import get_configuration_manager, get_server_settings
+from services.session.scheduler import get_clinical_scheduler
 from domain.settings.configuration import ServerSettings
 from domain.settings.runtime_ui import (
     RUNTIME_SETTINGS_DEFAULTS,
@@ -177,6 +178,10 @@ class RuntimeSettingsService:
                 "Runtime settings could not be saved.",
                 retryable=True,
             ) from exc
+        if "general" in updates:
+            # A raised concurrency limit admits queued sessions immediately;
+            # a lowered one only gates new starts.
+            get_clinical_scheduler().dispatch()
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -185,6 +190,7 @@ class RuntimeSettingsService:
             general=GeneralRuntimeSettings(
                 polling_interval=settings.jobs.polling_interval,
                 llm_output_token_limit=settings.jobs.llm_output_token_limit,
+                max_concurrent_clinical_jobs=settings.jobs.max_concurrent_clinical_jobs,
             ),
             data=DataRuntimeSettings(
                 drug_name_min_length=settings.ingestion.drug_name_min_length,

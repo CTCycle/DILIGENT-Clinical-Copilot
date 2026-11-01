@@ -9,7 +9,6 @@ from typing import Any
 from pydantic import ValidationError
 
 from common.exceptions import (
-    ServiceNotFoundError,
     ServiceValidationError,
 )
 from common.utils.logger import logger
@@ -24,11 +23,6 @@ from domain.clinical.entities import (
 )
 from domain.clinical.robustness import ClinicalInputPreflightResult
 from domain.clinical.validation import ValidationMessageBundle
-from domain.jobs import (
-    JobCancelResponse,
-    JobStartResponse,
-    JobStatusResponse,
-)
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
@@ -69,7 +63,7 @@ from services.session.text_section_parser import (
 from services.session.session_workflow import (
     build_matched_drugs_payload_workflow,
     process_single_patient_workflow,
-    start_clinical_job_workflow,
+    validate_clinical_launch_workflow,
 )
 
 
@@ -593,6 +587,7 @@ class ClinicalSessionService(
         session_version: int = 1,
         progress_callback: Callable[[str, float, str | None], None] | None = None,
         stop_check: Callable[[], None] | None = None,
+        session_id: int,
     ) -> dict[str, Any]:
         return await process_single_patient_workflow(
             self,
@@ -604,14 +599,15 @@ class ClinicalSessionService(
             session_version=session_version,
             progress_callback=progress_callback,
             stop_check=stop_check,
+            session_id=session_id,
         )
 
     # -------------------------------------------------------------------------
-    def start_clinical_job(
+    def validate_clinical_launch(
         self,
         request_payload: ClinicalSessionRequest,
-    ) -> JobStartResponse:
-        return start_clinical_job_workflow(self, request_payload)
+    ) -> dict[str, Any]:
+        return validate_clinical_launch_workflow(self, request_payload)
 
     # -------------------------------------------------------------------------
     def validate_clinical_input(
@@ -623,30 +619,4 @@ class ClinicalSessionService(
             request_payload,
             knowledge_repository=self.knowledge_repository,
             drug_catalog_repository=self.drug_catalog_repository,
-        )
-
-    # -------------------------------------------------------------------------
-    def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
-        job_status = self.job_manager.get_job_status(job_id)
-        if job_status is None:
-            raise ServiceNotFoundError(
-                "Job not found.",
-            )
-        return JobStatusResponse(**job_status)
-
-    # -------------------------------------------------------------------------
-    def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
-        job_status = self.job_manager.get_job_status(job_id)
-        if job_status is None:
-            raise ServiceNotFoundError(
-                "Job not found.",
-            )
-        cancelled_snapshot = self.job_manager.cancel_job(job_id)
-        success = cancelled_snapshot is not None
-        if success:
-            logger.info("Clinical analysis stop requested for job %s", job_id)
-        return JobCancelResponse(
-            job_id=job_id,
-            success=success,
-            message="Cancellation requested" if success else "Job cannot be cancelled",
         )

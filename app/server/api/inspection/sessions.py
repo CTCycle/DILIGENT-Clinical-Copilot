@@ -22,6 +22,7 @@ from domain.inspection import (
     SessionCatalogResponse,
     SessionDetailResponse,
     SessionListFilters,
+    SessionSort,
     SessionStatus,
     SessionUpdateRequest,
     SessionVersionDetailResponse,
@@ -53,6 +54,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
         filter_date: date | None = Query(default=None, alias="date"),
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=10, ge=1, le=100),
+        sort: SessionSort = Query(default="updated_desc"),
     ) -> SessionCatalogResponse:
         filters = SessionListFilters(
             search=search,
@@ -69,6 +71,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             filter_date=filters.date,
             offset=filters.offset,
             limit=filters.limit,
+            sort=sort,
         )
         return SessionCatalogResponse(**payload)
 

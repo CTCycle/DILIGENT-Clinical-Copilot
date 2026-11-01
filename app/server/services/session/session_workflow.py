@@ -11,11 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from typing import cast
-from common.exceptions import (
-    ServiceConflictError,
-    ServiceError,
-    ServiceValidationError,
-)
+from common.exceptions import ServiceValidationError
 from common.utils.languages import (
     MISSING_VISIT_LABEL_BY_LANGUAGE,
     resolve_supported_language_code,
@@ -35,7 +31,6 @@ from domain.clinical.entities import (
     PipelineIssue,
 )
 from domain.clinical.robustness import NormalizedDocument
-from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.dili_evidence import DiliEvidenceBuilder
@@ -66,7 +61,7 @@ from services.session.robust_pipeline import (
     render_fact_graph_report,
     validate_fact_graph,
 )
-from services.session.session_shared import NarrativeBuilder, run_clinical_job
+from services.session.session_shared import NarrativeBuilder
 from services.text.vocabulary import invalidate_text_normalization_snapshot
 from services.session.workflow_shared import (
     ClinicalPersistenceError,
@@ -248,6 +243,7 @@ async def process_single_patient_workflow(
     session_version: int = 1,
     progress_callback=None,
     stop_check=None,
+    session_id: int,
 ) -> dict[str, Any]:
     service.run_stop_check(stop_check)
     logger.info(
@@ -646,7 +642,7 @@ async def process_single_patient_workflow(
             if faithfulness_audit.manual_review_required
             else "no",
         }
-    session_status = "successful"
+    session_status = "completed"
     if faithfulness_audit.blocking_issues:
         issues.extend(
             PipelineIssue(
@@ -904,7 +900,8 @@ async def process_single_patient_workflow(
     persisted_session_id = None
     try:
         persisted_session_id = await asyncio.to_thread(
-            service.session_repository.save_clinical_session,
+            service.session_repository.complete_clinical_session,
+            session_id,
             {
                 "patient_name": payload.name,
                 "patient_visit_date": payload.visit_date,
@@ -971,15 +968,35 @@ async def process_single_patient_workflow(
     return result_payload
 
 ###############################################################################
-def start_clinical_job_workflow(
+def prepare_clinical_run_workflow(
     service: Any,
     request_payload: ClinicalSessionRequest,
-) -> JobStartResponse:
-    if service.job_manager.is_job_running(
-        service.JOB_TYPE, scope_key="clinical:global"
-    ):
-        raise ServiceConflictError("Clinical analysis is already in progress")
+) -> dict[str, Any]:
+    """Deterministically split and structure the input; never calls a model."""
+    parse_result = service.validate_assessment_prerequisites_without_llm(
+        request_payload
+    )
+    try:
+        prepared = service.prepare_structured_clinical_input(
+            request_payload,
+            parse_result=parse_result,
+        )
+    except ClinicalInputExtractionError as exc:
+        raise ServiceValidationError(str(exc)) from exc
+    try:
+        service.ensure_submission_requirements(prepared["patient_payload"])
+    except ClinicalPipelineValidationError as exc:
+        raise ServiceValidationError(
+            service.serialize_pipeline_issues(exc.issues)
+        ) from exc
+    return prepared
 
+###############################################################################
+def validate_clinical_launch_workflow(
+    service: Any,
+    request_payload: ClinicalSessionRequest,
+) -> dict[str, Any]:
+    """Run every launch-time check and freeze the runtime for this session."""
     model_overrides = (
         request_payload.model_overrides.as_runtime_overrides()
         if request_payload.model_overrides is not None
@@ -1009,9 +1026,6 @@ def start_clinical_job_workflow(
                 f"Configure an active {provider.title()} access key before running cloud analysis."
             )
 
-    parse_result = service.validate_assessment_prerequisites_without_llm(
-        request_payload
-    )
     use_documents = request_payload.evidence.documents
     rag_readiness = check_rag_readiness(requested=use_documents)
     if use_documents and not rag_readiness.available:
@@ -1025,49 +1039,14 @@ def start_clinical_job_workflow(
                 }
             ]
         )
-
-    try:
-        prepared = service.prepare_structured_clinical_input(
-            request_payload,
-            parse_result=parse_result,
-        )
-        normalized_document = prepared["normalized_document"]
-        section_extraction = prepared["section_extraction"]
-        patient_payload = prepared["patient_payload"]
-    except ClinicalInputExtractionError as exc:
-        raise ServiceValidationError(str(exc)) from exc
-    try:
-        service.ensure_submission_requirements(patient_payload)
-    except ClinicalPipelineValidationError as exc:
-        raise ServiceValidationError(
-            service.serialize_pipeline_issues(exc.issues)
-        ) from exc
+    prepared = prepare_clinical_run_workflow(service, request_payload)
     runtime_snapshot, runtime_snapshot_hash = LLMRuntimeConfig.capture_run_snapshot(
         evidence_sources=list(request_payload.evidence_sources),
         model_overrides=model_overrides,
     )
-    job_id = service.job_manager.start_job(
-        job_type=service.JOB_TYPE,
-        runner=run_clinical_job,
-        scope_key="clinical:global",
-        kwargs={
-            "service": service,
-            "payload": patient_payload,
-            "patient_image_base64": request_payload.patient_image_base64,
-            "section_extraction": section_extraction,
-            "normalized_document": normalized_document,
-            "report_mode": request_payload.report_mode,
-            "runtime_snapshot": runtime_snapshot,
-            "runtime_snapshot_hash": runtime_snapshot_hash,
-        },
-    )
-    job_status = service.job_manager.get_job_status(job_id)
-    if job_status is None:
-        raise ServiceError("Failed to initialize clinical analysis job")
-    return JobStartResponse(
-        job_id=job_id,
-        job_type=job_status["job_type"],
-        status=job_status["status"],
-        message="Clinical analysis job started",
-        poll_interval=get_server_settings().jobs.polling_interval,
-    )
+    return {
+        "patient_payload": prepared["patient_payload"],
+        "model_overrides": model_overrides,
+        "runtime_snapshot": runtime_snapshot,
+        "runtime_snapshot_hash": runtime_snapshot_hash,
+    }

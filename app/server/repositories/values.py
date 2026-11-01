@@ -72,11 +72,23 @@ def normalize_flag(value: Any) -> int | None:
         return None
 
 ###############################################################################
+SESSION_LIFECYCLE_STATUSES = (
+    "draft",
+    "queued",
+    "running",
+    "completed",
+    "cancelled",
+    "failed",
+)
+ACTIVE_SESSION_STATUSES = frozenset({"queued", "running"})
+TERMINAL_SESSION_STATUSES = frozenset({"completed", "cancelled", "failed"})
+
+###############################################################################
 def normalize_session_status(value: Any) -> str:
-    normalized = normalize_string(value)
-    return (
-        "failed" if normalized and normalized.casefold() == "failed" else "successful"
-    )
+    normalized = (normalize_string(value) or "").casefold()
+    if normalized not in SESSION_LIFECYCLE_STATUSES:
+        raise ValueError(f"Unsupported clinical session status: {value!r}")
+    return normalized
 
 ###############################################################################
 def join_values(values: set[str]) -> str | None:

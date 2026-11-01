@@ -6,7 +6,6 @@
 from repositories.schemas.base import Base
 from repositories.schemas.clinical import (
     ClinicalDrugMention,
-    ClinicalInputDraft,
     ClinicalLabObservation,
     ClinicalSession,
     ClinicalSessionAttachment,
@@ -48,7 +47,6 @@ from repositories.schemas.terminology import (
 __all__ = [
     "Base",
     "ClinicalDrugMention",
-    "ClinicalInputDraft",
     "ClinicalLabObservation",
     "ClinicalSession",
     "ClinicalSessionAttachment",

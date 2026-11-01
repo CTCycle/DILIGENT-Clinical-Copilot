@@ -49,7 +49,7 @@ def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) ->
         assert second.current_heads == (HEAD_REVISION,)
         assert second.upgraded is False
         assert inspect(engine).has_table("clinical_sessions")
-        assert inspect(engine).has_table("clinical_input_drafts")
+        assert not inspect(engine).has_table("clinical_input_drafts")
         assert inspect(engine).has_table("alembic_version")
         with engine.connect() as connection:
             assert (
@@ -251,3 +251,49 @@ def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
         results = list(executor.map(lambda _item: run_startup(), range(2)))
 
     assert results == [(HEAD_REVISION,), (HEAD_REVISION,)]
+
+###############################################################################
+def test_lifecycle_migration_preserves_reports_and_the_legacy_draft(
+    tmp_path: Path,
+) -> None:
+    engine = _engine(tmp_path / "lifecycle.db")
+    try:
+        with migration_coordinator._migration_transaction(engine) as connection:
+            migration_coordinator._run_command(connection, "upgrade", "202611010002")
+            connection.execute(
+                text(
+                    "insert into clinical_sessions (patient_name, session_timestamp, "
+                    "session_status) values ('Old Success', '2026-10-01 10:00:00', "
+                    "'successful'), ('Old Failure', '2026-10-02 10:00:00', 'failed'), "
+                    "('Old Unknown', '2026-10-03 10:00:00', NULL)"
+                )
+            )
+            connection.execute(
+                text(
+                    "insert into clinical_input_drafts (id, draft_key, revision, "
+                    "is_active, patient_name, clinical_input, updated_at) values "
+                    "(1, 'key', 3, 1, 'Draft Patient', 'Unsaved history', "
+                    "'2026-10-04 09:00:00')"
+                )
+            )
+
+        migrate_database(engine, database_was_empty=False)
+
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "select patient_name, session_status, clinical_input, created_at "
+                    "from clinical_sessions order by id"
+                )
+            ).all()
+            assert not inspect(connection).has_table("clinical_input_drafts")
+        assert [(row[0], row[1]) for row in rows] == [
+            ("Old Success", "completed"),
+            ("Old Failure", "failed"),
+            ("Old Unknown", "completed"),
+            ("Draft Patient", "draft"),
+        ]
+        assert rows[3][2] == "Unsaved history"
+        assert str(rows[0][3]).startswith("2026-10-01")
+    finally:
+        engine.dispose()

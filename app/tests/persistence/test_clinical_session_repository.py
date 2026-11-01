@@ -17,7 +17,7 @@ def test_persisted_lab_sample_date_populates_observation_at(persistence_engine) 
     session_id = repository.save_clinical_session(
         {
             "patient_name": "Synthetic sample-date persistence",
-            "session_status": "successful",
+            "session_status": "completed",
             "session_result_payload": {
                 "lab_timeline": [
                     {
@@ -56,7 +56,7 @@ def test_repeated_lab_representations_persist_one_observation(persistence_engine
     session_id = repository.save_clinical_session(
         {
             "patient_name": "Synthetic duplicate labs",
-            "session_status": "successful",
+            "session_status": "completed",
             "session_result_payload": {"lab_timeline": [entry, dict(entry)]},
         }
     )
@@ -76,7 +76,7 @@ def test_attachments_are_idempotent_version_scoped_and_cascade(persistence_engin
     graph = build_repository_graph(engine=persistence_engine)
     repository = graph.clinical_session_repository
     session_id = repository.save_clinical_session(
-        {"patient_name": "Synthetic attachments", "session_status": "successful"}
+        {"patient_name": "Synthetic attachments", "session_status": "completed"}
     )
     assert session_id is not None
     version = graph.session_revision_repository.get_version_record_for_session(

@@ -18,9 +18,9 @@ def test_health_route_uses_response_model() -> None:
     assert content["schema"]["$ref"].endswith("/HealthResponse")
 
 ###############################################################################
-def test_clinical_job_route_advertises_response_model() -> None:
+def test_clinical_launch_route_advertises_response_model() -> None:
     schema = app.openapi()
-    response = schema["paths"]["/api/clinical/jobs"]["post"]["responses"]["202"]
+    response = schema["paths"]["/api/clinical/sessions/{session_id}/launch"]["post"]["responses"]["202"]
     assert "application/json" in response["content"]
 
 ###############################################################################

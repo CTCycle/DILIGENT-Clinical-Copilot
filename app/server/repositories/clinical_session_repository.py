@@ -6,10 +6,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date, datetime, timedelta
-from typing import Any
+from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
 
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
@@ -37,6 +38,30 @@ def _build_search_pattern(value: str | None) -> str | None:
     return f"%{escaped}%"
 
 ###############################################################################
+class SessionStateConflictError(RuntimeError):
+    """A lifecycle guard rejected a write because the session state changed."""
+
+###############################################################################
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+###############################################################################
+def _same_instant(stored: datetime | None, expected: datetime) -> bool:
+    if stored is None:
+        return False
+    def as_utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return as_utc(stored) == as_utc(expected)
+
+###############################################################################
+def session_input_text(row: ClinicalSession) -> str:
+    return row.clinical_input or ""
+
+###############################################################################
+def session_input_hash(row: ClinicalSession) -> str:
+    return hashlib.sha256(session_input_text(row).encode("utf-8")).hexdigest()
+
+###############################################################################
 class ClinicalSessionRepository:
 
     # -------------------------------------------------------------------------
@@ -49,84 +74,113 @@ class ClinicalSessionRepository:
         self.session_factory = context.session_factory
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _apply_result_columns(
+        row: ClinicalSession, session_data: dict[str, Any]
+    ) -> None:
+        row.patient_name = repository_values.normalize_string(
+            session_data.get("patient_name")
+        )
+        row.visit_date = repository_values.normalize_date_value(
+            session_data.get("patient_visit_date")
+        )
+        row.anamnesis = repository_values.normalize_string(session_data.get("anamnesis"))
+        row.drugs_text = repository_values.normalize_string(session_data.get("drugs"))
+        row.laboratory_analysis = repository_values.normalize_string(
+            session_data.get("laboratory_analysis")
+        )
+        if "patient_image_base64" in session_data:
+            row.patient_image_blob = session_result_data.decode_patient_image(
+                session_data.get("patient_image_base64")
+            )
+        row.session_timestamp = session_result_data.parse_datetime(
+            session_data.get("session_timestamp")
+        )
+        row.hepatic_pattern = repository_values.normalize_string(
+            session_data.get("hepatic_pattern")
+        )
+        row.text_extraction_model = repository_values.normalize_string(
+            session_data.get("text_extraction_model")
+        )
+        row.clinical_model = repository_values.normalize_string(
+            session_data.get("clinical_model")
+        )
+        row.total_duration = repository_values.to_float(
+            session_data.get("total_duration")
+        )
+        row.session_kind = repository_values.normalize_string(
+            session_data.get("session_kind")
+        )
+        if "metadata" in session_data:
+            row.metadata_json = session_result_data.serialize_json_payload(
+                session_data.get("metadata")
+            )
+
+    # -------------------------------------------------------------------------
+    def _persist_result_children(
+        self,
+        db_session: Session,
+        row: ClinicalSession,
+        session_data: dict[str, Any],
+    ) -> None:
+        session_id = int(row.id)
+        if session_data.get("root_session_id") is None:
+            db_session.add(
+                ClinicalSessionVersion(
+                    session_id=session_id,
+                    root_session_id=session_id,
+                    source_version_id=None,
+                    version_number=1,
+                    version_status="current",
+                    revision_kind="original",
+                    llm_qa_status="not_run",
+                    clinical_review_status="not_reviewed",
+                    pipeline_run_id=None,
+                    model_configuration_json=session_result_data.serialize_json_payload(
+                        {
+                            "text_extraction_model": row.text_extraction_model,
+                            "clinical_model": row.clinical_model,
+                        }
+                    ),
+                    completed_at=row.session_timestamp,
+                )
+            )
+            db_session.flush()
+        self.persist_session_sections(db_session, session_id, session_data)
+        self.persist_session_labs(db_session, session_id, session_data)
+        self.persist_session_drugs(db_session, session_id, session_data)
+        self.persist_session_result_payload(db_session, session_id, session_data)
+
+    # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
+        """Insert an already finished session (agentic revisions)."""
         if not session_data:
             logger.warning("Skipping clinical session save; payload is empty")
             return None
         db_session = self.session_factory()
         try:
-            persisted_session = ClinicalSession(
-                patient_name=repository_values.normalize_string(
-                    session_data.get("patient_name")
-                ),
-                visit_date=repository_values.normalize_date_value(
-                    session_data.get("patient_visit_date")
-                ),
-                anamnesis=repository_values.normalize_string(
-                    session_data.get("anamnesis")
-                ),
-                drugs_text=repository_values.normalize_string(
-                    session_data.get("drugs")
-                ),
-                laboratory_analysis=repository_values.normalize_string(
-                    session_data.get("laboratory_analysis")
-                ),
-                patient_image_blob=session_result_data.decode_patient_image(
-                    session_data.get("patient_image_base64")
-                ),
-                session_timestamp=session_result_data.parse_datetime(
-                    session_data.get("session_timestamp")
-                ),
-                hepatic_pattern=repository_values.normalize_string(
-                    session_data.get("hepatic_pattern")
-                ),
-                text_extraction_model=repository_values.normalize_string(
-                    session_data.get("text_extraction_model")
-                ),
-                clinical_model=repository_values.normalize_string(
-                    session_data.get("clinical_model")
-                ),
-                total_duration=repository_values.to_float(
-                    session_data.get("total_duration")
-                ),
-                session_status=repository_values.normalize_session_status(
-                    session_data.get("session_status")
-                ),
-                session_kind=repository_values.normalize_string(
-                    session_data.get("session_kind")
-                ),
-                metadata_json=session_result_data.serialize_json_payload(
-                    session_data.get("metadata")
-                ),
+            # A finished session is created at the moment it was produced.
+            finished_at = (
+                session_result_data.parse_datetime(session_data.get("session_timestamp"))
+                or _utc_now()
             )
+            persisted_session = ClinicalSession(
+                session_status=repository_values.normalize_session_status(
+                    session_data.get("session_status") or "completed"
+                ),
+                clinical_input=repository_values.normalize_string(
+                    session_data.get("clinical_input")
+                ),
+                created_at=finished_at,
+                updated_at=finished_at,
+                finished_at=finished_at,
+                state_version=1,
+            )
+            self._apply_result_columns(persisted_session, session_data)
             db_session.add(persisted_session)
             db_session.flush()
             session_id = int(persisted_session.id)
-            if session_data.get("root_session_id") is None:
-                db_session.add(
-                    ClinicalSessionVersion(
-                        session_id=session_id,
-                        root_session_id=session_id,
-                        source_version_id=None,
-                        version_number=1,
-                        version_status="current",
-                        revision_kind="original",
-                        llm_qa_status="not_run",
-                        clinical_review_status="not_reviewed",
-                        pipeline_run_id=None,
-                        model_configuration_json=session_result_data.serialize_json_payload(
-                            {
-                                "text_extraction_model": persisted_session.text_extraction_model,
-                                "clinical_model": persisted_session.clinical_model,
-                            }
-                        ),
-                        completed_at=persisted_session.session_timestamp,
-                    )
-                )
-            self.persist_session_sections(db_session, session_id, session_data)
-            self.persist_session_labs(db_session, session_id, session_data)
-            self.persist_session_drugs(db_session, session_id, session_data)
-            self.persist_session_result_payload(db_session, session_id, session_data)
+            self._persist_result_children(db_session, persisted_session, session_data)
             db_session.commit()
             return session_id
         except Exception:
@@ -134,6 +188,405 @@ class ClinicalSessionRepository:
             raise
         finally:
             db_session.close()
+
+    # -------------------------------------------------------------------------
+    def complete_clinical_session(
+        self, session_id: int, session_data: dict[str, Any]
+    ) -> int:
+        """Persist the outcome of a running analysis onto its own session row."""
+        status = repository_values.normalize_session_status(
+            session_data.get("session_status")
+        )
+        if status not in {"completed", "failed"}:
+            raise ValueError("A finished analysis is either completed or failed.")
+        db_session = self.session_factory()
+        try:
+            # Take the write lock with the guard itself before reading the row.
+            guarded = db_session.execute(
+                update(ClinicalSession)
+                .where(
+                    ClinicalSession.id == int(session_id),
+                    ClinicalSession.session_status == "running",
+                )
+                .values(state_version=ClinicalSession.state_version + 1)
+            )
+            if guarded.rowcount != 1:
+                raise SessionStateConflictError(
+                    "Only a running clinical session can be completed."
+                )
+            row = cast(ClinicalSession, db_session.get(ClinicalSession, int(session_id)))
+            self._apply_result_columns(row, session_data)
+            now = _utc_now()
+            row.session_status = status
+            row.finished_at = now
+            row.updated_at = now
+            error = session_data.get("lifecycle_error")
+            row.error_json = (
+                session_result_data.serialize_json_payload(error) if error else None
+            )
+            if status == "completed":
+                row.progress_stage = "completed"
+                row.progress_percent = 100.0
+                row.progress_message = None
+            self._persist_result_children(db_session, row, session_data)
+            db_session.commit()
+            return int(row.id)
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -------------------------------------------------------------------------
+    def create_draft(
+        self,
+        *,
+        patient_name: str | None,
+        visit_date: date | None,
+        clinical_input: str,
+        patient_image_base64: str | None,
+    ) -> dict[str, Any]:
+        now = _utc_now()
+        with self.session_factory() as db_session:
+            row = ClinicalSession(
+                patient_name=repository_values.normalize_string(patient_name),
+                visit_date=visit_date,
+                clinical_input=clinical_input,
+                patient_image_blob=session_result_data.decode_patient_image(
+                    patient_image_base64
+                ),
+                session_status="draft",
+                session_kind="standard_assessment",
+                state_version=1,
+                created_at=now,
+                updated_at=now,
+            )
+            db_session.add(row)
+            db_session.commit()
+            session_id = int(row.id)
+        return cast(dict[str, Any], self.get_session_state(session_id))
+
+    # -------------------------------------------------------------------------
+    def update_draft_input(
+        self,
+        session_id: int,
+        *,
+        patient_name: str | None,
+        visit_date: date | None,
+        clinical_input: str,
+        patient_image_base64: str | None,
+        expected_updated_at: datetime,
+    ) -> dict[str, Any] | None:
+        with self.session_factory() as db_session:
+            row = db_session.get(ClinicalSession, int(session_id))
+            if row is None:
+                return None
+            status, updated_at, state_version = (
+                row.session_status,
+                row.updated_at,
+                row.state_version,
+            )
+        if status != "draft":
+            raise SessionStateConflictError("Only a draft session can be edited.")
+        stale = SessionStateConflictError(
+            "The draft changed since it was loaded. Reload it before saving."
+        )
+        if not _same_instant(updated_at, expected_updated_at):
+            raise stale
+        # A fresh transaction whose first statement is the guarded write.
+        with self.session_factory() as db_session:
+            result = db_session.execute(
+                update(ClinicalSession)
+                .where(
+                    ClinicalSession.id == int(session_id),
+                    ClinicalSession.session_status == "draft",
+                    ClinicalSession.state_version == state_version,
+                )
+                .values(
+                    patient_name=repository_values.normalize_string(patient_name),
+                    visit_date=visit_date,
+                    clinical_input=clinical_input,
+                    patient_image_blob=session_result_data.decode_patient_image(
+                        patient_image_base64
+                    ),
+                    updated_at=_utc_now(),
+                    state_version=ClinicalSession.state_version + 1,
+                )
+            )
+            if result.rowcount != 1:
+                db_session.rollback()
+                raise stale
+            db_session.commit()
+        return self.get_session_state(session_id)
+
+    # -------------------------------------------------------------------------
+    def launch_draft(
+        self,
+        session_id: int,
+        *,
+        patient_name: str | None,
+        visit_date: date | None,
+        clinical_input: str,
+        patient_image_base64: str | None,
+        metadata: dict[str, Any],
+        run_request: dict[str, Any],
+    ) -> bool:
+        """Atomically move a draft into the queue; False when it is not a draft."""
+        now = _utc_now()
+        with self.session_factory() as db_session:
+            result = db_session.execute(
+                update(ClinicalSession)
+                .where(
+                    ClinicalSession.id == int(session_id),
+                    ClinicalSession.session_status == "draft",
+                )
+                .values(
+                    session_status="queued",
+                    patient_name=repository_values.normalize_string(patient_name),
+                    visit_date=visit_date,
+                    clinical_input=clinical_input,
+                    patient_image_blob=session_result_data.decode_patient_image(
+                        patient_image_base64
+                    ),
+                    metadata_json=session_result_data.serialize_json_payload(metadata),
+                    run_request_json=session_result_data.serialize_json_payload(
+                        run_request
+                    ),
+                    progress_stage=None,
+                    progress_percent=None,
+                    progress_message=None,
+                    error_json=None,
+                    queued_at=now,
+                    updated_at=now,
+                    state_version=ClinicalSession.state_version + 1,
+                )
+            )
+            db_session.commit()
+            return result.rowcount == 1
+
+    # -------------------------------------------------------------------------
+    def claim_next_queued(self, job_id: str) -> int | None:
+        """Claim the oldest queued session for execution under ``job_id``.
+
+        One guarded UPDATE selects and claims the row, so the statement takes
+        the write lock before reading and two dispatchers cannot claim it twice.
+        """
+        oldest_queued = (
+            select(ClinicalSession.id)
+            .where(ClinicalSession.session_status == "queued")
+            .order_by(ClinicalSession.queued_at, ClinicalSession.id)
+            .limit(1)
+            .scalar_subquery()
+        )
+        now = _utc_now()
+        with self.session_factory() as db_session:
+            claimed = db_session.execute(
+                update(ClinicalSession)
+                .where(
+                    ClinicalSession.id == oldest_queued,
+                    ClinicalSession.session_status == "queued",
+                )
+                .values(
+                    session_status="running",
+                    job_id=job_id,
+                    started_at=now,
+                    updated_at=now,
+                    state_version=ClinicalSession.state_version + 1,
+                )
+                .returning(ClinicalSession.id)
+            ).scalar_one_or_none()
+            db_session.commit()
+            return int(claimed) if claimed is not None else None
+
+    # -------------------------------------------------------------------------
+    def count_sessions_with_status(self, *statuses: str) -> int:
+        with self.session_factory() as db_session:
+            return int(
+                db_session.execute(
+                    select(func.count())
+                    .select_from(ClinicalSession)
+                    .where(ClinicalSession.session_status.in_(statuses))
+                ).scalar_one()
+            )
+
+    # -------------------------------------------------------------------------
+    def get_run_request(self, session_id: int) -> dict[str, Any] | None:
+        with self.session_factory() as db_session:
+            row = db_session.get(ClinicalSession, int(session_id))
+            if row is None:
+                return None
+            return {
+                "session_id": int(row.id),
+                "status": row.session_status,
+                "job_id": row.job_id,
+                "patient_image_base64": session_result_data.encode_patient_image(
+                    row.patient_image_blob
+                ),
+                "run_request": session_result_data.parse_session_result_payload(
+                    row.run_request_json
+                )
+                or {},
+            }
+
+    # -------------------------------------------------------------------------
+    def record_progress(
+        self,
+        session_id: int,
+        *,
+        stage: str,
+        percent: float | None,
+        message: str | None,
+    ) -> None:
+        with self.session_factory() as db_session:
+            db_session.execute(
+                update(ClinicalSession)
+                .where(
+                    ClinicalSession.id == int(session_id),
+                    ClinicalSession.session_status == "running",
+                )
+                .values(
+                    progress_stage=stage,
+                    progress_percent=percent,
+                    progress_message=message,
+                    updated_at=_utc_now(),
+                    state_version=ClinicalSession.state_version + 1,
+                )
+            )
+            db_session.commit()
+
+    # -------------------------------------------------------------------------
+    def transition_session(
+        self,
+        session_id: int,
+        *,
+        from_statuses: set[str] | frozenset[str],
+        to_status: str,
+        error: dict[str, Any] | None = None,
+    ) -> bool:
+        """Apply one guarded lifecycle transition; False when the guard fails."""
+        target = repository_values.normalize_session_status(to_status)
+        now = _utc_now()
+        values: dict[str, Any] = {
+            "session_status": target,
+            "updated_at": now,
+            "state_version": ClinicalSession.state_version + 1,
+        }
+        if target in repository_values.TERMINAL_SESSION_STATUSES:
+            values["finished_at"] = now
+        if error is not None:
+            values["error_json"] = session_result_data.serialize_json_payload(error)
+        with self.session_factory() as db_session:
+            result = db_session.execute(
+                update(ClinicalSession)
+                .where(
+                    ClinicalSession.id == int(session_id),
+                    ClinicalSession.session_status.in_(sorted(from_statuses)),
+                )
+                .values(**values)
+            )
+            db_session.commit()
+            return result.rowcount == 1
+
+    # -------------------------------------------------------------------------
+    def fail_interrupted_sessions(
+        self, *, active_job_ids: set[str], error: dict[str, Any]
+    ) -> list[int]:
+        """Mark running sessions without a live worker as interrupted failures."""
+        with self.session_factory() as db_session:
+            rows = db_session.execute(
+                select(ClinicalSession.id, ClinicalSession.job_id).where(
+                    ClinicalSession.session_status == "running"
+                )
+            ).all()
+        interrupted: list[int] = []
+        for session_id, job_id in rows:
+            if job_id and job_id in active_job_ids:
+                continue
+            if self.transition_session(
+                int(session_id),
+                from_statuses={"running"},
+                to_status="failed",
+                error=error,
+            ):
+                interrupted.append(int(session_id))
+        return interrupted
+
+    # -------------------------------------------------------------------------
+    def get_session_state(self, session_id: int) -> dict[str, Any] | None:
+        with self.session_factory() as db_session:
+            row = db_session.get(ClinicalSession, int(session_id))
+            if row is None:
+                return None
+            has_report = bool(
+                db_session.execute(
+                    select(
+                        exists(
+                            select(1).where(
+                                ClinicalSessionVersion.session_id == row.id,
+                                ClinicalSessionVersion.report_text.isnot(None),
+                                ClinicalSessionVersion.report_text != "",
+                            )
+                        )
+                    )
+                ).scalar()
+            )
+            queue_position = None
+            if row.session_status == "queued":
+                queue_position = 1 + int(
+                    db_session.execute(
+                        select(func.count())
+                        .select_from(ClinicalSession)
+                        .where(
+                            ClinicalSession.session_status == "queued",
+                            or_(
+                                ClinicalSession.queued_at < row.queued_at,
+                                and_(
+                                    ClinicalSession.queued_at == row.queued_at,
+                                    ClinicalSession.id < row.id,
+                                ),
+                            ),
+                        )
+                    ).scalar_one()
+                )
+            return {
+                "session_id": int(row.id),
+                "status": row.session_status,
+                "patient_name": row.patient_name,
+                "visit_date": row.visit_date,
+                "created_at": row.created_at,
+                "updated_at": row.updated_at,
+                "queued_at": row.queued_at,
+                "started_at": row.started_at,
+                "finished_at": row.finished_at,
+                "queue_position": queue_position,
+                "job_id": row.job_id,
+                "progress": row.progress_percent,
+                "progress_stage": row.progress_stage,
+                "progress_message": row.progress_message,
+                "error": session_result_data.parse_session_result_payload(
+                    row.error_json
+                ),
+                "has_report": has_report,
+                "state_version": int(row.state_version or 0),
+            }
+
+    # -------------------------------------------------------------------------
+    def get_session_input(self, session_id: int) -> dict[str, Any] | None:
+        with self.session_factory() as db_session:
+            row = db_session.get(ClinicalSession, int(session_id))
+            if row is None:
+                return None
+            return {
+                "session_id": int(row.id),
+                "status": row.session_status,
+                "patient_name": row.patient_name,
+                "visit_date": row.visit_date,
+                "clinical_input": session_input_text(row),
+                "patient_image_base64": session_result_data.encode_patient_image(
+                    row.patient_image_blob
+                ),
+                "updated_at": row.updated_at,
+            }
 
     # -------------------------------------------------------------------------
     def list_sessions(
@@ -145,6 +598,7 @@ class ClinicalSessionRepository:
         filter_date: date | None,
         offset: int,
         limit: int,
+        sort: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         safe_offset = max(int(offset), 0)
         safe_limit = max(int(limit), 1)
@@ -176,28 +630,26 @@ class ClinicalSessionRepository:
                     result_payload_match,
                 )
             )
-        normalized_status_filter = (
-            status_filter.casefold() if isinstance(status_filter, str) else None
-        )
-        if normalized_status_filter in {"successful", "failed"}:
-            conditions.append(
-                func.lower(func.coalesce(ClinicalSession.session_status, "successful"))
-                == normalized_status_filter
-            )
+        if status_filter in repository_values.SESSION_LIFECYCLE_STATUSES:
+            conditions.append(ClinicalSession.session_status == status_filter)
         if filter_date is not None and date_mode in {"before", "after", "exact"}:
-            day_start = datetime.combine(filter_date, datetime.min.time())
+            day_start = datetime.combine(filter_date, datetime.min.time(), tzinfo=UTC)
             next_day = day_start + timedelta(days=1)
             if date_mode == "before":
-                conditions.append(ClinicalSession.session_timestamp < day_start)
+                conditions.append(ClinicalSession.created_at < day_start)
             elif date_mode == "after":
-                conditions.append(ClinicalSession.session_timestamp >= next_day)
+                conditions.append(ClinicalSession.created_at >= next_day)
             else:
                 conditions.extend(
                     [
-                        ClinicalSession.session_timestamp >= day_start,
-                        ClinicalSession.session_timestamp < next_day,
+                        ClinicalSession.created_at >= day_start,
+                        ClinicalSession.created_at < next_day,
                     ]
                 )
+        order_by = {
+            "created_desc": (ClinicalSession.created_at.desc(), ClinicalSession.id.desc()),
+            "created_asc": (ClinicalSession.created_at.asc(), ClinicalSession.id.asc()),
+        }.get(sort or "", (ClinicalSession.updated_at.desc(), ClinicalSession.id.desc()))
         db_session = self.session_factory()
         try:
             report_exists = exists(
@@ -229,9 +681,7 @@ class ClinicalSessionRepository:
                 count_stmt = count_stmt.where(combined)
             total_rows = int(db_session.execute(count_stmt).scalar_one())
             rows = db_session.execute(
-                sessions_stmt.order_by(
-                    ClinicalSession.session_timestamp.desc(), ClinicalSession.id.desc()
-                )
+                sessions_stmt.order_by(*order_by)
                 .offset(safe_offset)
                 .limit(safe_limit)
             ).all()
@@ -242,21 +692,19 @@ class ClinicalSessionRepository:
                         session_row.patient_name
                     ),
                     "session_timestamp": session_row.session_timestamp,
+                    "created_at": session_row.created_at,
+                    "updated_at": session_row.updated_at,
                     "version": int(version_value or 1),
-                    "status": repository_values.normalize_session_status(
-                        session_row.session_status
-                    ),
+                    "status": session_row.session_status,
+                    "progress": session_row.progress_percent,
+                    "progress_stage": session_row.progress_stage,
                     "total_duration": repository_values.to_float(
                         session_row.total_duration
                     ),
                     "has_report": bool(has_report),
                     "has_timeline": bool(has_timeline),
                     "can_generate_timeline": bool(
-                        repository_values.normalize_string(session_row.anamnesis)
-                        or repository_values.normalize_string(session_row.drugs_text)
-                        or repository_values.normalize_string(
-                            session_row.laboratory_analysis
-                        )
+                        session_input_text(session_row).strip()
                     ),
                 }
                 for session_row, version_value, has_report, has_timeline in rows
@@ -298,6 +746,7 @@ class ClinicalSessionRepository:
             )
             session_text = (
                 repository_values.normalize_string(payload.get("original_session_text"))
+                or session_row.clinical_input
                 or ""
             )
             official_report_text = repository_values.normalize_string(
@@ -311,9 +760,9 @@ class ClinicalSessionRepository:
                 "visit_date": session_row.visit_date,
                 "session_timestamp": session_row.session_timestamp,
                 "version": int(version_number or 1),
-                "status": repository_values.normalize_session_status(
-                    session_row.session_status
-                ),
+                "status": session_row.session_status,
+                "created_at": session_row.created_at,
+                "updated_at": session_row.updated_at,
                 "text_extraction_model": repository_values.normalize_string(
                     session_row.text_extraction_model
                 ),
@@ -349,23 +798,23 @@ class ClinicalSessionRepository:
         if serialized_payload is None:
             return False
         with self.session_factory() as db_session:
-            existing_session = db_session.get(ClinicalSession, int(session_id))
-            if existing_session is None:
-                return False
-            existing_result = db_session.execute(
-                select(ClinicalSessionResult).where(
-                    ClinicalSessionResult.session_id == int(session_id)
-                )
-            ).scalar_one_or_none()
-            if existing_result is None:
+            # Write first so concurrent analyses never upgrade a stale snapshot.
+            updated = db_session.execute(
+                update(ClinicalSessionResult)
+                .where(ClinicalSessionResult.session_id == int(session_id))
+                .values(payload_json=serialized_payload)
+            )
+            if updated.rowcount == 0:
                 db_session.add(
                     ClinicalSessionResult(
                         session_id=int(session_id), payload_json=serialized_payload
                     )
                 )
-            else:
-                existing_result.payload_json = serialized_payload
-            db_session.commit()
+            try:
+                db_session.commit()
+            except IntegrityError:
+                db_session.rollback()
+                return False
             return True
 
     # -------------------------------------------------------------------------
@@ -521,6 +970,10 @@ class ClinicalSessionRepository:
             existing = db_session.get(ClinicalSession, safe_session_id)
             if existing is None:
                 return False
+            if existing.session_status in repository_values.ACTIVE_SESSION_STATUSES:
+                raise SessionStateConflictError(
+                    "An active clinical session cannot be deleted."
+                )
             db_session.delete(existing)
             db_session.commit()
             return True

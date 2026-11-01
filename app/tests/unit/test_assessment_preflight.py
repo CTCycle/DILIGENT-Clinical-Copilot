@@ -13,7 +13,7 @@ from domain.clinical.robustness import RagReadiness
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
-from services.session.session_workflow import start_clinical_job_workflow
+from services.session.session_workflow import validate_clinical_launch_workflow
 
 ###############################################################################
 def _build_service():
@@ -49,7 +49,7 @@ def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> N
     )
     request = ClinicalSessionRequest(clinical_input=_valid_input(), visit_date=None)
     with pytest.raises(ServiceValidationError, match="Visit date is required"):
-        start_clinical_job_workflow(service, request)
+        validate_clinical_launch_workflow(service, request)
 
 ###############################################################################
 def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
@@ -79,7 +79,7 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) 
         visit_date=date(2025, 1, 15),
     )
     with pytest.raises(ServiceValidationError, match="LiverTox catalog is empty"):
-        start_clinical_job_workflow(service, request)
+        validate_clinical_launch_workflow(service, request)
 
 ###############################################################################
 def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
@@ -107,7 +107,7 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
         visit_date=date(2025, 1, 15),
     )
     with pytest.raises(ServiceValidationError, match="RxNav catalog is empty"):
-        start_clinical_job_workflow(service, request)
+        validate_clinical_launch_workflow(service, request)
 
 ###############################################################################
 def test_malformed_sections_block_job_start(monkeypatch) -> None:
@@ -139,7 +139,7 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
     with pytest.raises(
         ServiceValidationError, match="Clinical input sections are invalid"
     ):
-        start_clinical_job_workflow(service, request)
+        validate_clinical_launch_workflow(service, request)
 
 ###############################################################################
 def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
@@ -186,15 +186,6 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
         "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
         lambda: False,
     )
-    monkeypatch.setattr(
-        service.job_manager, "is_job_running", lambda *args, **kwargs: False
-    )
-    monkeypatch.setattr(service.job_manager, "start_job", lambda **kwargs: "job-123")
-    monkeypatch.setattr(
-        service.job_manager,
-        "get_job_status",
-        lambda job_id: {"job_id": job_id, "job_type": "clinical", "status": "pending"},
-    )
 
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
@@ -202,10 +193,10 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
         selected_model_providers=["ollama"],
     )
 
-    result = start_clinical_job_workflow(service, request)
+    result = validate_clinical_launch_workflow(service, request)
 
-    assert result.job_id == "job-123"
-    assert result.status == "pending"
+    assert result["model_overrides"] == {}
+    assert len(result["runtime_snapshot_hash"]) == 64
 
 ###############################################################################
 def test_preflight_returns_deterministic_diagnostics_for_complex_input(
@@ -339,7 +330,7 @@ def test_job_start_uses_opencode_credential_scope_for_opencode_go(
     )
 
     with pytest.raises(AssertionError, match="validation reached"):
-        start_clinical_job_workflow(
+        validate_clinical_launch_workflow(
             service,
             ClinicalSessionRequest(
                 clinical_input=_valid_input(),
@@ -435,4 +426,4 @@ def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None
     )
 
     with pytest.raises(ServiceValidationError, match="Start Ollama and retry"):
-        start_clinical_job_workflow(service, request)
+        validate_clinical_launch_workflow(service, request)

@@ -54,7 +54,7 @@ def save_revision_source_session(serializer: Any) -> int:
         {
             "patient_name": "Revision Patient",
             "session_timestamp": datetime(2026, 1, 15, 10, 0, tzinfo=UTC),
-            "session_status": "successful",
+            "session_status": "completed",
             "anamnesis": "Patient has jaundice after antibiotic exposure.",
             "drugs": "Amoxicillin started 2026-01-01.",
             "laboratory_analysis": "ALT 400 U/L on 2026-01-10.",

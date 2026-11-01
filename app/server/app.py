@@ -61,6 +61,7 @@ from services.inspection.revision_recovery import (
 from services.retrieval.embedding_runtime import close_embedding_runtime
 from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
+from services.session.scheduler import get_clinical_scheduler
 from services.runtime.ollama_process import ollama_process_manager
 from services.startup_validation import run_startup_validations
 
@@ -130,6 +131,10 @@ async def _release_application_resources() -> None:
             await asyncio.to_thread(fail_revision_runs_interrupted_by_shutdown)
         except Exception:
             logger.exception("Could not mark interrupted revision runs during shutdown")
+        try:
+            await asyncio.to_thread(get_clinical_scheduler().reconcile_interrupted)
+        except Exception:
+            logger.exception("Could not mark interrupted clinical sessions during shutdown")
     close_embedding_runtime()
     await asyncio.to_thread(ollama_process_manager.stop)
     try:
@@ -146,8 +151,12 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     job_manager = get_job_manager()
     job_manager.begin_startup()
     reconcile_interrupted_revision_jobs(job_manager)
+    clinical_scheduler = get_clinical_scheduler()
+    clinical_scheduler.reconcile_interrupted()
     initialize_reference_catalog_provider()
     run_startup_validations(settings)
+    # Queued sessions never started executing, so they resume from the queue.
+    clinical_scheduler.dispatch()
     application.state.server_settings = settings
     try:
         yield

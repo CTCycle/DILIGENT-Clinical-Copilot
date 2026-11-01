@@ -17,7 +17,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from services.runtime.jobs import JobErrorSanitizer, get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
-from services.session.session_workflow import start_clinical_job_workflow
+from services.session.session_workflow import validate_clinical_launch_workflow
 from typing import Any
 from domain.clinical import DrugEntry, PatientData, PatientDrugs
 from domain.clinical.extras import LabExtractionPayload
@@ -100,7 +100,7 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     assert prepared["patient_payload"].drugs == "Drug 10 mg 1-0-0-0"
     assert prepared["patient_payload"].laboratory_analysis == "ALT 120 U/L"
 
-def test_start_clinical_job_requires_active_cloud_key_before_extraction(
+def test_launch_requires_active_cloud_key_before_extraction(
     monkeypatch,
 ) -> None:
     service = _build_service()
@@ -142,7 +142,7 @@ def test_start_clinical_job_requires_active_cloud_key_before_extraction(
         ServiceValidationError,
         match="Configure an active Gemini access key before running cloud analysis.",
     ):
-        start_clinical_job_workflow(service, request)
+        validate_clinical_launch_workflow(service, request)
 
 def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) -> None:
     monkeypatch.setattr(

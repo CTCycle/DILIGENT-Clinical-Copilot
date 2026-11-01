@@ -14,14 +14,11 @@ from configurations.network import parse_cors_allow_origins
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 import app as server_app_module
-from datetime import date
 from typing import Any
 from api import ollama as ollama_routes
 from api import session as session_routes
 from configurations.startup import get_server_settings
-from domain.clinical import ClinicalSessionRequest
 from services.clinical import job_progress as clinical_job_progress
-from services.session import session_workflow
 from services.session import session_shared
 
 def _patch_configuration_paths(monkeypatch, tmp_path: Path) -> Path:  # type: ignore[no-untyped-def]
@@ -270,61 +267,6 @@ class JobManagerStub:
             "result": None,
             "error": None,
         }
-
-def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
-    job_manager_stub = JobManagerStub()
-    endpoint = get_route_owner(session_routes.router, "/clinical/jobs")
-    monkeypatch.setattr(endpoint.service, "job_manager", job_manager_stub)
-    monkeypatch.setattr(
-        endpoint.service,
-        "validate_clinical_input",
-        lambda _: SimpleNamespace(ready=True, blocking_issues=[]),
-    )
-    monkeypatch.setattr(
-        session_workflow.LLMRuntimeConfig,
-        "is_cloud_enabled",
-        staticmethod(lambda: False),
-    )
-    monkeypatch.setattr(
-        endpoint.service,
-        "apply_persisted_runtime_configuration",
-        lambda: None,
-    )
-    monkeypatch.setattr(
-        endpoint.service,
-        "validate_assessment_prerequisites_without_llm",
-        lambda _: SimpleNamespace(missing_required_sections=[], malformed_sections=[]),
-    )
-
-    monkeypatch.setattr(
-        endpoint.service,
-        "prepare_structured_clinical_input",
-        lambda request_payload, *, parse_result: {
-            "normalized_document": object(),
-            "section_extraction": object(),
-            "patient_payload": object(),
-        },
-    )
-    monkeypatch.setattr(
-        endpoint.service, "build_patient_payload", lambda request_payload: object()
-    )
-    monkeypatch.setattr(
-        endpoint.service, "ensure_submission_requirements", lambda _: None
-    )
-
-    response = endpoint.service.start_clinical_job(
-        ClinicalSessionRequest(
-            clinical_input=(
-                "Anamnesis: Clinical context\n"
-                "Drugs: Acetaminophen 500 mg 1 - 0 - 0 - 0 po started from 01/01/2024\n"
-                "Lab analysis: ALT 300 U/L"
-            ),
-            visit_date=date(2026, 4, 24),
-            selected_model_providers=[],
-        )
-    )
-
-    assert response.poll_interval == get_server_settings().jobs.polling_interval
 
 def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()

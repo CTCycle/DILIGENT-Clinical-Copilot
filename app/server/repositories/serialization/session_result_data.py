@@ -31,6 +31,21 @@ def decode_patient_image(value: Any) -> bytes | None:
         return None
 
 ###############################################################################
+def encode_patient_image(value: bytes | None) -> str | None:
+    """Return a stored patient image as the data URL the client submitted."""
+    if not value:
+        return None
+    if value.startswith(bytes.fromhex("89504e47")):
+        media_type = "image/png"
+    elif value.startswith(bytes.fromhex("ffd8")):
+        media_type = "image/jpeg"
+    elif value[:4] == b"RIFF" and value[8:12] == b"WEBP":
+        media_type = "image/webp"
+    else:
+        media_type = "application/octet-stream"
+    return f"data:{media_type};base64,{base64.b64encode(value).decode('ascii')}"
+
+###############################################################################
 def parse_datetime(value: Any) -> datetime | None:
     if value is None:
         return None

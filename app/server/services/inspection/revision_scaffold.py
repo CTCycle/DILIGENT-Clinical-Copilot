@@ -117,6 +117,12 @@ class InspectionRevisionScaffoldMixin:
         session = self.get_session_detail(session_id)
         if session is None:
             raise SessionRevisionNotFoundError("Session not found.")
+        if session.get("status") not in {"completed", "failed"} or not session.get(
+            "report"
+        ):
+            raise SessionRevisionConflictError(
+                "Revisions require a finished analysis with a report."
+            )
         if not self._session_has_revision_source(session):
             raise SessionRevisionValidationError(
                 "Session has no clinical text available for revision."

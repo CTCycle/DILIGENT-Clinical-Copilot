@@ -7,6 +7,7 @@ import asyncio
 import time
 from datetime import UTC, datetime
 from functools import partial
+from collections.abc import Callable
 from typing import Any
 
 from common.utils.logger import logger
@@ -24,7 +25,7 @@ from services.clinical.job_progress import (
     ClinicalJobCancelled,
 )
 from services.clinical.language import ClinicalLanguageDetector
-from services.runtime.jobs import JobManager
+from services.runtime.jobs import JobErrorSanitizer, JobManager
 
 NOT_AVAILABLE = "Not available"
 PATIENT_LINE_TEMPLATE = "- **Patient:** {value}"
@@ -61,7 +62,6 @@ def build_failed_session_payload(
     return {
         "patient_name": payload.name,
         "patient_visit_date": payload.visit_date,
-        "patient_image_base64": None,
         "session_timestamp": datetime.now(UTC),
         "hepatic_pattern": "indeterminate",
         "anamnesis": None,
@@ -414,11 +414,16 @@ class NarrativeBuilder:
         return NarrativeBuilder.compact_spacing("\n\n".join(sections))
 
 ###############################################################################
+def _failure_error(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message}
+
+###############################################################################
 async def execute_clinical_job(
     service: Any,
     payload: PatientData,
     patient_image_base64: str | None,
     job_id: str,
+    session_id: int,
     section_extraction: ClinicalSectionExtractionResult | None = None,
     normalized_document: NormalizedDocument | None = None,
     report_mode: str = "faithful_only",
@@ -434,6 +439,7 @@ async def execute_clinical_job(
         report_clinical_job_progress,
         job_manager=service.job_manager,
         job_id=job_id,
+        record_stage=partial(service.session_repository.record_progress, session_id),
     )
 
     ensure_not_cancelled()
@@ -443,8 +449,25 @@ async def execute_clinical_job(
         progress=2.0,
         detail="preflight.validated",
     )
-    progress_callback = report_progress
     job_started_at = time.perf_counter()
+
+    async def persist_failure(
+        issues: list[dict[str, Any]], error_message: str, error: dict[str, str]
+    ) -> None:
+        failed = build_failed_session_payload(
+            payload=payload,
+            patient_image_base64=patient_image_base64,
+            issues=issues,
+            error_message=error_message,
+            elapsed_seconds=(time.perf_counter() - job_started_at),
+            section_extraction=section_extraction,
+        )
+        failed["lifecycle_error"] = error
+        await asyncio.to_thread(
+            service.session_repository.complete_clinical_session,
+            session_id,
+            failed,
+        )
 
     try:
         result = await service.process_single_patient(
@@ -453,8 +476,9 @@ async def execute_clinical_job(
             section_extraction=section_extraction,
             normalized_document=normalized_document,
             report_mode=report_mode,
-            progress_callback=progress_callback,
+            progress_callback=report_progress,
             stop_check=ensure_not_cancelled,
+            session_id=session_id,
         )
     except ClinicalJobCancelled:
         service.job_manager.update_result(
@@ -467,15 +491,12 @@ async def execute_clinical_job(
         return {}
     except ClinicalPipelineValidationError as exc:
         serialized_issues = [issue.model_dump() for issue in exc.issues]
-        await asyncio.to_thread(
-            service.session_repository.save_clinical_session,
-            build_failed_session_payload(
-                payload=payload,
-                patient_image_base64=patient_image_base64,
-                issues=serialized_issues,
-                error_message=str(exc),
-                elapsed_seconds=(time.perf_counter() - job_started_at),
-                section_extraction=section_extraction,
+        await persist_failure(
+            serialized_issues,
+            str(exc),
+            _failure_error(
+                "validation_failed",
+                "The clinical input did not pass pipeline validation.",
             ),
         )
         service.job_manager.update_result(
@@ -494,15 +515,12 @@ async def execute_clinical_job(
             code="clinical_job_failed",
             message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
         ).model_dump()
-        await asyncio.to_thread(
-            service.session_repository.save_clinical_session,
-            build_failed_session_payload(
-                payload=payload,
-                patient_image_base64=patient_image_base64,
-                issues=[failure_issue],
-                error_message=str(exc),
-                elapsed_seconds=(time.perf_counter() - job_started_at),
-                section_extraction=section_extraction,
+        await persist_failure(
+            [failure_issue],
+            str(exc),
+            _failure_error(
+                "clinical_job_failed",
+                JobErrorSanitizer.build_safe_job_error_message(exc),
             ),
         )
         raise
@@ -522,6 +540,7 @@ def report_clinical_job_progress(
     *,
     job_manager: JobManager,
     job_id: str,
+    record_stage: Callable[..., None] | None = None,
 ) -> None:
     ensure_clinical_job_not_cancelled(job_manager=job_manager, job_id=job_id)
     bounded = min(100.0, max(0.0, float(progress)))
@@ -532,11 +551,13 @@ def report_clinical_job_progress(
     job_manager.update_progress(job_id, bounded)
     snapshot = job_manager.get_job_status(job_id)
     elapsed_seconds = 0.0
+    previous_stage = None
     if snapshot is not None:
         created_at = snapshot.get("created_at", 0.0)
         last_activity_at = snapshot.get("last_activity_at", 0.0)
         if last_activity_at > 0.0:
             elapsed_seconds = round(last_activity_at - created_at, 1)
+        previous_stage = (snapshot.get("result") or {}).get("progress_stage")
     job_manager.update_result(
         job_id,
         {
@@ -545,47 +566,12 @@ def report_clinical_job_progress(
             "progress_elapsed": elapsed_seconds,
         },
     )
+    # Persist stage changes only; fractional sub-stage ticks stay in memory.
+    if record_stage is not None and effective_stage != previous_stage:
+        record_stage(stage=effective_stage, percent=bounded, message=message)
     logger.info(
         "[job=%s] Progress: %.1f%% | %s",
         job_id,
         bounded,
         message,
     )
-
-###############################################################################
-def run_clinical_job(
-    service: Any,
-    payload: PatientData,
-    patient_image_base64: str | None,
-    job_id: str,
-    section_extraction: ClinicalSectionExtractionResult | None = None,
-    normalized_document: NormalizedDocument | None = None,
-    report_mode: str = "faithful_only",
-    runtime_snapshot: dict[str, object] | None = None,
-    runtime_snapshot_hash: str | None = None,
-) -> dict[str, Any]:
-    with LLMRuntimeConfig.override_for_run(runtime_snapshot):
-        result = asyncio.run(
-            execute_clinical_job(
-                service=service,
-                payload=payload,
-                patient_image_base64=patient_image_base64,
-                job_id=job_id,
-                section_extraction=section_extraction,
-                normalized_document=normalized_document,
-                report_mode=report_mode,
-            )
-        )
-    if not result:
-        return {}
-    if runtime_snapshot is not None:
-        result.setdefault("runtime_settings", {}).update(runtime_snapshot)
-        result.setdefault("pipeline_artifacts", {})["runtime_snapshot"] = (
-            runtime_snapshot
-        )
-        result["pipeline_artifacts"]["runtime_snapshot_hash"] = runtime_snapshot_hash
-        result["runtime_settings"]["runtime_snapshot_hash"] = runtime_snapshot_hash
-        session_id = result.get("session_id")
-        if isinstance(session_id, int):
-            service.session_repository.upsert_session_result_payload(session_id, result)
-    return result

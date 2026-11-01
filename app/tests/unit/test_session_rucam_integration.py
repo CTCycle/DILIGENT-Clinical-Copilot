@@ -27,7 +27,7 @@ from services.session.workflow_shared import resolve_rucam_source
 ###############################################################################
 def get_session_service() -> Any:
     for route in session_module.router.routes:
-        if getattr(route, "path", "") == "/clinical/jobs":
+        if getattr(route, "path", "") == "/clinical/validate-input":
             owner = getattr(route.endpoint, "__self__", None)
             if owner is not None:
                 return owner.service
@@ -67,9 +67,11 @@ def test_rucam_source_metadata_requires_explicit_provenance() -> None:
 class FakeSerializer:
 
     # -------------------------------------------------------------------------
-    def save_clinical_session(self, payload: dict[str, Any]) -> int:
+    def complete_clinical_session(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> int:
         _ = payload
-        return 101
+        return session_id
 
     # -------------------------------------------------------------------------
     def upsert_session_result_payload(
@@ -278,7 +280,7 @@ def _payload() -> PatientData:
 ###############################################################################
 def test_session_passes_report_language_to_rucam_estimator(monkeypatch) -> None:
     endpoint = get_session_service()
-    endpoint.serializer = FakeSerializer()
+    monkeypatch.setattr(endpoint, "session_repository", FakeSerializer())
     endpoint.drugs_parser = FakeDrugsParser()
     endpoint.disease_extractor = FakeDiseaseExtractor()
     endpoint.lab_extractor = FakeLabExtractor()
@@ -287,5 +289,5 @@ def test_session_passes_report_language_to_rucam_estimator(monkeypatch) -> None:
     monkeypatch.setattr(endpoint, "input_preparator", FakeInputPreparator())
     monkeypatch.setattr(endpoint, "hepatox_consultation_cls", FakeHepatoxConsultation)
 
-    asyncio.run(endpoint.process_single_patient(_payload()))
+    asyncio.run(endpoint.process_single_patient(_payload(), session_id=101))
     assert fake_estimator.captured_language == "it"

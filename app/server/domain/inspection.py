@@ -10,7 +10,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-SessionStatus = Literal["successful", "failed"]
+SessionStatus = Literal[
+    "draft", "queued", "running", "completed", "cancelled", "failed"
+]
+SessionSort = Literal["updated_desc", "created_desc", "created_asc"]
 DateFilterMode = Literal["before", "after", "exact"]
 InspectionUpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
 InspectionUpdateJobType = Literal[
@@ -42,8 +45,12 @@ class SessionCatalogItem(BaseModel):
     session_id: int
     patient_name: str | None = None
     session_timestamp: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     version: int = 1
     status: SessionStatus
+    progress: float | None = None
+    progress_stage: str | None = None
     total_duration: float | None = None
     has_report: bool = False
     has_timeline: bool = False
@@ -64,6 +71,8 @@ class SessionDetailResponse(BaseModel):
     patient_name: str | None = None
     visit_date: DateValue | None = None
     session_timestamp: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     version: int = 1
     status: SessionStatus
     text_extraction_model: str | None = None

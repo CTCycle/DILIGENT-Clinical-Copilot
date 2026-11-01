@@ -93,9 +93,11 @@ class FakeInputPreparator:
 class FakeSessionRepository:
 
     # -------------------------------------------------------------------------
-    def save_clinical_session(self, payload: dict[str, Any]) -> int | None:
+    def complete_clinical_session(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> int | None:
         self.saved_payload = payload
-        return 101
+        return session_id
 
     # -------------------------------------------------------------------------
     def upsert_session_result_payload(
@@ -282,6 +284,7 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
                 "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
             ),
             report_mode="faithful_only",
+            session_id=101,
         ),
     )
 
@@ -397,6 +400,7 @@ def test_workflow_does_not_recreate_bibliography_outside_report_finalizer() -> N
                 "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
             ),
             report_mode="faithful_only",
+            session_id=101,
         ),
     )
 
@@ -436,7 +440,9 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
         laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
     )
     service = FakeClinicalService()
-    service.session_repository.save_clinical_session = lambda payload: None
+    service.session_repository.complete_clinical_session = (
+        lambda session_id, payload: None
+    )
 
     with pytest.raises(ClinicalPersistenceError):
         asyncio.run(
@@ -447,6 +453,7 @@ def test_workflow_fails_when_persistence_returns_no_session_id() -> None:
                     "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
                 ),
                 report_mode="faithful_only",
+                session_id=101,
             ),
         )
 
@@ -468,7 +475,7 @@ def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> No
         elapsed_seconds=1.2,
     )
 
-    assert failed_payload["patient_image_base64"] is None
+    assert "patient_image_base64" not in failed_payload
     assert failed_payload["anamnesis"] is None
     assert failed_payload["drugs"] is None
     assert failed_payload["laboratory_analysis"] is None
@@ -549,6 +556,7 @@ def test_workflow_marks_blocking_faithfulness_result_as_failed(
                 "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
             ),
             report_mode="faithful_only",
+            session_id=101,
         ),
     )
 
@@ -576,7 +584,7 @@ def test_failed_clinical_job_payload_omits_phi_by_default() -> None:
     assert failed_payload["anamnesis"] is None
     assert failed_payload["drugs"] is None
     assert failed_payload["laboratory_analysis"] is None
-    assert failed_payload["patient_image_base64"] is None
+    assert "patient_image_base64" not in failed_payload
     result_payload = failed_payload["session_result_payload"]
     assert result_payload["error"] == "Clinical analysis failed before completion."
     assert result_payload["section_extraction"] is None
@@ -623,6 +631,7 @@ def test_workflow_routes_and_records_session_evidence_sources(
                 "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L, ALP 120 U/L."
             ),
             report_mode="faithful_only",
+            session_id=101,
         ),
     )
 

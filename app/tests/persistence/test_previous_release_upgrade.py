@@ -202,10 +202,14 @@ def test_v350_database_is_accepted_at_current_head_without_losing_data(
             ).scalar_one() == "Legacy LiverTox excerpt"
 
         upgraded_inspector = inspect(previous_database)
-        assert upgraded_inspector.has_table("clinical_input_drafts")
+        # The empty legacy draft table is folded into the session lifecycle.
+        assert not upgraded_inspector.has_table("clinical_input_drafts")
         with previous_database.connect() as connection:
             assert connection.execute(
-                text("select count(*) from clinical_input_drafts")
+                text("select session_status from clinical_sessions where id = 1")
+            ).scalar_one() == "completed"
+            assert connection.execute(
+                text("select count(*) from clinical_sessions where session_status = 'draft'")
             ).scalar_one() == 0
         assert upgraded_inspector.has_table("dilirank_records")
         assert {

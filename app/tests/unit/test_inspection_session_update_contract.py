@@ -96,7 +96,7 @@ class FakeEndpointService:
         )
         return {
             "session_id": session_id,
-            "status": "successful",
+            "status": "completed",
             "metadata": metadata or {},
         }
 

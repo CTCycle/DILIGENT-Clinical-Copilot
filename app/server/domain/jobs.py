@@ -44,6 +44,7 @@ class JobSummary(BaseModel):
     started_at: float
     finished_at: float | None = None
     stop_requested: bool = False
+    session_id: int | None = None
     cancellable: bool = False
 
 ###############################################################################

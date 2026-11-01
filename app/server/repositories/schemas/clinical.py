@@ -7,7 +7,6 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -28,25 +27,6 @@ from repositories.schemas.base import Base, UtcDateTime
 
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
-ACTIVE_SQLITE_WHERE = "is_active = 1"
-ACTIVE_POSTGRESQL_WHERE = "is_active = true"
-
-###############################################################################
-class ClinicalInputDraft(Base):
-    __tablename__ = "clinical_input_drafts"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    draft_key: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    revision: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default=text("0")
-    )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("false")
-    )
-    patient_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    visit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    clinical_input: Mapped[str | None] = mapped_column(Text, nullable=True)
-    updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 ###############################################################################
 class ClinicalSession(Base):
@@ -64,9 +44,26 @@ class ClinicalSession(Base):
     text_extraction_model: Mapped[str | None] = mapped_column(String)
     clinical_model: Mapped[str | None] = mapped_column(String)
     total_duration: Mapped[float | None] = mapped_column(Float)
-    session_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="draft", server_default=text("'draft'")
+    )
     session_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    clinical_input: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    run_request_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_stage: Mapped[str | None] = mapped_column(String, nullable=True)
+    progress_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    progress_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    state_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    created_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    queued_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
     sections: Mapped[list["ClinicalSessionSection"]] = relationship(
         "ClinicalSessionSection",
@@ -97,6 +94,13 @@ class ClinicalSession(Base):
             "id",
         ),
         Index("ix_clinical_sessions_timestamp_id", "session_timestamp", "id"),
+        Index("ix_clinical_sessions_status_queued_at", "session_status", "queued_at"),
+        Index("ix_clinical_sessions_updated_at_id", "updated_at", "id"),
+        CheckConstraint(
+            "session_status IN ('draft', 'queued', 'running', 'completed', "
+            "'cancelled', 'failed')",
+            name="ck_clinical_sessions_lifecycle_status",
+        ),
     )
 
 ###############################################################################
@@ -142,6 +146,7 @@ class ClinicalSessionTimeline(Base):
     source_model: Mapped[str | None] = mapped_column(String, nullable=True)
     source_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     timeline_payload_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

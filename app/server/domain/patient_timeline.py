@@ -156,6 +156,7 @@ class SessionTimelinePreview(BaseModel):
     missing_evidence_event_count: int = Field(default=0, ge=0)
     uncertain_event_count: int = Field(default=0, ge=0)
     undated_event_count: int = Field(default=0, ge=0)
+    is_stale: bool = False
 
 ###############################################################################
 class SessionTimelineListResponse(BaseModel):

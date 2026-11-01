@@ -22,6 +22,10 @@ from repositories.serialization.session_timelines import (
     validate_timeline_payload,
     parse_timeline_payload,
 )
+from repositories.clinical_session_repository import (
+    session_input_hash,
+    session_input_text,
+)
 from repositories.values import normalize_string
 
 ###############################################################################
@@ -37,8 +41,10 @@ class SessionTimelineRepository:
     def list_session_timelines(self, session_id: int) -> list[dict[str, Any]]:
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:
-            if db_session.get(ClinicalSession, safe_session_id) is None:
+            session_row = db_session.get(ClinicalSession, safe_session_id)
+            if session_row is None:
                 return []
+            current_hash = session_input_hash(session_row)
             rows = (
                 db_session.execute(
                     select(ClinicalSessionTimeline)
@@ -55,8 +61,30 @@ class SessionTimelineRepository:
             for row in rows:
                 timeline = timeline_from_row(row, session_id=safe_session_id)
                 if timeline is not None:
-                    previews.append(build_timeline_preview_payload(timeline))
+                    preview = build_timeline_preview_payload(timeline)
+                    # Timelines created before input hashing cannot be judged stale.
+                    preview["is_stale"] = bool(
+                        row.source_text_hash and row.source_text_hash != current_hash
+                    )
+                    previews.append(preview)
             return previews
+
+    # -------------------------------------------------------------------------
+    def is_latest_timeline_current(self, session_id: int) -> bool:
+        with self.session_factory() as db_session:
+            session_row = db_session.get(ClinicalSession, int(session_id))
+            if session_row is None:
+                return False
+            latest_hash = db_session.execute(
+                select(ClinicalSessionTimeline.source_text_hash)
+                .where(ClinicalSessionTimeline.session_id == int(session_id))
+                .order_by(
+                    ClinicalSessionTimeline.generated_at.desc(),
+                    ClinicalSessionTimeline.id.desc(),
+                )
+                .limit(1)
+            ).scalar_one_or_none()
+            return latest_hash is None or latest_hash == session_input_hash(session_row)
 
     # -------------------------------------------------------------------------
     def get_session_timeline_record(
@@ -102,7 +130,11 @@ class SessionTimelineRepository:
 
     # -------------------------------------------------------------------------
     def create_session_timeline_record(
-        self, session_id: int, payload: dict[str, Any]
+        self,
+        session_id: int,
+        payload: dict[str, Any],
+        *,
+        source_text_hash: str | None = None,
     ) -> dict[str, Any] | None:
         safe_session_id = int(session_id)
         timeline = validate_timeline_payload(payload)
@@ -124,6 +156,7 @@ class SessionTimelineRepository:
                 source_model=timeline.source_model,
                 source_kind=timeline.source_kind,
                 model_provider=timeline.model_provider,
+                source_text_hash=source_text_hash,
                 timeline_payload_json=serialized_payload,
             )
             db_session.add(record)
@@ -198,6 +231,8 @@ class SessionTimelineRepository:
                     session_row.text_extraction_model
                 ),
                 "clinical_model": normalize_string(session_row.clinical_model),
+                "clinical_input": session_input_text(session_row),
+                "source_text_hash": session_input_hash(session_row),
                 "sections": sections,
                 "session_result_payload": session_payload,
             }

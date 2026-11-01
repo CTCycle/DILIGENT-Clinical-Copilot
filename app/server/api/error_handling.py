@@ -109,11 +109,12 @@ def request_validation_error_handler(
         request.method,
         request.url.path,
     )
-    is_clinical_draft = request.url.path == "/api/clinical/draft"
+    # Session input bodies carry clinical text; never echo it in validation errors.
+    is_clinical_session_input = request.url.path.startswith("/api/clinical/sessions")
     payload = build_error_payload(
         detail=(
-            "Invalid draft request."
-            if is_clinical_draft
+            "Invalid clinical session request."
+            if is_clinical_session_input
             else make_json_safe(exc.errors())
         ),
         request_id=request_id,
@@ -124,7 +125,7 @@ def request_validation_error_handler(
         content=payload,
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
-    if is_clinical_draft:
+    if is_clinical_session_input:
         response.headers["Cache-Control"] = "no-store"
     return response
 

@@ -234,9 +234,13 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     llm_output_token_limit = min(
         max(coerce_int(payload.get("llm_output_token_limit"), 32768), 256), 1_000_000
     )
+    max_concurrent_clinical_jobs = min(
+        max(coerce_int(payload.get("max_concurrent_clinical_jobs"), 2), 1), 8
+    )
     return JobsSettings(
         polling_interval=polling_interval,
         llm_output_token_limit=llm_output_token_limit,
+        max_concurrent_clinical_jobs=max_concurrent_clinical_jobs,
     )
 
 ###############################################################################
