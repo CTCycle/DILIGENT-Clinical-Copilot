@@ -70,7 +70,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
     ) -> RxNavCatalogItem:
         if request is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Drug name is required.",
             )
         try:
@@ -80,7 +80,7 @@ class InspectionCatalogEndpoint(InspectionJobEndpointMixin):
             )
         except ValueError as error:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=str(error),
             ) from error
         if payload is None:

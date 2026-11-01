@@ -57,12 +57,9 @@ def test_clinical_validate_input_returns_deterministic_diagnostics(
     assert response.status == 200
     payload = response.json()
     assert "deterministic_diagnostics" in payload
-    diagnostics = payload["deterministic_diagnostics"]
-    if "therapy" in diagnostics:
-        assert diagnostics["therapy"]["drug_count"] >= 1
-    else:
-        blocking_codes = {issue["code"] for issue in payload.get("blocking_issues", [])}
-        assert {"livertox_catalog_empty", "rxnav_catalog_empty"} & blocking_codes
+    codes = {issue["code"] for issue in payload["blocking_issues"]}
+    assert not codes & {"livertox_catalog_empty", "rxnav_catalog_empty"}
+    assert payload["deterministic_diagnostics"]["therapy"]["drug_count"] >= 1
 
 ###############################################################################
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):

@@ -86,7 +86,7 @@ class InspectionJobEndpointMixin(InspectionEndpointBase):
             error_status = (
                 status.HTTP_409_CONFLICT
                 if "already running" in detail
-                else status.HTTP_422_UNPROCESSABLE_ENTITY
+                else status.HTTP_422_UNPROCESSABLE_CONTENT
             )
             logger.warning(
                 "Inspection update job rejected type=%s detail=%s", job_type, detail

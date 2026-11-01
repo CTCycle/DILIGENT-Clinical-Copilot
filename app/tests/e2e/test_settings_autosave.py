@@ -34,23 +34,27 @@ OPERATIONAL_FIELDS = {
         "livertox_skip_deterministic_ratio",
         "livertox_monograph_max_workers",
         "rxnav_request_timeout",
-        "rxnav_max_concurrency",
+        "terminology_download_timeout",
+        "drugcentral_enabled",
+        "drugcentral_host",
+        "drugcentral_port",
+        "drugcentral_database",
+        "drugcentral_user",
+        "chembl_enabled",
+        "chembl_max_phase",
+        "swissmedic_enabled",
     ],
     "matching": [
-        "direct_confidence",
-        "master_confidence",
-        "synonym_confidence",
-        "min_confidence",
-        "normalization_cache_limit",
-        "match_cache_limit",
-        "alias_cache_limit",
-        "token_min_length",
-        "catalog_index_limit",
-        "spelling_confidence",
-        "spelling_min_query_length",
-        "spelling_short_name_length",
-        "spelling_short_max_distance",
-        "spelling_long_max_distance",
+        "fuzzy_min_query_length",
+        "fuzzy_short_name_length",
+        "fuzzy_short_max_distance",
+        "fuzzy_long_max_distance",
+        "fuzzy_min_margin",
+        "fuzzy_shortlist_size",
+        "resolution_cache_limit",
+        "external_fallback_enabled",
+        "external_max_requests_per_name",
+        "external_negative_cache_days",
     ],
     "advanced": [
         "default_llm_timeout",
@@ -145,7 +149,17 @@ def _number_target(
 
 
 ###############################################################################
+def _set_control(control, value) -> None:
+    if control.get_attribute("type") == "checkbox":
+        control.set_checked(value)
+    else:
+        control.fill(str(value))
+
+###############################################################################
 def _assert_control_value(control, value) -> None:
+    if control.get_attribute("type") == "checkbox":
+        assert control.is_checked() is value
+        return
     actual = control.input_value()
     if control.get_attribute("type") == "number":
         assert Decimal(actual) == Decimal(str(value))
@@ -177,7 +191,10 @@ def test_every_operational_setting_autosaves_and_survives_reload(
         for key in fields:
             control = controls[key]
             input_type = control.get_attribute("type")
-            if input_type == "email":
+            if input_type == "checkbox":
+                candidate = not expected[key]
+                expected_value = candidate
+            elif input_type == "email":
                 candidate = "settings-autosave@example.org"
                 expected_value = candidate
             elif input_type == "text":
@@ -191,7 +208,7 @@ def test_every_operational_setting_autosaves_and_survives_reload(
                 raise AssertionError(f"Unreviewed operational control type: {input_type}")
 
             with _expect_settings_write(page) as response_info:
-                control.fill(candidate)
+                _set_control(control, candidate)
             response = response_info.value
             assert response.status == 200, response.text()
             expected[key] = expected_value
@@ -207,7 +224,7 @@ def test_every_operational_setting_autosaves_and_survives_reload(
         with _expect_settings_write(page) as response_info:
             for key in fields:
                 control = page.locator(f'[name="{key}"]')
-                control.fill(str(initial_category[key]))
+                _set_control(control, initial_category[key])
         restored = response_info.value
         assert restored.status == 200, restored.text()
         assert restored.json()["values"][category] == initial_category

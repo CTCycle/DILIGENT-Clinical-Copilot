@@ -79,10 +79,19 @@ def _mock_ready_preflight(page: Page) -> None:
     )
 
 ###############################################################################
+def _start_analysis_from_wizard(page: Page) -> None:
+    page.get_by_role("button", name="Run DILI analysis").click()
+    dialog = page.get_by_role("dialog", name="Prepare analysis")
+    for _ in range(3):
+        next_button = dialog.get_by_role("button", name="Next")
+        expect(next_button).to_be_enabled(timeout=10000)
+        next_button.click()
+    dialog.get_by_role("button", name="Start analysis").click()
+
+###############################################################################
 def test_dilu_agent_page_loads(page: Page, base_url: str):
     page.goto(base_url)
 
-    expect(page.get_by_text("DILI Assessment")).to_be_visible()
     expect(page.get_by_label("Clinical Input")).to_be_visible()
     expect(page.get_by_label("Patient Name")).to_be_visible()
     expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
@@ -428,11 +437,19 @@ def test_dili_run_burst_click_submits_single_job(
             ),
         ),
     )
+    run_button.click()
+    dialog = page.get_by_role("dialog", name="Prepare analysis")
+    for _ in range(3):
+        next_button = dialog.get_by_role("button", name="Next")
+        expect(next_button).to_be_enabled(timeout=10000)
+        next_button.click()
+    expect(dialog.get_by_role("button", name="Start analysis")).to_be_enabled()
     page.evaluate(
         """() => {
-            const runButton = document.querySelector('button.btn.btn-primary');
+            const startButton = [...document.querySelectorAll('.analysis-wizard-modal button')]
+                .find((button) => button.textContent?.trim() === 'Start analysis');
             for (let clickIndex = 0; clickIndex < 10; clickIndex += 1) {
-                runButton?.click();
+                startButton?.click();
             }
         }"""
     )
@@ -490,8 +507,8 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
     page.route("**/api/clinical/jobs", start_navigation_resume_job)
     page.route("**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status)
     try:
-        page.get_by_role("button", name="Run DILI analysis").click()
-        expect(page.locator(".spinner-label")).to_contain_text(
+        _start_analysis_from_wizard(page)
+        expect(page.locator(".analysis-progress-detail")).to_contain_text(
             "Extracting therapy and medication data"
         )
         page.get_by_role("tab", name="Settings").click()
@@ -500,10 +517,12 @@ def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
         page.wait_for_timeout(900)
         page.get_by_role("tab", name="DILI Agent").click()
         expect(page).to_have_url(re.compile(r"/?$"))
-        expect(page.locator(".spinner-label")).to_contain_text(
+        expect(page.locator(".analysis-progress-detail")).to_contain_text(
             "Gathering grounded evidence"
         )
-        expect(page.locator(".spinner-label")).to_contain_text("62%")
+        expect(page.get_by_role("progressbar")).to_have_attribute("aria-valuenow", "62")
+        expect(page.locator(".analysis-progress-heading strong", has_text="Analysis complete")).to_be_visible()
+        page.get_by_role("button", name=re.compile("View report")).click()
         expect(page.locator(".inspection-excerpt-text")).to_contain_text(
             "Navigation recovery completed."
         )
@@ -567,8 +586,8 @@ def test_dili_running_job_state_resumes_after_refresh(
     page.route("**/api/clinical/jobs", start_refresh_resume_job)
     page.route("**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status)
     try:
-        page.get_by_role("button", name="Run DILI analysis").click()
-        expect(page.locator(".spinner-label")).to_contain_text(
+        _start_analysis_from_wizard(page)
+        expect(page.locator(".analysis-progress-detail")).to_contain_text(
             "Extracting therapy and medication data"
         )
         assert page.evaluate(
@@ -576,10 +595,12 @@ def test_dili_running_job_state_resumes_after_refresh(
         ) == "refresh-resume"
         status_calls_before_refresh = status_call_count
         page.reload()
+        expect(page.locator(".analysis-progress-heading strong", has_text="Analysis complete")).to_be_visible()
+        expect(page.get_by_role("button", name="Run DILI analysis")).to_be_enabled()
+        page.get_by_role("button", name=re.compile("View report")).click()
         expect(page.locator(".inspection-excerpt-text")).to_contain_text(
             "Refresh recovery completed."
         )
-        expect(page.get_by_role("button", name="Run DILI analysis")).to_be_enabled()
         assert status_call_count > status_calls_before_refresh
         assert page.evaluate(
             "() => localStorage.getItem('dili-agent-active-job-v1')"
@@ -635,7 +656,7 @@ def test_dili_submit_accepts_variant_section_headings(
             ),
         ),
     )
-    run_button.click()
+    _start_analysis_from_wizard(page)
     page.wait_for_timeout(1200)
     page.unroute("**/api/clinical/validate-input")
     page.unroute("**/api/clinical/jobs/variant-headings**")
@@ -659,8 +680,8 @@ def test_dili_run_conflict_surfaces_clear_error_message(page: Page, base_url: st
         _fill_required_dili_fields(page)
         run_button = page.get_by_role("button", name="Run DILI analysis")
         expect(run_button).to_be_enabled(timeout=10000)
-        run_button.click()
-        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
+        _start_analysis_from_wizard(page)
+        expect(page.get_by_role("alert").filter(has_text="Another operation")).to_contain_text(
             "Another operation is already running. Please wait and retry."
         )
         expect(run_button).to_be_enabled(timeout=10000)

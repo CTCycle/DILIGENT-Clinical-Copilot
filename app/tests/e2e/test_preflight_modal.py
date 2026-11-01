@@ -18,6 +18,13 @@ def _fill_valid_fields(page: Page) -> None:
     page.get_by_label("Visit Date").fill("2026-07-17")
 
 ###############################################################################
+def _open_wizard(page: Page):
+    page.get_by_role("button", name="Run DILI analysis").click()
+    dialog = page.get_by_role("dialog", name="Prepare analysis")
+    expect(dialog).to_be_visible()
+    return dialog
+
+###############################################################################
 def _issue(severity: str, code: str, field: str) -> dict:
     return {
         "severity": severity,
@@ -64,22 +71,20 @@ def test_blocking_preflight_modal_prevents_job_submission(
         _fill_valid_fields(page)
         page.get_by_label("Visit Date").fill("")
         with page.expect_response("**/api/clinical/validate-input") as response:
-            page.get_by_role("button", name="Run DILI analysis").click()
+            dialog = _open_wizard(page)
         body = response.value.json()
         codes = [issue["code"] for issue in body["blocking_issues"]]
         assert codes.count("visit_date_missing") == 1
         assert "missing_visit_date" not in codes
 
-        dialog = page.get_by_role("dialog")
-        expect(dialog).to_be_visible()
-        expect(dialog).to_contain_text("Cannot start analysis")
-        expect(dialog.get_by_text("Visit date is missing", exact=True)).to_have_count(1)
-        expect(dialog.locator(".preflight-issue")).to_have_count(
+        expect(
+            dialog.locator(".wizard-issue h3").filter(has_text="Visit date is missing")
+        ).to_have_count(1)
+        expect(dialog.locator(".wizard-issue")).to_have_count(
             len(body["blocking_issues"]) + len(body["non_blocking_issues"])
         )
-        expect(
-            dialog.get_by_role("button", name="Continue with limitations")
-        ).to_have_count(0)
+        expect(dialog.get_by_role("button", name="Next")).to_be_disabled()
+        expect(dialog.get_by_role("button", name="Evidence Sources")).to_be_disabled()
         assert submission_count == 0
         assert (
             page.request.get(f"{base_url}/api/inspection/sessions").json()
@@ -153,17 +158,17 @@ def test_warning_acceptance_starts_one_job_and_preserves_form(
         page.goto(base_url)
         _fill_valid_fields(page)
         original_input = page.get_by_label("Clinical Input").input_value()
-        page.get_by_role("button", name="Run DILI analysis").click()
-
-        dialog = page.get_by_role("dialog")
-        expect(dialog).to_contain_text("Review before continuing")
-        continue_button = dialog.get_by_role("button", name="Continue with limitations")
-        continue_button.click()
+        dialog = _open_wizard(page)
+        expect(dialog.locator(".wizard-issue")).to_have_count(2)
+        for _ in range(3):
+            next_button = dialog.get_by_role("button", name="Next")
+            expect(next_button).to_be_enabled()
+            next_button.click()
+        expect(dialog).to_contain_text("Ready with 2 warnings")
+        dialog.get_by_role("button", name="Start analysis").click()
         page.wait_for_timeout(50)
 
-        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
-            "Pre-flight warning run completed."
-        )
+        expect(page.locator(".analysis-progress-heading strong", has_text="Analysis complete")).to_be_visible()
         assert submission_count == 1
         expect(page.get_by_label("Clinical Input")).to_have_value(original_input)
     finally:
@@ -191,16 +196,14 @@ def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     )
     try:
         page.goto(base_url)
-        page.get_by_role("button", name="Run DILI analysis").click()
-
-        dialog = page.get_by_role("dialog")
+        dialog = _open_wizard(page)
         header = dialog.locator(".modal-header")
         footer = dialog.locator(".modal-footer")
         issue_list = dialog.locator('[data-testid="preflight-issue-list"]')
         expect(dialog).to_be_visible()
         expect(header).to_be_visible()
         expect(footer).to_be_visible()
-        expect(issue_list.locator(".preflight-issue")).to_have_count(20)
+        expect(issue_list.locator(".wizard-issue")).to_have_count(20)
 
         dimensions = dialog.evaluate(
             "element => ({width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight})"
@@ -236,16 +239,14 @@ def test_focus_is_trapped_inside_warning_modal(
     )
     try:
         page.goto(base_url)
-        page.get_by_role("button", name="Run DILI analysis").click()
-
-        dialog = page.get_by_role("dialog")
-        close_button = dialog.get_by_role("button", name="Return to clinical input")
-        continue_button = dialog.get_by_role("button", name="Continue with limitations")
-        expect(dialog).to_be_visible()
+        dialog = _open_wizard(page)
+        close_button = dialog.get_by_role("button", name="Cancel and return to the workspace")
+        next_button = dialog.get_by_role("button", name="Next")
+        expect(next_button).to_be_enabled()
 
         close_button.focus()
         page.keyboard.press("Shift+Tab")
-        expect(continue_button).to_be_focused()
+        expect(next_button).to_be_focused()
 
         page.keyboard.press("Tab")
         expect(close_button).to_be_focused()
@@ -253,7 +254,7 @@ def test_focus_is_trapped_inside_warning_modal(
         page.unroute("**/api/clinical/validate-input")
 
 ###############################################################################
-def test_escape_does_not_close_blocking_modal(
+def test_escape_cancels_wizard_and_fix_in_input_returns_to_field(
     page: Page,
     base_url: str,
 ) -> None:
@@ -270,14 +271,38 @@ def test_escape_does_not_close_blocking_modal(
     )
     try:
         page.goto(base_url)
-        page.get_by_role("button", name="Run DILI analysis").click()
-        expect(page.get_by_role("dialog")).to_be_visible()
+        _fill_valid_fields(page)
+        original_input = page.get_by_label("Clinical Input").input_value()
+        dialog = _open_wizard(page)
+        expect(dialog.locator(".wizard-issue")).to_have_count(1)
 
         page.keyboard.press("Escape")
+        expect(page.get_by_role("dialog")).to_have_count(0)
+        expect(page.get_by_label("Clinical Input")).to_have_value(original_input)
 
-        expect(page.get_by_role("dialog")).to_be_visible()
-        page.get_by_role("button", name="Return to input").click()
+        dialog = _open_wizard(page)
+        dialog.get_by_role("button", name="Fix in input").click()
         expect(page.get_by_role("dialog")).to_have_count(0)
         expect(page.get_by_label("Visit Date")).to_be_focused()
     finally:
         page.unroute("**/api/clinical/validate-input")
+
+###############################################################################
+def test_seeded_knowledge_base_lets_unmocked_preflight_reach_review(
+    page: Page,
+    base_url: str,
+) -> None:
+    jobs_before = page.request.get(f"{base_url}/api/inspection/jobs").json()
+    page.goto(base_url)
+    _fill_valid_fields(page)
+    dialog = _open_wizard(page)
+
+    expect(dialog.locator(".wizard-badge.is-blocking")).to_have_count(0)
+    for _ in range(3):
+        next_button = dialog.get_by_role("button", name="Next")
+        expect(next_button).to_be_enabled()
+        next_button.click()
+    expect(dialog.get_by_role("button", name="Start analysis")).to_be_enabled()
+    expect(dialog).not_to_contain_text("blocking issue")
+    page.keyboard.press("Escape")
+    assert page.request.get(f"{base_url}/api/inspection/jobs").json() == jobs_before

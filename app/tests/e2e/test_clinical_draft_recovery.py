@@ -35,7 +35,6 @@ def _enter_case(page: Page, patient_name: str, clinical_input: str) -> None:
     page.get_by_label("Patient Name").fill(patient_name)
     page.get_by_label("Visit Date").fill("2026-10-23")
     page.get_by_label("Clinical Input").fill(clinical_input)
-    page.get_by_label("Use RAG evidence").check()
 
 
 def test_draft_http_contract_validation_conflict_and_tombstone(
@@ -166,7 +165,6 @@ def test_explicit_save_resume_and_discard_recover_without_running_assessment(
     expect(page.get_by_label("Patient Name")).to_have_value("Synthetic recovery patient")
     expect(page.get_by_label("Visit Date")).to_have_value("2026-10-23")
     expect(page.get_by_label("Clinical Input")).to_have_value(edited_text)
-    expect(page.get_by_label("Use RAG evidence")).to_be_checked()
     assert clinical_job_requests == []
 
     page.get_by_role("button", name="Discard draft").click()

@@ -51,6 +51,6 @@ def validate_clinical_session_request(
 
     if details:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=details,
         )

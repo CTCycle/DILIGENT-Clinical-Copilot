@@ -37,7 +37,7 @@ class AccessKeyEndpoint:
         except ValueError as exc:
             logger.warning("Access key listing rejected: %s", exc)
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Invalid access key provider.",
             ) from exc
 
@@ -59,7 +59,7 @@ class AccessKeyEndpoint:
         except ValueError as exc:
             logger.warning("Access key creation rejected: %s", exc)
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=str(exc),
             ) from exc
 

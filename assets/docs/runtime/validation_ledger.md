@@ -1,5 +1,5 @@
 # Validation Ledger
-Last updated: 2026-10-24
+Last updated: 2026-11-01
 
 ## Purpose and authority
 
@@ -11,7 +11,7 @@ This file keeps only cross-cutting validation findings, guarantees, and limits t
 
 | Product concepts | Durable finding and limit | Product documentation |
 |---|---|---|
-| API contracts and automated regression | The Windows Full browser harness classifies all 69 OpenAPI paths and 88 method/path operations. On 2026-10-24 it passed 60 tests with no skips and rejects unclassified public operations. The mandatory matrix and its explicit PostgreSQL, live-provider, and embedding boundaries are defined in the testing guide. | [API surface](../architecture/api_surface.md); [testing and quality](../coding/testing_and_quality.md) |
+| API contracts and automated regression | The Windows Full browser harness classifies all 83 OpenAPI paths and 104 method/path operations and rejects unclassified public operations. On 2026-11-01 it passed 61 tests with no skips, after the route matrix and browser tests were brought in line with the current four-step analysis wizard (Preflight, Evidence Sources, Models, Review), session-level evidence selection, and the expanded terminology settings; the seeded database carries one real drug (amoxicillin) so unmocked preflight passes. The new LocalOllama lane completed a synthetic amoxicillin assessment on installed Ollama `qwen3.5:2b` (job completed, report rendered, session persisted; 87 s), and the pinned multilingual embedding integration passed. Not covered: hosted PostgreSQL persistence (no `TEST_DATABASE_URL`), live-provider inference (the LiveProvider helper was updated to the wizard but not run), and local assessments on other models. | [API surface](../architecture/api_surface.md); [testing and quality](../coding/testing_and_quality.md) |
 | Resumable clinical input drafts | A single versioned draft is persisted in the configured database. SQLite API and browser coverage verifies explicit save, debounced autosave, refresh recovery, discard, stale-tab conflict protection, image exclusion, and absence of clinical text from browser localStorage. PostgreSQL parameterizations were skipped because `TEST_DATABASE_URL` was unset. | [Persistence](../architecture/persistence.md); [DILI workflow](../user/dili_assessment_workflow.md) |
 | Clinical assessment and pre-flight | Required-field and date blockers stop a run before job creation. Deterministic R-score and hepatic-pattern safeguards and structured causality evidence support review; they do not establish that a medicine caused injury or replace clinician judgment. | [DILI pipeline](../architecture/dili_assessment_pipeline.md); [assessment workflow](../user/dili_assessment_workflow.md) |
 | Drug identity and source linking | Ambiguous, missing, unvalidated, or untrusted drug matches remain review signals. FDA DILIrank clinical links use exact canonical drug names or trusted LiverTox/RxNorm aliases; ambiguous and unmatched rows remain inspectable without becoming patient-level evidence. | [DILI pipeline](../architecture/dili_assessment_pipeline.md); [persistence](../architecture/persistence.md) |

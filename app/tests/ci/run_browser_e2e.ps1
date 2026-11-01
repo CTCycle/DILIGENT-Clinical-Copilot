@@ -3,7 +3,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('Full', 'LiveProvider')]
+    [ValidateSet('Full', 'LocalOllama', 'LiveProvider')]
     [string]$Suite = 'Full',
     [ValidateSet('chrome', 'msedge')]
     [string]$BrowserChannel
@@ -118,14 +118,16 @@ $env:DILIGENT_LIVE_PROVIDER_LOG_DIR = $logDir
 $env:DILIGENT_PYTEST_CACHE_ROOT = $pytestCacheDir
 $env:PYTEST_ADDOPTS = "--basetemp=`"$(Join-Path $pytestCacheDir 'basetemp')`" -o cache_dir=`"$pytestCacheDir`""
 try {
-    if ($Suite -eq 'Full') {
-        $fakeOllamaPort = 11435
-        $env:OLLAMA_URL = "http://127.0.0.1:$fakeOllamaPort"
+    if ($Suite -in @('Full', 'LocalOllama')) {
         $seedScript = Join-Path $repoRoot 'app/tests/ci/seed_browser_regression_database.py'
         & $python $seedScript
         if ($LASTEXITCODE -ne 0) {
             throw "Browser regression database seed failed with exit code $LASTEXITCODE."
         }
+    }
+    if ($Suite -eq 'Full') {
+        $fakeOllamaPort = 11435
+        $env:OLLAMA_URL = "http://127.0.0.1:$fakeOllamaPort"
         $fakeOllamaScript = Join-Path $repoRoot 'app/tests/ci/fake_ollama.py'
         $fakeOllamaArguments = @(
             "`"$fakeOllamaScript`"",
@@ -162,9 +164,9 @@ try {
     }
     $frontendReady = $true
 
-    $testArguments = if ($Suite -eq 'LiveProvider') {
+    $testArguments = if ($Suite -in @('LiveProvider', 'LocalOllama')) {
         @(
-            (Join-Path $repoRoot 'app/tests/e2e/test_live_provider_flow.py'),
+            (Join-Path $repoRoot "app/tests/e2e/$(if ($Suite -eq 'LiveProvider') { 'test_live_provider_flow.py' } else { 'test_local_ollama_flow.py' })"),
             '-q',
             '-rs',
             '--junitxml',

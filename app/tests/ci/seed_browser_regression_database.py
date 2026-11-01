@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -13,14 +14,48 @@ SERVER_ROOT = Path(__file__).resolve().parents[2] / "server"
 if str(SERVER_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVER_ROOT))
 
+from sqlalchemy import text  # noqa: E402
+
 from configurations.startup import get_server_settings  # noqa: E402
 from repositories.clinical_session_repository import ClinicalSessionRepository  # noqa: E402
 from repositories.context import RepositoryContext  # noqa: E402
 from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
 from repositories.session_timeline_repository import SessionTimelineRepository  # noqa: E402
 
+KNOWLEDGE_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "amoxicillin_knowledge_base.json"
+)
+# Parents first so foreign keys resolve.
+KNOWLEDGE_TABLES = (
+    "drugs",
+    "livertox_monographs",
+    "drug_aliases",
+    "drug_rxnorm_codes",
+    "drug_identifiers",
+    "drug_livertox_links",
+    "dilirank_records",
+)
+
 SEED_PATIENT_NAME = "CI Browser Regression Subject"
 SEED_TIMESTAMP = datetime(2026, 9, 29, 8, 0)
+
+###############################################################################
+def seed_knowledge_base(context: RepositoryContext) -> None:
+    """Load one real LiverTox/RxNav/DILIrank drug so analysis preflight can pass."""
+    fixture = json.loads(KNOWLEDGE_FIXTURE.read_text(encoding="utf-8"))
+    with context.engine.begin() as connection:
+        drug_id = fixture["drugs"][0]["id"]
+        if connection.execute(
+            text("SELECT 1 FROM drugs WHERE id = :id"), {"id": drug_id}
+        ).first():
+            return
+        for table in KNOWLEDGE_TABLES:
+            for row in fixture[table]:
+                columns = ", ".join(row)
+                values = ", ".join(f":{column}" for column in row)
+                connection.execute(
+                    text(f"INSERT INTO {table} ({columns}) VALUES ({values})"), row
+                )
 
 ###############################################################################
 def seed_browser_regression_database() -> tuple[int, int]:
@@ -30,6 +65,7 @@ def seed_browser_regression_database() -> tuple[int, int]:
 
     initialize_sqlite_database(database_settings)
     context = RepositoryContext.create()
+    seed_knowledge_base(context)
     sessions = ClinicalSessionRepository(context)
     timelines = SessionTimelineRepository(context)
 

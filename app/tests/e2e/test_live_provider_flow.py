@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import APIRequestContext, Page
+from playwright.sync_api import APIRequestContext, Page, expect
 
 LIVE_PROVIDER_ENABLED = os.getenv("DILIGENT_LIVE_PROVIDER_E2E", "").strip().lower() in {
     "1",
@@ -218,19 +218,20 @@ def _wait_for_browser_job_submission(
     page.on("response", capture)
     try:
         page.get_by_role("button", name="Run DILI analysis").click()
-        deadline = time.monotonic() + timeout_seconds
-        dialog = page.get_by_role("dialog")
-        while "response" not in captured and time.monotonic() < deadline:
-            if dialog.is_visible():
-                continue_button = dialog.get_by_role(
-                    "button", name="Continue with limitations"
+        dialog = page.get_by_role("dialog", name="Prepare analysis")
+        next_button = dialog.get_by_role("button", name="Next")
+        for _ in range(3):
+            try:
+                expect(next_button).to_be_enabled(timeout=timeout_seconds * 1000)
+            except AssertionError:
+                pytest.fail(
+                    "Live provider browser preflight blocked the synthetic case: "
+                    + dialog.inner_text()
                 )
-                if not continue_button.is_visible():
-                    pytest.fail(
-                        "Live provider browser preflight blocked the synthetic case: "
-                        + dialog.inner_text()
-                    )
-                continue_button.click()
+            next_button.click()
+        dialog.get_by_role("button", name="Start analysis").click()
+        deadline = time.monotonic() + timeout_seconds
+        while "response" not in captured and time.monotonic() < deadline:
             page.wait_for_timeout(250)
         if "response" not in captured:
             pytest.fail("Browser did not submit the live provider clinical job.")

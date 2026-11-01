@@ -77,7 +77,7 @@ class InspectionRagEndpoint(InspectionJobEndpointMixin):
             ) from exc
         except (NotADirectoryError, ValueError, OSError) as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="The selected folder path is invalid or cannot be read.",
             ) from exc
 

@@ -33,6 +33,9 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/desktop/bootstrap"): "desktop.runtime-contract",
     ("POST", "/api/desktop/shutdown"): "desktop.runtime-contract",
     ("GET", "/api/health"): "root-runtime.success",
+    ("GET", "/api/system/status"): "root-runtime.success",
+    ("GET", "/api/jobs"): "jobs.monitor-and-cancel",
+    ("DELETE", "/api/jobs/{job_id}"): "jobs.monitor-and-cancel",
     ("GET", "/api/inspection/dilirank"): "inspection.catalog-reads",
     ("GET", "/api/inspection/dilirank/{drug_id}"): "inspection.not-found-contracts",
     ("POST", "/api/inspection/dilirank/jobs"): "inspection.job-boundary",
@@ -47,6 +50,16 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("DELETE", "/api/inspection/livertox/jobs/{job_id}"): "inspection.job-boundary",
     ("GET", "/api/inspection/livertox/jobs/{job_id}"): "inspection.job-boundary",
     ("GET", "/api/inspection/livertox/update-config"): "inspection.catalog-reads",
+    ("GET", "/api/inspection/terminology/summary"): "terminology.reads-and-validation",
+    ("GET", "/api/inspection/terminology/runs"): "terminology.reads-and-validation",
+    ("GET", "/api/inspection/terminology/conflicts"): "terminology.reads-and-validation",
+    ("GET", "/api/inspection/terminology/update-config"): "terminology.reads-and-validation",
+    ("POST", "/api/inspection/terminology/resolve"): "terminology.reads-and-validation",
+    ("POST", "/api/inspection/terminology/aliases/confirm"): "terminology.reads-and-validation",
+    ("POST", "/api/inspection/terminology/aliases/reject"): "terminology.reads-and-validation",
+    ("POST", "/api/inspection/terminology/jobs"): "external-boundary.start-status-cancel",
+    ("DELETE", "/api/inspection/terminology/jobs/{job_id}"): "external-boundary.start-status-cancel",
+    ("GET", "/api/inspection/terminology/jobs/{job_id}"): "external-boundary.start-status-cancel",
     ("GET", "/api/inspection/rag/browse"): "rag.filesystem-boundaries",
     ("GET", "/api/inspection/rag/documents"): "rag.inspection-and-dedup",
     ("POST", "/api/inspection/rag/jobs"): "rag.job-boundary",
@@ -180,6 +193,12 @@ def test_catalog_rag_and_runtime_observation_boundaries(
     api_context: APIRequestContext,
 ) -> None:
     for path in (
+        "/api/system/status",
+        "/api/jobs",
+        "/api/inspection/terminology/summary",
+        "/api/inspection/terminology/runs",
+        "/api/inspection/terminology/conflicts",
+        "/api/inspection/terminology/update-config",
         "/api/inspection/jobs",
         "/api/inspection/rxnav",
         "/api/inspection/rxnav/update-config",
@@ -268,6 +287,9 @@ def test_route_family_validation_and_missing_job_contracts(
             data={"provider": "not-a-provider", "model": "missing"},
         ),
         api_context.patch("/api/settings", data={}),
+        api_context.post("/api/inspection/terminology/resolve", data={}),
+        api_context.post("/api/inspection/terminology/aliases/confirm", data={}),
+        api_context.post("/api/inspection/terminology/aliases/reject", data={}),
     )
     for response in invalid_requests:
         assert response.status in {400, 409, 422}, response.text()
@@ -287,6 +309,9 @@ def test_route_family_validation_and_missing_job_contracts(
         ("/api/inspection/rag/jobs/missing", "delete"),
         ("/api/inspection/structured-sources/jobs/missing", "get"),
         ("/api/inspection/structured-sources/jobs/missing", "delete"),
+        ("/api/inspection/terminology/jobs/missing", "get"),
+        ("/api/inspection/terminology/jobs/missing", "delete"),
+        ("/api/jobs/missing", "delete"),
     )
     for path, method in missing_job_requests:
         response = getattr(api_context, method)(path)

@@ -26,7 +26,7 @@ The canonical browser command, from the repository root, is:
 .\app\tests\ci\run_browser_e2e.ps1 -Suite Full
 ~~~
 
-The Full harness seeds an isolated SQLite database through repositories, starts a controlled Ollama protocol fixture and the application services, runs the browser suite, validates JUnit results, emits diagnostics, and cleans up its process trees. It fails when a mandatory test is skipped. It excludes the live-provider test and heavyweight real-embedding integration; those are explicit lanes.
+The Full harness seeds an isolated SQLite database through repositories, starts a controlled Ollama protocol fixture and the application services, runs the browser suite, validates JUnit results, emits diagnostics, and cleans up its process trees. It fails when a mandatory test is skipped. It seeds one real drug (amoxicillin) from `app/tests/fixtures/amoxicillin_knowledge_base.json` so preflight passes. It excludes the live-provider, local-Ollama, and heavyweight real-embedding lanes; those are explicit.
 
 Run backend unit tests from `app/server` with `.\.venv\Scripts\python.exe -m pytest ..\tests\unit -q`. Run frontend unit tests from the repository root with `npm.cmd --prefix app/client run test -- --no-watch`. Runtime network configuration tests are part of the Vitest suite; there is no separate Node test command.
 
@@ -44,7 +44,13 @@ To exercise the live provider route, use the explicit LiveProvider lane:
 
 It runs the live-provider flow and requires DILIGENT_LIVE_PROVIDER_E2E=1 plus OPENCODE_GO_API_KEY in the hosted secret store. Never copy provider credentials into source, logs, or evidence. Synthetic access-key lifecycle tests prove DILIGENT's storage and redaction behavior, not provider-side credential validity.
 
-Real local Ollama compatibility and heavyweight embedding behavior remain provider/RAG integration coverage; a deterministic fixture or a successful API response is not a substitute for those lanes.
+To exercise a completed assessment on an installed local Ollama model (default `qwen3.5:2b`, override with `DILIGENT_LOCAL_OLLAMA_MODEL`), start Ollama and run the LocalOllama lane:
+
+~~~powershell
+.pp	ests\ciun_browser_e2e.ps1 -Suite LocalOllama
+~~~
+
+It seeds the isolated database with the one-drug amoxicillin knowledge-base fixture, drives the analysis wizard, waits for the clinical job to complete, and checks the rendered report and persisted session. Synthetic text stays on the machine. Heavyweight embedding behavior runs with `DILIGENT_RUN_EMBEDDING_INTEGRATION=1` against `app/tests/e2e/test_multilingual_embedding_runtime.py`. A deterministic fixture or a successful API response is not a substitute for those lanes.
 
 ## Local persistence slice
 
