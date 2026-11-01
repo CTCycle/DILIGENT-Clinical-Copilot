@@ -5,12 +5,23 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Iterator
 
 import pytest
 from playwright.sync_api import APIRequestContext, Page, Route, expect
 
 LIFECYCLE_FILTERS = ["All", "Draft", "Queued", "Running", "Completed", "Cancelled", "Failed"]
+
+def _valid_input(tag: str) -> str:
+    return (
+        f"## Anamnesis\n{tag}. "
+        + " ".join(["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12)
+        + "\n\n## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
+        + "## Laboratory history\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+    )
+
+
 ANY_STATUS = re.compile(r"^(Queued|Running|Completed|Cancelled|Failed)$")
 
 ###############################################################################
@@ -64,6 +75,12 @@ def _discard_sessions(api_context: APIRequestContext, name: str) -> None:
     for item in _sessions_named(api_context, name):
         if item["status"] in {"queued", "running"}:
             api_context.post(f"/api/clinical/sessions/{item['session_id']}/cancel")
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        items = _sessions_named(api_context, name)
+        if not any(item["status"] in {"queued", "running"} for item in items):
+            break
+        time.sleep(1)
     for item in _sessions_named(api_context, name):
         api_context.delete(f"/api/inspection/sessions/{item['session_id']}")
 
@@ -84,7 +101,7 @@ def test_draft_save_reopen_edit_and_launch_without_duplicates(
 ) -> None:
     _mock_ready_preflight(page)
     page.goto(base_url)
-    _fill_case(page, case_name, "First draft text")
+    _fill_case(page, case_name, _valid_input("First draft"))
     with page.expect_response(
         lambda response: response.request.method == "POST"
         and response.url.endswith("/api/clinical/sessions")
@@ -96,15 +113,15 @@ def test_draft_save_reopen_edit_and_launch_without_duplicates(
 
     stored = api_context.get(f"/api/clinical/sessions/{session_id}/input").json()
     assert stored["status"] == "draft"
-    assert stored["clinical_input"] == "First draft text"
+    assert stored["clinical_input"] == _valid_input("First draft")
 
     # A refresh restores the draft from the URL.
     page.reload()
     expect(page.get_by_label("Patient Name")).to_have_value(case_name)
-    expect(page.get_by_label("Clinical Input")).to_have_value("First draft text")
+    expect(page.get_by_label("Clinical Input")).to_have_value(_valid_input("First draft"))
 
     # Editing and saving again updates the same session.
-    page.get_by_label("Clinical Input").fill("Edited draft text")
+    page.get_by_label("Clinical Input").fill(_valid_input("Edited draft"))
     expect(page.locator(".dili-draft-status")).to_contain_text("Unsaved changes")
     with page.expect_response(
         lambda response: response.request.method == "PUT"
@@ -132,7 +149,7 @@ def test_launch_redirects_to_report_and_resets_the_form(
 ) -> None:
     _mock_ready_preflight(page)
     page.goto(base_url)
-    _fill_case(page, case_name, "Text for an immediate launch")
+    _fill_case(page, case_name, _valid_input("Immediate launch"))
 
     _start_from_wizard(page)
 
@@ -141,7 +158,7 @@ def test_launch_redirects_to_report_and_resets_the_form(
     expect(page.get_by_role("heading", level=1)).to_contain_text(case_name)
 
     # The creation page is immediately free for another session.
-    page.go_back()
+    page.get_by_role("tab", name="DILI Agent").click()
     expect(page.get_by_label("Patient Name")).to_have_value("")
     expect(page.get_by_label("Visit Date")).to_have_value("")
     expect(page.get_by_label("Clinical Input")).to_have_value("")
@@ -196,13 +213,13 @@ def test_cancel_queued_or_running_session_from_the_report(
 ) -> None:
     _mock_ready_preflight(page)
     page.goto(base_url)
-    _fill_case(page, case_name, "Text for a cancelled launch")
+    _fill_case(page, case_name, _valid_input("Cancelled launch"))
     _start_from_wizard(page)
     expect(page).to_have_url(re.compile(r"/report/\d+$"))
 
+    # The Full harness delays every fake model call, so the run stays active.
     cancel = page.get_by_role("button", name="Cancel analysis")
-    if cancel.count() == 0:
-        pytest.skip("The analysis already finished before it could be cancelled.")
+    expect(cancel).to_be_visible()
     cancel.click()
     expect(page.get_by_text("Cancel this analysis?")).to_be_visible()
     page.get_by_role("button", name="Yes, cancel").click()

@@ -12,6 +12,7 @@ lane runs against the isolated seeded database.
 from __future__ import annotations
 
 import os
+import re
 import time
 
 from playwright.sync_api import APIRequestContext, Page, expect
@@ -70,32 +71,30 @@ def test_completed_assessment_on_local_ollama(
             next_button.click()
         with page.expect_response(
             lambda response: response.request.method == "POST"
-            and response.url.rstrip("/").endswith("/api/clinical/jobs")
+            and response.url.rstrip("/").endswith("/launch")
         ) as started:
             dialog.get_by_role("button", name="Start analysis").click()
         assert started.value.status == 202, started.value.text()
-        job_id = started.value.json()["job_id"]
+        session_id = started.value.json()["session_id"]
+        expect(page).to_have_url(re.compile(rf"/report/{session_id}$"))
 
         deadline = time.monotonic() + JOB_TIMEOUT_SECONDS
-        job: dict = {}
+        state: dict = {}
         while time.monotonic() < deadline:
-            response = api_context.get(f"/api/clinical/jobs/{job_id}?_={time.monotonic_ns()}")
+            response = api_context.get(f"/api/clinical/sessions/{session_id}/status")
             assert response.status == 200, response.text()
-            job = response.json()
-            if job["status"] in {"completed", "failed", "cancelled"}:
+            state = response.json()
+            if state["status"] in {"completed", "failed", "cancelled"}:
                 break
             time.sleep(3)
-        assert job.get("status") == "completed", job.get("error") or job.get("status")
-        result = job["result"]
-        assert isinstance(result.get("session_id"), int)
-        assert result.get("report") or result.get("final_report")
+        assert state.get("status") == "completed", state.get("error") or state.get("status")
+        assert state["has_report"] is True
 
-        page.get_by_role("button", name="View report").click()
-        expect(page.locator("#rendered-report-content")).not_to_be_empty(timeout=60000)
+        expect(page.locator("app-clinical-report-viewer")).not_to_be_empty(timeout=60000)
 
-        session = api_context.get(f"/api/inspection/sessions/{result['session_id']}")
+        session = api_context.get(f"/api/inspection/sessions/{session_id}")
         assert session.status == 200, session.text()
-        assert session.json()["session_id"] == result["session_id"]
+        assert session.json()["session_id"] == session_id
     finally:
         api_context.put(
             "/api/model-config",

@@ -132,7 +132,9 @@ try {
         $fakeOllamaArguments = @(
             "`"$fakeOllamaScript`"",
             '--port',
-            "$fakeOllamaPort"
+            "$fakeOllamaPort",
+            '--chat-delay',
+            '3'
         )
         $fakeOllama = Start-Process -FilePath $python -ArgumentList $fakeOllamaArguments -WorkingDirectory $serverDir -RedirectStandardOutput $ollamaOut -RedirectStandardError $ollamaErr -WindowStyle Hidden -PassThru
         if (-not (Wait-HttpReady "http://127.0.0.1:$fakeOllamaPort/api/tags" -timeoutSeconds 30)) {

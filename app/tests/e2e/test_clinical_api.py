@@ -7,6 +7,8 @@ E2E tests for the clinical session API endpoints.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from playwright.sync_api import APIRequestContext
 
@@ -31,21 +33,36 @@ def build_minimal_payload() -> dict:
     }
 
 ###############################################################################
-@pytest.fixture(autouse=True)
-def cancel_active_job(api_context: APIRequestContext) -> None:
-    latest_job = api_context.get("/api/clinical/jobs/latest")
-    if latest_job.status == 200:
-        payload = latest_job.json()
-        job_id = payload.get("job_id")
-        status = payload.get("status")
-        if job_id and status in {"pending", "running"}:
-            api_context.delete(f"/api/clinical/jobs/{job_id}")
+@pytest.fixture
+def draft_session_id(api_context: APIRequestContext) -> Iterator[int]:
+    created = api_context.post(
+        "/api/clinical/sessions",
+        data={
+            "patient_name": "Clinical API Draft",
+            "visit_date": "2024-01-15",
+            "clinical_input": "Draft text for launch validation.",
+        },
+    )
+    assert created.status == 201, created.text()
+    session_id = created.json()["session_id"]
+    yield session_id
+    api_context.delete(f"/api/inspection/sessions/{session_id}")
 
 ###############################################################################
-def test_clinical_requires_sections(api_context: APIRequestContext):
-    response = api_context.post("/api/clinical/jobs", data={"name": "Test"})
-    assert response.status == 422
-    assert "Clinical input is required." in response.text()
+def _assert_launch_rejected(
+    api_context: APIRequestContext, session_id: int, payload: dict, message: str
+) -> None:
+    response = api_context.post(f"/api/clinical/sessions/{session_id}/launch", data=payload)
+    assert response.status == 422, response.text()
+    assert message in response.text()
+    status = api_context.get(f"/api/clinical/sessions/{session_id}/status").json()
+    assert status["status"] == "draft"
+
+###############################################################################
+def test_clinical_requires_sections(api_context: APIRequestContext, draft_session_id: int):
+    _assert_launch_rejected(
+        api_context, draft_session_id, {"name": "Test"}, "Clinical input is required."
+    )
 
 ###############################################################################
 def test_clinical_validate_input_returns_deterministic_diagnostics(
@@ -70,19 +87,19 @@ def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     assert "deterministic_diagnostics" in response.json()
 
 ###############################################################################
-def test_clinical_rejects_empty_provider_selection(api_context: APIRequestContext):
+def test_clinical_rejects_empty_provider_selection(
+    api_context: APIRequestContext, draft_session_id: int
+):
     payload = build_minimal_payload()
     payload["selected_model_providers"] = []
 
-    response = api_context.post("/api/clinical/jobs", data=payload)
-    assert response.status == 422
-    assert "At least one model provider must be selected." in response.text()
+    _assert_launch_rejected(
+        api_context, draft_session_id, payload, "At least one model provider must be selected."
+    )
 
 ###############################################################################
-def test_clinical_requires_visit_date(api_context: APIRequestContext):
+def test_clinical_requires_visit_date(api_context: APIRequestContext, draft_session_id: int):
     payload = build_minimal_payload()
     payload["visit_date"] = None
 
-    response = api_context.post("/api/clinical/jobs", data=payload)
-    assert response.status == 422
-    assert "Visit date is required." in response.text()
+    _assert_launch_rejected(api_context, draft_session_id, payload, "Visit date is required.")

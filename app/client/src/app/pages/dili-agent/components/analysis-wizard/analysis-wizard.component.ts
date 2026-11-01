@@ -305,7 +305,8 @@ export class AnalysisWizardComponent {
       return;
     }
     // Navigate first so clearing the draft cannot race with the page's `?session=` sync.
-    await this.router.navigate(['/report', sessionId]);
+    // Replacing the entry keeps Back from reopening the launched draft's editor URL.
+    await this.router.navigate(['/report', sessionId], { replaceUrl: true });
     this.reset();
     this.drafts.reset();
     this.started.emit();

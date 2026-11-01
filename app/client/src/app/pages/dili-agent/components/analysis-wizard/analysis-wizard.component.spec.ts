@@ -229,7 +229,7 @@ describe('AnalysisWizardComponent', () => {
         'POST /api/clinical/sessions/5/launch',
       ]);
       expect(launchPayloads[0].evidence_sources).toEqual(['livertox']);
-      expect(navigate).toHaveBeenCalledWith(['/report', 5]);
+      expect(navigate).toHaveBeenCalledWith(['/report', 5], { replaceUrl: true });
       expect(started).toHaveBeenCalledTimes(1);
       expect(appState.state().diliAgent).toMatchObject({
         draftSessionId: null,

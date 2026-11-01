@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
 from typing import Any
@@ -17,8 +18,9 @@ DEFAULT_MODEL = "qwen3.5:2b"
 class FakeOllamaState:
 
     # -------------------------------------------------------------------------
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, chat_delay: float = 0.0) -> None:
         self.lock = Lock()
+        self.chat_delay = chat_delay
         self.models: set[str] = {model}
 
     # -------------------------------------------------------------------------
@@ -98,6 +100,12 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
                 }
             )
             return
+        if self.path == "/api/chat":
+            self._read_json()
+            # Optional per-request delay keeps manual lifecycle checks observable.
+            time.sleep(self.server.state.chat_delay)
+            self._send_json({"model": DEFAULT_MODEL, "done": True, "message": {"role": "assistant", "content": "{}"}})
+            return
         if self.path in {"/api/embed", "/api/embeddings"}:
             payload = self._read_json()
             input_value = payload.get("input", payload.get("prompt", []))
@@ -133,8 +141,8 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
 class FakeOllamaServer(ThreadingHTTPServer):
 
     # -------------------------------------------------------------------------
-    def __init__(self, address: tuple[str, int], model: str) -> None:
-        self.state = FakeOllamaState(model)
+    def __init__(self, address: tuple[str, int], model: str, chat_delay: float = 0.0) -> None:
+        self.state = FakeOllamaState(model, chat_delay)
         super().__init__(address, FakeOllamaHandler)
 
 ###############################################################################
@@ -143,8 +151,9 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=11435)
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--chat-delay", type=float, default=0.0, help="Seconds each /api/chat request waits.")
     args = parser.parse_args()
-    server = FakeOllamaServer((args.host, args.port), args.model)
+    server = FakeOllamaServer((args.host, args.port), args.model, args.chat_delay)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

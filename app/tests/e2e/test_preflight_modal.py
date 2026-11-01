@@ -197,7 +197,7 @@ def test_warning_acceptance_launches_one_session_and_opens_its_report(
         assert created == 1
         assert launches == 1
 
-        page.go_back()
+        page.get_by_role("tab", name="DILI Agent").click()
         expect(page.get_by_label("Clinical Input")).to_have_value("")
         expect(page.get_by_label("Visit Date")).to_have_value("")
     finally:

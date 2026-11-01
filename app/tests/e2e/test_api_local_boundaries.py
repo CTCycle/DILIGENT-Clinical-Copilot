@@ -22,12 +22,12 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/access-keys"): "access-keys.synthetic-lifecycle",
     ("DELETE", "/api/access-keys/{key_id}"): "access-keys.synthetic-lifecycle",
     ("PUT", "/api/access-keys/{key_id}/activate"): "access-keys.synthetic-lifecycle",
-    ("POST", "/api/clinical/jobs"): "clinical.validation-and-lifecycle",
-    ("DELETE", "/api/clinical/draft"): "clinical.draft-persistence",
-    ("GET", "/api/clinical/draft"): "clinical.draft-persistence",
-    ("PUT", "/api/clinical/draft"): "clinical.draft-persistence",
-    ("DELETE", "/api/clinical/jobs/{job_id}"): "clinical.validation-and-lifecycle",
-    ("GET", "/api/clinical/jobs/{job_id}"): "clinical.validation-and-lifecycle",
+    ("POST", "/api/clinical/sessions"): "clinical.session-lifecycle",
+    ("GET", "/api/clinical/sessions/{session_id}/input"): "clinical.session-lifecycle",
+    ("PUT", "/api/clinical/sessions/{session_id}/input"): "clinical.session-lifecycle",
+    ("POST", "/api/clinical/sessions/{session_id}/launch"): "clinical.session-lifecycle",
+    ("GET", "/api/clinical/sessions/{session_id}/status"): "clinical.session-lifecycle",
+    ("POST", "/api/clinical/sessions/{session_id}/cancel"): "clinical.session-lifecycle",
     ("GET", "/api/clinical/section-template"): "clinical.success",
     ("POST", "/api/clinical/validate-input"): "clinical.validation-and-lifecycle",
     ("POST", "/api/desktop/bootstrap"): "desktop.runtime-contract",
@@ -270,7 +270,6 @@ def test_route_family_validation_and_missing_job_contracts(
     assert rag_cancel.status in {200, 404}, rag_cancel.text()
 
     invalid_requests = (
-        api_context.post("/api/clinical/jobs", data={"name": "invalid"}),
         api_context.post("/api/inspection/rxnav/jobs", data={"rxnav_request_timeout": 0}),
         api_context.post(
             "/api/inspection/livertox/jobs",
@@ -301,8 +300,6 @@ def test_route_family_validation_and_missing_job_contracts(
         assert response.status in {400, 409, 422}, response.text()
 
     missing_job_requests = (
-        ("/api/clinical/jobs/missing", "get"),
-        ("/api/clinical/jobs/missing", "delete"),
         ("/api/models/jobs/missing", "get"),
         ("/api/models/jobs/missing", "delete"),
         ("/api/inspection/rxnav/jobs/missing", "get"),
@@ -322,6 +319,61 @@ def test_route_family_validation_and_missing_job_contracts(
     for path, method in missing_job_requests:
         response = getattr(api_context, method)(path)
         _assert_not_found(response)
+
+###############################################################################
+def test_clinical_session_lifecycle_contracts(api_context: APIRequestContext) -> None:
+    created = api_context.post(
+        "/api/clinical/sessions",
+        data={
+            "patient_name": "Boundary Draft",
+            "visit_date": "2026-10-01",
+            "clinical_input": "Draft text",
+        },
+    )
+    assert created.status == 201, created.text()
+    state = created.json()
+    session_id = state["session_id"]
+    try:
+        assert state["status"] == "draft"
+        status = api_context.get(f"/api/clinical/sessions/{session_id}/status")
+        assert status.status == 200, status.text()
+        assert status.json()["status"] == "draft"
+
+        stale = api_context.put(
+            f"/api/clinical/sessions/{session_id}/input",
+            data={
+                "patient_name": "Boundary Draft",
+                "visit_date": "2026-10-01",
+                "clinical_input": "Overwrite attempt",
+                "expected_updated_at": "2000-01-01T00:00:00Z",
+            },
+        )
+        assert stale.status == 409, stale.text()
+        stored = api_context.get(f"/api/clinical/sessions/{session_id}/input").json()
+        assert stored["clinical_input"] == "Draft text"
+
+        invalid_launch = api_context.post(
+            f"/api/clinical/sessions/{session_id}/launch", data={"name": "invalid"}
+        )
+        assert invalid_launch.status in {400, 422}, invalid_launch.text()
+        still_draft = api_context.get(f"/api/clinical/sessions/{session_id}/status").json()
+        assert still_draft["status"] == "draft"
+
+        cancel_draft = api_context.post(f"/api/clinical/sessions/{session_id}/cancel")
+        assert cancel_draft.status == 409, cancel_draft.text()
+    finally:
+        api_context.delete(f"/api/inspection/sessions/{session_id}")
+
+    for method, suffix in (
+        ("get", "status"),
+        ("get", "input"),
+        ("post", "cancel"),
+        ("post", "launch"),
+    ):
+        response = getattr(api_context, method)(
+            f"/api/clinical/sessions/999999/{suffix}"
+        )
+        assert response.status in {404, 422}, (suffix, response.text())
 
 ###############################################################################
 def test_session_version_detail_and_timeline_job_lifecycle(

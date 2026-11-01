@@ -7,6 +7,7 @@ E2E tests for UI navigation and key UI workflows.
 
 import json
 import re
+from urllib.parse import urlparse
 
 from playwright.sync_api import Page, Route, expect
 
@@ -22,25 +23,6 @@ def _fill_required_dili_fields(page: Page) -> None:
     )
     page.get_by_label("Patient Name").fill("Marco Rossi")
     page.get_by_label("Visit Date").fill("2026-04-20")
-
-###############################################################################
-def _build_clinical_job_payload() -> dict:
-    return {
-        "name": "Marco Rossi",
-        "visit_date": {"day": 20, "month": 4, "year": 2026},
-        "clinical_input": (
-            "## Anamnesis\n"
-            + " ".join(
-                ["Patient reports persistent fatigue nausea and abdominal discomfort."]
-                * 12
-            )
-            + "\n\n## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
-            + "## Laboratory history\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
-        ),
-        "selected_model_providers": ["openai"],
-        "patient_image_base64": None,
-        "evidence_sources": ["livertox", "dilirank"],
-    }
 
 ###############################################################################
 def _build_variant_heading_payload() -> dict:
@@ -206,7 +188,7 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
 ):
     sessions_response = page.request.get(
         f"{api_base_url}/api/inspection/sessions",
-        params={"offset": 0, "limit": 1},
+        params={"offset": 0, "limit": 100},
     )
     assert sessions_response.status == 200
     sessions_payload = sessions_response.json()
@@ -218,6 +200,8 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
         for item in items:
             candidate_id = item.get("session_id") if isinstance(item, dict) else None
             if not isinstance(candidate_id, int) or candidate_id <= 0:
+                continue
+            if not item.get("has_timeline"):
                 continue
             timelines_response = page.request.get(
                 f"{api_base_url}/api/inspection/sessions/{candidate_id}/timelines"
@@ -397,221 +381,195 @@ def test_dili_form_state_resets_after_refresh(page: Page, base_url: str):
     expect(page.get_by_label("Clinical Input")).to_have_value("")
 
 ###############################################################################
-def test_dili_run_burst_click_submits_single_job(
-    page: Page, base_url: str, api_base_url: str
-):
+def _session_state(status: str, session_id: int = 9, **overrides) -> dict:
+    state = {
+        "session_id": session_id,
+        "status": status,
+        "patient_name": "Marco Rossi",
+        "visit_date": "2026-04-20",
+        "created_at": "2026-04-20T08:00:00Z",
+        "updated_at": "2026-04-20T08:00:00Z",
+        "queued_at": None,
+        "started_at": "2026-04-20T08:00:01Z" if status != "draft" else None,
+        "finished_at": None,
+        "queue_position": None,
+        "progress": None,
+        "progress_stage": None,
+        "progress_message": None,
+        "stop_requested": False,
+        "error": None,
+        "has_report": False,
+        "version": 1,
+        "poll_interval": 0.5,
+    }
+    state.update(overrides)
+    return state
+
+###############################################################################
+def _json_route(route: Route, body: dict, status: int = 200) -> None:
+    route.fulfill(status=status, content_type="application/json", body=json.dumps(body))
+
+###############################################################################
+class _SessionMock:
+    """Routes the session lifecycle endpoints for a single fake session."""
+
+    def __init__(self, page: Page, status_for_call, launch_status: int = 202) -> None:
+        self.page = page
+        self.status_for_call = status_for_call
+        self.launch_status = launch_status
+        self.creates = 0
+        self.launches = 0
+        self.status_calls = 0
+        self.launch_bodies: list[dict] = []
+        page.route("**/api/clinical/sessions**", self._handle)
+        page.route(
+            "**/api/inspection/sessions/9",
+            lambda route: _json_route(
+                route,
+                {
+                    "session_id": 9,
+                    "patient_name": "Marco Rossi",
+                    "visit_date": "2026-04-20",
+                    "session_timestamp": "2026-04-20T08:00:00Z",
+                    "version": 1,
+                    "original_session_id": None,
+                    "status": "completed",
+                    "text_extraction_model": "m",
+                    "clinical_model": "m",
+                    "metadata": {},
+                    "sections": {},
+                    "session_text": "",
+                    "source_clinical_text": "",
+                    "result_payload": {},
+                    "report": "Recovered report body.",
+                    "official_report_text": "Recovered report body.",
+                    "manual_edit_history": [],
+                },
+            ),
+        )
+
+    def _handle(self, route: Route) -> None:
+        request = route.request
+        path = urlparse(request.url).path.removeprefix("/api/clinical/sessions")
+        if request.method == "POST" and path == "":
+            self.creates += 1
+            _json_route(route, _session_state("draft"), 201)
+        elif request.method == "POST" and path.endswith("/launch"):
+            self.launches += 1
+            self.launch_bodies.append(json.loads(request.post_data or "{}"))
+            if self.launch_status == 202:
+                _json_route(route, _session_state("queued", queue_position=1), 202)
+            else:
+                _json_route(
+                    route,
+                    {"detail": "Another operation is already running."},
+                    self.launch_status,
+                )
+        elif path.endswith("/status"):
+            self.status_calls += 1
+            _json_route(route, self.status_for_call(self.status_calls))
+        elif path.endswith("/input"):
+            _json_route(
+                route,
+                {
+                    "session_id": 9,
+                    "status": "running",
+                    "patient_name": "Marco Rossi",
+                    "visit_date": "2026-04-20",
+                    "clinical_input": "Original clinical input",
+                    "patient_image_base64": None,
+                    "updated_at": "2026-04-20T08:00:00Z",
+                },
+            )
+        else:
+            route.continue_()
+
+    def close(self) -> None:
+        self.page.unroute("**/api/clinical/sessions**", self._handle)
+        self.page.unroute("**/api/inspection/sessions/9")
+        self.page.unroute("**/api/clinical/validate-input")
+
+###############################################################################
+def test_dili_run_burst_click_submits_single_session(page: Page, base_url: str):
     page.goto(base_url)
     _fill_required_dili_fields(page)
-
     run_button = page.get_by_role("button", name="Run DILI analysis")
     expect(run_button).to_be_enabled(timeout=10000)
 
-    submission_count = 0
-
-    def count_submissions(route: Route) -> None:
-        nonlocal submission_count
-        if route.request.method == "POST":
-            submission_count += 1
-            route.fulfill(
-                status=202,
-                content_type="application/json",
-                body=(
-                    '{"job_id":"burst-test","job_type":"clinical","status":"running",'
-                    '"message":"Clinical analysis started","poll_interval":0.2}'
-                ),
-            )
-            return
-        route.continue_()
-
     _mock_ready_preflight(page)
-    page.route("**/api/clinical/jobs", count_submissions)
-    page.route(
-        "**/api/clinical/jobs/burst-test**",
-        lambda route: route.fulfill(
-            status=200,
-            content_type="application/json",
-            body=(
-                '{"job_id":"burst-test","job_type":"clinical","status":"completed",'
-                '"progress":1,"result":{"report":"Burst test completed."},'
-                '"error":null,"created_at":1,"completed_at":2,"version":1}'
-            ),
-        ),
-    )
-    run_button.click()
-    dialog = page.get_by_role("dialog", name="Prepare analysis")
-    for _ in range(3):
-        next_button = dialog.get_by_role("button", name="Next")
-        expect(next_button).to_be_enabled(timeout=10000)
-        next_button.click()
-    expect(dialog.get_by_role("button", name="Start analysis")).to_be_enabled()
-    page.evaluate(
-        """() => {
-            const startButton = [...document.querySelectorAll('.analysis-wizard-modal button')]
-                .find((button) => button.textContent?.trim() === 'Start analysis');
-            for (let clickIndex = 0; clickIndex < 10; clickIndex += 1) {
-                startButton?.click();
-            }
-        }"""
-    )
-    page.wait_for_timeout(1200)
-    page.unroute("**/api/clinical/validate-input")
-    page.unroute("**/api/clinical/jobs/burst-test**")
-    page.unroute("**/api/clinical/jobs", count_submissions)
-
-    assert submission_count == 1
-
-###############################################################################
-def test_dili_progress_polling_survives_navigation(page: Page, base_url: str):
-    page.goto(base_url)
-    _fill_required_dili_fields(page)
-
-    def start_navigation_resume_job(route: Route) -> None:
-        route.fulfill(
-            status=202,
-            content_type="application/json",
-            body=(
-                '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
-                '"message":"Clinical analysis started","poll_interval":0.5}'
-            ),
-        )
-
-    status_call_count = 0
-
-    def serve_navigation_resume_status(route: Route) -> None:
-        nonlocal status_call_count
-        status_call_count += 1
-        if status_call_count == 1:
-            body = (
-                '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
-                '"progress":18,"result":{"progress_stage":"drugs.extracting",'
-                '"progress_message":"Extracting therapy and medication data"},'
-                '"error":null,"created_at":1,"completed_at":null,"version":1}'
-            )
-        elif status_call_count <= 5:
-            body = (
-                '{"job_id":"nav-resume","job_type":"clinical","status":"running",'
-                '"progress":62,"result":{"progress_stage":"retrieval.evidence",'
-                '"progress_message":"Gathering grounded evidence"},'
-                '"error":null,"created_at":1,"completed_at":null,"version":2}'
-            )
-        else:
-            body = (
-                '{"job_id":"nav-resume","job_type":"clinical","status":"completed",'
-                '"progress":100,"result":{"report":"Navigation recovery completed.",'
-                '"progress_stage":"completed","progress_message":"Clinical analysis completed."},'
-                '"error":null,"created_at":1,"completed_at":2,"version":3}'
-            )
-        route.fulfill(status=200, content_type="application/json", body=body)
-
-    _mock_ready_preflight(page)
-    page.route("**/api/clinical/jobs", start_navigation_resume_job)
-    page.route("**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status)
+    mock = _SessionMock(page, lambda _call: _session_state("queued", queue_position=1))
     try:
-        _start_analysis_from_wizard(page)
-        expect(page.locator(".analysis-progress-detail")).to_contain_text(
-            "Extracting therapy and medication data"
+        run_button.click()
+        dialog = page.get_by_role("dialog", name="Prepare analysis")
+        for _ in range(3):
+            next_button = dialog.get_by_role("button", name="Next")
+            expect(next_button).to_be_enabled(timeout=10000)
+            next_button.click()
+        expect(dialog.get_by_role("button", name="Start analysis")).to_be_enabled()
+        page.evaluate(
+            """() => {
+                const startButton = [...document.querySelectorAll('.analysis-wizard-modal button')]
+                    .find((button) => button.textContent?.trim() === 'Start analysis');
+                for (let clickIndex = 0; clickIndex < 10; clickIndex += 1) {
+                    startButton?.click();
+                }
+            }"""
         )
-        page.get_by_role("tab", name="Settings").click()
-        page.get_by_role("link", name="Models").click()
-        expect(page).to_have_url(re.compile(r"/settings/models/?$"))
-        page.wait_for_timeout(900)
-        page.get_by_role("tab", name="DILI Agent").click()
-        expect(page).to_have_url(re.compile(r"/?$"))
-        expect(page.locator(".analysis-progress-detail")).to_contain_text(
-            "Gathering grounded evidence"
-        )
-        expect(page.get_by_role("progressbar")).to_have_attribute("aria-valuenow", "62")
-        expect(page.locator(".analysis-progress-heading strong", has_text="Analysis complete")).to_be_visible()
-        page.get_by_role("button", name=re.compile("View report")).click()
-        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
-            "Navigation recovery completed."
-        )
+        expect(page).to_have_url(re.compile(r"/report/9$"))
+        page.wait_for_timeout(800)
+        assert mock.creates == 1
+        assert mock.launches == 1
     finally:
-        page.unroute(
-            "**/api/clinical/jobs/nav-resume**", serve_navigation_resume_status
-        )
-        page.unroute("**/api/clinical/validate-input")
-        page.unroute("**/api/clinical/jobs", start_navigation_resume_job)
+        mock.close()
 
 ###############################################################################
-def test_dili_running_job_state_resumes_after_refresh(
+def test_report_progress_is_restored_after_navigation_and_refresh(
     page: Page, base_url: str
 ):
-    page.goto(base_url)
-    _fill_required_dili_fields(page)
-
-    start_call_count = 0
-
-    def start_refresh_resume_job(route: Route) -> None:
-        nonlocal start_call_count
-        start_call_count += 1
-        route.fulfill(
-            status=202,
-            content_type="application/json",
-            body=(
-                '{"job_id":"refresh-resume","job_type":"clinical","status":"running",'
-                '"message":"Clinical analysis started","poll_interval":0.5}'
-            ),
-        )
-
-    status_call_count = 0
-
-    def serve_refresh_resume_status(route: Route) -> None:
-        nonlocal status_call_count
-        status_call_count += 1
-        if status_call_count == 1:
-            body = (
-                '{"job_id":"refresh-resume","job_type":"clinical","status":"running",'
-                '"progress":14,"result":{"progress_stage":"drugs.extracting",'
-                '"progress_message":"Extracting therapy and medication data"},'
-                '"error":null,"created_at":1,"completed_at":null,"version":1}'
+    def status_for_call(call: int) -> dict:
+        if call <= 2:
+            return _session_state(
+                "running",
+                progress=18,
+                progress_stage="drugs.extracting",
+                progress_message="Extracting therapy and medication data",
+                version=call,
             )
-        elif status_call_count in (2, 3):
-            body = (
-                '{"job_id":"refresh-resume","job_type":"clinical","status":"running",'
-                '"progress":57,"result":{"progress_stage":"retrieval.evidence",'
-                '"progress_message":"Collecting supporting evidence"},'
-                '"error":null,"created_at":1,"completed_at":null,"version":2}'
+        if call <= 12:
+            return _session_state(
+                "running",
+                progress=62,
+                progress_stage="retrieval.evidence",
+                progress_message="Gathering grounded evidence",
+                version=call,
             )
-        else:
-            body = (
-                '{"job_id":"refresh-resume","job_type":"clinical","status":"completed",'
-                '"progress":100,"result":{"report":"Refresh recovery completed.",'
-                '"progress_stage":"completed","progress_message":"Clinical analysis completed."},'
-                '"error":null,"created_at":1,"completed_at":2,"version":3}'
-            )
-        route.fulfill(status=200, content_type="application/json", body=body)
+        return _session_state("completed", has_report=True, progress=100, version=call)
 
     _mock_ready_preflight(page)
-    page.route("**/api/clinical/jobs", start_refresh_resume_job)
-    page.route("**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status)
+    mock = _SessionMock(page, status_for_call)
     try:
+        page.goto(base_url)
+        _fill_required_dili_fields(page)
         _start_analysis_from_wizard(page)
-        expect(page.locator(".analysis-progress-detail")).to_contain_text(
+        expect(page).to_have_url(re.compile(r"/report/9$"))
+        expect(page.locator(".analysis-progress-detail").first).to_contain_text(
             "Extracting therapy and medication data"
         )
-        assert page.evaluate(
-            "() => JSON.parse(localStorage.getItem('dili-agent-active-job-v1') || 'null').jobId"
-        ) == "refresh-resume"
-        status_calls_before_refresh = status_call_count
+
+        page.get_by_role("tab", name="Settings").click()
+        expect(page).to_have_url(re.compile(r"/settings/"))
+        page.go_back()
+        expect(page).to_have_url(re.compile(r"/report/9$"))
+        expect(page.locator(".analysis-progress-detail").first).to_contain_text(
+            "Gathering grounded evidence", timeout=15000
+        )
+
         page.reload()
-        expect(page.locator(".analysis-progress-heading strong", has_text="Analysis complete")).to_be_visible()
-        expect(page.get_by_role("button", name="Run DILI analysis")).to_be_enabled()
-        page.get_by_role("button", name=re.compile("View report")).click()
-        expect(page.locator(".inspection-excerpt-text")).to_contain_text(
-            "Refresh recovery completed."
-        )
-        assert status_call_count > status_calls_before_refresh
-        assert page.evaluate(
-            "() => localStorage.getItem('dili-agent-active-job-v1')"
-        ) is None
-        assert start_call_count == 1
+        expect(page.get_by_text("Recovered report body.")).to_be_visible(timeout=30000)
+        expect(page.get_by_test_id("session-status")).to_have_text("Completed")
+        assert mock.launches == 1
     finally:
-        page.unroute(
-            "**/api/clinical/jobs/refresh-resume**", serve_refresh_resume_status
-        )
-        page.unroute("**/api/clinical/validate-input")
-        page.unroute("**/api/clinical/jobs", start_refresh_resume_job)
+        mock.close()
 
 ###############################################################################
 def test_dili_submit_accepts_variant_section_headings(
@@ -625,69 +583,37 @@ def test_dili_submit_accepts_variant_section_headings(
 
     run_button = page.get_by_role("button", name="Run DILI analysis")
     expect(run_button).to_be_enabled(timeout=10000)
-    submission_count = 0
-
-    def submit_variant(route: Route) -> None:
-        nonlocal submission_count
-        if route.request.method == "POST":
-            submission_count += 1
-            route.fulfill(
-                status=202,
-                content_type="application/json",
-                body=(
-                    '{"job_id":"variant-headings","job_type":"clinical","status":"running",'
-                    '"message":"Clinical analysis started","poll_interval":0.2}'
-                ),
-            )
-            return
-        route.continue_()
 
     _mock_ready_preflight(page)
-    page.route("**/api/clinical/jobs", submit_variant)
-    page.route(
-        "**/api/clinical/jobs/variant-headings**",
-        lambda route: route.fulfill(
-            status=200,
-            content_type="application/json",
-            body=(
-                '{"job_id":"variant-headings","job_type":"clinical","status":"completed",'
-                '"progress":1,"result":{"report":"Variant heading test completed."},'
-                '"error":null,"created_at":1,"completed_at":2,"version":1}'
-            ),
-        ),
-    )
-    _start_analysis_from_wizard(page)
-    page.wait_for_timeout(1200)
-    page.unroute("**/api/clinical/validate-input")
-    page.unroute("**/api/clinical/jobs/variant-headings**")
-    page.unroute("**/api/clinical/jobs", submit_variant)
-
-    assert submission_count == 1
+    mock = _SessionMock(page, lambda _call: _session_state("queued", queue_position=1))
+    try:
+        _start_analysis_from_wizard(page)
+        expect(page).to_have_url(re.compile(r"/report/9$"))
+        assert mock.launches == 1
+        assert mock.launch_bodies[0]["clinical_input"] == payload["clinical_input"]
+    finally:
+        mock.close()
 
 ###############################################################################
 def test_dili_run_conflict_surfaces_clear_error_message(page: Page, base_url: str):
-    def mock_conflict(route: Route) -> None:
-        route.fulfill(
-            status=409,
-            content_type="application/json",
-            body='{"detail":"Another operation is already running."}',
-        )
-
     _mock_ready_preflight(page)
-    page.route("**/api/clinical/jobs", mock_conflict)
+    mock = _SessionMock(page, lambda _call: _session_state("draft"), launch_status=409)
     try:
         page.goto(base_url)
         _fill_required_dili_fields(page)
-        run_button = page.get_by_role("button", name="Run DILI analysis")
-        expect(run_button).to_be_enabled(timeout=10000)
         _start_analysis_from_wizard(page)
         expect(page.get_by_role("alert").filter(has_text="Another operation")).to_contain_text(
             "Another operation is already running. Please wait and retry."
         )
-        expect(run_button).to_be_enabled(timeout=10000)
+        expect(
+            page.get_by_role("dialog", name="Prepare analysis").get_by_role(
+                "button", name="Start analysis"
+            )
+        ).to_be_enabled(timeout=10000)
+        expect(page).not_to_have_url(re.compile(r"/report/"))
+        expect(page.get_by_label("Patient Name")).to_have_value("Marco Rossi")
     finally:
-        page.unroute("**/api/clinical/validate-input")
-        page.unroute("**/api/clinical/jobs", mock_conflict)
+        mock.close()
 
 ###############################################################################
 def test_timetable_route_load_does_not_autogenerate_timeline(
@@ -695,7 +621,7 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
 ):
     sessions_response = page.request.get(
         f"{api_base_url}/api/inspection/sessions",
-        params={"offset": 0, "limit": 1},
+        params={"offset": 0, "limit": 100},
     )
     assert sessions_response.status == 200
     sessions_payload = sessions_response.json()
@@ -905,7 +831,7 @@ def test_clinical_sessions_row_selection_loads_matching_detail(
 ):
     sessions_response = page.request.get(
         f"{api_base_url}/api/inspection/sessions",
-        params={"offset": 0, "limit": 1},
+        params={"offset": 0, "limit": 100},
     )
     assert sessions_response.status == 200
     sessions_payload = sessions_response.json()
@@ -932,7 +858,7 @@ def test_clinical_sessions_row_selection_loads_matching_detail(
         target_row = session_rows.nth(1) if row_count >= 2 else session_rows.first
 
         row_label = target_row.inner_text()
-        session_id_match = re.search(r"Session\s+(\d+)", row_label)
+        session_id_match = re.search(r"#(\d+)", row_label)
         assert session_id_match is not None, (
             f"Unable to parse session id from row label: {row_label!r}"
         )

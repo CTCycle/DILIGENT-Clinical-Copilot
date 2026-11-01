@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,27 @@ def _wait_for_job(
         time.sleep(2)
     pytest.fail(
         f"{label} job did not reach a terminal state within "
+        f"{timeout_seconds}s: status={last_payload.get('status')}"
+    )
+
+###############################################################################
+def _wait_for_session(
+    api_context: APIRequestContext,
+    session_id: int,
+    *,
+    timeout_seconds: int = 600,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout_seconds
+    last_payload: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        response = api_context.get(f"/api/clinical/sessions/{session_id}/status")
+        assert response.status == 200, response.text()
+        last_payload = response.json()
+        if last_payload.get("status") in {"completed", "failed", "cancelled"}:
+            return last_payload
+        time.sleep(2)
+    pytest.fail(
+        f"Live provider session did not reach a terminal state within "
         f"{timeout_seconds}s: status={last_payload.get('status')}"
     )
 
@@ -211,7 +233,7 @@ def _wait_for_browser_job_submission(
 
     def capture(response: Any) -> None:
         if response.request.method == "POST" and response.url.rstrip("/").endswith(
-            "/api/clinical/jobs"
+            "/launch"
         ):
             captured["response"] = response
 
@@ -234,7 +256,7 @@ def _wait_for_browser_job_submission(
         while "response" not in captured and time.monotonic() < deadline:
             page.wait_for_timeout(250)
         if "response" not in captured:
-            pytest.fail("Browser did not submit the live provider clinical job.")
+            pytest.fail("Browser did not launch the live provider clinical session.")
         response = captured["response"]
         assert response.status == 202, response.text()
         return response.json()
@@ -254,7 +276,6 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
         )
 
     created_key_id: int | None = None
-    job_id: str | None = None
     session_id: int | None = None
     revision_job_id: str | None = None
     revision_pipeline_run_id: str | None = None
@@ -325,30 +346,21 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
         page.get_by_label("Patient Name").fill("Synthetic Release Gate Subject")
         page.get_by_label("Visit Date").fill("2026-09-08")
         start_payload = _wait_for_browser_job_submission(page)
-        job_id = start_payload.get("job_id")
-        assert isinstance(job_id, str) and job_id
-        assert start_payload.get("job_type") == "clinical"
+        session_id = start_payload.get("session_id")
+        assert isinstance(session_id, int)
+        assert start_payload.get("status") in {"queued", "running"}
+        expect(page).to_have_url(re.compile(rf"/report/{session_id}$"))
 
-        final_payload = _wait_for_job(api_context, job_id)
+        final_payload = _wait_for_session(api_context, session_id)
         _assert_secret_absent(
-            final_payload, provider_key, scope="clinical job response"
+            final_payload, provider_key, scope="clinical session response"
         )
         assert final_payload.get("status") == "completed", final_payload.get("error")
-        result = final_payload.get("result")
-        assert isinstance(result, dict)
-        assert isinstance(result.get("session_id"), int)
-        session_id = result["session_id"]
-        assert result.get("report") or result.get("final_report")
+        assert final_payload.get("has_report") is True
 
-        page.wait_for_function(
-            """() => {
-                const report = document.querySelector('#rendered-report-content');
-                return Boolean(report && report.textContent?.trim().length);
-            }""",
-            timeout=120000,
-        )
-        report_text = page.locator("#rendered-report-content").inner_text()
-        assert report_text.strip()
+        viewer = page.locator("app-clinical-report-viewer")
+        expect(viewer).not_to_be_empty(timeout=120000)
+        assert viewer.inner_text().strip()
 
         session_response = api_context.get(f"/api/inspection/sessions/{session_id}")
         assert session_response.status == 200, session_response.text()
@@ -606,8 +618,8 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
         )
         _assert_live_provider_logs_are_sanitized(provider_key)
     finally:
-        if job_id is not None and session_id is None:
-            api_context.delete(f"/api/clinical/jobs/{job_id}")
+        if session_id is not None:
+            api_context.post(f"/api/clinical/sessions/{session_id}/cancel")
         if revision_job_id is not None:
             revision_status = api_context.get(
                 f"/api/inspection/sessions/revision/jobs/{revision_job_id}"
