@@ -10,6 +10,7 @@ import { SYSTEM_STATUS_POLL_INTERVAL_MS, SystemStatusStateService } from './syst
 const STATUS: SystemStatusResponse = {
   providers: { active: 1, total: 6 },
   ollama: 'reachable',
+  ollama_control: { state: 'running', managed: false, can_start: false, can_stop: false, executable_found: true, error: null },
   cpu_percent: 12,
   ram: { used_bytes: 8, total_bytes: 16 },
   vram: null,

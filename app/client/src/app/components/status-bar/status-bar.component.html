@@ -34,10 +34,41 @@
         </div>
       }
     </span>
-    <span class="status-item" title="Ollama server at the endpoint configured in Settings">
-      <span class="status-label">Local</span>
-      <span class="status-led" [class]="'status-led is-' + local().led" aria-hidden="true"></span>
-      <span class="status-value">{{ local().label }}</span>
+    <span class="status-item local-anchor">
+      <button
+        type="button"
+        class="status-button"
+        title="Local Ollama inference service"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="localOpen()"
+        (click)="toggleLocal()"
+      >
+        <span class="status-label">Local</span>
+        <span class="status-led" [class]="'status-led is-' + local().led" aria-hidden="true"></span>
+        <span class="status-value">{{ local().label }}</span>
+      </button>
+      @if (localOpen()) {
+        <div class="models-popover local-popover" role="dialog" aria-label="Local Ollama service">
+          <div class="models-row">
+            <span class="status-label">Ollama</span>
+            <span class="status-value">{{ local().label }}</span>
+          </div>
+          <p class="local-detail">{{ localDetail() }}</p>
+          @if (ollamaMessage(); as message) {
+            <p class="local-message" [class.is-error]="message.kind === 'error'" role="status">{{ message.text }}</p>
+          }
+          @if (localControl(); as control) {
+            @if (control.can_start || ollamaBusy()) {
+              <button type="button" class="btn btn-primary local-action" [disabled]="ollamaBusy()" (click)="startLocal()">
+                {{ ollamaBusy() ? 'Starting…' : 'Start Ollama' }}
+              </button>
+            }
+            @if (control.can_stop) {
+              <button type="button" class="btn btn-secondary local-action" (click)="stopLocal()">Stop Ollama</button>
+            }
+          }
+        </div>
+      }
     </span>
   </div>
   <div class="status-group status-metrics" title="System-wide hardware usage, not limited to this application">

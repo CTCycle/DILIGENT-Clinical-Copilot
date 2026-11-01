@@ -9,9 +9,19 @@ export type MemoryUsage = {
   total_bytes: number;
 };
 
+export type OllamaControl = {
+  state: 'running' | 'stopped' | 'starting' | 'error';
+  managed: boolean;
+  can_start: boolean;
+  can_stop: boolean;
+  executable_found: boolean;
+  error: string | null;
+};
+
 export type SystemStatusResponse = {
   providers: { active: number; total: number };
   ollama: 'reachable' | 'unreachable';
+  ollama_control: OllamaControl;
   cpu_percent: number | null;
   ram: MemoryUsage | null;
   vram: MemoryUsage | null;
@@ -23,6 +33,24 @@ export async function fetchSystemStatus(): Promise<SystemStatusResponse> {
   return requestJson<SystemStatusResponse>(
     `${API_BASE_URL}/system/status`,
     { method: 'GET', cache: 'no-store' },
+    STATUS_REQUEST_TIMEOUT_SECONDS,
+  );
+}
+
+const OLLAMA_START_TIMEOUT_SECONDS = 60;
+
+export async function startOllama(): Promise<SystemStatusResponse> {
+  return requestJson<SystemStatusResponse>(
+    `${API_BASE_URL}/system/ollama/start`,
+    { method: 'POST' },
+    OLLAMA_START_TIMEOUT_SECONDS,
+  );
+}
+
+export async function stopOllama(): Promise<SystemStatusResponse> {
+  return requestJson<SystemStatusResponse>(
+    `${API_BASE_URL}/system/ollama/stop`,
+    { method: 'POST' },
     STATUS_REQUEST_TIMEOUT_SECONDS,
   );
 }

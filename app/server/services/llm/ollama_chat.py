@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import inspect
 import json
 import math
 import re
-import shutil
 from collections.abc import AsyncGenerator
 from typing import Any, Literal
 
@@ -18,6 +16,11 @@ import httpx
 from common.utils.logger import logger
 from common.utils.types import extract_positive_int
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.runtime.ollama_process import (
+    OllamaProcessError,
+    OllamaStartTimeout,
+    ollama_process_manager,
+)
 from services.llm.generation_policy import GenerationPurpose
 from domain.model_configs import ReasoningLevel
 from configurations.startup import get_server_settings
@@ -532,42 +535,18 @@ async def start_server(
     if await self.is_server_online():
         return "already_running"
 
-    if shutil.which("ollama") is None:
-        raise OllamaError("Ollama executable not found in PATH.")
-
     try:
-        process = await asyncio.create_subprocess_exec(
-            "ollama",
-            "serve",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-            stdin=asyncio.subprocess.DEVNULL,
-            start_new_session=True,
+        await ollama_process_manager.start(
+            str(self.client.base_url),
+            is_online=self.is_server_online,
+            wait_timeout_s=wait_timeout_s,
+            poll_interval_s=poll_interval_s,
         )
-    except FileNotFoundError as e:
-        raise OllamaError("Ollama executable not found.") from e
-    except Exception as e:  # noqa: BLE001
-        raise OllamaError(f"Failed to launch Ollama server: {e}") from e
-
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + wait_timeout_s
-
-    while loop.time() < deadline:
-        if await self.is_server_online():
-            return "started"
-
-        if process.returncode not in (None, 0):
-            code = process.returncode
-            raise OllamaError(f"Ollama server exited unexpectedly with code {code}")
-
-        await asyncio.sleep(poll_interval_s)
-
-    with contextlib.suppress(ProcessLookupError):
-        process.terminate()
-    with contextlib.suppress(Exception):
-        await process.wait()
-
-    raise OllamaTimeout("Timed out waiting for Ollama server to start")
+    except OllamaStartTimeout as e:
+        raise OllamaTimeout(str(e)) from e
+    except OllamaProcessError as e:
+        raise OllamaError(str(e)) from e
+    return "started"
 
 ###############################################################################
 async def check_model_availability(self, name: str, *, auto_pull: bool = True) -> None:

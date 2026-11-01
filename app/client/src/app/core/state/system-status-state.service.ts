@@ -50,7 +50,7 @@ export class SystemStatusStateService {
     this.clearTimer();
   }
 
-  private async refresh(): Promise<void> {
+  async refresh(): Promise<void> {
     if (this.inFlight) {
       return;
     }

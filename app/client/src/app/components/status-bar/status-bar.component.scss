@@ -97,6 +97,27 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
+.local-popover {
+  min-width: 280px;
+  max-width: 340px;
+  white-space: normal;
+}
+
+.local-detail,
+.local-message {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.local-message.is-error {
+  color: var(--color-status-error-text);
+}
+
+.local-action {
+  justify-self: start;
+}
+
 .models-row {
   display: flex;
   justify-content: space-between;

@@ -4,7 +4,8 @@
 import { Component, ElementRef, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
 
 import { RuntimeSettings } from '../../core/models/types';
-import { MemoryUsage } from '../../core/services/system-status-api';
+import { formatUnknownError } from '../../core/utils';
+import { MemoryUsage, startOllama, stopOllama } from '../../core/services/system-status-api';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { SystemStatusStateService } from '../../core/state/system-status-state.service';
 
@@ -66,17 +67,47 @@ export class StatusBarComponent implements OnDestroy {
       : 'Provider availability is unknown';
   });
 
+  readonly localControl = computed(() => this.state.status()?.ollama_control ?? null);
+
   readonly local = computed<{ led: LedState; label: string }>(() => {
     const status = this.state.status();
+    if (this.ollamaBusy()) return { led: 'pending', label: 'Starting' };
     if (status) {
-      return status.ollama === 'reachable'
-        ? { led: 'ok', label: 'Reachable' }
-        : { led: 'error', label: 'Unreachable' };
+      const control = status.ollama_control;
+      switch (control.state) {
+        case 'running':
+          return { led: 'ok', label: 'Running' };
+        case 'starting':
+          return { led: 'pending', label: 'Starting' };
+        case 'error':
+          return { led: 'error', label: 'Error' };
+        default:
+          return control.can_start
+            ? { led: 'warning', label: 'Stopped' }
+            : { led: 'error', label: 'Unreachable' };
+      }
     }
     return this.state.connection() === 'loading'
       ? { led: 'pending', label: 'Checking' }
       : { led: 'unknown', label: 'Unknown' };
   });
+
+  readonly localDetail = computed(() => {
+    const control = this.localControl();
+    if (this.ollamaBusy()) return 'Starting Ollama…';
+    if (!control) return 'Status unavailable while the backend is disconnected.';
+    if (control.state === 'running') {
+      return control.managed ? 'Running, started by DILIGENT.' : 'Running, managed outside DILIGENT.';
+    }
+    if (control.error) return control.error;
+    if (!control.executable_found) return 'Ollama is not installed or not on PATH.';
+    if (!control.can_start) return 'Ollama is configured on another host and cannot be started here.';
+    return 'Ollama is not running.';
+  });
+
+  readonly ollamaBusy = signal(false);
+  readonly ollamaMessage = signal<{ kind: 'success' | 'error'; text: string } | null>(null);
+  readonly localOpen = signal(false);
 
   readonly modelsOpen = signal(false);
 
@@ -119,16 +150,53 @@ export class StatusBarComponent implements OnDestroy {
     this.modelsOpen.update((open) => !open);
   }
 
+  toggleLocal(): void {
+    this.ollamaMessage.set(null);
+    this.localOpen.update((open) => !open);
+  }
+
+  async startLocal(): Promise<void> {
+    await this.runOllamaAction(() => startOllama(), 'Ollama is running.', true);
+  }
+
+  async stopLocal(): Promise<void> {
+    await this.runOllamaAction(() => stopOllama(), 'Ollama stopped.', false);
+  }
+
+  private async runOllamaAction(
+    action: () => Promise<unknown>,
+    success: string,
+    showBusy: boolean,
+  ): Promise<void> {
+    this.ollamaMessage.set(null);
+    this.ollamaBusy.set(showBusy);
+    try {
+      await action();
+      this.ollamaMessage.set({ kind: 'success', text: success });
+    } catch (error) {
+      this.ollamaMessage.set({ kind: 'error', text: formatUnknownError(error, 'Ollama action failed.') });
+    } finally {
+      this.ollamaBusy.set(false);
+      await this.state.refresh();
+    }
+  }
+
   @HostListener('document:pointerdown', ['$event'])
   closeOnOutsidePointer(event: Event): void {
-    if (this.modelsOpen() && !this.host.nativeElement.querySelector('.models-anchor')?.contains(event.target as Node)) {
+    const target = event.target as Node;
+    const host = this.host.nativeElement;
+    if (this.modelsOpen() && !host.querySelector('.models-anchor')?.contains(target)) {
       this.modelsOpen.set(false);
+    }
+    if (this.localOpen() && !host.querySelector('.local-anchor')?.contains(target)) {
+      this.localOpen.set(false);
     }
   }
 
   @HostListener('document:keydown.escape')
   closeOnEscape(): void {
     this.modelsOpen.set(false);
+    this.localOpen.set(false);
   }
 
   ngOnDestroy(): void {

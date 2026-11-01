@@ -61,6 +61,7 @@ from services.inspection.revision_recovery import (
 from services.retrieval.embedding_runtime import close_embedding_runtime
 from services.runtime.desktop import get_desktop_runtime_service
 from services.runtime.jobs import get_job_manager
+from services.runtime.ollama_process import ollama_process_manager
 from services.startup_validation import run_startup_validations
 
 _CLIENT_ASSET_SUFFIXES = {
@@ -130,6 +131,7 @@ async def _release_application_resources() -> None:
         except Exception:
             logger.exception("Could not mark interrupted revision runs during shutdown")
     close_embedding_runtime()
+    await asyncio.to_thread(ollama_process_manager.stop)
     try:
         RepositoryContext.create().engine.dispose()
     except Exception:
