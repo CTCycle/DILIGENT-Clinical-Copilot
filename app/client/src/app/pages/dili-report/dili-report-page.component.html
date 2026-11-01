@@ -117,9 +117,7 @@
             [jobProgress]="session.progress ?? 0"
             [errorMessage]="session.error?.message ?? null"
           ></app-analysis-progress>
-          @if (isInterrupted()) {
-            <p class="dili-report-note">The analysis was interrupted before it finished, for example because the application was closed. Start a new session to run it again.</p>
-          } @else if (session.status === 'cancelled') {
+          @if (session.status === 'cancelled') {
             <p class="dili-report-note">The analysis was cancelled before it finished.</p>
           }
         </div>

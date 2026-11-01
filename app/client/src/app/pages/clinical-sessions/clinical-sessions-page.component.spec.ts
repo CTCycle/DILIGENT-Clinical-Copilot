@@ -412,6 +412,7 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
     items = [
       { ...sessionItem(1), status: 'running', progress: 40, has_report: false },
       { ...sessionItem(2), status: 'draft', patient_name: null, has_report: false },
+      { ...sessionItem(3), status: 'queued', has_report: false },
     ];
     await create();
 
@@ -421,6 +422,8 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
     expect(rows[1].textContent).toContain('Session #2');
     expect(rows[1].textContent).toContain('Draft');
     expect(rows[1].querySelector('[role="progressbar"]')).toBeNull();
+    expect(rows[2].textContent).toContain('Queued');
+    expect(rows[2].querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('auto-refreshes every few seconds only while an active session is listed', async () => {

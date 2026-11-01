@@ -109,7 +109,7 @@
                   <small>
                     #{{ session.session_id }} · Created {{ session.created_at | date:'short' }} · Updated {{ session.updated_at | date:'short' }}
                   </small>
-                  @if (isActiveStatus(session.status)) {
+                  @if (session.status === 'running') {
                     <span
                       class="clinical-session-row-progress"
                       [class.is-indeterminate]="session.progress === null"
@@ -127,7 +127,7 @@
                   <span class="session-status-chip" [attr.data-tone]="statusTone(session.status)">
                     {{ statusLabel(session.status) }}
                   </span>
-                  <span class="clinical-session-row-flags">
+                  <span>
                     @if (session.has_report) { <span title="Has report">Report</span> }
                     @if (session.has_timeline) { <span title="Has timeline">Timeline</span> }
                   </span>
@@ -194,7 +194,11 @@
           <section class="clinical-session-preview">
             <div class="clinical-session-preview-main">
               <div class="clinical-session-preview-card">
-                <div class="clinical-session-preview-content" [innerHTML]="previewReportHtml(detail)"></div>
+                @if (selectedIsInFlight()) {
+                  <p class="clinical-sessions-empty">{{ inFlightPreviewNote(detail.status) }}</p>
+                } @else {
+                  <div class="clinical-session-preview-content" [innerHTML]="previewReportHtml(detail)"></div>
+                }
               </div>
             </div>
             <aside class="clinical-session-preview-side">

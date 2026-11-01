@@ -157,7 +157,6 @@ describe('DiliReportPageComponent', () => {
       error: { code: 'interrupted', message: 'Application restarted during analysis.' },
     });
 
-    expect(text()).toContain('interrupted');
     expect(text()).toContain('Application restarted during analysis.');
     expect(text()).toContain('Partial report');
     expect(text()).toContain('Stored report');

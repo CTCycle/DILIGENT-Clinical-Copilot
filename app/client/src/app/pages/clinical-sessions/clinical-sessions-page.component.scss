@@ -71,8 +71,8 @@
 }
 
 .clinical-sessions-filter-nav {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
   min-width: 0;
   border-bottom: 1px solid var(--color-divider);
@@ -272,17 +272,12 @@
 
 .clinical-session-row-progress.is-indeterminate > span {
   width: 40%;
+  transform: translateX(-100%);
   animation: clinical-session-row-slide 1.4s ease-in-out infinite;
 }
 
 @keyframes clinical-session-row-slide {
-  from { transform: translateX(-100%); }
   to { transform: translateX(250%); }
-}
-
-.clinical-session-row-flags {
-  display: inline-flex;
-  gap: var(--space-sm);
 }
 
 .clinical-session-toolbar {

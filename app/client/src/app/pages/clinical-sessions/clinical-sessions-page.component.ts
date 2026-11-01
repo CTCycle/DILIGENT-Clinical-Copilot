@@ -964,6 +964,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  inFlightPreviewNote(status: InspectionSessionStatus): string {
+    return status === 'draft'
+      ? 'This session is a draft. Edit and run it to generate a report.'
+      : 'The analysis has not finished. Open the report to follow its progress.';
+  }
+
   previewReport(detail: ClinicalSessionDetail): string {
     return extractReport(detail);
   }

@@ -94,7 +94,6 @@ export class DiliReportPageComponent {
     const updated = this.state()?.updated_at;
     return updated ? Date.parse(updated) : null;
   });
-  readonly isInterrupted = computed(() => this.state()?.error?.code === 'interrupted');
   readonly evidenceSources = computed(() => {
     const sources = this.detail()?.metadata['evidence_sources'];
     return Array.isArray(sources)
