@@ -1,5 +1,5 @@
 # Backend Layers
-Last updated: 2026-08-20
+Last updated: 2026-11-01
 
 Sampling behavior is owned by `services/llm/generation_policy.py`.
 
@@ -109,11 +109,13 @@ metadata and session detail belong to `ClinicalSessionRepository`.
 - Current page-local interaction state uses Angular `signal` and `computed` values in model configuration, access-key, and clinical-session preview components; API transport remains in the core service layer.
 
 ## Layered Request Paths
-### `POST /api/clinical/jobs`
+### `POST /api/clinical/sessions/{session_id}/launch`
 - `app/server/api/session.py`
+- `app/server/services/session/lifecycle.py` (launch validation, draft → queued)
+- `app/server/services/session/scheduler.py` (admission, per-session runner, cancellation, recovery)
 - `app/server/services/session/session_service.py`
 - `app/server/repositories/clinical_session_repository.py`
-- Performs clinical preflight before job creation, normalizes the submitted document, applies deterministic section-first extraction before clinical LLM extraction, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact and gate summaries through the job result.
+- Performs clinical preflight before queueing, normalizes the submitted document, applies deterministic section-first extraction before clinical LLM extraction, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact and gate summaries through the job result.
 - Core section extraction is deterministic only and preserves verbatim source slices with heading spans, body spans, char spans, match strategy, confidence, source hash, and review flags.
 - Low-confidence section extraction blocks preflight below `0.65`; review-required section extraction returns non-blocking preflight issues that the frontend must acknowledge before starting the job.
 - Therapy, anamnesis, disease, and laboratory extraction use provider-agnostic structured LLM calls first for both cloud and local providers, then fall back to direct rule-based parsing after bounded validation or provider failures.
@@ -209,7 +211,7 @@ sequenceDiagram
   - Shared access goes through `get_job_manager()`.
   - Work is exposed through start, poll, and cancel endpoints.
 - Job execution state is process-local. Revision run records remain durable, and stale `running` revision runs are failed/recoverable during service startup when their in-memory worker no longer exists.
-- Job concurrency uses explicit scope keys: clinical assessment currently uses `clinical:global`, session revision uses `revision:{root_session_id}`, and catalog updates use `catalog:{job_type}`.
+- Job concurrency uses explicit scope keys: clinical assessment uses one `clinical:{session_id}` scope per admitted session (capacity is enforced by the session scheduler), session revision uses `revision:{root_session_id}`, and catalog updates use `catalog:{job_type}`.
 - CPU-heavy or blocking work must run through the job system instead of blocking request handlers.
 
 ## Architectural Constraints

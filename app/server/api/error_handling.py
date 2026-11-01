@@ -91,8 +91,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
                 request.url.path,
                 response.status_code,
             )
-        if request.url.path == "/api/clinical/draft":
-            response.headers["Cache-Control"] = "no-store"
         return response
 
 
