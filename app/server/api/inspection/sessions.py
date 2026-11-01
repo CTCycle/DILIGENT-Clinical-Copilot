@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import date
 
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, Response, status
 
 from api.inspection.common import InspectionJobEndpointMixin
 from domain.inspection import (
@@ -14,6 +16,9 @@ from domain.inspection import (
     ManualReportEditAudit,
     ManualReportEditRequest,
     ManualReportEditResponse,
+    SessionAttachmentListResponse,
+    SessionAttachmentSummary,
+    SessionAttachmentUploadRequest,
     SessionCatalogResponse,
     SessionDetailResponse,
     SessionListFilters,
@@ -24,6 +29,8 @@ from domain.inspection import (
     SessionVersionSummary,
 )
 from services.inspection.service import DataInspectionService
+
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 ###############################################################################
 class InspectionSessionEndpoint(InspectionJobEndpointMixin):
@@ -158,6 +165,70 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------
+    def list_session_attachments(self, session_id: int) -> SessionAttachmentListResponse:
+        return SessionAttachmentListResponse(
+            items=self.service.list_session_attachments(session_id)
+        )
+
+    # -------------------------------------------------------------------------
+    def upload_session_attachment(
+        self, session_id: int, request: SessionAttachmentUploadRequest
+    ) -> SessionAttachmentSummary:
+        try:
+            content = base64.b64decode(request.content_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Attachment content must be valid base64.",
+            ) from exc
+        if not content or len(content) > MAX_ATTACHMENT_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Attachment must be between 1 byte and 10 MB.",
+            )
+        stored = self.service.add_session_attachment(
+            session_id,
+            file_name=request.file_name,
+            media_type=request.media_type,
+            content=content,
+        )
+        if stored is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found.",
+            )
+        return SessionAttachmentSummary(**stored)
+
+    # -------------------------------------------------------------------------
+    def download_session_attachment(self, session_id: int, attachment_id: int) -> Response:
+        found = self.service.get_session_attachment_content(session_id, attachment_id)
+        if found is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attachment not found.",
+            )
+        summary, content = found
+        return Response(
+            content=content,
+            media_type=summary["media_type"],
+            headers={
+                "Content-Disposition": "inline",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    # -------------------------------------------------------------------------
+    def delete_session_attachment(
+        self, session_id: int, attachment_id: int
+    ) -> DeleteEntityResponse:
+        if not self.service.delete_session_attachment(session_id, attachment_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attachment not found.",
+            )
+        return DeleteEntityResponse(deleted=True)
+
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/sessions",
@@ -206,6 +277,34 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             self.list_manual_edits,
             methods=["GET"],
             response_model=list[ManualReportEditAudit],
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/attachments",
+            self.list_session_attachments,
+            methods=["GET"],
+            response_model=SessionAttachmentListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/attachments",
+            self.upload_session_attachment,
+            methods=["POST"],
+            response_model=SessionAttachmentSummary,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/attachments/{attachment_id}",
+            self.download_session_attachment,
+            methods=["GET"],
+            response_class=Response,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/attachments/{attachment_id}",
+            self.delete_session_attachment,
+            methods=["DELETE"],
+            response_model=DeleteEntityResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

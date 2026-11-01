@@ -133,19 +133,17 @@ async def extract_from_payload(
     else:
         timeline_entries.extend(deterministic_entries)
     extractor.emit_progress(progress_callback, 0.85)
-    normalized: list[ClinicalLabEntry] = []
-    seen: set[tuple[str, str, str, str]] = set()
-    for entry in timeline_entries:
-        prepared = extractor.normalize_entry(
-            entry, visit_date=payload.visit_date, date_order=date_order
+    prepared_entries = [
+        prepared
+        for entry in timeline_entries
+        if (
+            prepared := extractor.normalize_entry(
+                entry, visit_date=payload.visit_date, date_order=date_order
+            )
         )
-        if prepared is None:
-            continue
-        key = extractor.dedupe_key(prepared)
-        if key in seen:
-            continue
-        seen.add(key)
-        normalized.append(prepared)
+        is not None
+    ]
+    normalized = extractor.merge_duplicate_entries(prepared_entries)
     normalized.sort(key=extractor.lab_entry_sort_key)
     extractor.emit_progress(progress_callback, 1.0)
     return PatientLabTimeline(entries=normalized), onset_context

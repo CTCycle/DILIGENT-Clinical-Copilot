@@ -571,8 +571,40 @@ class ClinicalLabExtractor:
             entry.marker_name.strip().upper(),
             date_token,
             value_token.strip().lower(),
-            entry.source,
+            (entry.unit or "").strip().lower(),
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def merge_duplicate_entries(
+        cls, entries: list[ClinicalLabEntry]
+    ) -> list[ClinicalLabEntry]:
+        """Collapse repeated representations of one observation.
+
+        The same marker, date, value and unit restated in several sections is one
+        observation; its provenance becomes ``merged`` when the sources differ.
+        """
+        merged: dict[tuple[str, str, str, str], ClinicalLabEntry] = {}
+        for entry in entries:
+            key = cls.dedupe_key(entry)
+            kept = merged.get(key)
+            if kept is None:
+                merged[key] = entry
+            elif kept.source != entry.source:
+                merged[key] = kept.model_copy(
+                    update={
+                        "source": "merged",
+                        "evidence": kept.evidence or entry.evidence,
+                        "upper_limit_normal": (
+                            kept.upper_limit_normal
+                            if kept.upper_limit_normal is not None
+                            else entry.upper_limit_normal
+                        ),
+                        "upper_limit_text": kept.upper_limit_text
+                        or entry.upper_limit_text,
+                    }
+                )
+        return list(merged.values())
 
     # -------------------------------------------------------------------------
     @classmethod

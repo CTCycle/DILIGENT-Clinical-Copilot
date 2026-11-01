@@ -589,6 +589,45 @@ class ClinicalLabObservation(Base):
     )
 
 ###############################################################################
+class ClinicalSessionAttachment(Base):
+    __tablename__ = "clinical_session_attachments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK, ondelete="CASCADE"),
+        nullable=False,
+    )
+    version_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("clinical_session_versions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    file_name: Mapped[str] = mapped_column(String, nullable=False)
+    media_type: Mapped[str] = mapped_column(String, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('image', 'json', 'document')",
+            name="ck_clinical_session_attachments_kind",
+        ),
+        UniqueConstraint(
+            "session_id",
+            "version_id",
+            "sha256",
+            name="uq_clinical_session_attachments_session_version_sha256",
+        ),
+        Index("ix_clinical_session_attachments_session_id", "session_id"),
+    )
+
+###############################################################################
 class ClinicalDrugMention(Base):
     __tablename__ = "clinical_drug_mentions"
 

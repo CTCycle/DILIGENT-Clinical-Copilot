@@ -368,3 +368,23 @@ def test_calculated_and_indeterminate_pattern_resolution() -> None:
     assert calculated.source == "calculated"
     assert missing.final_value == "indeterminate"
     assert missing.source == "undetermined"
+
+###############################################################################
+def test_same_observation_from_two_sections_merges_with_provenance() -> None:
+    laboratory = ClinicalLabEntry(
+        marker_name="ALT", value=37, unit="U/L", source="laboratory_analysis"
+    )
+    anamnesis = ClinicalLabEntry(
+        marker_name="ALT", value=37, unit="U/L", source="anamnesis", evidence="ALT 37"
+    )
+    other_value = ClinicalLabEntry(marker_name="ALT", value=57, unit="U/L")
+
+    merged = ClinicalLabExtractor.merge_duplicate_entries(
+        [laboratory, anamnesis, other_value]
+    )
+
+    assert [(entry.value, entry.source) for entry in merged] == [
+        (37, "merged"),
+        (57, "anamnesis"),
+    ]
+    assert merged[0].evidence == "ALT 37"

@@ -34,6 +34,8 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/desktop/shutdown"): "desktop.runtime-contract",
     ("GET", "/api/health"): "root-runtime.success",
     ("GET", "/api/system/status"): "root-runtime.success",
+    ("POST", "/api/system/ollama/start"): "root-runtime.success",
+    ("POST", "/api/system/ollama/stop"): "root-runtime.success",
     ("GET", "/api/jobs"): "jobs.monitor-and-cancel",
     ("DELETE", "/api/jobs/{job_id}"): "jobs.monitor-and-cancel",
     ("GET", "/api/inspection/dilirank"): "inspection.catalog-reads",
@@ -83,6 +85,10 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("DELETE", "/api/inspection/sessions/{session_id}"): "session.not-found-contracts",
     ("GET", "/api/inspection/sessions/{session_id}"): "session.timeline-revision-slice",
     ("PUT", "/api/inspection/sessions/{session_id}"): "session.mutation-persistence",
+    ("GET", "/api/inspection/sessions/{session_id}/attachments"): "session.mutation-persistence",
+    ("POST", "/api/inspection/sessions/{session_id}/attachments"): "session.mutation-persistence",
+    ("GET", "/api/inspection/sessions/{session_id}/attachments/{attachment_id}"): "session.mutation-persistence",
+    ("DELETE", "/api/inspection/sessions/{session_id}/attachments/{attachment_id}"): "session.mutation-persistence",
     ("GET", "/api/inspection/sessions/{session_id}/manual-edits"): "session.mutation-persistence",
     ("PUT", "/api/inspection/sessions/{session_id}/report"): "session.mutation-persistence",
     ("POST", "/api/inspection/sessions/{session_id}/revision/jobs"): "revision.error-and-persistence-boundaries",
@@ -389,6 +395,24 @@ def test_session_inspection_mutations_and_timeline_errors(
     )
     assert metadata_update.status == 200, metadata_update.text()
     assert metadata_update.json()["session_id"] == session_id
+
+    attachment_body = {
+        "file_name": "contract.json",
+        "media_type": "application/json",
+        "content_base64": "eyJvayI6IHRydWV9",
+    }
+    attachments_path = f"/api/inspection/sessions/{session_id}/attachments"
+    first_upload = api_context.post(attachments_path, data=attachment_body)
+    assert first_upload.status == 200, first_upload.text()
+    repeat_upload = api_context.post(attachments_path, data=attachment_body)
+    assert repeat_upload.json()["attachment_id"] == first_upload.json()["attachment_id"]
+    assert first_upload.json()["kind"] == "json"
+    listed = api_context.get(attachments_path).json()["items"]
+    assert [item["file_name"] for item in listed] == ["contract.json"]
+    attachment_path = f"{attachments_path}/{first_upload.json()['attachment_id']}"
+    assert api_context.get(attachment_path).body() == b'{"ok": true}'
+    assert api_context.delete(attachment_path).status == 200
+    assert api_context.get(attachment_path).status == 404
 
     edited_report = f"{original_report}\n\nAPI boundary validation marker."
     try:

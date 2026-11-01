@@ -78,6 +78,31 @@ class SessionDetailResponse(BaseModel):
     manual_edit_history: list["ManualReportEditAudit"] = Field(default_factory=list)
 
 ###############################################################################
+class SessionAttachmentSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    attachment_id: int
+    session_id: int
+    version_id: int
+    kind: Literal["image", "json", "document"]
+    file_name: str
+    media_type: str
+    size_bytes: int
+    sha256: str
+    created_at: str | None = None
+
+###############################################################################
+class SessionAttachmentUploadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    file_name: str = Field(min_length=1, max_length=255)
+    media_type: str = Field(default="application/octet-stream", max_length=127)
+    content_base64: str = Field(min_length=1, max_length=14_000_000)
+
+###############################################################################
+class SessionAttachmentListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[SessionAttachmentSummary] = Field(default_factory=list)
+
+###############################################################################
 class SessionUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_text: str | None = Field(default=None, max_length=100000)

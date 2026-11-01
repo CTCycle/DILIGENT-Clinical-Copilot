@@ -529,19 +529,19 @@ class ClinicalSessionExtractionPipelineMixin:
                     date_order=date_order,
                 )
             )
-            normalized_entries = []
-            seen_keys: set[tuple[str, str, str, str]] = set()
-            for entry in fallback_entries:
-                prepared = self.lab_extractor.normalize_entry(
-                    entry, visit_date=payload.visit_date, date_order=date_order
+            prepared_entries = [
+                prepared
+                for entry in fallback_entries
+                if (
+                    prepared := self.lab_extractor.normalize_entry(
+                        entry, visit_date=payload.visit_date, date_order=date_order
+                    )
                 )
-                if prepared is None:
-                    continue
-                key = self.lab_extractor.dedupe_key(prepared)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                normalized_entries.append(prepared)
+                is not None
+            ]
+            normalized_entries = self.lab_extractor.merge_duplicate_entries(
+                prepared_entries
+            )
             normalized_entries.sort(key=self.lab_extractor.lab_entry_sort_key)
             lab_timeline = PatientLabTimeline(entries=normalized_entries)
             onset_context = None

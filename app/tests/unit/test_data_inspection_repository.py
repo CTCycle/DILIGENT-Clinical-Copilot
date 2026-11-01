@@ -213,6 +213,17 @@ def test_session_list_filters_and_search() -> None:
     assert total == 1
     assert items[0]["patient_name"] == "Carol Archive"
 
+    for status_filter, expected_total in (("failed", 1), ("successful", 0)):
+        _, total = repository_graph.clinical_session_repository.list_sessions(
+            search="bob",
+            status_filter=status_filter,
+            date_mode="exact",
+            filter_date=date(2025, 1, 2),
+            offset=0,
+            limit=10,
+        )
+        assert total == expected_total
+
 ###############################################################################
 def test_session_report_and_text_use_result_payload_only() -> None:
     repository_graph, _ = build_repository_graph_for_test()

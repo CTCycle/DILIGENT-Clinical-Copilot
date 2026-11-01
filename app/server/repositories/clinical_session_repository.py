@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from datetime import date, datetime, timedelta
@@ -19,6 +20,7 @@ from repositories.schemas.clinical import (
     ClinicalDrugMention,
     ClinicalLabObservation,
     ClinicalSession,
+    ClinicalSessionAttachment,
     ClinicalSessionResult,
     ClinicalSessionSection,
     ClinicalSessionTimeline,
@@ -428,6 +430,91 @@ class ClinicalSessionRepository:
         return self.get_session_detail(safe_session_id)
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _serialize_attachment(row: ClinicalSessionAttachment) -> dict[str, Any]:
+        return {
+            "attachment_id": int(row.id),
+            "session_id": int(row.session_id),
+            "version_id": int(row.version_id),
+            "kind": row.kind,
+            "file_name": row.file_name,
+            "media_type": row.media_type,
+            "size_bytes": int(row.size_bytes),
+            "sha256": row.sha256,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+
+    # -------------------------------------------------------------------------
+    def add_attachment(
+        self,
+        session_id: int,
+        *,
+        version_id: int,
+        kind: str,
+        file_name: str,
+        media_type: str,
+        content: bytes,
+    ) -> dict[str, Any] | None:
+        """Store an attachment once per session version and content hash."""
+        safe_session_id = int(session_id)
+        digest = hashlib.sha256(content).hexdigest()
+        with self.session_factory() as db_session:
+            if db_session.get(ClinicalSession, safe_session_id) is None:
+                return None
+            row = db_session.execute(
+                select(ClinicalSessionAttachment).where(
+                    ClinicalSessionAttachment.session_id == safe_session_id,
+                    ClinicalSessionAttachment.version_id == int(version_id),
+                    ClinicalSessionAttachment.sha256 == digest,
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                row = ClinicalSessionAttachment(
+                    session_id=safe_session_id,
+                    version_id=int(version_id),
+                    kind=kind,
+                    file_name=file_name,
+                    media_type=media_type,
+                    size_bytes=len(content),
+                    sha256=digest,
+                    content=content,
+                )
+                db_session.add(row)
+                db_session.commit()
+                db_session.refresh(row)
+            return self._serialize_attachment(row)
+
+    # -------------------------------------------------------------------------
+    def list_attachments(self, session_id: int) -> list[dict[str, Any]]:
+        with self.session_factory() as db_session:
+            rows = db_session.execute(
+                select(ClinicalSessionAttachment)
+                .where(ClinicalSessionAttachment.session_id == int(session_id))
+                .order_by(ClinicalSessionAttachment.id)
+            ).scalars()
+            return [self._serialize_attachment(row) for row in rows]
+
+    # -------------------------------------------------------------------------
+    def get_attachment_content(
+        self, session_id: int, attachment_id: int
+    ) -> tuple[dict[str, Any], bytes] | None:
+        with self.session_factory() as db_session:
+            row = db_session.get(ClinicalSessionAttachment, int(attachment_id))
+            if row is None or int(row.session_id) != int(session_id):
+                return None
+            return self._serialize_attachment(row), bytes(row.content)
+
+    # -------------------------------------------------------------------------
+    def delete_attachment(self, session_id: int, attachment_id: int) -> bool:
+        with self.session_factory() as db_session:
+            row = db_session.get(ClinicalSessionAttachment, int(attachment_id))
+            if row is None or int(row.session_id) != int(session_id):
+                return False
+            db_session.delete(row)
+            db_session.commit()
+            return True
+
+    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         safe_session_id = int(session_id)
         with self.session_factory() as db_session:
@@ -487,6 +574,7 @@ class ClinicalSessionRepository:
             "INR": "inr",
             "ALB": "albumin",
         }
+        seen_observations: set[tuple[Any, ...]] = set()
         for ordinal, item in enumerate(timeline_raw):
             if not isinstance(item, dict):
                 continue
@@ -502,18 +590,24 @@ class ClinicalSessionRepository:
             ) or repository_values.normalize_string(item.get("upper_limit_text"))
             if value_raw is None and upper_limit_raw is None:
                 continue
+            observation_at = session_result_data.parse_datetime(
+                item.get("observation_at")
+                or item.get("date")
+                or item.get("sample_date")
+            )
+            unit = repository_values.normalize_string(item.get("unit"))
+            observation_key = (lab_code, observation_at, value_raw, upper_limit_raw, unit)
+            if observation_key in seen_observations:
+                continue
+            seen_observations.add(observation_key)
             db_session.add(
                 ClinicalLabObservation(
                     session_id=session_id,
                     marker_code=lab_code,
-                    observation_at=session_result_data.parse_datetime(
-                        item.get("observation_at")
-                        or item.get("date")
-                        or item.get("sample_date")
-                    ),
+                    observation_at=observation_at,
                     value_numeric=repository_values.to_float(value_raw),
                     value_text=value_raw,
-                    unit=repository_values.normalize_string(item.get("unit")),
+                    unit=unit,
                     upper_limit_numeric=repository_values.to_float(upper_limit_raw),
                     source_ordinal=ordinal,
                     metadata_json={

@@ -281,6 +281,54 @@ class DataInspectionService(
         return {"session": session, "audit": updated["audit"]}
 
     # -------------------------------------------------------------------------
+    def list_session_attachments(self, session_id: int) -> list[dict[str, Any]]:
+        return self.clinical_session_repository.list_attachments(session_id)
+
+    # -------------------------------------------------------------------------
+    def add_session_attachment(
+        self,
+        session_id: int,
+        *,
+        file_name: str,
+        media_type: str,
+        content: bytes,
+    ) -> dict[str, Any] | None:
+        version = self.session_revision_repository.get_version_record_for_session(
+            session_id
+        )
+        if version is None:
+            return None
+        lowered_name = file_name.lower()
+        if media_type.startswith("image/"):
+            kind = "image"
+        elif media_type == "application/json" or lowered_name.endswith(".json"):
+            kind = "json"
+        else:
+            kind = "document"
+        return self.clinical_session_repository.add_attachment(
+            session_id,
+            version_id=int(version["version_id"]),
+            kind=kind,
+            file_name=file_name,
+            media_type=media_type,
+            content=content,
+        )
+
+    # -------------------------------------------------------------------------
+    def get_session_attachment_content(
+        self, session_id: int, attachment_id: int
+    ) -> tuple[dict[str, Any], bytes] | None:
+        return self.clinical_session_repository.get_attachment_content(
+            session_id, attachment_id
+        )
+
+    # -------------------------------------------------------------------------
+    def delete_session_attachment(self, session_id: int, attachment_id: int) -> bool:
+        return self.clinical_session_repository.delete_attachment(
+            session_id, attachment_id
+        )
+
+    # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         self.session_revision_repository.delete_session_revisions(session_id)
         return self.clinical_session_repository.delete_session(session_id)
