@@ -3,7 +3,7 @@
 <main class="page-container dili-report-page">
   @if (pageState() !== 'empty') {
     <header class="dili-report-header">
-      <div>
+      <div class="dili-report-heading">
         <a class="dili-report-back" routerLink="/">← Back to workspace</a>
         <h1>{{ patientLabel() }}</h1>
         <dl class="dili-report-meta">
@@ -21,6 +21,17 @@
           }
         </dl>
       </div>
+      @if (pageState() === 'completed') {
+        <div class="dili-report-actions" role="toolbar" aria-label="Report actions">
+          <button type="button" class="dili-report-action" title="Copy report" aria-label="Copy report" (click)="copyReport()">
+            @if (copied()) { <svg lucideCheck size="18" aria-hidden="true"></svg> } @else { <svg lucideCopy size="18" aria-hidden="true"></svg> }
+          </button>
+          <button type="button" class="dili-report-action" title="Download report" aria-label="Download report" (click)="downloadReport()">
+            <svg lucideDownload size="18" aria-hidden="true"></svg>
+          </button>
+          <span class="dili-report-copied" role="status">{{ copied() ? 'Copied' : '' }}</span>
+        </div>
+      }
     </header>
   }
 

@@ -84,7 +84,6 @@
   --app-min-viewport-width: 1100px;
   --container-max: 1536px;
   --drawer-width: 360px;
-  --report-max-height: 480px;
   --app-top-nav-height: 59px;
   --app-status-bar-height: 26px;
   --app-chrome-height: calc(var(--app-top-nav-height) + var(--app-status-bar-height));
@@ -532,10 +531,6 @@ app-root {
   margin-top: calc(var(--space-3xl) + var(--space-md));
 }
 
-.report-section.stitch-dili-report {
-  margin-top: 0;
-}
-
 /* ============================================
    Header
    ============================================ */
@@ -591,11 +586,6 @@ app-root {
 .main-form-grid .patient-info {
   grid-column: 2;
   grid-row: 1;
-}
-
-.main-form-grid .report-section {
-  grid-column: 1 / -1;
-  grid-row: 2;
 }
 
 /* ============================================
@@ -1406,61 +1396,6 @@ app-root {
   background: rgba(0, 0, 0, 0.03);
 }
 
-/* ============================================
-   Report Section
-   ============================================ */
-.report-section {
-  margin: 0;
-}
-
-.report-shell {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-alt) 100%);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-
-.report-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-lg) var(--space-xl);
-  border-bottom: 1px solid var(--color-divider);
-}
-
-.report-eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 700;
-  color: var(--color-brand);
-  font-size: var(--font-xs);
-}
-
-.report-header h2 {
-  margin: 0;
-  font-size: var(--font-xl);
-  color: var(--color-text-primary);
-}
-
-.report-subtitle {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-sm);
-}
-
-/* Report Toolbar */
-.report-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-xl);
-  background: var(--color-surface-alt);
-  border-bottom: 1px solid var(--color-divider);
-}
-
 .toolbar-btn {
   display: inline-flex;
   align-items: center;
@@ -1491,31 +1426,6 @@ app-root {
 .toolbar-btn svg {
   width: 16px;
   height: 16px;
-}
-
-/* Report Content */
-.report-content {
-  padding: var(--space-lg) var(--space-xl);
-  min-height: 180px;
-  max-height: var(--report-max-height);
-  overflow-y: auto;
-  background: var(--color-surface-alt);
-}
-
-.report-content.is-expanded {
-  max-height: min(78vh, 820px);
-  min-height: 220px;
-  resize: vertical;
-}
-
-.report-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 120px;
-  color: var(--color-text-muted);
-  font-size: var(--font-base);
-  font-style: italic;
 }
 
 /* Markdown Styling */
@@ -3367,45 +3277,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--color-text-secondary);
 }
 
-.inspection-report-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-.inspection-report-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-md);
-  flex: 0 0 auto;
-}
-
-.inspection-report-header h1 {
-  margin: 0;
-}
-
-.inspection-report-subtitle {
-  margin: 6px 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-sm);
-}
-
-.inspection-report-shell {
-  min-height: 0;
-  flex: 1 1 auto;
-  display: flex;
-}
-
-.inspection-report-shell .report-content {
-  max-height: none;
-  min-height: 0;
-  flex: 1 1 auto;
-}
-
 .inspection-modal {
   --modal-max-width: 760px;
   overflow: hidden;
@@ -3775,11 +3646,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-color: var(--color-border);
 }
 
-:root[data-theme="dark"] .report-toolbar,
-:root[data-theme="dark"] .report-content {
-  background: rgba(15, 23, 42, 0.86);
-}
-
 :root[data-theme="dark"] .toolbar-btn:hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.2);
 }
@@ -3894,7 +3760,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(148, 163, 184, 0.22);
 }
 
-
 /* ============================================
    Angular Parity Fixes
    ============================================ */
@@ -3927,17 +3792,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root[data-theme="dark"] .stitch-dili-inline-fields .field input {
   background: var(--color-surface);
   border-color: var(--color-border);
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell {
-  background: #132235;
-  border-top-color: var(--color-divider);
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell .report-toolbar,
-:root[data-theme="dark"] .stitch-dili-report-shell .report-content {
-  background: #132235;
-  border-bottom-color: var(--color-divider);
 }
 
 .app-header-icon-btn .theme-icon-image {
@@ -4282,71 +4136,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(255, 255, 255, 0.52);
 }
 
-.report-shell.is-full-page {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 2500;
-  border-radius: 0;
-}
-
-.stitch-dili-report-shell {
-  border: 0;
-  border-top: 1px solid rgba(15, 125, 90, 0.18);
-  border-radius: 0;
-  background: var(--color-surface-alt);
-  box-shadow: none;
-}
-
-.stitch-dili-report-shell .report-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-xl);
-  background: var(--color-surface);
-  border-bottom: 1px solid rgba(15, 125, 90, 0.18);
-}
-
-.stitch-dili-report-shell .report-content {
-  min-height: 260px;
-  padding: 0 var(--space-xl) var(--space-xl);
-  background: var(--color-surface-alt);
-}
-
-.report-toolbar-label {
-  margin: 0 auto 0 0;
-  font-family: "Manrope", "Inter", sans-serif;
-  font-size: var(--font-sm);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.stitch-dili-report-shell .toolbar-btn {
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-.stitch-dili-report-shell .toolbar-btn:hover:not(:disabled) {
-  background: var(--color-brand-bg);
-  color: var(--color-text-primary);
-}
-
-.report-shell.is-full-page .report-content {
-  height: calc(100vh - 72px);
-  max-height: none;
-  resize: none;
-}
-
-.report-shell.is-full-page .inspection-excerpt-text {
-  max-height: none;
-  height: 100%;
-  overflow-y: auto;
-}
-
 .report-markdown {
   line-height: 1.6;
   white-space: normal;
@@ -4565,35 +4354,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #a8c6bc !important;
 }
 
-.stitch-dili-report-shell {
-  background: #f4f8f6;
-}
-
-.stitch-dili-report-shell .report-toolbar {
-  background: #fbfefd;
-  border-bottom: 1px solid #d6e5de;
-}
-
-.report-toolbar-label {
-  color: #167d64;
-}
-
-.stitch-dili-report-shell .toolbar-btn {
-  color: #2d3f3c;
-}
-
-.stitch-dili-report-shell .toolbar-btn:hover:not(:disabled) {
-  background: rgba(20, 134, 99, 0.1);
-  color: #183531;
-}
-
-.stitch-dili-report-shell .report-content {
-  background:
-    radial-gradient(circle at 1px 1px, rgba(130, 168, 154, 0.2) 1px, transparent 0) 0 0 / 16px 16px,
-    #f7fbf9;
-  border-top: 0;
-}
-
 /* Variant E dark-mode palette */
 :root[data-theme="dark"] .app-shell {
   background: #071923;
@@ -4664,32 +4424,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #d5e4e7;
 }
 
-:root[data-theme="dark"] .stitch-dili-report-shell {
-  background: #0a2230;
-  border-top-color: rgba(68, 96, 104, 0.5);
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell .report-toolbar {
-  background: #132b37;
-  border-bottom-color: rgba(68, 96, 104, 0.5);
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell .report-content {
-  background:
-    radial-gradient(circle at 1px 1px, rgba(124, 164, 150, 0.2) 1px, transparent 0) 0 0 / 16px 16px,
-    #0e2835;
-}
-
-:root[data-theme="dark"] .report-toolbar-label,
-:root[data-theme="dark"] .stitch-dili-report-shell .toolbar-btn {
-  color: #c5d6dc;
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell .toolbar-btn:hover:not(:disabled) {
-  background: rgba(49, 195, 152, 0.16);
-  color: #e4f2f4;
-}
-
 /* ============================================
    Post-Annotation Refinements
    ============================================ */
@@ -4734,17 +4468,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 0.82;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.46) 14%, #000 100%);
   mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.46) 14%, #000 100%);
-}
-
-/* DILI report toolbar actions: stronger emphasis */
-.stitch-dili-report-shell .toolbar-btn {
-  font-weight: 700;
-  color: #223733;
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell .toolbar-btn {
-  font-weight: 700;
-  color: #d9e8ec;
 }
 
 /* Knowledge: show denser index column + more visible rows across views */
@@ -4887,14 +4610,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-local-row .model-config-inline-btn {
   padding: 6px 10px;
-}
-
-.stitch-dili-report-shell .toolbar-btn:disabled {
-  opacity: 0.82;
-}
-
-:root[data-theme="dark"] .stitch-dili-report-shell .toolbar-btn:disabled {
-  opacity: 0.82;
 }
 
 /* Extra parameters moved to right column, placed below summary */

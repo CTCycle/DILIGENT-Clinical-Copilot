@@ -4,15 +4,18 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { LucideCheck, LucideCopy, LucideDownload } from '@lucide/angular';
 import { map } from 'rxjs';
 
 import { AnalysisProgressComponent } from '../../components/analysis-progress/analysis-progress.component';
 import { ClinicalReportViewerComponent } from '../../components/clinical-report-viewer/clinical-report-viewer.component';
+import { REPORT_EXPORT_FILENAME } from '../../core/constants';
 import { describeEvidenceSources } from '../../core/evidence-sources';
 import { ClinicalSessionDetail } from '../../core/models/inspection-types';
 import { fetchClinicalSessionDetail } from '../../core/services/clinical-sessions-api';
+import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { AppStateService } from '../../core/state/app-state.service';
-import { formatUnknownError, isRecord } from '../../core/utils';
+import { createDownloadUrl, formatUnknownError, isRecord } from '../../core/utils';
 import { previewReport } from '../clinical-sessions/clinical-session-preview';
 
 type ReportPageState = 'loading' | 'running' | 'interrupted' | 'completed' | 'empty' | 'error';
@@ -27,13 +30,14 @@ function parseSessionId(value: string | null): number | null {
 
 @Component({
   selector: 'app-dili-report-page',
-  imports: [RouterLink, AnalysisProgressComponent, ClinicalReportViewerComponent],
+  imports: [RouterLink, LucideCheck, LucideCopy, LucideDownload, AnalysisProgressComponent, ClinicalReportViewerComponent],
   templateUrl: './dili-report-page.component.html',
   styleUrl: './dili-report-page.component.scss',
 })
 export class DiliReportPageComponent {
   private readonly stateService = inject(AppStateService);
   private readonly route = inject(ActivatedRoute);
+  private readonly markdownRenderer = inject(MarkdownRendererService);
 
   private readonly routeSessionId = toSignal(
     this.route.paramMap.pipe(map((params) => parseSessionId(params.get('sessionId')))),
@@ -44,6 +48,8 @@ export class DiliReportPageComponent {
   readonly detail = signal<ClinicalSessionDetail | null>(null);
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
+  readonly copied = signal(false);
+  private copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly vm = computed(() => this.stateService.state().diliAgent);
   readonly isStoredRoute = computed(() => this.routeSessionId() !== null);
@@ -101,6 +107,36 @@ export class DiliReportPageComponent {
       const sessionId = this.targetSessionId();
       untracked(() => void this.load(sessionId));
     });
+  }
+
+  async copyReport(): Promise<void> {
+    const rendered = this.markdownRenderer.render(this.reportMarkdown());
+    if (!rendered.text || !navigator.clipboard) return;
+    const clipboardItemCtor = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+    if (clipboardItemCtor) {
+      await navigator.clipboard.write([
+        new clipboardItemCtor({
+          'text/html': new Blob([rendered.html], { type: 'text/html' }),
+          'text/plain': new Blob([rendered.text], { type: 'text/plain' }),
+        }),
+      ]);
+    } else {
+      await navigator.clipboard.writeText(rendered.text);
+    }
+    this.copied.set(true);
+    if (this.copiedTimer) clearTimeout(this.copiedTimer);
+    this.copiedTimer = setTimeout(() => this.copied.set(false), 2000);
+  }
+
+  downloadReport(): void {
+    const markdown = this.reportMarkdown();
+    if (!markdown) return;
+    const url = createDownloadUrl(markdown, REPORT_EXPORT_FILENAME);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = REPORT_EXPORT_FILENAME;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   private isLiveReportAvailable(): boolean {

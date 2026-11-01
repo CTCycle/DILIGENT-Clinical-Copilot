@@ -5,6 +5,57 @@
   display: grid;
   gap: var(--space-lg);
   align-content: start;
+  max-width: 960px;
+  margin: 0 auto;
+  padding-top: 0;
+}
+
+.dili-report-header {
+  position: sticky;
+  top: var(--app-top-nav-height);
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-lg) 0 var(--space-md);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--app-background);
+}
+
+.dili-report-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
+.dili-report-action {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height-md);
+  height: var(--control-height-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.dili-report-action:hover {
+  background: var(--color-brand-bg);
+  color: var(--color-text-primary);
+}
+
+.dili-report-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.dili-report-copied {
+  min-width: 3.5rem;
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
 }
 
 .dili-report-header h1 {
