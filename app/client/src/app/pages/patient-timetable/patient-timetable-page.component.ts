@@ -68,13 +68,6 @@ const EVENT_COLORS: Record<InspectionTimelineEventType, string> = {
   other: 'var(--color-chart-other)',
 };
 
-const EVENT_TYPE_LABELS: Record<InspectionTimelineEventType, string> = {
-  therapy: 'Medication',
-  disease: 'Clinical',
-  lab: 'Laboratory',
-  other: 'Other',
-};
-
 const TIMING_LABELS: Record<InspectionTimelineTimingType, string> = {
   explicit_date: 'Explicit date',
   relative: 'Relative timing',
@@ -442,10 +435,6 @@ export class PatientTimetablePageComponent implements OnInit {
   selectNextEvent(): void {
     const event = this.filteredEvents()[this.selectedEventIndex() + 1];
     if (event) this.selectEvent(event);
-  }
-
-  eventTypeLabel(event: InspectionTimelineEvent): string {
-    return EVENT_TYPE_LABELS[event.event_type] ?? EVENT_TYPE_LABELS.other;
   }
 
   eventLaneLabel(event: InspectionTimelineEvent): string {

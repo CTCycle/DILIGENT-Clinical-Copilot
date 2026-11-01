@@ -142,7 +142,7 @@
                         }
                       </div>
                       <div class="event-group-copy">
-                        <span class="section-kicker">{{ group.eyebrow }}</span>
+                        @if (group.isUnanchored) { <span class="section-kicker">{{ group.eyebrow }}</span> }
                         <h3 [id]="'group-' + group.key">{{ group.label }}</h3>
                         <p>{{ group.events.length }} {{ group.events.length === 1 ? 'event' : 'events' }} <span aria-hidden="true">·</span> {{ group.dateHint }}</p>
                       </div>
@@ -157,7 +157,6 @@
                               <div class="event-card-title">
                                 <div class="event-labels">
                                   <span class="event-category">{{ eventLaneLabel(event) }}</span>
-                                  <span class="event-type">{{ eventTypeLabel(event) }}</span>
                                 </div>
                                 <h4>{{ event.title }}</h4>
                               </div>
@@ -168,7 +167,6 @@
                             </div>
                             <div class="event-meta-row">
                               <span class="event-meta-item"><span class="meta-label">Timing</span>{{ timingLabel(event.timing_type) }}</span>
-                              <span class="event-meta-item"><span class="meta-label">Placement</span>{{ eventDateSummary(event) }}</span>
                               @if (isEventUncertain(event)) {
                                 <span class="event-flag is-uncertain">Approximate placement</span>
                               }
@@ -213,7 +211,6 @@
             <section class="inspector-hero">
               <div class="event-labels">
                 <span class="event-category">{{ eventLaneLabel(event) }}</span>
-                <span class="event-type">{{ eventTypeLabel(event) }}</span>
               </div>
               <h3>{{ event.title }}</h3>
               <p>{{ eventDateSummary(event) }}</p>
