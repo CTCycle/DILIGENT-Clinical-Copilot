@@ -1,12 +1,16 @@
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
 <main class="page-container dili-report-page">
-  @if (pageState() !== 'empty') {
+  @if (state(); as session) {
     <header class="dili-report-header">
       <div class="dili-report-heading">
-        <a class="dili-report-back" routerLink="/">← Back to workspace</a>
-        <h1>{{ patientLabel() }}</h1>
+        <a class="dili-report-back" routerLink="/clinical-sessions" [queryParams]="{ session: session.session_id }">← Clinical Sessions</a>
+        <div class="dili-report-title-row">
+          <h1>{{ title() }}</h1>
+          <span class="session-status-chip" [attr.data-tone]="statusTone()" data-testid="session-status">{{ statusLabel() }}</span>
+        </div>
         <dl class="dili-report-meta">
+          <div><dt>Session</dt><dd>#{{ session.session_id }}</dd></div>
           @if (visitDate(); as date) {
             <div><dt>Visit date</dt><dd>{{ date }}</dd></div>
           }
@@ -21,8 +25,41 @@
           }
         </dl>
       </div>
-      @if (pageState() === 'completed') {
-        <div class="dili-report-actions" role="toolbar" aria-label="Report actions">
+      <div class="dili-report-actions" role="toolbar" aria-label="Session actions">
+        @if (isActive()) {
+          @if (stopRequested()) {
+            <span class="dili-report-stopping" role="status">Stopping after the current step…</span>
+          } @else if (cancelStep() === 'idle') {
+            <button type="button" class="btn btn-secondary dili-report-button" (click)="requestCancel()">Cancel analysis</button>
+          } @else {
+            <span class="dili-report-confirm" role="group" aria-label="Confirm cancellation">
+              <span>Cancel this analysis?</span>
+              <button
+                type="button"
+                class="btn btn-danger dili-report-button"
+                [disabled]="cancelStep() === 'requesting'"
+                (click)="confirmCancel()"
+              >
+                {{ cancelStep() === 'requesting' ? 'Cancelling…' : 'Yes, cancel' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary dili-report-button"
+                [disabled]="cancelStep() === 'requesting'"
+                (click)="dismissCancel()"
+              >
+                Keep running
+              </button>
+            </span>
+          }
+        }
+        @if (session.status === 'draft') {
+          <a class="btn btn-primary dili-report-button" routerLink="/" [queryParams]="{ session: session.session_id }">Edit draft</a>
+        }
+        @if (session.status === 'draft' || session.has_report) {
+          <a class="btn btn-secondary dili-report-button" routerLink="/clinical-sessions" [queryParams]="{ session: session.session_id, tab: 'timeline' }">Timeline</a>
+        }
+        @if (reportMarkdown()) {
           <button type="button" class="dili-report-action" title="Copy report" aria-label="Copy report" (click)="copyReport()">
             @if (copied()) { <svg lucideCheck size="18" aria-hidden="true"></svg> } @else { <svg lucideCopy size="18" aria-hidden="true"></svg> }
           </button>
@@ -30,52 +67,82 @@
             <svg lucideDownload size="18" aria-hidden="true"></svg>
           </button>
           <span class="dili-report-copied" role="status">{{ copied() ? 'Copied' : '' }}</span>
-        </div>
-      }
-    </header>
-  }
-
-  @switch (pageState()) {
-    @case ('running') {
-      <div class="dili-report-status">
-        <app-analysis-progress
-          [jobStatus]="vm().jobStatus"
-          [jobProgress]="vm().jobProgress"
-          [stage]="vm().jobStage"
-          [stageMessage]="vm().jobStageMessage"
-          [startedAtMs]="vm().jobStartedAtMs"
-          [lastProgressAtMs]="vm().jobLastProgressAtMs"
-        ></app-analysis-progress>
-        <p class="dili-report-note">The report appears here when the analysis completes.</p>
-      </div>
-    }
-    @case ('loading') {
-      <p class="dili-report-note" role="status">Loading report...</p>
-    }
-    @case ('error') {
-      <p class="dili-report-note is-error" role="alert">{{ loadError() }}</p>
-    }
-    @case ('interrupted') {
-      <div class="dili-report-status">
-        <app-analysis-progress
-          [jobStatus]="vm().jobStatus"
-          [jobProgress]="vm().jobProgress"
-          [errorMessage]="vm().message"
-        ></app-analysis-progress>
-        @if (vm().jobStatus === 'cancelled') {
-          <p class="dili-report-note">{{ vm().message }}</p>
         }
       </div>
+    </header>
+    @if (cancelError(); as error) {
+      <p class="dili-report-note is-error" role="alert">{{ error }}</p>
     }
-    @case ('completed') {
-      <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
+
+    @switch (session.status) {
+      @case ('draft') {
+        <div class="dili-report-status">
+          <p class="dili-report-note">This session is a draft. It has not been analysed yet.</p>
+        </div>
+      }
+      @case ('queued') {
+        <div class="dili-report-status">
+          <p class="dili-report-note" role="status">
+            Waiting for capacity@if (session.queue_position !== null) { (position {{ session.queue_position }}) }.
+            The analysis starts automatically; you can leave this page.
+          </p>
+        </div>
+      }
+      @case ('running') {
+        <div class="dili-report-status">
+          <app-analysis-progress
+            jobStatus="running"
+            [jobProgress]="session.progress ?? 0"
+            [stage]="session.progress_stage"
+            [stageMessage]="session.progress_message"
+            [startedAtMs]="progressStartedAtMs()"
+            [lastProgressAtMs]="progressUpdatedAtMs()"
+          ></app-analysis-progress>
+          <p class="dili-report-note">The report appears here when the analysis completes.</p>
+        </div>
+      }
+      @case ('completed') {
+        @if (reportMarkdown()) {
+          <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
+        } @else if (detailError(); as error) {
+          <p class="dili-report-note is-error" role="alert">{{ error }}</p>
+        } @else {
+          <p class="dili-report-note" role="status">Loading report…</p>
+        }
+      }
+      @default {
+        <div class="dili-report-status" data-testid="session-interrupted">
+          <app-analysis-progress
+            [jobStatus]="session.status === 'failed' ? 'failed' : 'cancelled'"
+            [jobProgress]="session.progress ?? 0"
+            [errorMessage]="session.error?.message ?? null"
+          ></app-analysis-progress>
+          @if (isInterrupted()) {
+            <p class="dili-report-note">The analysis was interrupted before it finished, for example because the application was closed. Start a new session to run it again.</p>
+          } @else if (session.status === 'cancelled') {
+            <p class="dili-report-note">The analysis was cancelled before it finished.</p>
+          }
+        </div>
+        @if (reportMarkdown()) {
+          <h2 class="dili-report-section-title">Partial report</h2>
+          <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
+        }
+      }
     }
-    @default {
-      <div class="dili-report-empty">
-        <h2>No report yet</h2>
-        <p>Run an analysis from the workspace, or open a stored report from Clinical Sessions.</p>
-        <a class="btn btn-secondary" routerLink="/">Back to workspace</a>
-      </div>
+
+    @if (input(); as source) {
+      <details class="dili-report-input">
+        <summary>Clinical input</summary>
+        <pre class="dili-report-input-text">{{ source.clinical_input }}</pre>
+      </details>
     }
+  } @else if (loadError(); as error) {
+    <div class="dili-report-empty">
+      <h2>Session unavailable</h2>
+      <p role="alert">{{ error }}</p>
+      <a class="btn btn-secondary" routerLink="/clinical-sessions">Back to Clinical Sessions</a>
+    </div>
+  } @else {
+    <p class="dili-report-note" role="status">Loading session…</p>
   }
 </main>

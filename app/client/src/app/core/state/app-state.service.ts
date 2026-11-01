@@ -4,13 +4,12 @@
 import { Injectable, effect, signal } from '@angular/core';
 
 import { DEFAULT_FORM_STATE } from '../constants';
-import { ClinicalFormState, JobStatus } from '../models/types';
+import { ClinicalFormState } from '../models/types';
 
 export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'settings';
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
-const DILI_AGENT_UI_STATE_KEY = 'dili-agent-ui-state-v1';
 const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
   'clinical-sessions': '/clinical-sessions',
@@ -39,22 +38,16 @@ export function resolvePathFromPage(page: PageId): string {
   return PAGE_PATHS[page] || PAGE_PATHS[DEFAULT_PAGE];
 }
 
+export type DraftSaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
+
 export interface DiliAgentState {
   form: ClinicalFormState;
-  message: string;
-  jobId: string | null;
-  jobProgress: number;
-  jobStatus: JobStatus | null;
-  jobStage: string | null;
-  jobStageMessage: string | null;
-  sessionId: number | null;
-  isStarting: boolean;
-  isRunning: boolean;
+  draftSessionId: number | null;
+  draftUpdatedAt: string | null;
+  saveStatus: DraftSaveStatus;
+  lastSavedAt: string | null;
+  isDirty: boolean;
   isPulling: boolean;
-  isExpanded: boolean;
-  jobStartedAtMs: number | null;
-  jobLastProgressAtMs: number | null;
-  pollIntervalMs: number | null;
 }
 
 export interface AppState {
@@ -63,85 +56,21 @@ export interface AppState {
   diliAgent: DiliAgentState;
 }
 
-type PersistedDiliAgentUiState = {
-  isExpanded: boolean;
-  sessionId: number | null;
-};
-
-const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
+export const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   form: DEFAULT_FORM_STATE,
-  message: '',
-  jobId: null,
-  jobProgress: 0,
-  jobStatus: null,
-  jobStage: null,
-  jobStageMessage: null,
-  sessionId: null,
-  isStarting: false,
-  isRunning: false,
+  draftSessionId: null,
+  draftUpdatedAt: null,
+  saveStatus: 'idle',
+  lastSavedAt: null,
+  isDirty: false,
   isPulling: false,
-  isExpanded: false,
-  jobStartedAtMs: null,
-  jobLastProgressAtMs: null,
-  pollIntervalMs: null,
 };
-
-function readPersistedDiliAgentUiState(): Pick<DiliAgentState, 'isExpanded' | 'sessionId'> | null {
-  if (!('localStorage' in globalThis)) {
-    return null;
-  }
-
-  try {
-    const serializedState = globalThis.localStorage.getItem(DILI_AGENT_UI_STATE_KEY);
-    if (!serializedState) {
-      return null;
-    }
-
-    const parsedState: unknown = JSON.parse(serializedState);
-    if (typeof parsedState !== 'object' || parsedState === null) {
-      return null;
-    }
-    const { isExpanded, sessionId } = parsedState as Partial<PersistedDiliAgentUiState>;
-    if (typeof isExpanded !== 'boolean') {
-      return null;
-    }
-    return {
-      isExpanded,
-      sessionId: typeof sessionId === 'number' && Number.isInteger(sessionId) ? sessionId : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writePersistedDiliAgentState(isExpanded: boolean, sessionId: number | null): void {
-  if (!('localStorage' in globalThis)) {
-    return;
-  }
-
-  const persistedState: PersistedDiliAgentUiState = {
-    isExpanded,
-    sessionId,
-  };
-
-  try {
-    globalThis.localStorage.setItem(
-      DILI_AGENT_UI_STATE_KEY,
-      JSON.stringify(persistedState),
-    );
-  } catch {
-    // keep runtime state only when browser storage is unavailable
-  }
-}
 
 function createDefaultAppState(): AppState {
   return {
     activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? '/'),
     theme: globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light',
-    diliAgent: {
-      ...DEFAULT_DILI_AGENT_STATE,
-      ...readPersistedDiliAgentUiState(),
-    },
+    diliAgent: { ...DEFAULT_DILI_AGENT_STATE },
   };
 }
 
@@ -154,11 +83,6 @@ export class AppStateService {
       const theme = this.state().theme;
       document.documentElement.dataset['theme'] = theme;
       document.documentElement.style.colorScheme = theme;
-    });
-
-    effect(() => {
-      const { isExpanded, sessionId } = this.state().diliAgent;
-      writePersistedDiliAgentState(isExpanded, sessionId);
     });
   }
 

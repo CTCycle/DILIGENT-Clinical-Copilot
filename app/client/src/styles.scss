@@ -5835,3 +5835,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-radius: var(--radius-sm);
   font-size: var(--font-base);
 }
+
+.session-status-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px var(--space-sm);
+  white-space: nowrap;
+}
+
+.session-status-chip[data-tone='success'] {
+  border-color: var(--color-status-success-border);
+  background: var(--color-status-success-bg);
+  color: var(--color-status-success-text);
+}
+
+.session-status-chip[data-tone='error'] {
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
+  color: var(--color-status-error-text);
+}
+
+.session-status-chip[data-tone='info'] {
+  border-color: var(--color-status-info-border);
+  background: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+}
+
+.session-status-chip[data-tone='warning'] {
+  border-color: var(--color-status-warning-border);
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-text);
+}

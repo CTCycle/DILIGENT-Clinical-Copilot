@@ -310,4 +310,37 @@ describe('PatientTimetablePageComponent', () => {
     expect(component.loading()).toBe(false);
     expect(component.error()).toBeNull();
   });
+  it('shows the stale notice for a stale timeline and clears every trace when the session changes', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      const sessionId = url.includes('/sessions/1/') ? 1 : 2;
+      return jsonResponse({
+        timeline_id: sessionId * 11,
+        session_id: sessionId,
+        generated_at: '2026-09-17T09:00:00Z',
+        is_stale: sessionId === 1,
+        events: [],
+      });
+    });
+    const handleRouteChange = (component as unknown as {
+      handleRouteChange: (sessionId: number, timelineId: number | null) => Promise<void>;
+    }).handleRouteChange.bind(component);
+
+    fixture.detectChanges();
+    await handleRouteChange(1, 11);
+    fixture.detectChanges();
+    const notice = (fixture.nativeElement as HTMLElement).querySelector('.status-note.is-stale');
+    expect(notice?.textContent).toContain('clinical input changed');
+    expect(notice?.querySelector('button')?.textContent).toContain('Regenerate');
+
+    component.error.set('old session error');
+    component.selectedEventId.set('event-from-session-1');
+    const pendingSecondLoad = handleRouteChange(2, 22);
+    expect(component.timeline()).toBeNull();
+    expect(component.isStale()).toBe(false);
+    expect(component.error()).toBeNull();
+    expect(component.selectedEventId()).toBeNull();
+    await pendingSecondLoad;
+    expect(component.timeline()?.session_id).toBe(2);
+  });
 });

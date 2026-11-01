@@ -7,67 +7,30 @@ import { AppStateService, resolvePageIdFromPath, resolvePathFromPage } from './a
 import { ModelConfigStateResponse } from '../models/types';
 import { ModelConfigStateService } from './model-config-state.service';
 
-const UI_STATE_KEY = 'dili-agent-ui-state-v1';
-
 describe('AppStateService', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({});
   });
 
-  it('persists only the UI-local expansion preference and the report session id', () => {
+  it('starts with an empty form and no draft, and keeps editing state out of browser storage', () => {
     const service = TestBed.inject(AppStateService);
 
+    expect(service.state().diliAgent).toMatchObject({
+      draftSessionId: null,
+      saveStatus: 'idle',
+      isDirty: false,
+    });
+    expect(service.state().diliAgent.form.patientName).toBe('');
+
     service.updateDiliAgent({
-      isExpanded: true,
-      form: {
-        ...service.state().diliAgent.form,
-        patientName: 'Transient patient',
-      },
-      message: 'Transient message',
-      jobId: 'transient-job',
-      isRunning: true,
-      sessionId: 42,
+      form: { ...service.state().diliAgent.form, patientName: 'Transient patient' },
+      draftSessionId: 42,
+      isDirty: true,
     });
     TestBed.flushEffects();
 
-    expect(JSON.parse(localStorage.getItem(UI_STATE_KEY) || '{}')).toEqual({
-      isExpanded: true,
-      sessionId: 42,
-    });
-  });
-
-  it('does not restore legacy model, form, or job state', () => {
-    localStorage.setItem('dili-agent-state-v2', JSON.stringify({
-      isExpanded: true,
-      jobId: 'legacy-job',
-      isRunning: true,
-      settings: { clinicalModel: 'legacy-model' },
-    }));
-
-    const service = TestBed.inject(AppStateService);
-
-    expect(service.state().diliAgent.isExpanded).toBe(false);
-    expect(service.state().diliAgent.jobId).toBeNull();
-    expect(service.state().diliAgent.isRunning).toBe(false);
-    expect(service.state().diliAgent.form.patientName).toBe('');
-  });
-
-  it('rehydrates the current UI preference without rehydrating runtime state', () => {
-    localStorage.setItem(UI_STATE_KEY, JSON.stringify({
-      isExpanded: true,
-      sessionId: 9,
-      jobId: 'stale-job',
-      isRunning: true,
-      settings: { clinicalModel: 'stale-model' },
-    }));
-
-    const service = TestBed.inject(AppStateService);
-
-    expect(service.state().diliAgent.isExpanded).toBe(true);
-    expect(service.state().diliAgent.sessionId).toBe(9);
-    expect(service.state().diliAgent.jobId).toBeNull();
-    expect(service.state().diliAgent.isRunning).toBe(false);
+    expect(localStorage.length).toBe(0);
   });
 
   it('maps configuration routes to Settings', () => {

@@ -7,7 +7,7 @@ type PollStep = () => Promise<boolean>;
 type PollCancelled = () => boolean;
 
 type PollOptions = {
-  intervalMs: number;
+  intervalMs: number | (() => number);
   pollStep: PollStep;
   isCancelled?: PollCancelled;
 };
@@ -16,13 +16,13 @@ type PollOptions = {
 export class JobPollingService {
   async run(options: PollOptions): Promise<void> {
     const { intervalMs, pollStep, isCancelled } = options;
-    const safeIntervalMs = Math.max(250, intervalMs);
     while (!(isCancelled?.() ?? false)) {
       const shouldContinue = await pollStep();
       if (!shouldContinue) {
         return;
       }
-      await new Promise((resolve) => globalThis.setTimeout(resolve, safeIntervalMs));
+      const delayMs = Math.max(250, typeof intervalMs === 'function' ? intervalMs() : intervalMs);
+      await new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
     }
   }
 }

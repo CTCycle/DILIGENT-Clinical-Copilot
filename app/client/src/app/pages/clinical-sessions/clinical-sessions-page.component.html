@@ -49,24 +49,28 @@
           >
             All
           </button>
-          <button
-            type="button"
-            [attr.aria-current]="statusFilter() === 'successful' ? 'page' : null"
-            [class.is-active]="statusFilter() === 'successful'"
-            (click)="updateStatusFilter('successful')"
-          >
-            Successful
-          </button>
-          <button
-            type="button"
-            [attr.aria-current]="statusFilter() === 'failed' ? 'page' : null"
-            [class.is-active]="statusFilter() === 'failed'"
-            (click)="updateStatusFilter('failed')"
-          >
-            Failed
-          </button>
+          @for (status of statusOptions; track status) {
+            <button
+              type="button"
+              [attr.aria-current]="statusFilter() === status ? 'page' : null"
+              [class.is-active]="statusFilter() === status"
+              (click)="updateStatusFilter(status)"
+            >
+              {{ statusLabel(status) }}
+            </button>
+          }
         </nav>
         <div class="clinical-sessions-filter-controls">
+          <select
+            class="clinical-sessions-sort"
+            aria-label="Sort sessions"
+            [ngModel]="sort()"
+            (ngModelChange)="updateSort($event)"
+          >
+            @for (option of sortOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
           <select
             class="clinical-sessions-date-mode"
             aria-label="Date filter mode"
@@ -101,13 +105,31 @@
                 (click)="openSession(session.session_id)"
               >
                 <span class="clinical-session-row-main">
-                  <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
-                  <small>Session {{ session.session_id }} · Version {{ session.version || 1 }}</small>
+                  <strong>{{ session.patient_name || 'Session #' + session.session_id }}</strong>
+                  <small>
+                    #{{ session.session_id }} · Created {{ session.created_at | date:'short' }} · Updated {{ session.updated_at | date:'short' }}
+                  </small>
+                  @if (isActiveStatus(session.status)) {
+                    <span
+                      class="clinical-session-row-progress"
+                      [class.is-indeterminate]="session.progress === null"
+                      role="progressbar"
+                      aria-label="Analysis progress"
+                      [attr.aria-valuemin]="session.progress === null ? null : 0"
+                      [attr.aria-valuemax]="session.progress === null ? null : 100"
+                      [attr.aria-valuenow]="session.progress"
+                    >
+                      <span [style.width.%]="session.progress"></span>
+                    </span>
+                  }
                 </span>
                 <span class="clinical-session-row-meta">
-                  <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
-                  <span class="clinical-session-status-chip" [class.is-failed]="session.status === 'failed'">
+                  <span class="session-status-chip" [attr.data-tone]="statusTone(session.status)">
                     {{ statusLabel(session.status) }}
+                  </span>
+                  <span class="clinical-session-row-flags">
+                    @if (session.has_report) { <span title="Has report">Report</span> }
+                    @if (session.has_timeline) { <span title="Has timeline">Timeline</span> }
                   </span>
                 </span>
               </button>
@@ -138,18 +160,27 @@
       } @else if (selected(); as detail) {
         <div class="clinical-session-toolbar">
           <div>
-            <h2>{{ detail.patient_name || 'Unknown patient' }}</h2>
-            <p>Session {{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}</p>
+            <h2>{{ detail.patient_name || 'Session #' + detail.session_id }}</h2>
+            <p>
+              <span class="session-status-chip" [attr.data-tone]="statusTone(detail.status)">{{ statusLabel(detail.status) }}</span>
+              Session {{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}
+            </p>
           </div>
-          <a class="toolbar-btn" [routerLink]="['/report', detail.session_id]">Open report</a>
+          @if (detail.status === 'draft') {
+            <a class="toolbar-btn" routerLink="/" [queryParams]="{ session: detail.session_id }">Edit draft</a>
+          } @else {
+            <a class="toolbar-btn" [routerLink]="['/report', detail.session_id]">Open report</a>
+          }
         </div>
 
         <div class="clinical-session-tabs-row" data-guidance-target="clinical-session-tabs">
           <nav class="clinical-session-tabs" aria-label="Session sections">
             <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">Preview</button>
-            <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
-            <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
-            <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision</button>
+            @if (!selectedIsInFlight()) {
+              <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
+              <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
+              <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision</button>
+            }
             <button type="button" [class.is-active]="activeSection() === 'timeline'" (click)="setSection('timeline')">Timeline</button>
           </nav>
           <app-help-popover

@@ -40,7 +40,7 @@ describe('SettingsPageComponent', () => {
 });
 
 const VALUES: RuntimeSettingsValues = {
-  general: { polling_interval: 1, llm_output_token_limit: 32768 },
+  general: { polling_interval: 1, llm_output_token_limit: 32768, max_concurrent_clinical_jobs: 2 },
   data: {
     drug_name_min_length: 3,
     drug_name_max_length: 200,

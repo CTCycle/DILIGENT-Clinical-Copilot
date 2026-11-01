@@ -4,7 +4,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import {
   LucideFileText,
   LucideFlaskConical,
@@ -47,6 +47,7 @@ import {
   ClinicalSessionAttachment,
   ClinicalSessionDetail,
   InspectionSessionItem,
+  InspectionSessionSort,
   InspectionSessionStatus,
 } from '../../core/models/inspection-types';
 import {
@@ -91,6 +92,12 @@ import {
 } from './clinical-session-preview';
 import { TerminologyCandidate } from '../../core/models/inspection-types';
 import { decideTerminologyAlias } from '../../core/services/terminology-api';
+import {
+  SESSION_STATUSES,
+  isActiveSessionStatus,
+  sessionStatusLabel,
+  sessionStatusTone,
+} from '../../core/utils/session-status';
 import { terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
 
 function selectPersistedRevision(
@@ -114,6 +121,18 @@ function selectPersistedRevision(
       || right.version_id - left.version_id
     ));
   return candidates[0];
+}
+
+const ACTIVE_REFRESH_MS = 3000;
+const SECTIONS: readonly ClinicalSessionSection[] = ['preview', 'editor', 'metadata', 'revision', 'timeline'];
+
+function parseQueryId(value: string | null): number | null {
+  const parsed = Number(value);
+  return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseSection(value: string | null): ClinicalSessionSection | null {
+  return SECTIONS.find((section) => section === value) ?? null;
 }
 
 @Component({
@@ -141,12 +160,29 @@ function selectPersistedRevision(
   styleUrl: './clinical-sessions-page.component.scss',
 })
 export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly jobPolling = inject(JobPollingService);
   private readonly modelConfigState = inject(ModelConfigStateService);
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
   readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
+  readonly sort = signal<InspectionSessionSort>('updated_desc');
+  readonly statusOptions = SESSION_STATUSES;
+  readonly sortOptions: ReadonlyArray<{ value: InspectionSessionSort; label: string }> = [
+    { value: 'updated_desc', label: 'Recently updated' },
+    { value: 'created_desc', label: 'Newest first' },
+    { value: 'created_asc', label: 'Oldest first' },
+  ];
+  readonly statusLabel = sessionStatusLabel;
+  readonly statusTone = sessionStatusTone;
+  readonly isActiveStatus = isActiveSessionStatus;
+  readonly hasActiveSessions = computed(() => this.sessions().some((item) => isActiveSessionStatus(item.status)));
+  readonly selectedIsInFlight = computed(() => {
+    const status = this.selected()?.status;
+    return status === 'draft' || status === 'queued' || status === 'running';
+  });
   readonly dateFilterMode = signal<ClinicalSessionDateFilterMode>('any');
   readonly dateFilter = signal('');
   readonly selected = signal<ClinicalSessionDetail | null>(null);
@@ -213,20 +249,65 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private revisionLoadGeneration = 0;
   private sessionsLoadGeneration = 0;
   private detailLoadGeneration = 0;
+  private requestedSessionId: number | null = null;
+  private deepLinkPending = false;
+  private refreshTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
   ngOnInit(): void {
+    this.deepLinkPending = parseQueryId(this.route.snapshot.queryParamMap.get('session')) !== null;
+    this.route.queryParamMap.subscribe((params) => this.applyQueryParams(params));
     void this.loadSessions();
     void this.loadRevisionModelConfig();
   }
 
   ngOnDestroy(): void {
     this.stopPoller();
+    this.clearRefreshTimer();
   }
 
-  async loadSessions(): Promise<void> {
+  private applyQueryParams(params: ParamMap): void {
+    const sessionId = parseQueryId(params.get('session'));
+    const tab = parseSection(params.get('tab'));
+    if (sessionId !== null && sessionId !== this.requestedSessionId) {
+      void this.openSession(sessionId, tab ?? 'preview', false);
+    } else if (tab !== null && sessionId === this.requestedSessionId) {
+      this.activeSection.set(tab);
+    }
+  }
+
+  private syncQueryParams(replaceUrl = false): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        session: this.requestedSessionId,
+        tab: this.requestedSessionId === null ? null : this.activeSection(),
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl,
+    });
+  }
+
+  private scheduleRefresh(): void {
+    this.clearRefreshTimer();
+    if (!this.hasActiveSessions()) return;
+    this.refreshTimer = globalThis.setTimeout(() => {
+      this.refreshTimer = null;
+      void this.loadSessions(true);
+    }, ACTIVE_REFRESH_MS);
+  }
+
+  private clearRefreshTimer(): void {
+    if (this.refreshTimer !== null) {
+      globalThis.clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  async loadSessions(quiet = false): Promise<void> {
     const loadGeneration = ++this.sessionsLoadGeneration;
     const isCurrentLoad = (): boolean => loadGeneration === this.sessionsLoadGeneration;
-    this.loading.set(true);
+    this.clearRefreshTimer();
+    if (!quiet) this.loading.set(true);
     this.listError.set(null);
     try {
       const dateMode = this.dateFilterMode();
@@ -235,6 +316,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       const payload = await fetchInspectionSessions({
         search: this.query() || undefined,
         status: status === 'all' ? undefined : status,
+        sort: this.sort(),
         date_mode: dateMode !== 'any' && date ? dateMode : undefined,
         date: dateMode !== 'any' && date ? date : undefined,
         offset: 0,
@@ -242,17 +324,27 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       });
       if (!isCurrentLoad()) return;
       this.sessions.set(payload.items);
+      this.reopenSelectedWhenStatusChanged(payload.items);
       await this.ensureSelectedSessionVisible(loadGeneration);
+      this.deepLinkPending = false;
     } catch (error) {
       if (isCurrentLoad()) {
         this.listError.set(formatUnknownError(error, 'Failed to load clinical sessions.'));
       }
     } finally {
-      if (isCurrentLoad()) this.loading.set(false);
+      if (isCurrentLoad()) {
+        this.loading.set(false);
+        this.scheduleRefresh();
+      }
     }
   }
 
-  async openSession(sessionId: number): Promise<void> {
+  async openSession(
+    sessionId: number,
+    section: ClinicalSessionSection = 'preview',
+    updateUrl = true,
+  ): Promise<void> {
+    this.requestedSessionId = sessionId;
     const detailLoadGeneration = ++this.detailLoadGeneration;
     const isCurrentLoad = (): boolean => detailLoadGeneration === this.detailLoadGeneration;
     const revisionLoadGeneration = ++this.revisionLoadGeneration;
@@ -279,7 +371,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.manualEditReviewerNote.set('');
       this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
       this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(detail.metadata || {}), null, 2));
-      this.activeSection.set('preview');
+      this.activeSection.set(section);
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
       this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
@@ -287,6 +379,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       void this.loadAttachments(detail.session_id, detailLoadGeneration);
       void this.loadDetectedDrugEvidence(detail, detailLoadGeneration);
       void this.loadPersistedRevision(detail.session_id, revisionLoadGeneration);
+      if (updateUrl) this.syncQueryParams();
     } catch (error) {
       if (isCurrentLoad()) {
         this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
@@ -323,6 +416,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   updateStatusFilter(value: 'all' | InspectionSessionStatus): void {
     this.statusFilter.set(value);
+    this.deepLinkPending = false;
+    void this.loadSessions();
+  }
+
+  updateSort(value: InspectionSessionSort): void {
+    this.sort.set(value);
     void this.loadSessions();
   }
 
@@ -355,6 +454,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (selectedId && visibleSessions.some((session) => session.session_id === selectedId)) {
       return;
     }
+    // A deep-linked session stays open even when the active filters hide it.
+    if (this.deepLinkPending && this.requestedSessionId !== null) {
+      return;
+    }
     const nextSession = visibleSessions[0];
     if (nextSession) {
       await this.openSession(nextSession.session_id);
@@ -362,9 +465,20 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     }
     if (!isCurrentLoad()) return;
     this.clearSelectedSession();
+    if (this.route.snapshot.queryParamMap.has('session')) this.syncQueryParams(true);
+  }
+
+  /** Lifecycle changes (e.g. running to completed) alter what the open session can show. */
+  private reopenSelectedWhenStatusChanged(items: InspectionSessionItem[]): void {
+    const selected = this.selected();
+    const current = selected && items.find((item) => item.session_id === selected.session_id);
+    if (selected && current && current.status !== selected.status) {
+      void this.openSession(selected.session_id, this.activeSection(), false);
+    }
   }
 
   private clearSelectedSession(): void {
+    this.requestedSessionId = null;
     this.detailLoadGeneration += 1;
     this.revisionLoadGeneration += 1;
     this.selected.set(null);
@@ -784,6 +898,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   setSection(section: ClinicalSessionSection): void {
     this.activeSection.set(section);
+    this.syncQueryParams(true);
   }
 
   async saveManualReportEdit(): Promise<void> {
@@ -847,10 +962,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     } catch (error) {
       this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to save metadata.'));
     }
-  }
-
-  statusLabel(value: InspectionSessionStatus): string {
-    return value === 'failed' ? 'Failed' : 'Successful';
   }
 
   previewReport(detail: ClinicalSessionDetail): string {

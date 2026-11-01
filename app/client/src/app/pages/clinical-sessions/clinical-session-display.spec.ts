@@ -16,7 +16,7 @@ describe('clinical-session-preview', () => {
     session_timestamp: null,
     version: 1,
     original_session_id: null,
-    status: 'successful',
+    status: 'completed',
     text_extraction_model: null,
     clinical_model: null,
     metadata: {},

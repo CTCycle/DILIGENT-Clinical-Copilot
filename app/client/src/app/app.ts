@@ -12,7 +12,6 @@ import {
   resolvePageIdFromPath,
   resolvePathFromPage,
 } from './core/state/app-state.service';
-import { DiliJobTrackerService } from './core/services/dili-job-tracker.service';
 import { InspectionUpdateJobTrackerService } from './core/state/inspection-update-job-tracker.service';
 import { NavSidebarComponent } from './components/nav-sidebar/nav-sidebar.component';
 import { StatusBarComponent } from './components/status-bar/status-bar.component';
@@ -29,13 +28,11 @@ import { TipsAndTricksComponent } from './core/guidance/tips-and-tricks.componen
 export class App {
   readonly stateService = inject(AppStateService);
   readonly tipsOpen = signal(false);
-  private readonly diliJobTracker = inject(DiliJobTrackerService);
   private readonly inspectionUpdateTracker = inject(InspectionUpdateJobTrackerService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
-    void this.diliJobTracker;
     void this.inspectionUpdateTracker;
     this.router.events
       .pipe(

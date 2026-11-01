@@ -56,7 +56,11 @@
   <article class="jobs-monitor-item" [class.is-active]="isActive(job)" [attr.data-status]="job.status">
     <div class="jobs-monitor-item-head">
       <div class="jobs-monitor-item-title">
-        <strong>{{ name(job) }}</strong>
+        @if (reportLink(job); as link) {
+          <a class="jobs-monitor-link" [routerLink]="link" (click)="toggle()">{{ name(job) }} #{{ job.session_id }}</a>
+        } @else {
+          <strong>{{ name(job) }}</strong>
+        }
         <span>{{ kind(job) }}</span>
       </div>
       <span class="jobs-monitor-status" [attr.data-status]="job.status">{{ statusLabel(job) }}</span>

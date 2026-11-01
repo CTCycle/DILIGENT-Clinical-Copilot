@@ -10,6 +10,7 @@ export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancel
 export interface JobSummary {
   job_id: string;
   job_type: string;
+  session_id: number | null;
   status: JobStatus;
   progress: number | null;
   phase: string | null;

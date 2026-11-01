@@ -26,6 +26,12 @@
     @if (error()) {
       <p class="error-note" role="alert">{{ error() }}</p>
     }
+    @if (isStale() && timeline()) {
+      <p class="status-note is-stale" role="status">
+        <span>The clinical input changed after this timeline was generated.</span>
+        <button type="button" class="btn-primary" (click)="regenerate()" [disabled]="loading()">Regenerate</button>
+      </p>
+    }
 
     @if (timeline(); as currentTimeline) {
       <section class="panel generation-summary" [class.is-warning]="isFallbackTimeline()" aria-labelledby="timeline-summary-title">

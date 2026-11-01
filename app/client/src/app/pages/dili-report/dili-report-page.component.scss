@@ -27,7 +27,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .dili-report-action {
@@ -145,4 +147,65 @@
 .dili-report-empty .btn {
   width: auto;
   text-decoration: none;
+}
+
+.dili-report-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.dili-report-title-row h1 {
+  margin: var(--space-xs) 0 var(--space-sm);
+}
+
+.dili-report-button {
+  width: auto;
+  text-decoration: none;
+}
+
+.dili-report-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.dili-report-stopping {
+  color: var(--color-status-warning-text);
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.dili-report-section-title {
+  margin: 0;
+  font-size: var(--font-lg);
+}
+
+.dili-report-input {
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-md);
+}
+
+.dili-report-input summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.dili-report-input summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.dili-report-input-text {
+  margin: var(--space-sm) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: var(--font-sm);
+  color: var(--color-text-primary);
 }

@@ -708,3 +708,13 @@ svg {
   white-space: nowrap;
   border: 0;
 }
+
+.status-note.is-stale {
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  border-color: var(--color-status-warning-border);
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-text);
+}

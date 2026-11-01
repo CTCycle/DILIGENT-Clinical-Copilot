@@ -59,6 +59,12 @@
                 <small>{{ timelineQualityLabel(preview) }}</small>
               </div>
               <p class="timeline-row-title">{{ preview.title || 'No event title available' }}</p>
+              @if (preview.is_stale) {
+                <p class="timeline-stale" role="status">
+                  The clinical input changed after this timeline was generated.
+                  <button type="button" class="timeline-stale-action" (click)="generateTimeline()" [disabled]="!canGenerate()">Regenerate</button>
+                </p>
+              }
               <div class="timeline-row-summary">
                 <span>{{ preview.generated_at | date:'mediumDate' }}</span>
                 <span>{{ preview.source_kind === 'cloud' ? 'Cloud' : 'Local' }} · {{ timelineProviderLabel(preview) }} · {{ timelineModelLabel(preview) }}</span>

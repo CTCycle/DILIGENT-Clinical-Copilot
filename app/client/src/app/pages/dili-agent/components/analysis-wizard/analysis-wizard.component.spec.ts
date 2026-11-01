@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,7 +11,7 @@ import {
   ClinicalRequestPayload,
   ModelConfigStateResponse,
 } from '../../../../core/models/types';
-import { DiliJobTrackerService } from '../../../../core/services/dili-job-tracker.service';
+import { jsonResponse, sessionState } from '../../../../core/testing/clinical-session-fixtures';
 import { AppStateService } from '../../../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
 import { AnalysisWizardComponent, LIVERTOX_WARNING } from './analysis-wizard.component';
@@ -63,7 +64,9 @@ describe('AnalysisWizardComponent', () => {
   let fixture: ComponentFixture<AnalysisWizardComponent>;
   let component: AnalysisWizardComponent;
   let appState: AppStateService;
-  let tracker: DiliJobTrackerService;
+  let sessionRequests: string[];
+  let launchPayloads: ClinicalRequestPayload[];
+  let launchResponse: () => Response;
   let payloads: ClinicalRequestPayload[];
   let responses: ClinicalInputPreflightResponse[];
 
@@ -86,17 +89,28 @@ describe('AnalysisWizardComponent', () => {
     localStorage.clear();
     payloads = [];
     responses = [];
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+    sessionRequests = [];
+    launchPayloads = [];
+    launchResponse = () => jsonResponse(sessionState({ status: 'queued', queue_position: 1 }), 202);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      const target = String(url);
+      if (target.includes('/clinical/sessions')) {
+        sessionRequests.push(`${init?.method} ${target}`);
+        if (target.endsWith('/launch')) {
+          launchPayloads.push(JSON.parse(String(init?.body)) as ClinicalRequestPayload);
+          return launchResponse();
+        }
+        return jsonResponse(sessionState(), init?.method === 'POST' ? 201 : 200);
+      }
       payloads.push(JSON.parse(String(init?.body)) as ClinicalRequestPayload);
-      return new Response(JSON.stringify(responses.shift() ?? preflight()), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return jsonResponse(responses.shift() ?? preflight());
     });
-    await TestBed.configureTestingModule({ imports: [AnalysisWizardComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [AnalysisWizardComponent],
+      providers: [provideRouter([])],
+    }).compileComponents();
     TestBed.inject(ModelConfigStateService).setFromApiState(modelConfig());
     appState = TestBed.inject(AppStateService);
-    tracker = TestBed.inject(DiliJobTrackerService);
     appState.updateDiliAgent({
       form: { patientName: 'P', visitDate: '2026-10-01', patientImageDataUrl: null, clinicalInput: 'text' },
     });
@@ -194,32 +208,68 @@ describe('AnalysisWizardComponent', () => {
     expect(component.modelOverrides()).toBeNull();
   });
 
-  it('starts once even when Start is clicked twice', async () => {
-    const startSpy = vi.spyOn(tracker, 'startSession').mockImplementation(async () => {
-      appState.updateDiliAgent({ isRunning: true });
+  describe('start', () => {
+    let navigate: ReturnType<typeof vi.spyOn>;
+    let started: () => void;
+
+    beforeEach(() => {
+      navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      started = vi.fn();
+      component.started.subscribe(started);
+      component.goTo(3);
+      fixture.detectChanges();
     });
-    const started = vi.fn();
-    component.started.subscribe(started);
-    component.goTo(3);
-    fixture.detectChanges();
 
-    await Promise.all([component.start(), component.start()]);
+    it('saves a new draft, launches it once, opens its report, and resets the form', async () => {
+      appState.updateDiliAgent({ isDirty: true });
+      await Promise.all([component.start(), component.start()]);
 
-    expect(startSpy).toHaveBeenCalledTimes(1);
-    expect(started).toHaveBeenCalledTimes(1);
-    expect(component.sources()).toEqual(['livertox']);
-  });
-
-  it('re-enables Start and shows the error when the job could not be started', async () => {
-    vi.spyOn(tracker, 'startSession').mockImplementation(async () => {
-      appState.updateDiliAgent({ isRunning: false, message: '[ERROR] backend down' });
+      expect(sessionRequests).toEqual([
+        'POST /api/clinical/sessions',
+        'POST /api/clinical/sessions/5/launch',
+      ]);
+      expect(launchPayloads[0].evidence_sources).toEqual(['livertox']);
+      expect(navigate).toHaveBeenCalledWith(['/report', 5]);
+      expect(started).toHaveBeenCalledTimes(1);
+      expect(appState.state().diliAgent).toMatchObject({
+        draftSessionId: null,
+        isDirty: false,
+        form: { patientName: '', clinicalInput: '' },
+      });
+      expect(component.sources()).toEqual(['livertox']);
     });
-    component.goTo(3);
 
-    await component.start();
-    fixture.detectChanges();
+    it('launches a clean stored draft without rewriting it', async () => {
+      appState.updateDiliAgent({ draftSessionId: 5, draftUpdatedAt: '2026-10-01T08:00:00Z', isDirty: false });
 
-    expect(component.starting()).toBe(false);
-    expect(root().textContent).toContain('[ERROR] backend down');
+      await component.start();
+
+      expect(sessionRequests).toEqual(['POST /api/clinical/sessions/5/launch']);
+    });
+
+    it('updates a modified draft before launching it', async () => {
+      appState.updateDiliAgent({ draftSessionId: 5, draftUpdatedAt: '2026-10-01T08:00:00Z', isDirty: true });
+
+      await component.start();
+
+      expect(sessionRequests).toEqual([
+        'PUT /api/clinical/sessions/5/input',
+        'POST /api/clinical/sessions/5/launch',
+      ]);
+    });
+
+    it('keeps the form and draft and shows the error when launch is rejected', async () => {
+      launchResponse = () => jsonResponse({ detail: 'Backend validation failed.' }, 422);
+
+      await component.start();
+      fixture.detectChanges();
+
+      expect(component.starting()).toBe(false);
+      expect(navigate).not.toHaveBeenCalled();
+      expect(started).not.toHaveBeenCalled();
+      expect(appState.state().diliAgent.draftSessionId).toBe(5);
+      expect(appState.state().diliAgent.form.clinicalInput).toBe('text');
+      expect(root().textContent).toContain('Backend validation failed.');
+    });
   });
 });

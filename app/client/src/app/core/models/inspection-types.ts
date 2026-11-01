@@ -4,6 +4,7 @@
 import type {
   ClinicalActorConfidence,
   ClinicalActorSource,
+  ClinicalSessionStatus,
   JobStatus,
   JobStatusResponse,
 } from "./types";
@@ -41,7 +42,8 @@ export type InspectionUpdateJobListResponse = {
   jobs: InspectionUpdateJobStatusResponse[];
 };
 
-export type InspectionSessionStatus = "successful" | "failed";
+export type InspectionSessionStatus = ClinicalSessionStatus;
+export type InspectionSessionSort = "updated_desc" | "created_desc" | "created_asc";
 export type InspectionDateFilterMode = "before" | "after" | "exact";
 
 export type InspectionSessionItem = {
@@ -51,6 +53,10 @@ export type InspectionSessionItem = {
   version: number;
   original_session_id: number | null;
   status: InspectionSessionStatus;
+  created_at: string;
+  updated_at: string;
+  progress: number | null;
+  progress_stage: string | null;
   total_duration: number | null;
   has_report: boolean;
   has_timeline: boolean;
@@ -170,6 +176,7 @@ export type InspectionSessionTimeline = {
   timeline_id?: number | null;
   session_id: number;
   generated_at: string;
+  is_stale?: boolean;
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
   generation_error_code?:
@@ -197,6 +204,7 @@ export type InspectionSessionTimelinePreview = {
   timeline_id: number | null;
   session_id: number;
   generated_at: string;
+  is_stale?: boolean;
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
   generation_error_code?:
@@ -235,6 +243,7 @@ export type InspectionCatalogQuery = {
 
 export type InspectionSessionQuery = InspectionCatalogQuery & {
   status?: InspectionSessionStatus;
+  sort?: InspectionSessionSort;
   date_mode?: InspectionDateFilterMode;
   date?: string;
 };

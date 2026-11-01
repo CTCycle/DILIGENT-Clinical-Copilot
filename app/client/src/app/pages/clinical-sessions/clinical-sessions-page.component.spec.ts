@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,6 +10,7 @@ import {
   InspectionSessionItem,
 } from '../../core/models/inspection-types';
 import { SessionVersionSummary } from '../../core/models/revision-types';
+import { jsonResponse as lifecycleJson } from '../../core/testing/clinical-session-fixtures';
 import { ClinicalSessionsPageComponent } from './clinical-sessions-page.component';
 
 type Deferred<T> = {
@@ -38,7 +39,7 @@ function sessionDetail(sessionId: number): ClinicalSessionDetail {
     session_timestamp: '2026-09-17T08:00:00Z',
     version: 1,
     original_session_id: null,
-    status: 'successful',
+    status: 'completed',
     text_extraction_model: 'parser',
     clinical_model: 'clinical',
     metadata: {},
@@ -59,7 +60,11 @@ function sessionItem(sessionId: number): InspectionSessionItem {
     session_timestamp: '2026-09-17T08:00:00Z',
     version: 1,
     original_session_id: null,
-    status: 'successful',
+    status: 'completed',
+    created_at: '2026-09-17T08:00:00Z',
+    updated_at: '2026-09-17T08:05:00Z',
+    progress: null,
+    progress_stage: null,
     total_duration: null,
     has_report: true,
     has_timeline: false,
@@ -342,5 +347,126 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(component.revisionVersionStatus()).toBeNull();
     expect(component.revisionDraftReport()).toBe('');
     expect(fetchSpy.mock.calls.some(([input]) => String(input).endsWith('/sessions/19/versions'))).toBe(true);
+  });
+});
+
+describe('ClinicalSessionsPageComponent lifecycle list', () => {
+  let fixture: ComponentFixture<ClinicalSessionsPageComponent>;
+  let component: ClinicalSessionsPageComponent;
+  let router: Router;
+  let listUrls: string[];
+  let items: InspectionSessionItem[];
+
+  beforeEach(async () => {
+    listUrls = [];
+    items = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/inspection/sessions?')) {
+        listUrls.push(url);
+        return lifecycleJson({ items, total: items.length, offset: 0, limit: 100 });
+      }
+      const detail = /\/inspection\/sessions\/(\d+)$/.exec(url);
+      if (detail) return lifecycleJson(sessionDetail(Number(detail[1])));
+      return lifecycleJson({ items: [] });
+    });
+    await TestBed.configureTestingModule({
+      imports: [ClinicalSessionsPageComponent],
+      providers: [provideRouter([])],
+    }).compileComponents();
+    router = TestBed.inject(Router);
+  });
+
+  afterEach(() => {
+    fixture?.destroy();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  async function create(url = '/'): Promise<void> {
+    await router.navigateByUrl(url);
+    fixture = TestBed.createComponent(ClinicalSessionsPageComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.loading()).toBe(false));
+    fixture.detectChanges();
+  }
+
+  it('offers every lifecycle status filter and sends status and sort to the server', async () => {
+    await create();
+    const labels = Array.from(
+      fixture.nativeElement.querySelectorAll('nav[aria-label="Session status"] button'),
+    ).map((button) => (button as HTMLElement).textContent?.trim());
+    expect(labels).toEqual(['All', 'Draft', 'Queued', 'Running', 'Completed', 'Cancelled', 'Failed']);
+
+    component.updateStatusFilter('queued');
+    component.updateSort('created_asc');
+    await vi.waitFor(() => expect(listUrls.length).toBeGreaterThanOrEqual(3));
+
+    const params = new URL(listUrls.at(-1)!, 'http://localhost').searchParams;
+    expect(params.get('status')).toBe('queued');
+    expect(params.get('sort')).toBe('created_asc');
+  });
+
+  it('shows status, progress and indicators on compact rows', async () => {
+    items = [
+      { ...sessionItem(1), status: 'running', progress: 40, has_report: false },
+      { ...sessionItem(2), status: 'draft', patient_name: null, has_report: false },
+    ];
+    await create();
+
+    const rows = fixture.nativeElement.querySelectorAll('.clinical-session-row');
+    expect(rows[0].textContent).toContain('Running');
+    expect(rows[0].querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('40');
+    expect(rows[1].textContent).toContain('Session #2');
+    expect(rows[1].textContent).toContain('Draft');
+    expect(rows[1].querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it('auto-refreshes every few seconds only while an active session is listed', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    items = [{ ...sessionItem(1), status: 'running' }];
+    await create();
+    const afterLoad = listUrls.length;
+
+    await vi.advanceTimersByTimeAsync(3100);
+    expect(listUrls.length).toBeGreaterThan(afterLoad);
+
+    items = [{ ...sessionItem(1), status: 'completed' }];
+    await vi.advanceTimersByTimeAsync(3100);
+    const settled = listUrls.length;
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(listUrls).toHaveLength(settled);
+  });
+
+  it('reopens the selected session when its lifecycle status changes during a refresh', async () => {
+    items = [{ ...sessionItem(1), status: 'running' }];
+    await create();
+    component.selected.set({ ...sessionDetail(1), status: 'running' });
+    items = [{ ...sessionItem(1), status: 'completed' }];
+
+    await component.loadSessions(true);
+
+    await vi.waitFor(() => expect(component.selected()?.status).toBe('completed'));
+  });
+
+  it('restores the selected session and tab from the URL, even when filters would hide it', async () => {
+    items = [sessionItem(1)];
+    await create('/?session=3&tab=timeline');
+    await vi.waitFor(() => expect(component.selected()?.session_id).toBe(3));
+
+    expect(component.activeSection()).toBe('timeline');
+    expect(component.sessions().map((item) => item.session_id)).toEqual([1]);
+  });
+
+  it('writes the selected session and tab to the URL so back navigation keeps context', async () => {
+    items = [sessionItem(2)];
+    await create();
+    await vi.waitFor(() => expect(component.selected()?.session_id).toBe(2));
+
+    component.setSection('metadata');
+
+    await vi.waitFor(() => expect(router.url).toContain('tab=metadata'));
+    expect(router.url).toContain('session=2');
   });
 });

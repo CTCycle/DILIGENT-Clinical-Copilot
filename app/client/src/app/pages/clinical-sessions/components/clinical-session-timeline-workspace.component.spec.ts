@@ -37,7 +37,7 @@ function session(sessionId: number): ClinicalSessionDetail {
     session_timestamp: '2026-09-17T08:00:00Z',
     version: 1,
     original_session_id: null,
-    status: 'successful',
+    status: 'completed',
     text_extraction_model: 'parser',
     clinical_model: 'clinical',
     metadata: {},
@@ -412,5 +412,58 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
     await vi.waitFor(() => expect(component.timelinePreviews()).toHaveLength(2));
     expect(fetchSpy.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(3);
     expect(component.generationStatus()).toBe('Timeline generated and saved.');
+  });
+  it('flags a stale timeline and regenerates it for a draft session', async () => {
+    const requests: string[] = [];
+    vi.spyOn(TestBed.inject(JobPollingService), 'run').mockResolvedValue();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? 'GET'} ${url} ${String(init?.body ?? '')}`);
+      if (url.endsWith('/sessions/1/timelines')) {
+        return jsonResponse({ items: [{ ...preview(1, 11), is_stale: true }, preview(1, 12)] });
+      }
+      if (url.endsWith('/sessions/1/timeline-jobs')) {
+        return jsonResponse({ job_id: 'job-9', job_type: 'session_timeline', status: 'pending', message: '', poll_interval: 1 });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fixture.componentRef.setInput('session', { ...session(1), status: 'draft' });
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.timelinePreviews()).toHaveLength(2));
+    fixture.detectChanges();
+
+    const notices = fixture.nativeElement.querySelectorAll('.timeline-stale');
+    expect(notices).toHaveLength(1);
+    expect(notices[0].textContent).toContain('clinical input changed');
+
+    (notices[0].querySelector('button') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(component.generationJobId()).toBe('job-9'));
+
+    expect(requests.some((entry) => entry.includes('POST') && entry.includes('force_regenerate'))).toBe(true);
+  });
+
+  it('drops the previous session timelines and status as soon as the session changes', async () => {
+    const second = deferred<Response>();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/1/timelines')) return jsonResponse({ items: [preview(1, 11)] });
+      if (url.endsWith('/sessions/2/timelines')) return second.promise;
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    fixture.componentRef.setInput('session', session(1));
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.timelinePreviews()).toHaveLength(1));
+    component.generationStatus.set('Timeline generated and saved.');
+    component.generationError.set('old error');
+
+    fixture.componentRef.setInput('session', session(2));
+    fixture.detectChanges();
+
+    expect(component.timelinePreviews()).toEqual([]);
+    expect(component.generationStatus()).toBeNull();
+    expect(component.generationError()).toBeNull();
+    second.resolve(jsonResponse({ items: [preview(2, 21)] }));
+    await vi.waitFor(() => expect(component.timelinePreviews().map((item) => item.timeline_id)).toEqual([21]));
   });
 });

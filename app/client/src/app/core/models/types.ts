@@ -225,23 +225,55 @@ export type ClinicalFormState = {
   clinicalInput: string;
 };
 
-export type ClinicalDraftForm = {
+export type ClinicalSessionStatus =
+  | "draft"
+  | "queued"
+  | "running"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+export type ClinicalSessionError = {
+  code: string;
+  message: string;
+};
+
+export type ClinicalSessionState = {
+  session_id: number;
+  status: ClinicalSessionStatus;
+  patient_name: string | null;
+  visit_date: string | null;
+  created_at: string;
+  updated_at: string;
+  queued_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  queue_position: number | null;
+  progress: number | null;
+  progress_stage: string | null;
+  progress_message: string | null;
+  stop_requested: boolean;
+  error: ClinicalSessionError | null;
+  has_report: boolean;
+  version: number;
+  poll_interval: number;
+};
+
+export type ClinicalSessionInput = {
+  session_id: number;
+  status: ClinicalSessionStatus;
+  patient_name: string | null;
+  visit_date: string | null;
+  clinical_input: string;
+  patient_image_base64: string | null;
+  updated_at: string;
+};
+
+export type ClinicalSessionInputWrite = {
   patient_name: string;
   visit_date: string | null;
   clinical_input: string;
-};
-
-export type ClinicalDraftSnapshot = {
-  draft_key: string | null;
-  revision: number;
-  updated_at: string | null;
-  form: ClinicalDraftForm | null;
-};
-
-export type ClinicalDraftWrite = {
-  expected_revision: number;
-  expected_draft_key: string | null;
-  form: ClinicalDraftForm;
+  patient_image_base64?: string | null;
 };
 
 export type EvidenceSourceId = "livertox" | "dilirank" | "documents";
@@ -330,14 +362,6 @@ export type JobStatus =
   | "failed"
   | "cancelled";
 
-export type ClinicalJobResult = {
-  report?: string;
-  progress_stage?: string;
-  progress_message?: string;
-  session_id?: number;
-  [key: string]: unknown;
-};
-
 export type OllamaPullJobResult = {
   model?: string;
   pulled?: boolean;
@@ -356,7 +380,7 @@ export type JobStartResponse = {
   poll_interval: number;
 };
 
-export type JobStatusResponse<TJobResult extends Record<string, unknown> = ClinicalJobResult> = {
+export type JobStatusResponse<TJobResult extends Record<string, unknown> = Record<string, unknown>> = {
   job_id: string;
   job_type: JobType;
   status: JobStatus;

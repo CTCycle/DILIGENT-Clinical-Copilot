@@ -101,6 +101,7 @@ export class PatientTimetablePageComponent implements OnInit {
   readonly timelineId = signal<number | null>(null);
   readonly timeline = signal<InspectionSessionTimeline | null>(null);
   readonly loading = signal(false);
+  readonly isStale = signal(false);
   readonly error = signal<string | null>(null);
   readonly viewMode = signal<TimelineViewMode>('list');
   readonly selectedEventId = signal<string | null>(null);
@@ -287,6 +288,7 @@ export class PatientTimetablePageComponent implements OnInit {
       if (!isCurrentLoad()) return;
       this.applyTimeline(payload);
       this.timelineId.set(payload.timeline_id ?? timelineId ?? null);
+      this.isStale.set(payload.is_stale ?? false);
     } catch (error) {
       if (!isCurrentLoad()) return;
       this.timeline.set(null);
@@ -330,6 +332,7 @@ export class PatientTimetablePageComponent implements OnInit {
       if (!isCurrentGeneration()) return;
       this.applyTimeline(payload);
       this.timelineId.set(payload.timeline_id ?? null);
+      this.isStale.set(false);
       if (payload.timeline_id) {
         if (!isCurrentGeneration()) return;
         await this.router.navigate(['/sessions', id, 'timetable', payload.timeline_id], { replaceUrl: true });
@@ -441,6 +444,19 @@ export class PatientTimetablePageComponent implements OnInit {
     return next;
   }
 
+  /** Never carry events, selection, or notices from one session into another. */
+  private resetSessionState(): void {
+    this.timeline.set(null);
+    this.timelineId.set(null);
+    this.error.set(null);
+    this.isStale.set(false);
+    this.selectedEventId.set(null);
+    this.expandedEventIds.set(new Set());
+    this.collapsedGroupKeys.set(new Set([UNANCHORED_GROUP_KEY]));
+    this.hiddenCategories.set(new Set());
+    this.selectionAnnouncement.set('');
+  }
+
   private async handleRouteChange(sessionId: number, timelineId: number | null): Promise<void> {
     const loadGeneration = ++this.routeLoadGeneration;
     if (!Number.isFinite(sessionId) || sessionId <= 0) {
@@ -452,6 +468,10 @@ export class PatientTimetablePageComponent implements OnInit {
       this.error.set('Invalid timeline id.');
       this.timeline.set(null);
       return;
+    }
+    const previousSessionId = this.sessionId();
+    if (previousSessionId !== null && previousSessionId !== sessionId) {
+      this.resetSessionState();
     }
     this.sessionId.set(sessionId);
     this.timelineId.set(timelineId);

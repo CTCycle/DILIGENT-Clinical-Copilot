@@ -15,16 +15,6 @@
             [ngModel]="vm.form.clinicalInput"
             (ngModelChange)="handleFormChange('clinicalInput', $event)"
           ></textarea>
-          <button
-            class="stitch-dili-draft-save"
-            type="button"
-            title="Save draft"
-            aria-label="Save draft"
-            (click)="saveDraft()"
-            [disabled]="clinicalDraft.loading() || clinicalDraft.saveStatus() === 'saving'"
-          >
-            <svg lucideSave size="18" aria-hidden="true"></svg>
-          </button>
         </div>
       </div>
     </section>
@@ -81,104 +71,51 @@
           </div>
         </div>
 
-        <div class="stitch-dili-progress-slot" aria-live="off">
-          @if (showProgress()) {
-            <app-analysis-progress
-              [jobStatus]="vm.jobStatus"
-              [jobProgress]="vm.jobProgress"
-              [stage]="vm.jobStage"
-              [stageMessage]="vm.jobStageMessage"
-              [startedAtMs]="vm.jobStartedAtMs"
-              [lastProgressAtMs]="vm.jobLastProgressAtMs"
-              [errorMessage]="progressError()"
-            ></app-analysis-progress>
-          }
-        </div>
-
         <div class="stitch-dili-actions">
           <button
             id="run-analysis-button"
             data-guidance-target="dili-review-run"
             class="btn btn-primary"
             type="button"
-            [disabled]="runActionDisabled"
-            (click)="runOrStop()"
+            [disabled]="loadingDraft()"
+            (click)="runAnalysis()"
           >
-            {{ runActionLabel }}
-          </button>
-          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="isActiveJob">
-            Clear all
+            Run DILI analysis
           </button>
           <button
-            class="stitch-dili-report-link"
+            id="save-draft-button"
+            class="btn btn-secondary"
             type="button"
-            [disabled]="!canViewReport()"
-            (click)="viewReport()"
+            [disabled]="loadingDraft() || vm.saveStatus === 'saving'"
+            (click)="saveDraft()"
           >
-            <span class="stitch-dili-report-dot" [attr.data-state]="hasReport() ? 'ready' : isActiveJob ? 'running' : 'idle'" aria-hidden="true"></span>
-            View report →
+            Save as draft
+          </button>
+          <button class="stitch-dili-clear" type="button" (click)="clearAll()">
+            Clear all
           </button>
         </div>
 
-        <section class="clinical-draft-panel" aria-label="Clinical draft">
-          @if (clinicalDraft.pendingRecovery()) {
-            <div class="clinical-draft-banner" role="region" aria-labelledby="clinical-draft-title">
-              <div>
-                <h4 id="clinical-draft-title">Saved draft available</h4>
-                <p>Resume to restore the saved form. The patient image must be selected again.</p>
-              </div>
-              <div class="clinical-draft-actions">
-                <button
-                  class="btn btn-primary"
-                  type="button"
-                  (click)="resumeDraft()"
-                  [disabled]="isActiveJob"
-                >
-                  Resume
-                </button>
-                <button class="btn btn-secondary" type="button" (click)="discardDraft()">
-                  Discard
-                </button>
-              </div>
-            </div>
-          } @else if (!clinicalDraft.autosaveEnabled() && !clinicalDraft.hasPersistedDraft()) {
-            <p class="clinical-draft-note">
-              Saved in the configured database; patient image is not included.
+        <section class="dili-draft-panel" aria-label="Draft status">
+          <div class="dili-draft-status-row">
+            <p
+              class="dili-draft-status"
+              [class.is-error]="vm.saveStatus === 'error' || vm.saveStatus === 'conflict'"
+              role="status"
+              aria-live="polite"
+            >
+              {{ draftStatusText }}
             </p>
-          }
-
-          @if (clinicalDraft.autosaveEnabled() || clinicalDraft.saveStatus() === 'error' || clinicalDraft.saveStatus() === 'conflict') {
-            <div class="clinical-draft-status-row">
-              <p class="clinical-draft-status" role="status" aria-live="polite">
-                {{ draftStatusText }}
-              </p>
-              @if (clinicalDraft.saveStatus() === 'error' && clinicalDraft.autosaveEnabled()) {
-                <button
-                  class="clinical-draft-link"
-                  type="button"
-                  (click)="clinicalDraft.retrySave(vm.form)"
-                >
-                  Retry save
-                </button>
-              }
-              @if (clinicalDraft.saveStatus() === 'conflict' || (clinicalDraft.saveStatus() === 'error' && clinicalDraft.hasPersistedDraft())) {
-                <button class="clinical-draft-link" type="button" (click)="reloadDraft()">
-                  Reload draft
-                </button>
-              }
-              @if (clinicalDraft.autosaveEnabled() && clinicalDraft.hasPersistedDraft()) {
-                <button class="clinical-draft-link" type="button" (click)="discardDraft()">
-                  Discard draft
-                </button>
-              }
-            </div>
-          }
-          @if (clinicalDraft.errorMessage(); as draftError) {
-            <p class="clinical-draft-error" role="status">{{ draftError }}</p>
+            @if (vm.saveStatus === 'conflict' && vm.draftSessionId !== null) {
+              <button class="dili-draft-link" type="button" (click)="reloadDraft()">Reload draft</button>
+            }
+          </div>
+          @if (pageError(); as error) {
+            <p class="dili-draft-status is-error" role="alert">{{ error }}</p>
           }
         </section>
 
-        @if (!vm.message && !isActiveJob) {
+        @if (!vm.form.clinicalInput && vm.draftSessionId === null) {
           <app-feature-tip
             [guidanceId]="'dili-first-assessment'"
             [version]="guidanceDefinitions.diliFirstAssessment.version"
@@ -204,38 +141,3 @@
   (fixInput)="fixInput($event)"
   (editSource)="editSource($event)"
 ></app-analysis-wizard>
-
-<app-modal-shell
-  [isOpen]="draftConfirmation() !== null"
-  [title]="draftConfirmationTitle"
-  titleId="clinical-draft-confirmation-title"
-  ariaLabelledBy="clinical-draft-confirmation-title"
-  ariaDescribedBy="clinical-draft-confirmation-description"
-  [footer]="true"
-  closeLabel="Cancel draft action"
-  (close)="closeDraftConfirmation()"
-  (closed)="closeDraftConfirmation()"
->
-  <p id="clinical-draft-confirmation-description" class="clinical-draft-confirmation-copy">
-    {{ draftConfirmationDescription }}
-  </p>
-  <div modal-footer class="clinical-draft-confirmation-actions">
-    <button
-      class="btn btn-secondary"
-      type="button"
-      data-modal-initial-focus
-      (click)="closeDraftConfirmation()"
-    >
-      Cancel
-    </button>
-    <button class="btn btn-primary" type="button" (click)="confirmDraftAction()">
-      @if (draftConfirmation() === 'resume') {
-        Replace input and resume
-      } @else if (draftConfirmation() === 'clear') {
-        Discard and clear
-      } @else {
-        Discard draft
-      }
-    </button>
-  </div>
-</app-modal-shell>

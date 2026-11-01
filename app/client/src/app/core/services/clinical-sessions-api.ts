@@ -20,6 +20,7 @@ export async function fetchInspectionSessions(
   const queryString = buildQueryString({
     search: query.search,
     status: query.status,
+    sort: query.sort,
     date_mode: query.date_mode,
     date: query.date,
     offset: query.offset ?? 0,

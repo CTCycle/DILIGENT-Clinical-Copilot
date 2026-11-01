@@ -1,23 +1,17 @@
-// Copyright © 2023–2025 Thomas Virdis
-// Licensed under the GNU General Public License, version 3 or later.
-
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, ViewChild, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
-import { AnalysisProgressComponent } from '../../components/analysis-progress/analysis-progress.component';
-import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
-import { DEFAULT_FORM_STATE } from '../../core/constants';
-import { DILI_ASSESSMENT_TOUR, GUIDANCE_DEFINITIONS } from '../../core/guidance/guidance-content';
+import { GUIDANCE_DEFINITIONS, DILI_ASSESSMENT_TOUR } from '../../core/guidance/guidance-content';
 import { FeatureTipComponent } from '../../core/guidance/feature-tip.component';
 import { GuidanceTourService } from '../../core/guidance/guidance-tour.service';
-import { ClinicalDraftForm } from '../../core/models/types';
 import { fetchClinicalSectionTemplate } from '../../core/services/clinical-api';
-import { DiliJobTrackerService } from '../../core/services/dili-job-tracker.service';
-import { LucideSave } from '@lucide/angular';
-import { ClinicalDraftService } from '../../core/services/clinical-draft.service';
-import { NotificationService } from '../../core/services/notification.service';
+import {
+  ClinicalSessionDraftService,
+  DraftNotEditableError,
+} from '../../core/services/clinical-session-draft.service';
 import { AppStateService } from '../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { formatUnknownError, normalizeVisitDateInput } from '../../core/utils';
@@ -34,19 +28,14 @@ Comorbidities / liver risk factors:
 Timeline of symptoms and treatment changes:
 Working clinical question:`;
 
-type DraftConfirmationAction = 'resume' | 'discard' | 'clear';
+function parseDraftId(value: string | null): number | null {
+  const parsed = Number(value);
+  return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 @Component({
   selector: 'app-dili-agent-page',
-  imports: [
-    CommonModule,
-    FormsModule,
-    AnalysisProgressComponent,
-    AnalysisWizardComponent,
-    ModalShellComponent,
-    FeatureTipComponent,
-    LucideSave,
-  ],
+  imports: [CommonModule, FormsModule, AnalysisWizardComponent, FeatureTipComponent],
   templateUrl: './dili-agent-page.component.html',
   styleUrl: './dili-agent-page.component.scss',
 })
@@ -57,29 +46,43 @@ export class DiliAgentPageComponent {
   readonly modelConfigState = inject(ModelConfigStateService);
   readonly guidanceDefinitions = GUIDANCE_DEFINITIONS;
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly guidanceTour = inject(GuidanceTourService);
-  private readonly diliJobTracker = inject(DiliJobTrackerService);
-  readonly clinicalDraft = inject(ClinicalDraftService);
-  private readonly notifications = inject(NotificationService);
+  private readonly drafts = inject(ClinicalSessionDraftService);
   private readonly wizard = viewChild(AnalysisWizardComponent);
 
-  readonly isCancelling = signal(false);
   readonly wizardOpen = signal(false);
   readonly todayIso = todayIso;
   readonly clinicalInputTemplate = signal('');
-  readonly draftConfirmation = signal<DraftConfirmationAction | null>(null);
-  readonly hasReport = computed(() => {
-    const vm = this.vm;
-    return vm.jobStatus === 'completed' && Boolean(vm.message);
-  });
-  readonly canViewReport = computed(() => this.hasReport() || this.isActiveJob || this.vm.sessionId !== null);
-  readonly showProgress = computed(() => this.vm.jobStatus !== null || this.vm.isStarting || this.vm.isRunning);
-  readonly progressError = computed(() => (this.vm.jobStatus === 'failed' ? this.vm.message : null));
+  readonly loadingDraft = signal(false);
+  readonly pageError = signal<string | null>(null);
 
   constructor() {
-    void this.clinicalDraft.loadOnOpen();
     void this.loadClinicalSectionTemplate();
     void this.modelConfigState.load().catch(() => undefined);
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const requested = parseDraftId(params.get('session'));
+        if (requested !== null && requested !== this.vm.draftSessionId) {
+          void this.openDraft(requested);
+        }
+      });
+    // Keep `?session=` in step with the draft so a refresh restores it.
+    effect(() => {
+      const draftId = this.stateService.state().diliAgent.draftSessionId;
+      untracked(() => {
+        const current = parseDraftId(this.route.snapshot.queryParamMap.get('session'));
+        if (draftId !== current && !this.loadingDraft()) {
+          void this.router.navigate([], {
+            queryParams: { session: draftId },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          });
+        }
+      });
+    });
   }
 
   get vm() {
@@ -94,42 +97,12 @@ export class DiliAgentPageComponent {
     void this.router.navigateByUrl('/settings/models');
   }
 
-  viewReport(): void {
-    void this.router.navigateByUrl('/report');
-  }
-
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {
-    const currentMessage = this.vm.message ?? '';
-    const shouldClearStaleOutput =
-      !this.vm.isRunning &&
-      !this.vm.isStarting &&
-      Boolean(currentMessage || this.vm.jobId || this.vm.jobStatus);
-    const shouldClearValidationMessage =
-      !this.vm.isRunning &&
-      !this.vm.isStarting &&
-      currentMessage.startsWith('[ERROR]') &&
-      currentMessage !== '[ERROR] Clinical analysis failed.';
-
-    const updatedForm = { ...this.vm.form, [key]: value };
     this.stateService.updateDiliAgent({
-      form: updatedForm,
-      ...(shouldClearStaleOutput || shouldClearValidationMessage
-        ? {
-            message: '',
-            jobId: null,
-            jobProgress: 0,
-            jobStatus: null,
-            jobStage: null,
-            jobStageMessage: null,
-            jobStartedAtMs: null,
-            jobLastProgressAtMs: null,
-            pollIntervalMs: null,
-          }
-        : {}),
+      form: { ...this.vm.form, [key]: value },
+      isDirty: true,
+      saveStatus: this.vm.saveStatus === 'conflict' ? 'conflict' : 'idle',
     });
-    if (this.clinicalDraft.autosaveEnabled()) {
-      this.clinicalDraft.scheduleSave(updatedForm);
-    }
   }
 
   private async loadClinicalSectionTemplate(): Promise<void> {
@@ -188,192 +161,64 @@ export class DiliAgentPageComponent {
     });
   }
 
-  async stopSession(): Promise<void> {
-    if (!this.vm.jobId) {
-      return;
-    }
-    this.isCancelling.set(true);
-    try {
-      await this.diliJobTracker.cancelSession();
-    } catch (error) {
-      this.stateService.updateDiliAgent({
-        message: formatUnknownError(error, 'Failed to request cancellation.'),
-      });
-    } finally {
-      this.isCancelling.set(false);
-    }
-  }
-
   async saveDraft(): Promise<void> {
-    const saved = await this.clinicalDraft.saveAndEnable(this.vm.form);
-    if (saved) {
-      this.clinicalDraft.scheduleSave(this.vm.form);
-      this.notifications.notify('Draft saved', 'success', 2500);
-    }
+    this.pageError.set(null);
+    await this.drafts.save();
   }
 
-  resumeDraft(): void {
-    if (this.isActiveJob) {
-      return;
-    }
-    const draft = this.clinicalDraft.getRestorableForm();
-    if (!draft) {
-      return;
-    }
-    const current = this.vm.form;
-    const hasCurrentInput = Boolean(
-      current.patientName || current.visitDate || current.clinicalInput || current.patientImageDataUrl,
-    );
-    const differs = current.patientName !== draft.patient_name ||
-      current.visitDate !== (draft.visit_date ?? '') ||
-      current.clinicalInput !== draft.clinical_input ||
-      current.patientImageDataUrl !== null;
-    if (hasCurrentInput && differs) {
-      this.draftConfirmation.set('resume');
-      return;
-    }
-    this.applyResumedDraft(draft);
-  }
-
-  discardDraft(): void {
-    if (this.clinicalDraft.hasPersistedDraft()) {
-      this.draftConfirmation.set('discard');
+  async reloadDraft(): Promise<void> {
+    const draftId = this.vm.draftSessionId;
+    if (draftId !== null) {
+      await this.openDraft(draftId);
     }
   }
 
   clearAll(): void {
-    if (this.isActiveJob) {
-      return;
-    }
-    if (this.clinicalDraft.hasPersistedDraft()) {
-      this.draftConfirmation.set('clear');
-      return;
-    }
-    this.performClearAll();
-  }
-
-  async confirmDraftAction(): Promise<void> {
-    const action = this.draftConfirmation();
-    this.draftConfirmation.set(null);
-    if (action === 'resume') {
-      const draft = this.clinicalDraft.getRestorableForm();
-      if (draft) {
-        this.applyResumedDraft(draft);
-      }
-      return;
-    }
-    if (action !== 'discard' && action !== 'clear') {
-      return;
-    }
-    if (!(await this.clinicalDraft.discard())) {
-      return;
-    }
-    this.stateService.updateDiliAgent({ form: { ...DEFAULT_FORM_STATE } });
-    if (action === 'clear') {
-      this.performClearAll();
-    }
-  }
-
-  closeDraftConfirmation(): void {
-    this.draftConfirmation.set(null);
-  }
-
-  async reloadDraft(): Promise<void> {
-    await this.clinicalDraft.reloadDraft();
-  }
-
-  get isActiveJob(): boolean {
-    return this.vm.isRunning || this.vm.isStarting ||
-      this.vm.jobStatus === 'pending' || this.vm.jobStatus === 'running';
-  }
-
-  get draftStatusText(): string {
-    switch (this.clinicalDraft.saveStatus()) {
-      case 'saving':
-        return 'Saving';
-      case 'conflict':
-        return 'Draft changed or database switched. Reload before saving.';
-      case 'error':
-        return 'Unsaved changes. Draft could not be saved.';
-      case 'saved': {
-        if (this.clinicalDraft.hasUnsavedChanges()) {
-          return 'Unsaved changes';
-        }
-        const savedAt = this.clinicalDraft.lastSavedAt();
-        return savedAt
-          ? `Saved at ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : 'Saved';
-      }
-      default:
-        return this.clinicalDraft.hasUnsavedChanges() ? 'Unsaved changes' : '';
-    }
-  }
-
-  get draftConfirmationTitle(): string {
-    return this.draftConfirmation() === 'resume'
-      ? 'Replace current input?'
-      : this.draftConfirmation() === 'clear'
-        ? 'Discard saved draft and clear all?'
-        : 'Discard saved draft?';
-  }
-
-  get draftConfirmationDescription(): string {
-    if (this.draftConfirmation() === 'resume') {
-      return 'Resuming replaces the current form with the saved draft. The selected patient image is not part of the draft and must be chosen again.';
-    }
-    return 'This permanently removes the saved draft from the configured database and clears the current form. This does not change an assessment already in progress.';
-  }
-
-  private applyResumedDraft(draft: ClinicalDraftForm): void {
-    if (this.isActiveJob) {
-      return;
-    }
-    this.diliJobTracker.clearJobState();
-    this.stateService.updateDiliAgent({
-      form: {
-        patientName: draft.patient_name,
-        visitDate: draft.visit_date ?? '',
-        patientImageDataUrl: null,
-        clinicalInput: draft.clinical_input,
-      },
-    });
-    this.clinicalDraft.resume();
-  }
-
-  private performClearAll(): void {
-    this.diliJobTracker.clearJobState();
+    this.pageError.set(null);
     this.wizard()?.reset();
-    this.stateService.updateDiliAgent({
-      form: { ...DEFAULT_FORM_STATE },
-    });
+    this.drafts.reset();
   }
 
-  runOrStop(): void {
-    if (this.isCancelling() || this.vm.isStarting) {
-      return;
-    }
-    if (this.vm.isRunning) {
-      void this.stopSession();
-      return;
-    }
+  runAnalysis(): void {
     this.wizardOpen.set(true);
   }
 
-  get runActionDisabled(): boolean {
-    return this.isCancelling() || this.vm.isStarting;
+  private async openDraft(sessionId: number): Promise<void> {
+    this.loadingDraft.set(true);
+    this.pageError.set(null);
+    try {
+      await this.drafts.load(sessionId);
+    } catch (error) {
+      if (error instanceof DraftNotEditableError) {
+        void this.router.navigate(['/report', sessionId], { replaceUrl: true });
+      } else {
+        this.pageError.set(formatUnknownError(error, 'The draft could not be opened.'));
+      }
+    } finally {
+      this.loadingDraft.set(false);
+    }
   }
 
-  get runActionLabel(): string {
-    if (!this.vm.isRunning) {
-      return 'Run DILI analysis';
+  get draftStatusText(): string {
+    const { saveStatus, isDirty, draftSessionId, lastSavedAt } = this.vm;
+    switch (saveStatus) {
+      case 'saving':
+        return 'Saving draft…';
+      case 'conflict':
+        return 'This draft changed elsewhere or was already launched. Reload it before saving.';
+      case 'error':
+        return 'Unsaved changes. The draft could not be saved.';
+      default:
+        break;
     }
-    if (this.isCancelling()) {
-      return 'Stopping...';
+    if (isDirty) {
+      return draftSessionId === null ? 'Not saved yet' : 'Unsaved changes';
     }
-    if (!this.vm.jobId) {
-      return 'Starting...';
+    if (draftSessionId !== null && lastSavedAt) {
+      const time = new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `Draft #${draftSessionId} · Saved ${time}`;
     }
-    return 'Stop analysis';
+    return '';
   }
 
   get patientNameLabel(): string {

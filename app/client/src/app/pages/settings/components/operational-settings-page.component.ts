@@ -88,6 +88,17 @@ export const SETTINGS_SECTION_DEFINITIONS: Record<
         step: 256,
         unit: 'tokens',
       },
+      {
+        key: 'max_concurrent_clinical_jobs',
+        label: 'Maximum concurrent DILI analyses',
+        help: 'Additional analyses wait in a queue. Local Ollama processes requests one at a time, so higher values mainly help cloud providers.',
+        scope: 'Jobs',
+        kind: 'number',
+        min: 1,
+        max: 8,
+        step: 1,
+        unit: 'analyses',
+      },
     ],
   },
   data: {

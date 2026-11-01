@@ -3,6 +3,7 @@
 
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
 import { JobMonitorService } from '../../core/services/job-monitor.service';
@@ -13,6 +14,7 @@ function job(overrides: Partial<JobSummary>): JobSummary {
   return {
     job_id: 'job-1',
     job_type: 'rag_update',
+    session_id: null,
     status: 'running',
     progress: null,
     phase: null,
@@ -48,7 +50,7 @@ describe('JobsMonitorComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [{ provide: JobMonitorService, useValue: monitor }],
+      providers: [provideRouter([]), { provide: JobMonitorService, useValue: monitor }],
     });
   });
 
@@ -57,6 +59,18 @@ describe('JobsMonitorComponent', () => {
 
     expect(element.querySelector('.jobs-monitor-badge')).toBeNull();
     expect(element.textContent).toContain('No background jobs yet');
+  });
+
+  it('links clinical analyses to their session report', () => {
+    const element = render([
+      job({ job_id: 'c', job_type: 'clinical', session_id: 12 }),
+      job({ job_id: 'r', job_type: 'rag_update' }),
+    ]);
+
+    const links = element.querySelectorAll('a.jobs-monitor-link');
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute('href')).toBe('/report/12');
+    expect(links[0].textContent).toContain('Clinical analysis');
   });
 
   it('uses an indeterminate bar unless progress was measured', () => {

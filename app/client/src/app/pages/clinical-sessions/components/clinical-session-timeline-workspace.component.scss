@@ -41,3 +41,33 @@
 .timeline-action-icon { width: var(--control-height-sm); padding: 0 !important; }
 .timeline-action-icon svg { width: 16px; height: 16px; }
 .is-error { color: var(--color-error); }
+
+.timeline-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  color: var(--color-status-warning-text);
+  font-size: var(--font-sm);
+}
+
+.timeline-stale-action {
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.timeline-stale-action:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.timeline-stale-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}

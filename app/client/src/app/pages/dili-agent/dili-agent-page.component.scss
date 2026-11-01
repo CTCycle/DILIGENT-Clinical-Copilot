@@ -1,60 +1,7 @@
 /* Copyright © 2023–2025 Thomas Virdis */
 /* Licensed under the GNU General Public License, version 3 or later. */
 
-.stitch-dili-progress-slot {
-  min-height: 0;
-}
-
-.stitch-dili-progress-slot:not(:empty) {
-  margin-top: var(--space-md);
-}
-
-.stitch-dili-report-link {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-xs) 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-brand);
-  font: inherit;
-  font-size: var(--font-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.stitch-dili-report-link:hover:not(:disabled) {
-  text-decoration: underline;
-}
-
-.stitch-dili-report-link:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
-  border-radius: var(--radius-sm);
-}
-
-.stitch-dili-report-link:disabled {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-}
-
-.stitch-dili-report-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-divider);
-}
-
-.stitch-dili-report-dot[data-state='ready'] {
-  background: var(--color-status-success-text);
-}
-
-.stitch-dili-report-dot[data-state='running'] {
-  background: var(--color-status-info-text);
-}
-
-.clinical-draft-panel {
+.dili-draft-panel {
   display: grid;
   gap: var(--space-sm);
   margin-top: var(--space-md);
@@ -62,67 +9,32 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.clinical-draft-note,
-.clinical-draft-status,
-.clinical-draft-error,
-.clinical-draft-confirmation-copy {
+.dili-draft-heading {
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-xs);
-  line-height: 1.45;
-}
-
-.clinical-draft-banner {
-  display: grid;
-  gap: var(--space-sm);
-  border: 1px solid var(--color-border-subtle);
-  border-left: 3px solid var(--color-brand);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  padding: var(--space-md);
-}
-
-.clinical-draft-banner h4 {
-  margin: 0 0 var(--space-xs);
   color: var(--color-text-primary);
   font-size: var(--font-sm);
 }
 
-.clinical-draft-banner p {
+.dili-draft-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 1.5rem;
+}
+
+.dili-draft-status {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-xs);
   line-height: 1.45;
 }
 
-.clinical-draft-actions,
-.clinical-draft-confirmation-actions,
-.clinical-draft-status-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.clinical-draft-actions .btn,
-.clinical-draft-confirmation-actions .btn {
-  width: auto;
-  flex: 0 1 auto;
-}
-
-.clinical-draft-status-row {
-  min-height: 1.5rem;
-}
-
-.clinical-draft-status {
-  flex: 1 1 auto;
-}
-
-.clinical-draft-error {
+.dili-draft-status.is-error {
   color: var(--color-status-error-text);
 }
 
-.clinical-draft-link {
+.dili-draft-link {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -134,12 +46,7 @@
   text-underline-offset: 0.15em;
 }
 
-.clinical-draft-link:focus-visible {
+.dili-draft-link:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
-}
-
-.clinical-draft-confirmation-copy {
-  max-width: 58ch;
-  font-size: var(--font-sm);
 }

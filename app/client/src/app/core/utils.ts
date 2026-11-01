@@ -4,6 +4,7 @@
 import {
   ClinicalFormState,
   ClinicalRequestPayload,
+  ClinicalSessionInputWrite,
   EvidenceSourceId,
   RuntimeSettings,
   SessionModelOverrides,
@@ -142,6 +143,15 @@ export function buildClinicalPayload(
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     evidence_sources: [...evidenceSources],
     model_overrides: modelOverrides,
+  };
+}
+
+export function buildSessionInputPayload(form: ClinicalFormState): ClinicalSessionInputWrite {
+  return {
+    patient_name: form.patientName,
+    visit_date: form.visitDate || null,
+    clinical_input: form.clinicalInput,
+    patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
   };
 }
 

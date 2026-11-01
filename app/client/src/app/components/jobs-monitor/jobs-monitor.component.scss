@@ -135,8 +135,20 @@
   min-width: 0;
 }
 
-.jobs-monitor-item-title strong {
+.jobs-monitor-item-title strong,
+.jobs-monitor-link {
   font-size: var(--font-sm);
+}
+
+.jobs-monitor-link {
+  color: var(--color-brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.jobs-monitor-link:hover,
+.jobs-monitor-link:focus-visible {
+  text-decoration: underline;
 }
 
 .jobs-monitor-status {

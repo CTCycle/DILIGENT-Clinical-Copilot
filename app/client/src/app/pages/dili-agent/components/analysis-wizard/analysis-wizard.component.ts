@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { ModalShellComponent } from '../../../../components/modal-shell/modal-shell.component';
 import {
@@ -19,7 +20,8 @@ import {
   SessionModelOverrides,
 } from '../../../../core/models/types';
 import { validateClinicalInput } from '../../../../core/services/clinical-api';
-import { DiliJobTrackerService } from '../../../../core/services/dili-job-tracker.service';
+import { ClinicalSessionDraftService } from '../../../../core/services/clinical-session-draft.service';
+import { launchClinicalSession } from '../../../../core/services/clinical-session-lifecycle-api';
 import { AppStateService } from '../../../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
 import { buildClinicalPayload } from '../../../../core/utils';
@@ -88,7 +90,8 @@ export class AnalysisWizardComponent {
 
   private readonly stateService = inject(AppStateService);
   private readonly modelConfigState = inject(ModelConfigStateService);
-  private readonly tracker = inject(DiliJobTrackerService);
+  private readonly drafts = inject(ClinicalSessionDraftService);
+  private readonly router = inject(Router);
 
   readonly steps = WIZARD_STEPS;
   readonly sourceOptions = EVIDENCE_SOURCE_OPTIONS;
@@ -286,21 +289,26 @@ export class AnalysisWizardComponent {
     }
     this.starting.set(true);
     this.startError.set(null);
+    let sessionId: number;
     try {
-      await this.tracker.startSession(await this.buildPayload(), null);
+      const payload = await this.buildPayload();
+      const { draftSessionId, isDirty } = this.stateService.state().diliAgent;
+      const savedId = draftSessionId !== null && !isDirty ? draftSessionId : await this.drafts.save();
+      if (savedId === null) {
+        throw new Error('The session could not be saved before starting. Your input is unchanged.');
+      }
+      sessionId = savedId;
+      await launchClinicalSession(sessionId, payload);
     } catch (error) {
       this.starting.set(false);
       this.startError.set(error instanceof Error ? error.message : 'The analysis could not be started.');
       return;
     }
-    const vm = this.stateService.state().diliAgent;
-    if (vm.isRunning) {
-      this.reset();
-      this.started.emit();
-      return;
-    }
-    this.starting.set(false);
-    this.startError.set(vm.message || 'The analysis could not be started.');
+    // Navigate first so clearing the draft cannot race with the page's `?session=` sync.
+    await this.router.navigate(['/report', sessionId]);
+    this.reset();
+    this.drafts.reset();
+    this.started.emit();
   }
 
   private async buildPayload(): Promise<ClinicalRequestPayload> {

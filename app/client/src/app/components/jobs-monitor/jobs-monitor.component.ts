@@ -3,6 +3,7 @@
 
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, effect, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { JobMonitorService } from '../../core/services/job-monitor.service';
 import { JobStatus, JobSummary } from '../../core/services/jobs-api';
@@ -32,7 +33,7 @@ const STATUS_LABEL: Record<JobStatus, string> = {
 @Component({
   selector: 'app-jobs-monitor',
   standalone: true,
-  imports: [DecimalPipe, NgTemplateOutlet],
+  imports: [DecimalPipe, NgTemplateOutlet, RouterLink],
   templateUrl: './jobs-monitor.component.html',
   styleUrl: './jobs-monitor.component.scss',
 })
@@ -76,6 +77,10 @@ export class JobsMonitorComponent implements OnDestroy {
 
   name(job: JobSummary): string {
     return JOB_TYPE_INFO[job.job_type]?.name ?? job.job_type;
+  }
+
+  reportLink(job: JobSummary): Array<string | number> | null {
+    return job.job_type === 'clinical' && job.session_id !== null ? ['/report', job.session_id] : null;
   }
 
   kind(job: JobSummary): string {

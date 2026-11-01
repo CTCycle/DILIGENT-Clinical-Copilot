@@ -11,6 +11,7 @@ export type RuntimeSettingsCategory =
 export interface GeneralRuntimeSettings {
   polling_interval: number;
   llm_output_token_limit: number;
+  max_concurrent_clinical_jobs: number;
 }
 
 export interface DataRuntimeSettings {
