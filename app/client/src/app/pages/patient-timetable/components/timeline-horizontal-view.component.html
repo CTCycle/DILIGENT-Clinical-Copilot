@@ -1,0 +1,63 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<div class="track-controls">
+  <p>{{ columns().length }} {{ columns().length === 1 ? 'date' : 'dates' }} · columns are evenly spaced; chips show the time between them.</p>
+  <div class="track-scroll-buttons">
+    <button type="button" class="icon-button" aria-label="Scroll timeline back" (click)="scrollTrack(-1)"><svg lucideChevronLeft size="16" aria-hidden="true"></svg></button>
+    <button type="button" class="icon-button" aria-label="Scroll timeline forward" (click)="scrollTrack(1)"><svg lucideChevronRight size="16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="track-scroller" #scroller tabindex="0" role="region" aria-label="Horizontal clinical timeline">
+  <div class="track-grid" [style.grid-template-columns]="gridTemplateColumns()">
+    <div class="corner-cell" style="grid-row: 1; grid-column: 1">Category</div>
+    @for (column of columns(); track column.key; let c = $index) {
+      <div class="column-header" [style.grid-row]="1" [style.grid-column]="c + 2">
+        @if (column.gapLabel) {
+          <span class="gap-chip" [attr.aria-label]="column.gapLabel + ' since previous date'">{{ column.gapLabel }}</span>
+        }
+        <span class="column-marker" aria-hidden="true"></span>
+        <strong>{{ column.label }}</strong>
+        <span>{{ column.events.length }} {{ column.events.length === 1 ? 'event' : 'events' }}</span>
+      </div>
+    }
+    @for (lane of lanes(); track lane.category; let r = $index) {
+      <div class="lane-label" [style.grid-row]="r + 2" style="grid-column: 1">
+        <span class="lane-dot" [class]="'lane-dot is-' + lane.category" aria-hidden="true"></span>
+        {{ lane.label }}
+      </div>
+      @for (cell of lane.cells; track $index; let c = $index) {
+        <div class="lane-cell" [style.grid-row]="r + 2" [style.grid-column]="c + 2" [style.--bar-tracks]="lane.barTracks">
+          @for (event of cell; track event.event_id) {
+            <button
+              type="button"
+              class="event-chip"
+              [class.is-selected]="selectedEventId() === event.event_id"
+              [class.is-approximate]="isApproximate(event)"
+              [class.needs-review]="needsReview(event)"
+              [style.--event-color]="eventColor(event)"
+              [attr.aria-pressed]="selectedEventId() === event.event_id"
+              [attr.aria-label]="chipLabel(event)"
+              [attr.data-chip-id]="event.event_id"
+              [title]="chipLabel(event)"
+              (click)="eventSelect.emit(event)"
+            >
+              <span class="chip-dot" aria-hidden="true"></span>
+              <span class="chip-title">{{ event.title }}</span>
+            </button>
+          }
+        </div>
+      }
+    }
+    @for (bar of rangeBars(); track bar.event.event_id) {
+      <div
+        class="range-bar"
+        [style.grid-row]="bar.lane + 2"
+        [style.grid-column]="bar.startColumn + 2 + ' / ' + (bar.endColumn + 3)"
+        [style.--event-color]="eventColor(bar.event)"
+        [style.--bar-track]="bar.track"
+        [title]="bar.label"
+        aria-hidden="true"
+      ></div>
+    }
+  </div>
+</div>

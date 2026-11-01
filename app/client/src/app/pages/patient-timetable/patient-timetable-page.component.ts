@@ -7,15 +7,17 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   LucideArrowLeft,
-  LucideCircleDot,
+  LucideChartGantt,
+  LucideChevronDown,
+  LucideChevronsDownUp,
+  LucideChevronsUpDown,
   LucideCircleHelp,
-  LucideExternalLink,
   LucideFilterX,
+  LucideList,
   LucideX,
 } from '@lucide/angular';
 
 import { HelpPopoverComponent } from '../../core/guidance/help-popover.component';
-import { APP_LOCALE } from '../../core/constants';
 import {
   fetchInspectionSessionTimelineById,
   fetchInspectionSessionTimelineJobStatus,
@@ -27,98 +29,45 @@ import {
   InspectionSessionTimeline,
   InspectionTimelineJobStatusResponse,
   InspectionTimelineEvent,
-  InspectionTimelineEventType,
-  InspectionTimelineTimingType,
 } from '../../core/models/inspection-types';
 import {
   dayToUtcDate,
+  formatDayGap,
   normalizeTimelineDate,
   NormalizedTimelineDate,
-  TimelineDatePrecision,
 } from './timeline-date';
 import {
-  TimetableFilterOption,
-  TimetableFilterSelectComponent,
-} from './components/timetable-filter-select.component';
+  eventCategory,
+  eventColor,
+  eventDateLabel,
+  formatMonth,
+  formatTimelineDate,
+  hasEventEvidence,
+  isDateInferred,
+  isEventUncertain,
+  TIMELINE_CATEGORIES,
+  TIMELINE_CATEGORY_LABELS,
+  TimelineCategory,
+  TimelineEventGroup,
+  TimelineViewMode,
+} from './timeline-presentation';
+import { TimelineEventDetailsComponent } from './components/timeline-event-details.component';
+import { TimelineHorizontalViewComponent } from './components/timeline-horizontal-view.component';
 
-type TimetableLane = 'clinical' | 'therapy' | 'labs' | 'uncertainty' | 'unanchored';
-type TimelineEvidenceFilter = 'all' | 'with_evidence' | 'missing_evidence';
-type TimelineDensity = 'compact' | 'comfortable' | 'dense';
-
-type TimelineEventGroup = {
-  key: string;
-  eyebrow: string;
-  label: string;
-  dateHint: string;
-  isUnanchored: boolean;
-  events: InspectionTimelineEvent[];
-};
-
-type TimelineLaneSummary = {
-  id: TimetableLane;
+type TimelineCategorySummary = {
+  id: TimelineCategory;
   label: string;
   count: number;
-  collapsed: boolean;
+  hidden: boolean;
 };
 
-const EVENT_COLORS: Record<InspectionTimelineEventType, string> = {
-  therapy: 'var(--color-chart-therapy)',
-  disease: 'var(--color-chart-disease)',
-  lab: 'var(--color-chart-lab)',
-  other: 'var(--color-chart-other)',
+const UNANCHORED_GROUP_KEY = 'unanchored';
+
+const PRECISION_HINTS: Record<NormalizedTimelineDate['precision'], string> = {
+  day: 'Day-level date',
+  month: 'Month only · day not stated',
+  year: 'Year only · day and month not stated',
 };
-
-const TIMING_LABELS: Record<InspectionTimelineTimingType, string> = {
-  explicit_date: 'Explicit date',
-  relative: 'Relative timing',
-  duration: 'Duration',
-  recurring: 'Recurring',
-  uncertain: 'Uncertain timing',
-  ordering: 'Relative order',
-};
-
-const TIMETABLE_LANE_LABELS: Record<TimetableLane, string> = {
-  clinical: 'Clinical',
-  therapy: 'Medications',
-  labs: 'Laboratory',
-  uncertainty: 'Uncertain',
-  unanchored: 'Date not reported',
-};
-
-const TIMETABLE_LANES: TimetableLane[] = ['clinical', 'therapy', 'labs', 'uncertainty', 'unanchored'];
-const TIMELINE_DAY_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-const TIMELINE_MONTH_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-const TIMELINE_YEAR_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-const EVIDENCE_FILTER_OPTIONS: readonly TimetableFilterOption[] = [
-  { value: 'all', label: 'All events' },
-  { value: 'with_evidence', label: 'Has source evidence' },
-  { value: 'missing_evidence', label: 'Missing source evidence' },
-];
-const DENSITY_OPTIONS: readonly TimetableFilterOption[] = [
-  { value: 'dense', label: 'Dense' },
-  { value: 'compact', label: 'Compact' },
-  { value: 'comfortable', label: 'Comfortable' },
-];
-
-function isTimelineEvidenceFilter(value: string): value is TimelineEvidenceFilter {
-  return value === 'all' || value === 'with_evidence' || value === 'missing_evidence';
-}
-
-function isTimelineDensity(value: string): value is TimelineDensity {
-  return value === 'dense' || value === 'compact' || value === 'comfortable';
-}
 
 @Component({
   selector: 'app-patient-timetable-page',
@@ -126,13 +75,17 @@ function isTimelineDensity(value: string): value is TimelineDensity {
   imports: [
     CommonModule,
     RouterLink,
-    TimetableFilterSelectComponent,
     HelpPopoverComponent,
+    TimelineEventDetailsComponent,
+    TimelineHorizontalViewComponent,
     LucideArrowLeft,
-    LucideCircleDot,
+    LucideChartGantt,
+    LucideChevronDown,
+    LucideChevronsDownUp,
+    LucideChevronsUpDown,
     LucideCircleHelp,
-    LucideExternalLink,
     LucideFilterX,
+    LucideList,
     LucideX,
   ],
   templateUrl: './patient-timetable-page.component.html',
@@ -149,22 +102,13 @@ export class PatientTimetablePageComponent implements OnInit {
   readonly timeline = signal<InspectionSessionTimeline | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly viewMode = signal<TimelineViewMode>('list');
   readonly selectedEventId = signal<string | null>(null);
-  readonly collapsedLanes = signal<Record<TimetableLane, boolean>>({
-    clinical: false,
-    therapy: false,
-    labs: false,
-    uncertainty: false,
-    unanchored: false,
-  });
-  readonly evidenceFilter = signal<TimelineEvidenceFilter>('all');
+  readonly expandedEventIds = signal<ReadonlySet<string>>(new Set());
+  readonly collapsedGroupKeys = signal<ReadonlySet<string>>(new Set([UNANCHORED_GROUP_KEY]));
+  readonly hiddenCategories = signal<ReadonlySet<TimelineCategory>>(new Set());
   readonly showUncertainEvents = signal(true);
-  readonly hideEmptyLanes = signal(false);
-  readonly density = signal<TimelineDensity>('comfortable');
   readonly selectionAnnouncement = signal('');
-  readonly evidenceFilterOptions = EVIDENCE_FILTER_OPTIONS;
-  readonly densityOptions = DENSITY_OPTIONS;
-  private lastFocusedElement: HTMLElement | null = null;
   private routeLoadGeneration = 0;
 
   readonly orderedEvents = computed(() => [...(this.timeline()?.events ?? [])].sort((a, b) => {
@@ -181,6 +125,8 @@ export class PatientTimetablePageComponent implements OnInit {
     return a.sort_order - b.sort_order || a.event_id.localeCompare(b.event_id);
   }));
 
+  readonly eventsById = computed(() => new Map(this.orderedEvents().map((event) => [event.event_id, event])));
+
   readonly dateRange = computed<{ start: Date | null; end: Date | null }>(() => {
     const dates = this.orderedEvents()
       .map((event) => this.resolveNormalizedRange(event))
@@ -191,67 +137,88 @@ export class PatientTimetablePageComponent implements OnInit {
     };
   });
 
-  readonly filteredEvents = computed(() => this.orderedEvents().filter((event) => {
-    if (!this.showUncertainEvents() && this.isEventUncertain(event)) return false;
-    const hasEvidence = this.hasEventEvidence(event);
-    return this.evidenceFilter() === 'all'
-      || (this.evidenceFilter() === 'with_evidence' ? hasEvidence : !hasEvidence);
-  }));
+  /** Events passing the timing filter, before category visibility is applied. */
+  private readonly timingFilteredEvents = computed(() => this.orderedEvents()
+    .filter((event) => this.showUncertainEvents() || !isEventUncertain(event)));
 
-  readonly laneSummaries = computed<TimelineLaneSummary[]>(() => TIMETABLE_LANES
+  readonly filteredEvents = computed(() => this.timingFilteredEvents()
+    .filter((event) => !this.hiddenCategories().has(eventCategory(event))));
+
+  readonly categorySummaries = computed<TimelineCategorySummary[]>(() => TIMELINE_CATEGORIES
     .map((id) => ({
       id,
-      label: TIMETABLE_LANE_LABELS[id],
-      count: this.filteredEvents().filter((event) => this.resolveLane(event) === id).length,
-      collapsed: this.collapsedLanes()[id],
+      label: TIMELINE_CATEGORY_LABELS[id],
+      count: this.timingFilteredEvents().filter((event) => eventCategory(event) === id).length,
+      hidden: this.hiddenCategories().has(id),
     }))
-    .filter((lane) => !this.hideEmptyLanes() || lane.count > 0));
+    .filter((category) => category.count > 0 || category.hidden));
+
+  readonly visibleCategories = computed(() => this.categorySummaries()
+    .filter((category) => !category.hidden && category.count > 0)
+    .map((category) => category.id));
 
   readonly timelineGroups = computed<TimelineEventGroup[]>(() => {
     const groups = new Map<string, TimelineEventGroup>();
+    let previousDayStart: number | null = null;
     for (const event of this.filteredEvents()) {
-      const lane = this.resolveLane(event);
-      if (this.collapsedLanes()[lane]) continue;
-
       const normalized = normalizeTimelineDate(event.event_date);
-      const key = normalized ? `date:${normalized.startDay}` : 'unanchored';
+      const key = normalized ? `${normalized.precision}:${normalized.startDay}` : UNANCHORED_GROUP_KEY;
       const existing = groups.get(key);
       if (existing) {
         existing.events.push(event);
         continue;
       }
-
-      groups.set(key, normalized
-        ? {
+      if (!normalized) {
+        groups.set(key, {
           key,
-          eyebrow: 'Chronology',
-          label: this.eventDateLabel(event),
-          dateHint: this.dateHint(event),
-          isUnanchored: false,
-          events: [event],
-        }
-        : {
-          key,
-          eyebrow: 'Review required',
           label: 'Date not reported',
-          dateHint: 'Events are kept in source order until a canonical date is available.',
+          dateHint: 'Kept in source order until a date is documented',
           isUnanchored: true,
+          startDay: null,
+          gapLabel: null,
           events: [event],
         });
+        continue;
+      }
+      // Gaps are only meaningful between day-level dates.
+      const gapLabel = previousDayStart !== null && normalized.precision === 'day'
+        ? formatDayGap(normalized.startDay - previousDayStart)
+        : null;
+      groups.set(key, {
+        key,
+        label: formatTimelineDate(normalized),
+        dateHint: PRECISION_HINTS[normalized.precision],
+        isUnanchored: false,
+        startDay: normalized.startDay,
+        gapLabel,
+        events: [event],
+      });
+      if (normalized.precision === 'day') previousDayStart = normalized.startDay;
     }
-    return [...groups.values()];
+    // Dated groups first in chronological order, the undated review group last.
+    return [...groups.values()].sort((left, right) => Number(left.isUnanchored) - Number(right.isUnanchored));
   });
 
-  readonly visibleEventsCount = computed(() => this.timelineGroups().reduce((total, group) => total + group.events.length, 0));
-  readonly selectedEvent = computed(() => {
-    const selectedId = this.selectedEventId();
-    return this.orderedEvents().find((event) => event.event_id === selectedId) ?? null;
+  readonly datedGroups = computed(() => this.timelineGroups().filter((group) => !group.isUnanchored));
+  readonly undatedGroup = computed(() => this.timelineGroups().find((group) => group.isUnanchored) ?? null);
+  readonly displayedEvents = computed(() => this.timelineGroups().flatMap((group) => group.events));
+  readonly visibleEventsCount = computed(() => this.displayedEvents().length);
+  readonly reviewEventsCount = computed(() => this.orderedEvents()
+    .filter((event) => isEventUncertain(event) || isDateInferred(event)).length);
+  readonly allExpanded = computed(() => {
+    const expanded = this.expandedEventIds();
+    const events = this.displayedEvents();
+    return events.length > 0
+      && events.every((event) => expanded.has(event.event_id))
+      && this.timelineGroups().every((group) => !this.collapsedGroupKeys().has(group.key));
   });
+
+  readonly selectedEvent = computed(() => this.eventsById().get(this.selectedEventId() ?? '') ?? null);
   readonly rangeLabel = computed(() => {
     const range = this.dateRange();
     if (!range.start || !range.end) return 'Timeline events';
-    if (this.monthLabel(range.start) === this.monthLabel(range.end)) return this.monthLabel(range.start);
-    return `${this.monthLabel(range.start)} – ${this.monthLabel(range.end)}`;
+    if (formatMonth(range.start) === formatMonth(range.end)) return formatMonth(range.start);
+    return `${formatMonth(range.start)} – ${formatMonth(range.end)}`;
   });
   readonly isFallbackTimeline = computed(() => this.timeline()?.generation_status === 'fallback');
   readonly generationNote = computed(() => {
@@ -280,11 +247,16 @@ export class PatientTimetablePageComponent implements OnInit {
     };
     return labels[code] || 'Generation failure';
   });
-  readonly selectedEventIndex = computed(() => this.filteredEvents().findIndex((event) => event.event_id === this.selectedEventId()));
+  readonly selectedEventIndex = computed(() => this.displayedEvents().findIndex((event) => event.event_id === this.selectedEventId()));
   readonly hasPreviousEvent = computed(() => this.selectedEventIndex() > 0);
-  readonly hasNextEvent = computed(() => this.selectedEventIndex() >= 0 && this.selectedEventIndex() < this.filteredEvents().length - 1);
-  readonly linkedSelectedEventIds = computed(() => new Set(this.selectedEvent()?.linked_patient_event_ids ?? []));
-  readonly selectedEventHasSourceEvidence = computed(() => this.hasEventEvidence(this.selectedEvent()));
+  readonly hasNextEvent = computed(() => this.selectedEventIndex() < this.displayedEvents().length - 1);
+
+  readonly eventColor = eventColor;
+  readonly eventDateLabel = eventDateLabel;
+  readonly hasEventEvidence = hasEventEvidence;
+  readonly isDateInferred = isDateInferred;
+  readonly isEventUncertain = isEventUncertain;
+  readonly categoryLabel = (event: InspectionTimelineEvent): string => TIMELINE_CATEGORY_LABELS[eventCategory(event)];
 
   async ngOnInit(): Promise<void> {
     this.route.paramMap
@@ -313,9 +285,8 @@ export class PatientTimetablePageComponent implements OnInit {
         ? await fetchInspectionSessionTimelineById(sessionId, timelineId)
         : await this.fetchLatestTimeline(sessionId);
       if (!isCurrentLoad()) return;
-      this.timeline.set(payload);
+      this.applyTimeline(payload);
       this.timelineId.set(payload.timeline_id ?? timelineId ?? null);
-      this.selectedEventId.set(null);
     } catch (error) {
       if (!isCurrentLoad()) return;
       this.timeline.set(null);
@@ -357,9 +328,8 @@ export class PatientTimetablePageComponent implements OnInit {
         ? await fetchInspectionSessionTimelineById(id, generatedTimelineId)
         : await this.fetchLatestTimeline(id);
       if (!isCurrentGeneration()) return;
-      this.timeline.set(payload);
+      this.applyTimeline(payload);
       this.timelineId.set(payload.timeline_id ?? null);
-      this.selectedEventId.set(null);
       if (payload.timeline_id) {
         if (!isCurrentGeneration()) return;
         await this.router.navigate(['/sessions', id, 'timetable', payload.timeline_id], { replaceUrl: true });
@@ -373,142 +343,102 @@ export class PatientTimetablePageComponent implements OnInit {
     }
   }
 
-  selectEvent(event: InspectionTimelineEvent): void {
-    const active = document.activeElement;
-    this.lastFocusedElement = active instanceof HTMLElement ? active : null;
-    this.selectedEventId.set(event.event_id);
-    this.selectionAnnouncement.set(`Selected ${event.title}.`);
-    queueMicrotask(() => document.querySelector<HTMLElement>(`[data-event-id="${CSS.escape(event.event_id)}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+  setViewMode(mode: TimelineViewMode): void {
+    this.viewMode.set(mode);
   }
 
-  closeInspector(): void {
-    this.selectedEventId.set(null);
-    queueMicrotask(() => this.lastFocusedElement?.focus());
-  }
-
-  @HostListener('document:keydown.escape')
-  handleEscape(): void {
-    if (this.selectedEventId()) this.closeInspector();
-  }
-
-  toggleLaneCollapsed(lane: TimetableLane): void {
-    this.collapsedLanes.update((value) => ({ ...value, [lane]: !value[lane] }));
-  }
-
-  setEvidenceFilter(value: string): void {
-    if (isTimelineEvidenceFilter(value)) this.evidenceFilter.set(value);
+  toggleCategory(category: TimelineCategory): void {
+    this.hiddenCategories.update((current) => this.toggled(current, category));
   }
 
   toggleUncertainEvents(): void {
     this.showUncertainEvents.update((value) => !value);
   }
 
-  toggleHideEmptyLanes(): void {
-    this.hideEmptyLanes.update((value) => !value);
+  isExpanded(event: InspectionTimelineEvent): boolean {
+    return this.expandedEventIds().has(event.event_id);
   }
 
-  setDensity(value: string): void {
-    if (isTimelineDensity(value)) this.density.set(value);
+  toggleEvent(event: InspectionTimelineEvent): void {
+    this.expandedEventIds.update((current) => this.toggled(current, event.event_id));
   }
 
-  handleEventKeydown(event: KeyboardEvent, item: InspectionTimelineEvent): void {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      this.selectEvent(item);
-      return;
+  isGroupCollapsed(group: TimelineEventGroup): boolean {
+    return this.collapsedGroupKeys().has(group.key);
+  }
+
+  toggleGroup(group: TimelineEventGroup): void {
+    this.collapsedGroupKeys.update((current) => this.toggled(current, group.key));
+  }
+
+  expandAll(): void {
+    this.collapsedGroupKeys.set(new Set());
+    this.expandedEventIds.set(new Set(this.displayedEvents().map((event) => event.event_id)));
+  }
+
+  collapseAll(): void {
+    this.expandedEventIds.set(new Set());
+  }
+
+  linkedEvents(event: InspectionTimelineEvent): InspectionTimelineEvent[] {
+    const byId = this.eventsById();
+    return event.linked_patient_event_ids
+      .map((id) => byId.get(id))
+      .filter((linked): linked is InspectionTimelineEvent => Boolean(linked));
+  }
+
+  isLinkedToSelectedEvent(event: InspectionTimelineEvent): boolean {
+    return this.selectedEvent()?.linked_patient_event_ids.includes(event.event_id) ?? false;
+  }
+
+  /** Select an event, reveal it in the active view, and expand it in the list. */
+  selectEvent(event: InspectionTimelineEvent): void {
+    this.selectedEventId.set(event.event_id);
+    this.selectionAnnouncement.set(`Selected ${event.title}.`);
+    this.expandedEventIds.update((current) => new Set(current).add(event.event_id));
+    const group = this.timelineGroups().find((candidate) => candidate.events.includes(event));
+    if (group) this.collapsedGroupKeys.update((current) => {
+      const next = new Set(current);
+      next.delete(group.key);
+      return next;
+    });
+    if (this.viewMode() === 'list') {
+      queueMicrotask(() => [...document.querySelectorAll<HTMLElement>('[data-event-row]')]
+        .find((row) => row.dataset['eventRow'] === event.event_id)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
     }
-    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-      event.preventDefault();
-      this.selectPreviousEvent();
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-      event.preventDefault();
-      this.selectNextEvent();
-    }
+  }
+
+  clearSelection(): void {
+    this.selectedEventId.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (this.selectedEventId()) this.clearSelection();
   }
 
   selectPreviousEvent(): void {
-    const event = this.filteredEvents()[this.selectedEventIndex() - 1];
+    const event = this.displayedEvents()[this.selectedEventIndex() - 1];
     if (event) this.selectEvent(event);
   }
 
   selectNextEvent(): void {
-    const event = this.filteredEvents()[this.selectedEventIndex() + 1];
+    const event = this.displayedEvents()[this.selectedEventIndex() + 1];
     if (event) this.selectEvent(event);
   }
 
-  eventLaneLabel(event: InspectionTimelineEvent): string {
-    return TIMETABLE_LANE_LABELS[this.resolveLane(event)];
+  private applyTimeline(payload: InspectionSessionTimeline): void {
+    this.timeline.set(payload);
+    this.selectedEventId.set(null);
+    this.expandedEventIds.set(new Set());
+    this.collapsedGroupKeys.set(new Set([UNANCHORED_GROUP_KEY]));
   }
 
-  eventColor(event: InspectionTimelineEvent): string {
-    return EVENT_COLORS[event.event_type] ?? EVENT_COLORS.other;
-  }
-
-  timingLabel(value: InspectionTimelineTimingType): string {
-    return TIMING_LABELS[value] ?? value;
-  }
-
-  confidenceLabel(value: number | null): string {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return 'Not scored';
-    if (value >= 0.9) return 'Very high';
-    if (value >= 0.75) return 'High';
-    if (value >= 0.55) return 'Moderate';
-    if (value >= 0.35) return 'Low';
-    return 'Very low';
-  }
-
-  generationStatusLabel(): string {
-    return this.isFallbackTimeline() ? 'Fallback chronology' : 'LLM generated';
-  }
-
-  eventTimingText(event: InspectionTimelineEvent): string {
-    return event.extracted_timing_text || event.relative_time || event.event_date || this.timingLabel(event.timing_type);
-  }
-
-  eventDateLabel(event: InspectionTimelineEvent): string {
-    const resolved = this.resolveEventDate(event.event_date);
-    if (!resolved) return 'Date not reported';
-    if (resolved.precision === 'day') return TIMELINE_DAY_FORMATTER.format(resolved.date);
-    if (resolved.precision === 'month') return TIMELINE_MONTH_FORMATTER.format(resolved.date);
-    return TIMELINE_YEAR_FORMATTER.format(resolved.date);
-  }
-
-  eventDateSummary(event: InspectionTimelineEvent): string {
-    const resolved = this.resolveEventDate(event.event_date);
-    if (!resolved) {
-      const extracted = event.extracted_timing_text || event.relative_time;
-      return extracted ? `No canonical date · ${extracted}` : 'No canonical date reported';
-    }
-
-    let summary = this.eventDateLabel(event);
-    const explicitEnd = normalizeTimelineDate(event.event_date_end ?? null);
-    if (explicitEnd && explicitEnd.startDay > resolved.date.getTime() / 86_400_000) {
-      summary += ` – ${this.formatEndDate(explicitEnd, resolved.precision)}`;
-    }
-    if (resolved.precision !== 'day') summary += ` · ${resolved.precision}-level date`;
-    const extracted = event.extracted_timing_text || event.relative_time;
-    return extracted && extracted !== event.event_date ? `${summary} · ${extracted}` : summary;
-  }
-
-  precisionLabel(value: string | null): string {
-    const precision = this.resolveEventDate(value)?.precision;
-    return precision ? `${precision[0].toUpperCase()}${precision.slice(1)} precision` : 'Not reported';
-  }
-
-  isEventUncertain(event: InspectionTimelineEvent): boolean {
-    return event.date_certainty === 'uncertain'
-      || event.timing_type === 'uncertain'
-      || event.timing_type === 'ordering'
-      || !normalizeTimelineDate(event.event_date);
-  }
-
-  hasEventEvidence(event: InspectionTimelineEvent | null): boolean {
-    return Boolean(event?.source_evidence?.trim());
-  }
-
-  isLinkedToSelectedEvent(event: InspectionTimelineEvent): boolean {
-    return this.linkedSelectedEventIds().has(event.event_id);
+  private toggled<T>(current: ReadonlySet<T>, value: T): ReadonlySet<T> {
+    const next = new Set(current);
+    if (!next.delete(value)) next.add(value);
+    return next;
   }
 
   private async handleRouteChange(sessionId: number, timelineId: number | null): Promise<void> {
@@ -577,42 +507,12 @@ export class PatientTimetablePageComponent implements OnInit {
     throw new Error('Timeline generation timed out. Check the saved timeline history and retry if needed.');
   }
 
-  private resolveEventDate(value: string | null): { date: Date; precision: TimelineDatePrecision } | null {
-    const normalized = normalizeTimelineDate(value);
-    return normalized ? { date: dayToUtcDate(normalized.startDay), precision: normalized.precision } : null;
-  }
-
   private resolveNormalizedRange(event: InspectionTimelineEvent): NormalizedTimelineDate | null {
     const start = normalizeTimelineDate(event.event_date);
     if (!start) return null;
     const explicitEnd = normalizeTimelineDate(event.event_date_end ?? null);
     if (!explicitEnd || explicitEnd.startDay < start.startDay) return start;
     return { ...start, endDay: explicitEnd.endDay };
-  }
-
-  private resolveLane(event: InspectionTimelineEvent): TimetableLane {
-    if (!normalizeTimelineDate(event.event_date)) return 'unanchored';
-    if (event.timing_type === 'uncertain' || event.timing_type === 'ordering') return 'uncertainty';
-    if (event.event_type === 'therapy') return 'therapy';
-    if (event.event_type === 'lab') return 'labs';
-    return 'clinical';
-  }
-
-  private dateHint(event: InspectionTimelineEvent): string {
-    if (this.isEventUncertain(event)) return 'Date present, but timing requires review.';
-    const precision = this.resolveEventDate(event.event_date)?.precision;
-    return precision === 'day' ? 'Day-level placement' : `${precision ?? 'Unknown'}-level placement`;
-  }
-
-  private formatEndDate(value: NormalizedTimelineDate, precision: TimelineDatePrecision): string {
-    const date = dayToUtcDate(value.endDay);
-    if (precision === 'year') return TIMELINE_YEAR_FORMATTER.format(date);
-    if (precision === 'month') return TIMELINE_MONTH_FORMATTER.format(dayToUtcDate(value.startDay));
-    return TIMELINE_DAY_FORMATTER.format(date);
-  }
-
-  private monthLabel(value: Date): string {
-    return TIMELINE_MONTH_FORMATTER.format(value);
   }
 
   private isNotFoundError(error: unknown): boolean {

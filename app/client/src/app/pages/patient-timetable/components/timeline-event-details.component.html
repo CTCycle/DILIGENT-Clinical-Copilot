@@ -1,0 +1,51 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+@let item = event();
+<div class="event-details">
+  @if (item.description) {
+    <p class="details-description">{{ item.description }}</p>
+  }
+  <dl class="details-grid">
+    <div>
+      <dt>Date</dt>
+      <dd>{{ dateSummary() }}</dd>
+    </div>
+    <div>
+      <dt>Timing</dt>
+      <dd>{{ timingLabel(item.timing_type) }}</dd>
+    </div>
+    <div>
+      <dt>Date precision</dt>
+      <dd>{{ certaintyLabel() }}</dd>
+    </div>
+    <div>
+      <dt>Source</dt>
+      <dd>{{ item.source || 'Not reported' }}</dd>
+    </div>
+    <div>
+      <dt>Model confidence</dt>
+      <dd>{{ confidenceLabel(item.confidence) }}</dd>
+    </div>
+    @if (item.confidence_rationale) {
+      <div>
+        <dt>Confidence rationale</dt>
+        <dd>{{ item.confidence_rationale }}</dd>
+      </div>
+    }
+  </dl>
+  @if (item.uncertainty_reason) {
+    <p class="details-review"><strong>Review note</strong> {{ item.uncertainty_reason }}</p>
+  }
+  <figure class="source-evidence" [class.is-warning]="!hasEvidence()">
+    <figcaption>Source evidence</figcaption>
+    <blockquote>{{ item.source_evidence || 'Missing source evidence. Do not treat this event as clinically grounded chronology.' }}</blockquote>
+  </figure>
+  @if (linkedEvents().length > 0) {
+    <div class="linked-events">
+      <span class="linked-label">Linked events</span>
+      @for (linked of linkedEvents(); track linked.event_id) {
+        <button type="button" class="linked-chip" (click)="linkedSelect.emit(linked)">{{ linked.title }}</button>
+      }
+    </div>
+  }
+</div>

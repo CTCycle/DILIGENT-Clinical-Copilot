@@ -10,13 +10,6 @@ export type NormalizedTimelineDate = {
   precision: TimelineDatePrecision;
 };
 
-export type TimelineScale = {
-  startDay: number;
-  endDay: number;
-  span: number;
-  toPercent: (day: number) => number;
-};
-
 const MS_PER_DAY = 86_400_000;
 
 function utcDay(year: number, month: number, day: number): number | null {
@@ -46,15 +39,12 @@ export function normalizeTimelineDate(value: string | null): NormalizedTimelineD
   return nextYear === null ? null : { value, startDay, endDay: nextYear - 1, precision: 'year' };
 }
 
-export function createTimelineScale(startDay: number, endDay: number): TimelineScale {
-  const safeEnd = Math.max(startDay, endDay);
-  const span = Math.max(1, safeEnd - startDay);
-  return {
-    startDay,
-    endDay: safeEnd,
-    span,
-    toPercent: (day: number) => Math.min(100, Math.max(0, ((day - startDay) / span) * 100)),
-  };
+/** Compact label for the distance between two timeline columns, e.g. "+5 d". */
+export function formatDayGap(days: number): string | null {
+  if (!Number.isFinite(days) || days <= 0) return null;
+  if (days < 60) return `+${days} d`;
+  if (days < 730) return `+${Math.round(days / 30.44)} mo`;
+  return `+${Math.round(days / 365.25)} y`;
 }
 
 export function dayToUtcDate(day: number): Date {

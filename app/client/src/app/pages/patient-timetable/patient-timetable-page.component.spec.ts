@@ -6,9 +6,10 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { InspectionSessionTimeline } from '../../core/models/inspection-types';
+import { InspectionSessionTimeline, InspectionTimelineEvent } from '../../core/models/inspection-types';
 import { PatientTimetablePageComponent } from './patient-timetable-page.component';
-import { createTimelineScale, normalizeTimelineDate } from './timeline-date';
+import { formatDayGap } from './timeline-date';
+import { eventDateSummary, precisionLabel } from './timeline-presentation';
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -45,6 +46,8 @@ describe('PatientTimetablePageComponent', () => {
         },
       ],
     }).compileComponents();
+    // jsdom does not implement scrolling; selection scrolls the chosen event into view.
+    Element.prototype.scrollIntoView = vi.fn();
     fixture = TestBed.createComponent(PatientTimetablePageComponent);
     component = fixture.componentInstance;
   });
@@ -116,42 +119,42 @@ describe('PatientTimetablePageComponent', () => {
     },
   );
 
-  it('renders a warning when source evidence is missing', () => {
-    const timeline: InspectionSessionTimeline = {
-      timeline_id: 8,
+  function timelineEvent(overrides: Partial<InspectionTimelineEvent> & Pick<InspectionTimelineEvent, 'event_id'>): InspectionTimelineEvent {
+    return {
+      title: overrides.event_id,
+      description: null,
+      event_type: 'other',
+      timing_type: 'explicit_date',
+      event_date: null,
+      relative_time: null,
+      extracted_timing_text: null,
+      source_evidence: 'source',
+      linked_patient_event_ids: [],
+      source: null,
+      confidence: null,
+      confidence_rationale: null,
+      sort_order: 0,
+      ...overrides,
+    };
+  }
+
+  function setEvents(events: InspectionTimelineEvent[]): void {
+    (component as unknown as { applyTimeline: (value: InspectionSessionTimeline) => void }).applyTimeline({
+      timeline_id: 9,
       session_id: 12,
       generated_at: '2026-07-09T08:00:00Z',
-      generation_status: 'llm_generated',
-      generation_note: null,
-      source_model: 'llama3.1',
-      source_kind: 'local',
-      model_provider: 'ollama',
-      events: [
-        {
-          event_id: 'event-1',
-          title: 'Therapy started',
-          description: 'No source snippet preserved.',
-          event_type: 'therapy',
-          timing_type: 'uncertain',
-          event_date: null,
-          relative_time: null,
-          extracted_timing_text: null,
-          source_evidence: null,
-          linked_patient_event_ids: [],
-          source: 'fallback_parser',
-          confidence: null,
-          confidence_rationale: null,
-          sort_order: 0,
-        },
-      ],
-    };
+      events,
+    });
+  }
 
-    component.timeline.set(timeline);
-    component.selectedEventId.set('event-1');
+  it('renders a warning when source evidence is missing', () => {
+    setEvents([
+      timelineEvent({ event_id: 'event-1', title: 'Therapy started', event_type: 'therapy', timing_type: 'uncertain', source_evidence: null }),
+    ]);
+    component.expandAll();
     fixture.detectChanges();
 
-    const root = fixture.nativeElement as HTMLElement;
-    const sourceEvidence = root.querySelector<HTMLElement>('.source-evidence');
+    const sourceEvidence = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.source-evidence');
 
     expect(sourceEvidence?.classList.contains('is-warning')).toBe(true);
     expect(sourceEvidence?.textContent).toContain(
@@ -159,73 +162,112 @@ describe('PatientTimetablePageComponent', () => {
     );
   });
 
-  it('uses explicit partial-date precision without browser partial-date parsing', () => {
-    const resolver = (component as unknown as { resolveEventDate: (value: string | null) => unknown }).resolveEventDate;
-    const label = (component as unknown as { precisionLabel: (value: string | null) => string }).precisionLabel.bind(component);
-
-    expect(resolver.call(component, '2025-02-03')).toEqual({ date: new Date(Date.UTC(2025, 1, 3)), precision: 'day' });
-    expect(resolver.call(component, '2025-02')).toEqual({ date: new Date(Date.UTC(2025, 1, 1)), precision: 'month' });
-    expect(resolver.call(component, '2025')).toEqual({ date: new Date(Date.UTC(2025, 0, 1)), precision: 'year' });
-    expect(resolver.call(component, '2025-99')).toBeNull();
-    expect(resolver.call(component, null)).toBeNull();
-    expect(label('2025-02')).toBe('Month precision');
-  });
-
-  it('filters evidence, keeps uncertain events exclusive, and supports category collapse', () => {
-    component.timeline.set({
-      timeline_id: 9, session_id: 12, generated_at: '2026-07-09T08:00:00Z', events: [
-        { event_id: 'therapy', title: 'Therapy', description: null, event_type: 'therapy', timing_type: 'explicit_date', event_date: '2025-01-01', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: null, confidence: null, confidence_rationale: null, sort_order: 0 },
-        { event_id: 'uncertain', title: 'Uncertain', description: null, event_type: 'therapy', timing_type: 'uncertain', event_date: null, relative_time: null, extracted_timing_text: null, source_evidence: null, linked_patient_event_ids: [], source: null, confidence: null, confidence_rationale: null, sort_order: 1 },
-      ],
-    });
-
-    expect(component.timelineGroups().find((group) => group.isUnanchored)?.events.map((event) => event.event_id)).toEqual(['uncertain']);
-    component.setEvidenceFilter('with_evidence');
-    expect(component.filteredEvents().map((event) => event.event_id)).toEqual(['therapy']);
-    component.toggleLaneCollapsed('therapy');
-    expect(component.laneSummaries().find((lane) => lane.id === 'therapy')?.collapsed).toBe(true);
-    expect(component.timelineGroups()).toEqual([]);
-  });
-
-  it('guards typed filter and density values', () => {
-    component.setEvidenceFilter('with_evidence');
-    component.setDensity('dense');
-    component.setEvidenceFilter('not-a-filter');
-    component.setDensity('not-a-density');
-
-    expect(component.evidenceFilter()).toBe('with_evidence');
-    expect(component.density()).toBe('dense');
-  });
-
-  it('groups same-day events and keeps undated events in a review group', () => {
-    component.timeline.set({
-      timeline_id: 10,
-      session_id: 12,
-      generated_at: '2026-07-09T08:00:00Z',
-      events: [
-        { event_id: 'first', title: 'First', description: 'One', event_type: 'disease', timing_type: 'explicit_date', event_date: '2025-02-03', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: 'anamnesis', confidence: 0.9, confidence_rationale: null, sort_order: 0 },
-        { event_id: 'second', title: 'Second', description: 'Two', event_type: 'lab', timing_type: 'explicit_date', event_date: '2025-02-03', relative_time: null, extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: 'laboratory history', confidence: 0.8, confidence_rationale: null, sort_order: 1 },
-        { event_id: 'undated', title: 'Undated', description: 'Three', event_type: 'other', timing_type: 'uncertain', event_date: null, relative_time: 'After treatment', extracted_timing_text: null, source_evidence: 'source', linked_patient_event_ids: [], source: 'anamnesis', confidence: null, confidence_rationale: null, sort_order: 2 },
-      ],
-    });
-
-    expect(component.timelineGroups().map((group) => [group.label, group.events.length])).toEqual([
-      ['3 Feb 2025', 2],
-      ['Date not reported', 1],
+  it('keeps events collapsed and the undated group closed until expanded on demand', () => {
+    setEvents([
+      timelineEvent({ event_id: 'dated', event_date: '2025-02-03', description: 'Dated detail' }),
+      timelineEvent({ event_id: 'undated', timing_type: 'uncertain' }),
     ]);
-    expect(component.eventDateSummary(component.timeline()!.events[2])).toBe('No canonical date · After treatment');
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelectorAll('.event-row').length).toBe(1);
+    expect(root.querySelector('app-timeline-event-details')).toBeNull();
+
+    root.querySelector<HTMLButtonElement>('.event-row-toggle')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.event-row-toggle')?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('app-timeline-event-details')?.textContent).toContain('Dated detail');
+
+    component.expandAll();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.event-row').length).toBe(2);
+    expect(component.allExpanded()).toBe(true);
+
+    component.collapseAll();
+    fixture.detectChanges();
+    expect(root.querySelector('app-timeline-event-details')).toBeNull();
   });
 
-  it('keeps January 5 on the same UTC scale as the month boundaries', () => {
-    const start = normalizeTimelineDate('2024-12-01');
-    const event = normalizeTimelineDate('2025-01-05');
-    const end = normalizeTimelineDate('2025-02-01');
+  it('formats partial-date precision without browser partial-date parsing', () => {
+    expect(precisionLabel('2025-02')).toBe('Month precision');
+    expect(precisionLabel('2025-99')).toBe('Not reported');
+    expect(eventDateSummary(timelineEvent({ event_id: 'range', event_date: '2024-12-30', event_date_end: '2025-01-03' })))
+      .toBe('30 Dec 2024 – 3 Jan 2025');
+    expect(eventDateSummary(timelineEvent({ event_id: 'year', event_date: '2025' }))).toBe('2025 · year-level date');
+  });
 
-    expect(start && event && end).toBeTruthy();
-    const scale = createTimelineScale(start!.startDay, end!.endDay);
-    expect(scale.toPercent(event!.startDay)).toBeCloseTo(56.4516, 3);
-    expect(scale.toPercent(normalizeTimelineDate('2025-01-01')!.startDay)).toBeLessThan(scale.toPercent(event!.startDay));
-    expect(scale.toPercent(normalizeTimelineDate('2025-02-01')!.startDay)).toBeGreaterThan(scale.toPercent(event!.startDay));
+  it('filters uncertain timing and hidden categories', () => {
+    setEvents([
+      timelineEvent({ event_id: 'therapy', event_type: 'therapy', event_date: '2025-01-01' }),
+      timelineEvent({ event_id: 'uncertain', event_type: 'therapy', timing_type: 'uncertain' }),
+      timelineEvent({ event_id: 'lab', event_type: 'lab', event_date: '2025-01-02' }),
+    ]);
+
+    component.toggleUncertainEvents();
+    expect(component.filteredEvents().map((event) => event.event_id)).toEqual(['therapy', 'lab']);
+    component.toggleCategory('therapy');
+    expect(component.categorySummaries().find((category) => category.id === 'therapy')?.hidden).toBe(true);
+    expect(component.filteredEvents().map((event) => event.event_id)).toEqual(['lab']);
+    expect(component.visibleCategories()).toEqual(['labs']);
+  });
+
+  it('groups by date and precision, labels day gaps, and keeps undated events last', () => {
+    setEvents([
+      timelineEvent({ event_id: 'first', event_type: 'disease', event_date: '2025-02-03', sort_order: 0 }),
+      timelineEvent({ event_id: 'second', event_type: 'lab', event_date: '2025-02-03', sort_order: 1 }),
+      timelineEvent({ event_id: 'undated', timing_type: 'uncertain', relative_time: 'After treatment', sort_order: 2 }),
+      timelineEvent({ event_id: 'year', event_date: '2025', sort_order: 3 }),
+      timelineEvent({ event_id: 'later', event_date: '2025-03-20', sort_order: 4 }),
+    ]);
+
+    expect(component.timelineGroups().map((group) => [group.label, group.events.length, group.gapLabel])).toEqual([
+      ['2025', 1, null],
+      ['3 Feb 2025', 2, null],
+      ['20 Mar 2025', 1, '+45 d'],
+      ['Date not reported', 1, null],
+    ]);
+    expect(eventDateSummary(component.timeline()!.events[2])).toBe('No canonical date · After treatment');
+  });
+
+  it('formats gaps between timeline columns', () => {
+    expect(formatDayGap(0)).toBeNull();
+    expect(formatDayGap(5)).toBe('+5 d');
+    expect(formatDayGap(91)).toBe('+3 mo');
+    expect(formatDayGap(800)).toBe('+2 y');
+  });
+
+  it('resolves linked events and selects them across groups', () => {
+    setEvents([
+      timelineEvent({ event_id: 'start', title: 'Therapy start', event_date: '2025-01-01', linked_patient_event_ids: ['alt', 'missing'] }),
+      timelineEvent({ event_id: 'alt', title: 'ALT rise', timing_type: 'uncertain' }),
+    ]);
+
+    const [start] = component.orderedEvents();
+    expect(component.linkedEvents(start).map((event) => event.event_id)).toEqual(['alt']);
+    component.selectEvent(component.linkedEvents(start)[0]);
+    expect(component.selectedEventId()).toBe('alt');
+    expect(component.isGroupCollapsed(component.undatedGroup()!)).toBe(false);
+    expect(component.isExpanded(component.selectedEvent()!)).toBe(true);
+  });
+
+  it('renders the horizontal view with dated columns and category lanes', () => {
+    setEvents([
+      timelineEvent({ event_id: 'therapy', title: 'Amoxicillin', event_type: 'therapy', event_date: '2024-12-30', event_date_end: '2025-01-06' }),
+      timelineEvent({ event_id: 'lab', title: 'ALT rise', event_type: 'lab', event_date: '2025-01-06' }),
+    ]);
+    component.setViewMode('horizontal');
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect([...root.querySelectorAll('.column-header strong')].map((node) => node.textContent?.trim())).toEqual(['30 Dec 2024', '6 Jan 2025']);
+    expect([...root.querySelectorAll('.lane-label')].map((node) => node.textContent?.trim())).toEqual(['Medications', 'Laboratory']);
+    expect(root.querySelector('.gap-chip')?.textContent?.trim()).toBe('+7 d');
+    expect(root.querySelectorAll('.range-bar').length).toBe(1);
+
+    root.querySelector<HTMLButtonElement>('[data-chip-id="lab"]')!.click();
+    fixture.detectChanges();
+    expect(component.selectedEventId()).toBe('lab');
+    expect(root.querySelector('.selection-panel h3')?.textContent).toContain('ALT rise');
   });
 
   it('ignores a late timetable response after the route changes', async () => {

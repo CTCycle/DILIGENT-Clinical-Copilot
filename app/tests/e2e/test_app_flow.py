@@ -734,7 +734,7 @@ def test_timetable_invalid_session_id_shows_validation_error(page: Page, base_ur
     expect(page.locator(".error-note")).to_contain_text("Invalid session id.")
 
 ###############################################################################
-def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
+def test_timetable_collapsible_chronology_and_horizontal_view(
     page: Page, base_url: str
 ):
     timeline = {
@@ -851,15 +851,23 @@ def test_timetable_deterministic_chronology_inspector_and_cluster_layout(
     january_group = page.get_by_role("region", name="5 Jan 2025")
     expect(january_group).to_be_visible()
     expect(january_group).to_contain_text("4 events")
-    expect(january_group.get_by_role("heading", name="Therapy 1")).to_be_visible()
+    therapy_row = january_group.get_by_role("button", name="Therapy 1", exact=False)
+    expect(therapy_row).to_have_attribute("aria-expanded", "false")
+    expect(january_group).not_to_contain_text("Therapy on 2025-01-05.")
 
-    page.get_by_role("button", name="Inspect Therapy 1 details").click()
-    inspector = page.get_by_role("complementary", name="Event inspector")
-    expect(inspector).to_be_visible()
-    expect(inspector).to_contain_text("Therapy 1")
-    expect(inspector).to_contain_text("5 Jan 2025")
+    therapy_row.click()
+    expect(therapy_row).to_have_attribute("aria-expanded", "true")
+    expect(january_group).to_contain_text("Therapy on 2025-01-05.")
+
+    page.get_by_role("button", name="Timeline", exact=True).click()
+    track = page.get_by_role("region", name="Horizontal clinical timeline")
+    expect(track).to_be_visible()
+    expect(track).to_contain_text("1 Dec 2024")
+    expect(track).to_contain_text("+35 d")
+    track.get_by_role("button", name="February endpoint").click()
+    expect(chronology).to_contain_text("Endpoint on 2025-02-01.")
     page.keyboard.press("Escape")
-    expect(inspector).to_contain_text("Select an event")
+    expect(chronology).to_contain_text("Select an event on the timeline")
 
 ###############################################################################
 def test_home_form_state_persists_across_back_forward_navigation(
