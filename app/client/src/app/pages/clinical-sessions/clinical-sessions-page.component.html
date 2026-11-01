@@ -16,9 +16,18 @@
           (ngModelChange)="updateQuery($event)"
           (keydown.enter)="loadSessions()"
         />
-        <button class="btn btn-secondary" type="button" (click)="loadSessions()">Search</button>
         <button
-          class="btn btn-secondary clinical-sessions-refresh"
+          class="btn btn-secondary clinical-sessions-icon-button"
+          type="button"
+          title="Search sessions"
+          aria-label="Search sessions"
+          [disabled]="loading()"
+          (click)="loadSessions()"
+        >
+          <svg lucideSearch size="16" aria-hidden="true"></svg>
+        </button>
+        <button
+          class="btn btn-secondary clinical-sessions-icon-button clinical-sessions-refresh"
           type="button"
           title="Refresh sessions"
           aria-label="Refresh sessions"
@@ -69,26 +78,22 @@
             <option value="before">Before</option>
             <option value="exact">On date</option>
           </select>
-          <div class="clinical-sessions-date-input-shell" [class.is-empty]="!dateFilter()">
-            <input
-              class="clinical-sessions-date-input"
-              type="date"
-              lang="en-GB"
-              aria-label="Session filter date"
-              [disabled]="dateFilterMode() === 'any'"
-              [ngModel]="dateFilter()"
-              (ngModelChange)="updateDateFilter($event)"
-            />
-          </div>
+          <input
+            class="clinical-sessions-date-input"
+            type="date"
+            aria-label="Session filter date"
+            [ngModel]="dateFilter()"
+            (ngModelChange)="updateDateFilter($event)"
+          />
         </div>
       </div>
       <div class="clinical-sessions-results">
         @if (loading()) {
           <p class="clinical-sessions-empty">Loading sessions...</p>
-        } @else if (!filteredSessions().length) {
+        } @else if (!sessions().length) {
           <p class="clinical-sessions-empty">No clinical sessions found.</p>
         } @else {
-          @for (session of filteredSessions(); track session.session_id) {
+          @for (session of sessions(); track session.session_id) {
             <div class="clinical-session-row-shell" [class.is-active]="selected()?.session_id === session.session_id">
               <button
                 type="button"
@@ -368,15 +373,18 @@
                   </div>
                   <label class="btn btn-secondary">
                     Load images
-                    <input type="file" accept="image/*" multiple (change)="onMetadataFilesSelected('images', $event)" />
+                    <input type="file" accept="image/*" multiple (change)="onMetadataFilesSelected($event)" />
                   </label>
                   <hr class="clinical-session-metadata-divider" />
                   <section class="clinical-session-metadata-summary-card">
                     <strong>Attached images</strong>
-                    @if (metadataEntries('images').length) {
+                    @if (imageAttachments().length) {
                       <ul>
-                        @for (image of metadataEntries('images'); track image) {
-                          <li>{{ image }}</li>
+                        @for (item of imageAttachments(); track item.attachment_id) {
+                          <li>
+                            <a [href]="attachmentUrl(item)" target="_blank" rel="noopener">{{ item.file_name }}</a>
+                            <button type="button" class="clinical-session-attachment-remove" [attr.aria-label]="'Remove ' + item.file_name" [title]="'Remove ' + item.file_name" (click)="removeAttachment(item)">Remove</button>
+                          </li>
                         }
                       </ul>
                     } @else {
@@ -396,15 +404,18 @@
                   </div>
                   <label class="btn btn-secondary">
                     Load documents
-                    <input type="file" multiple (change)="onMetadataFilesSelected('documents', $event)" />
+                    <input type="file" multiple (change)="onMetadataFilesSelected($event)" />
                   </label>
                   <hr class="clinical-session-metadata-divider" />
                   <section class="clinical-session-metadata-summary-card">
                     <strong>Attached documents</strong>
-                    @if (metadataEntries('documents').length) {
+                    @if (documentAttachments().length) {
                       <ul>
-                        @for (document of metadataEntries('documents'); track document) {
-                          <li>{{ document }}</li>
+                        @for (item of documentAttachments(); track item.attachment_id) {
+                          <li>
+                            <a [href]="attachmentUrl(item)" target="_blank" rel="noopener">{{ item.file_name }}</a>
+                            <button type="button" class="clinical-session-attachment-remove" [attr.aria-label]="'Remove ' + item.file_name" [title]="'Remove ' + item.file_name" (click)="removeAttachment(item)">Remove</button>
+                          </li>
                         }
                       </ul>
                     } @else {
@@ -468,35 +479,32 @@
               </div>
               <span class="clinical-session-revision-state">{{ revisionRunning() ? 'Running' : 'Ready' }}</span>
             </header>
-            <div class="clinical-session-revision-layout">
-              <section class="clinical-session-revision-card" aria-label="Revision instruction">
-                <div class="clinical-session-revision-card-header"><h4>Instruction</h4><span>Optional</span></div>
-                <label class="clinical-session-revision-instruction">
-                  <textarea aria-label="Revision instruction (optional)" [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe a report issue or leave blank for a full review."></textarea>
-                </label>
-              </section>
-              <section class="clinical-session-revision-card clinical-session-revision-model-panel" aria-label="Configured Revision model">
-                <div class="clinical-session-revision-card-header"><h4>Revision model</h4><a class="clinical-session-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a></div>
-                <div class="clinical-session-revision-card-body">
-                  <span class="clinical-session-revision-eyebrow">Configured model</span>
-                  <strong class="clinical-session-revision-model-name">{{ revisionModelName() || 'No Revision model is configured.' }}</strong>
-                  <p>Changes are managed centrally.</p>
-                  @if (revisionModelLoading()) { <p class="clinical-session-panel-note">Loading configured role...</p> }
-                  @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
-                </div>
-                <div class="clinical-session-revision-card-footer">
-                  <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning() || !revisionModelName()">Start revision</button>
+            <div class="clinical-session-revision-form">
+              <label class="clinical-session-revision-instruction">
+                <span class="clinical-session-revision-label">Instruction <small>Optional</small></span>
+                <textarea aria-label="Revision instruction (optional)" [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe a report issue or leave blank for a full review."></textarea>
+              </label>
+              <div class="clinical-session-revision-toolbar">
+                <p class="clinical-session-revision-model" aria-label="Configured Revision model">
+                  <span>Revision model</span>
+                  <strong>{{ revisionModelName() || 'None configured' }}</strong>
+                  <a class="clinical-session-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
+                </p>
+                <div class="clinical-session-actions">
                   @if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }
+                  <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning() || !revisionModelName()">Start revision</button>
                 </div>
-              </section>
+              </div>
+              @if (revisionModelLoading()) { <p class="clinical-session-panel-note">Loading configured role...</p> }
+              @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
             </div>
             @if (revisionStatus()) { <p class="clinical-session-panel-note" role="status">{{ revisionStatus() }}</p> }
             @if (revisionDraftReport()) {
-              <section class="clinical-session-revision-card clinical-session-revision-draft" aria-label="Generated Revision draft">
-                <div class="clinical-session-revision-card-header"><h4>Generated draft</h4><span>Current report remains unchanged until a human decision.</span></div>
+              <section class="clinical-session-revision-draft" aria-label="Generated Revision draft">
+                <header><h4>Generated draft</h4><span>Current report remains unchanged until a human decision.</span></header>
                 <div class="clinical-session-revision-draft-content" [innerHTML]="revisionDraftReportHtml()"></div>
                 @if (revisionReviewAvailable()) {
-                  <div class="clinical-session-revision-card-footer clinical-session-revision-decision">
+                  <div class="clinical-session-revision-decision">
                     <span>Human review required</span>
                     <div class="clinical-session-actions"><button type="button" class="btn" (click)="recordRevisionReview('rejected')">Reject</button><button type="button" class="btn btn-primary" (click)="recordRevisionReview('approved')">Approve by human</button></div>
                   </div>

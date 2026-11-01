@@ -84,6 +84,18 @@ export type ClinicalSessionDetail = {
   manual_edit_history: ManualReportEditAudit[];
 };
 
+export type ClinicalSessionAttachment = {
+  attachment_id: number;
+  session_id: number;
+  version_id: number;
+  kind: "image" | "json" | "document";
+  file_name: string;
+  media_type: string;
+  size_bytes: number;
+  sha256: string;
+  created_at: string | null;
+};
+
 export type ClinicalSessionUpdateRequest = {
   session_text?: string | null;
   report_text?: string | null;

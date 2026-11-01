@@ -12,6 +12,7 @@ import {
   LucideImage,
   LucidePill,
   LucideRefreshCw,
+  LucideSearch,
   LucideTrash2,
 } from '@lucide/angular';
 
@@ -20,10 +21,14 @@ import { HelpPopoverComponent } from '../../core/guidance/help-popover.component
 
 import {
   deleteInspectionSession,
+  deleteSessionAttachment,
   fetchClinicalSessionDetail,
   fetchInspectionSessions,
+  fetchSessionAttachments,
   manualEditClinicalSessionReport,
+  sessionAttachmentContentUrl,
   updateClinicalSession,
+  uploadSessionAttachment,
 } from '../../core/services/clinical-sessions-api';
 import {
   fetchInspectionLiverToxCatalog,
@@ -39,6 +44,7 @@ import {
   updateRevisionClinicalReview,
 } from '../../core/services/session-revision-api';
 import {
+  ClinicalSessionAttachment,
   ClinicalSessionDetail,
   InspectionSessionItem,
   InspectionSessionStatus,
@@ -55,9 +61,7 @@ import { ModelConfigStateService } from '../../core/state/model-config-state.ser
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
 import {
   DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
-  ClinicalSessionMetadataKey,
   normalizeClinicalSessionMetadata,
-  readMetadataEntries,
 } from './clinical-session-metadata';
 import { ClinicalSessionEditorToolbarComponent } from './components/clinical-session-editor-toolbar.component';
 import { ClinicalSessionRevisionAuditComponent } from './components/clinical-session-revision-audit.component';
@@ -130,6 +134,7 @@ function selectPersistedRevision(
     LucideImage,
     LucidePill,
     LucideRefreshCw,
+    LucideSearch,
     LucideTrash2,
   ],
   templateUrl: './clinical-sessions-page.component.html',
@@ -144,25 +149,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
   readonly dateFilterMode = signal<ClinicalSessionDateFilterMode>('any');
   readonly dateFilter = signal('');
-  readonly filteredSessions = computed(() => {
-    const status = this.statusFilter();
-    const dateMode = this.dateFilterMode();
-    const dateFilter = this.dateFilter();
-    const filtered = this.sessions().filter((session) => {
-      if (status !== 'all' && session.status !== status) return false;
-      if (dateMode === 'any' || !dateFilter) return true;
-      const sessionDate = this.dateKey(session.session_timestamp);
-      if (!sessionDate) return false;
-      if (dateMode === 'after') return sessionDate > dateFilter;
-      if (dateMode === 'before') return sessionDate < dateFilter;
-      return sessionDate === dateFilter;
-    });
-    return [...filtered].sort((left, right) => {
-      const leftTime = Date.parse(left.session_timestamp || '') || 0;
-      const rightTime = Date.parse(right.session_timestamp || '') || 0;
-      return rightTime - leftTime;
-    });
-  });
   readonly selected = signal<ClinicalSessionDetail | null>(null);
   readonly loading = signal(false);
   readonly detailLoading = signal(false);
@@ -181,6 +167,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly manualEditEditedBy = signal('');
   readonly metadataText = signal(DEFAULT_CLINICAL_SESSION_METADATA_TEXT);
   readonly metadataSaveStatus = signal('');
+  readonly attachments = signal<ClinicalSessionAttachment[]>([]);
+  readonly imageAttachments = computed(() => this.attachments().filter((item) => item.kind === 'image'));
+  readonly documentAttachments = computed(() => this.attachments().filter((item) => item.kind !== 'image'));
   readonly activeSection = signal<ClinicalSessionSection>('preview');
   readonly saveStatus = signal('');
   readonly deletingSessionId = signal<number | null>(null);
@@ -240,8 +229,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.listError.set(null);
     try {
+      const dateMode = this.dateFilterMode();
+      const date = this.dateFilter();
+      const status = this.statusFilter();
       const payload = await fetchInspectionSessions({
         search: this.query() || undefined,
+        status: status === 'all' ? undefined : status,
+        date_mode: dateMode !== 'any' && date ? dateMode : undefined,
+        date: dateMode !== 'any' && date ? date : undefined,
         offset: 0,
         limit: 100,
       });
@@ -289,6 +284,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
+      void this.loadAttachments(detail.session_id, detailLoadGeneration);
       void this.loadDetectedDrugEvidence(detail, detailLoadGeneration);
       void this.loadPersistedRevision(detail.session_id, revisionLoadGeneration);
     } catch (error) {
@@ -327,7 +323,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   updateStatusFilter(value: 'all' | InspectionSessionStatus): void {
     this.statusFilter.set(value);
-    void this.ensureSelectedSessionVisible();
+    void this.loadSessions();
   }
 
   updateDateFilterMode(value: ClinicalSessionDateFilterMode): void {
@@ -335,12 +331,17 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (value === 'any') {
       this.dateFilter.set('');
     }
-    void this.ensureSelectedSessionVisible();
+    if (value === 'any' || this.dateFilter()) {
+      void this.loadSessions();
+    }
   }
 
   updateDateFilter(value: string): void {
     this.dateFilter.set(value);
-    void this.ensureSelectedSessionVisible();
+    if (value && this.dateFilterMode() === 'any') {
+      this.dateFilterMode.set('exact');
+    }
+    void this.loadSessions();
   }
 
   private async ensureSelectedSessionVisible(expectedLoadGeneration?: number): Promise<void> {
@@ -349,7 +350,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       || expectedLoadGeneration === this.sessionsLoadGeneration
     );
     if (!isCurrentLoad()) return;
-    const visibleSessions = this.filteredSessions();
+    const visibleSessions = this.sessions();
     const selectedId = this.selected()?.session_id;
     if (selectedId && visibleSessions.some((session) => session.session_id === selectedId)) {
       return;
@@ -371,6 +372,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.manualEditReviewerNote.set('');
     this.manualEditEditedBy.set('');
     this.metadataText.set(DEFAULT_CLINICAL_SESSION_METADATA_TEXT);
+    this.attachments.set([]);
     this.detectedDrugEvidence.set([]);
     this.detectedDiseases.set([]);
     this.labSummary.set([]);
@@ -977,41 +979,45 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
 
-  private dateKey(value: string | null): string {
-    if (!value) return '';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '';
-    return parsed.toISOString().slice(0, 10);
+  attachmentUrl(item: ClinicalSessionAttachment): string {
+    return sessionAttachmentContentUrl(item.session_id, item.attachment_id);
   }
 
-  metadataEntries(key: ClinicalSessionMetadataKey): string[] {
-    return readMetadataEntries(this.metadataText(), key);
+  private async loadAttachments(sessionId: number, generation: number): Promise<void> {
+    try {
+      const items = await fetchSessionAttachments(sessionId);
+      if (generation === this.detailLoadGeneration) this.attachments.set(items);
+    } catch (error) {
+      if (generation === this.detailLoadGeneration) {
+        this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to load attachments.'));
+      }
+    }
   }
 
-  onMetadataFilesSelected(kind: ClinicalSessionMetadataKey, event: Event): void {
+  async onMetadataFilesSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement | null;
     const files = Array.from(input?.files || []);
-    if (!files.length) return;
-    const additions = files.map((file) => ({
-      file_name: file.name,
-      file_size: file.size,
-      file_type: file.type || 'application/octet-stream',
-      category: kind === 'images' ? 'image' : 'document',
-      last_modified: new Date(file.lastModified).toISOString(),
-    }));
-    const metadata = this.readMetadataDraft();
-    const current: unknown[] = Array.isArray(metadata[kind]) ? metadata[kind] : [];
-    metadata[kind] = [...current, ...additions];
-    this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(metadata), null, 2));
+    const detail = this.selected();
     if (input) input.value = '';
+    if (!files.length || !detail) return;
+    this.metadataSaveStatus.set(`Uploading ${files.length} file(s)...`);
+    try {
+      for (const file of files) {
+        await uploadSessionAttachment(detail.session_id, file);
+      }
+      await this.loadAttachments(detail.session_id, this.detailLoadGeneration);
+      this.metadataSaveStatus.set('Attachments saved.');
+    } catch (error) {
+      this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to upload attachment.'));
+    }
   }
 
-  private readMetadataDraft(): Record<string, unknown> {
+  async removeAttachment(item: ClinicalSessionAttachment): Promise<void> {
     try {
-      const parsed: unknown = JSON.parse(this.metadataText());
-      return normalizeClinicalSessionMetadata(isRecord(parsed) ? parsed : {});
-    } catch {
-      return normalizeClinicalSessionMetadata({});
+      await deleteSessionAttachment(item.session_id, item.attachment_id);
+      this.attachments.update((items) => items.filter((entry) => entry.attachment_id !== item.attachment_id));
+    } catch (error) {
+      this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to remove attachment.'));
     }
   }
 

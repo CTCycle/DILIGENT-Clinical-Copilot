@@ -3,6 +3,7 @@
 
 import { API_BASE_URL } from "../constants";
 import {
+  ClinicalSessionAttachment,
   ClinicalSessionDetail,
   ClinicalSessionUpdateRequest,
   InspectionDeleteResponse,
@@ -77,5 +78,56 @@ export async function manualEditClinicalSessionReport(
       },
       body: JSON.stringify(payload),
     },
+  );
+}
+
+function sessionAttachmentsUrl(sessionId: number): string {
+  return `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/attachments`;
+}
+
+export function sessionAttachmentContentUrl(
+  sessionId: number,
+  attachmentId: number,
+): string {
+  return `${sessionAttachmentsUrl(sessionId)}/${encodeURIComponent(String(attachmentId))}`;
+}
+
+export async function fetchSessionAttachments(
+  sessionId: number,
+): Promise<ClinicalSessionAttachment[]> {
+  const response = await requestJson<{ items: ClinicalSessionAttachment[] }>(
+    sessionAttachmentsUrl(sessionId),
+    { method: "GET" },
+  );
+  return response.items;
+}
+
+export async function uploadSessionAttachment(
+  sessionId: number,
+  file: File,
+): Promise<ClinicalSessionAttachment> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return requestJson<ClinicalSessionAttachment>(sessionAttachmentsUrl(sessionId), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      file_name: file.name,
+      media_type: file.type || "application/octet-stream",
+      content_base64: btoa(binary),
+    }),
+  });
+}
+
+export async function deleteSessionAttachment(
+  sessionId: number,
+  attachmentId: number,
+): Promise<InspectionDeleteResponse> {
+  return requestJson<InspectionDeleteResponse>(
+    `${sessionAttachmentsUrl(sessionId)}/${encodeURIComponent(String(attachmentId))}`,
+    { method: "DELETE" },
   );
 }

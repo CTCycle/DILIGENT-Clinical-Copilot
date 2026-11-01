@@ -167,6 +167,36 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(component.selected()?.session_id).toBe(2);
   });
 
+  it('sends combined search, status and date filters to the server and clears them', async () => {
+    const urls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/inspection/sessions?')) {
+        urls.push(url);
+        return jsonResponse({ items: [], total: 0, offset: 0, limit: 100 });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    component.updateQuery('venditti');
+    component.updateStatusFilter('failed');
+    await fixture.whenStable();
+    component.updateDateFilter('2026-10-31');
+    await fixture.whenStable();
+
+    const filtered = new URL(urls[urls.length - 1], 'http://localhost').searchParams;
+    expect(filtered.get('search')).toBe('venditti');
+    expect(filtered.get('status')).toBe('failed');
+    expect(filtered.get('date_mode')).toBe('exact');
+    expect(filtered.get('date')).toBe('2026-10-31');
+
+    component.updateDateFilterMode('any');
+    component.updateStatusFilter('all');
+    await fixture.whenStable();
+    const cleared = new URL(urls[urls.length - 1], 'http://localhost').searchParams;
+    expect(cleared.has('date')).toBe(false);
+    expect(cleared.has('status')).toBe(false);
+  });
+
   it('ignores a stale session detail response after navigation', async () => {
     const firstResponse = deferred<Response>();
     const secondResponse = deferred<Response>();

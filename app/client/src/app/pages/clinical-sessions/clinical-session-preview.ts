@@ -397,6 +397,11 @@ function collectDiseaseNames(value: unknown): string[] {
   return [...new Set(names)];
 }
 
+function labSourceLabel(source: string | null): string {
+  if (source === 'merged') return 'laboratory_analysis + anamnesis';
+  return source || 'N/A';
+}
+
 export function previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRow[] {
   return arrayValue(detail.result_payload?.['lab_timeline'])
     .map((item) => recordValue(item))
@@ -412,7 +417,7 @@ export function previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRo
         unit,
         upperLimit,
         timing,
-        source: stringValue(item['source']) || 'N/A',
+        source: labSourceLabel(stringValue(item['source'])),
         evidence: stringValue(item['evidence']) || '',
       };
     });

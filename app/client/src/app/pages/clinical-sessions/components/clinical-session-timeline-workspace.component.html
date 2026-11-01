@@ -1,43 +1,34 @@
-<!-- Copyright © 2023–2025 Thomas Virdis -->
-<!-- Licensed under the GNU General Public License, version 3 or later. -->
 <div class="timeline-workspace">
-  <section class="timeline-card timeline-models" aria-label="Timeline generation">
-    <div class="timeline-card-header" data-guidance-target="timeline-generation-controls">
-      <div>
-        <h4>Generate a patient timeline</h4>
-        <p>Uses the model assigned to the Timeline role in Settings.</p>
-      </div>
+  <section class="timeline-generate" aria-label="Timeline generation">
+    <div class="timeline-section-heading" data-guidance-target="timeline-generation-controls">
+      <h4>Generate a patient timeline</h4>
+      <p>Uses the model assigned to the Timeline role in Settings.</p>
     </div>
-
-    <div class="timeline-card-body">
     <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!modelConfigLoading()">Loading model options…</p>
     @if (modelConfigError()) {
       <p class="is-error" role="alert">{{ modelConfigError() }}</p>
       <button type="button" class="btn btn-secondary" (click)="loadModelConfiguration()">Retry</button>
     }
-
-    <div class="timeline-configured-model">
-      <span class="timeline-configured-model-label">Configured Timeline model</span>
-      <strong>{{ selectedConfigurationLabel() }}</strong>
-      <a class="timeline-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
-    </div>
-    </div>
-    <div class="timeline-model-actions">
+    <div class="timeline-generate-row">
+      <p class="timeline-configured-model">
+        <span>Timeline model</span>
+        <strong>{{ selectedConfigurationLabel() }}</strong>
+        <a class="timeline-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
+      </p>
       <button type="button" class="btn btn-primary" (click)="generateTimeline()" [disabled]="!canGenerate()">{{ generationRunning() ? 'Generating timeline…' : 'Generate Timeline' }}</button>
-      @if (generationStatus()) { <p aria-live="polite">{{ generationStatus() }}</p> }
-      @if (generationError()) { <p class="is-error" role="alert">{{ generationError() }}</p> }
     </div>
+    @if (generationStatus()) { <p class="timeline-status" aria-live="polite">{{ generationStatus() }}</p> }
+    @if (generationError()) { <p class="is-error" role="alert">{{ generationError() }}</p> }
   </section>
 
-  <section class="timeline-card timeline-history" aria-label="Generated timelines">
-    <header class="timeline-card-header">
-      <div><h4>Generated timelines</h4><p>Saved timelines are listed with their generation date, model, and evidence count.</p></div>
-      <div class="timeline-header-meta">
-        @if (timelineListLoading() && timelinePreviews().length) { <span aria-live="polite">Refreshing…</span> }
-        <span class="timeline-count">{{ sortedTimelinePreviews().length }} saved</span>
-      </div>
+  <section class="timeline-history" aria-label="Generated timelines">
+    <header class="timeline-section-heading timeline-history-heading">
+      <h4>Generated timelines</h4>
+      <span class="timeline-count" aria-live="polite">
+        @if (timelineListLoading() && timelinePreviews().length) { Refreshing… · }
+        {{ sortedTimelinePreviews().length }} saved
+      </span>
     </header>
-    <div class="timeline-card-body">
     @if (timelineListLoading() && !timelinePreviews().length && !generationJobId()) { <p>Loading timeline history…</p> }
     @else if (timelineListError()) { <p class="is-error" role="alert">{{ timelineListError() }}</p> }
     @else {
@@ -59,13 +50,13 @@
         </article>
       }
       @if (sortedTimelinePreviews().length) {
-      <div class="timeline-gallery">
+      <div class="timeline-gallery" role="list">
         @for (preview of sortedTimelinePreviews(); track preview.timeline_id ?? preview.generated_at) {
-          <article class="timeline-row">
+          <article class="timeline-row" role="listitem">
             <div class="timeline-row-content">
               <div class="timeline-row-heading">
                 <strong>Timeline #{{ preview.timeline_id }}</strong>
-                <span>{{ timelineQualityLabel(preview) }}</span>
+                <small>{{ timelineQualityLabel(preview) }}</small>
               </div>
               <p class="timeline-row-title">{{ preview.title || 'No event title available' }}</p>
               <div class="timeline-row-summary">
@@ -89,7 +80,6 @@
         </div>
       }
     }
-    </div>
   </section>
 </div>
 
