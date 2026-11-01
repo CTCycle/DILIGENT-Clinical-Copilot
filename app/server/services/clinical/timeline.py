@@ -25,14 +25,16 @@ from domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
 )
-from domain.timeline_dates import normalize_timeline_interval, timeline_date_sort_key
+from common.utils.clinical_dates import DateOrder, case_date_order
+from domain.timeline_dates import (
+    EvidenceDate,
+    TimelineDateInterval,
+    find_evidence_dates,
+    normalize_timeline_interval,
+)
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 
-DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
-DATE_YEAR_RE = re.compile(r"^\d{4}$")
-ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 ISO_PARTIAL_DATE_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
 CANONICAL_TIMELINE_SOURCE_FIELDS = (
     "anamnesis",
@@ -41,18 +43,38 @@ CANONICAL_TIMELINE_SOURCE_FIELDS = (
 )
 
 ###############################################################################
-class _UnsupportedTimelineEvidenceError(ValueError):
-    """Raised when a model's quoted timeline evidence is absent from the source."""
-
-    error_code = "invalid_response"
-    retryable = False
-
-###############################################################################
 class _EmptyTimelineExtractionError(ValueError):
     """Raised when clinical source fields yield no usable timeline events."""
 
     error_code = "invalid_response"
     retryable = False
+
+###############################################################################
+def build_timeline_source(source_payload: dict[str, Any]) -> dict[str, Any]:
+    """Keep only clinician-entered session text as timeline model input.
+
+    Generated reports, pipeline artifacts, runtime settings, and patient
+    identity are excluded so the model cannot quote model-generated text as
+    evidence and no identity data is sent to the provider.
+    """
+    scoped: dict[str, Any] = {}
+    visit_date = source_payload.get("visit_date")
+    if isinstance(visit_date, str) and visit_date.strip():
+        scoped["visit_date"] = visit_date.strip()
+    for field_name in CANONICAL_TIMELINE_SOURCE_FIELDS:
+        value = source_payload.get(field_name)
+        if isinstance(value, str) and value.strip():
+            scoped[field_name] = value
+    sections = source_payload.get("sections")
+    if isinstance(sections, dict):
+        scoped_sections = {
+            str(name): value
+            for name, value in sections.items()
+            if isinstance(value, str) and value.strip()
+        }
+        if scoped_sections:
+            scoped["sections"] = scoped_sections
+    return scoped
 
 ###############################################################################
 def _iter_source_text_values(value: Any) -> Iterator[str]:
@@ -117,6 +139,8 @@ def _source_field_for_evidence(
         )
     ]
     return matches[0] if len(matches) == 1 else None
+
+_PRECISION_RANK = {"year": 0, "month": 1, "day": 2}
 
 ###############################################################################
 class PatientTimelineExtractor:
@@ -218,18 +242,21 @@ class PatientTimelineExtractor:
         return interval.value if interval else None
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def event_sort_key(cls, event: PatientTimelineEvent) -> tuple[int, str, int, str]:
-        normalized_date = cls.normalize_date_token(event.event_date)
-        if normalized_date:
-            return (
-                0,
-                str(timeline_date_sort_key(normalized_date)[0]),
-                event.sort_order,
-                event.title.casefold(),
-            )
-        relative = (event.relative_time or "").casefold()
-        return (1, relative, event.sort_order, event.title.casefold())
+    @staticmethod
+    def event_sort_key(
+        event: PatientTimelineEvent, source_index: int = 0
+    ) -> tuple[int, int, int, int]:
+        """Order dated events by start day, coarser precision first, then keep
+        the model's narrative order for ties and for undated events."""
+        interval = normalize_timeline_interval(event.event_date)
+        if interval is None:
+            return (1, 0, 0, source_index)
+        return (
+            0,
+            interval.start_day,
+            _PRECISION_RANK.get(interval.precision, 0),
+            source_index,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -257,79 +284,168 @@ class PatientTimelineExtractor:
         return "complex"
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _date_supported_by(
+        interval: TimelineDateInterval, evidence_dates: list[EvidenceDate]
+    ) -> EvidenceDate | None:
+        """Return the evidence date that states this date at equal precision."""
+        for candidate in evidence_dates:
+            if candidate.interval.value == interval.value:
+                return candidate
+        return None
+
+    # -------------------------------------------------------------------------
+    def ground_event_dates(
+        self, payload: dict[str, Any], date_order: DateOrder
+    ) -> None:
+        """Reconcile model dates with the dates stated in the quoted evidence.
+
+        A date counts as explicit only when the evidence states it. A model date
+        that contradicts the single date in the evidence of an explicitly dated
+        event is corrected; model dates the evidence does not state are kept
+        but labelled inferred with a review reason. Numbers that are doses or
+        laboratory values are never read as dates.
+        """
+        evidence_dates = find_evidence_dates(payload.get("source_evidence"), date_order)
+        start = normalize_timeline_interval(payload.get("event_date"))
+        end = normalize_timeline_interval(payload.get("event_date_end"))
+        reasons: list[str] = []
+        start_explicit = False
+
+        if start is None:
+            if len(evidence_dates) == 1:
+                start = evidence_dates[0].interval
+                start_explicit = True
+                payload["extracted_timing_text"] = (
+                    payload.get("extracted_timing_text") or evidence_dates[0].text
+                )
+                if payload.get("timing_type") == "uncertain":
+                    payload["timing_type"] = "explicit_date"
+        elif (supported := self._date_supported_by(start, evidence_dates)) is not None:
+            start_explicit = True
+            payload["extracted_timing_text"] = (
+                payload.get("extracted_timing_text") or supported.text
+            )
+        elif (
+            len(evidence_dates) == 1
+            and payload.get("timing_type") in {"explicit_date", "uncertain"}
+            and not (
+                evidence_dates[0].interval.start_day <= start.start_day
+                and start.end_day <= evidence_dates[0].interval.end_day
+            )
+        ):
+            reasons.append(
+                f"Model date {start.value} was corrected to the date stated in the "
+                f"evidence ({evidence_dates[0].text})."
+            )
+            start = evidence_dates[0].interval
+            start_explicit = True
+        elif evidence_dates:
+            reasons.append(
+                "The date is not stated at this precision in the quoted evidence."
+            )
+        else:
+            reasons.append("The date is not stated in the quoted evidence.")
+
+        end_explicit = True
+        if start is not None and end is not None:
+            if end.start_day < start.start_day:
+                end = None
+                reasons.append("The extracted date range was reversed and was removed.")
+            else:
+                end_explicit = self._date_supported_by(end, evidence_dates) is not None
+                if not end_explicit:
+                    reasons.append("The range end is not stated in the quoted evidence.")
+        elif payload.get("event_date_end"):
+            end = None
+            reasons.append("The extracted date range was invalid and was removed.")
+
+        payload["event_date"] = start.value if start else None
+        payload["event_date_end"] = end.value if start and end else None
+        payload["date_precision"] = start.precision if start else None
+        if start is None:
+            if payload.get("date_certainty") == "explicit":
+                payload["date_certainty"] = "uncertain"
+        else:
+            payload["date_certainty"] = (
+                "explicit" if start_explicit and end_explicit else "inferred"
+            )
+        if reasons:
+            model_reason = payload.get("uncertainty_reason")
+            payload["uncertainty_reason"] = " ".join(
+                [*reasons, *([model_reason] if model_reason else [])]
+            )[:500]
+
+    # -------------------------------------------------------------------------
     def normalize_events(
-        self, events: list[PatientTimelineEvent]
+        self,
+        events: list[PatientTimelineEvent],
+        date_order: DateOrder = "day_first",
     ) -> list[PatientTimelineEvent]:
-        deduped: dict[tuple[str, str, str], PatientTimelineEvent] = {}
-        for item in events:
+        deduped: dict[
+            tuple[str, str, str], tuple[int, PatientTimelineEvent, set[str]]
+        ] = {}
+        for source_index, item in enumerate(events):
             if not item.source_evidence or not item.source_evidence.strip():
                 continue
             payload = item.model_dump()
-            evidence_dates = list(
-                dict.fromkeys(ISO_PARTIAL_DATE_RE.findall(item.source_evidence or ""))
-            )
-            # An explicit source span is authoritative for a single dated event.
-            # This prevents a model from carrying a nearby lab date onto a different
-            # observation while retaining ambiguous multi-date evidence unchanged.
-            normalized_model_date = self.normalize_date_token(item.event_date)
-            normalized_model_end = self.normalize_date_token(item.event_date_end)
-            evidence_date = evidence_dates[0] if len(evidence_dates) == 1 else None
-            if (
-                evidence_date
-                and normalized_model_date
-                and normalized_model_date.startswith(evidence_date)
-                and len(normalized_model_date) > len(evidence_date)
-            ):
-                # A year token embedded in natural-language evidence is not more
-                # authoritative than a model date that preserves the same year at
-                # day or month precision.
-                evidence_date = normalized_model_date
-            payload["event_date"] = evidence_date or normalized_model_date
-            payload["event_date_end"] = normalized_model_end
-            interval = normalize_timeline_interval(
-                payload["event_date"], normalized_model_end
-            )
-            if interval is not None:
-                payload["event_date"] = interval.value
-                payload["event_date_end"] = interval.end_value
-            elif payload["event_date_end"]:
-                payload["event_date_end"] = None
-                payload["date_certainty"] = "uncertain"
-                payload["uncertainty_reason"] = (
-                    "The extracted date range was reversed or invalid."
-                )
-            if payload["event_date"] and payload.get("date_precision") is None:
-                payload["date_precision"] = (
-                    "day"
-                    if DATE_PREFIX_RE.fullmatch(payload["event_date"])
-                    else "month"
-                    if DATE_SHORT_RE.fullmatch(payload["event_date"])
-                    else "year"
-                )
-            if payload["event_date"] and payload.get("date_certainty") == "uncertain":
-                payload["date_certainty"] = (
-                    "explicit" if len(evidence_dates) == 1 else "inferred"
-                )
-            event = PatientTimelineEvent(
-                **payload,
-            )
+            self.ground_event_dates(payload, date_order)
+            event = PatientTimelineEvent(**payload)
             key = self.event_dedupe_key(event)
             previous = deduped.get(key)
             if previous is None:
-                deduped[key] = event
+                deduped[key] = (source_index, event, set())
                 continue
+            previous_index, previous_event, aliases = previous
             previous_score = (
-                previous.confidence if previous.confidence is not None else -1.0
+                previous_event.confidence
+                if previous_event.confidence is not None
+                else -1.0
             )
             current_score = event.confidence if event.confidence is not None else -1.0
             if current_score > previous_score:
-                deduped[key] = event
-        ordered = sorted(deduped.values(), key=self.event_sort_key)
+                aliases.add(previous_event.event_id)
+                deduped[key] = (previous_index, event, aliases)
+            else:
+                aliases.add(event.event_id)
+
+        ordered = sorted(
+            deduped.values(),
+            key=lambda entry: self.event_sort_key(entry[1], entry[0]),
+        )
+        # Event ids must be unique for selection and linking; merged duplicates
+        # keep resolving to the event that survived deduplication.
+        id_map: dict[str, str] = {}
+        final_ids: list[str] = []
+        used_ids: set[str] = set()
+        for _, event, aliases in ordered:
+            base_id = event.event_id[:110]
+            final_id = base_id
+            suffix = 2
+            while final_id in used_ids:
+                final_id = f"{base_id}-{suffix}"
+                suffix += 1
+            used_ids.add(final_id)
+            final_ids.append(final_id)
+            for alias in (event.event_id, *sorted(aliases)):
+                id_map.setdefault(alias, final_id)
+
         normalized: list[PatientTimelineEvent] = []
-        for index, item in enumerate(ordered):
-            payload = item.model_dump()
-            payload["sort_order"] = index
-            normalized.append(PatientTimelineEvent(**payload))
+        for index, ((_, event, _), final_id) in enumerate(zip(ordered, final_ids)):
+            links = [
+                id_map[link]
+                for link in event.linked_patient_event_ids
+                if link in id_map and id_map[link] != final_id
+            ]
+            normalized.append(
+                event.model_copy(
+                    update={
+                        "event_id": final_id,
+                        "sort_order": index,
+                        "linked_patient_event_ids": list(dict.fromkeys(links)),
+                    }
+                )
+            )
         return normalized
 
     # -------------------------------------------------------------------------
@@ -344,8 +460,12 @@ class PatientTimelineExtractor:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for timeline extraction")
 
+        timeline_source = build_timeline_source(source_payload)
+        date_order = case_date_order(
+            *(timeline_source.get(name) for name in CANONICAL_TIMELINE_SOURCE_FIELDS)
+        )
         source_payload_json = json.dumps(
-            source_payload,
+            timeline_source,
             ensure_ascii=False,
             sort_keys=True,
             default=str,
@@ -354,10 +474,11 @@ class PatientTimelineExtractor:
         source_payload_hash = hashlib.sha256(
             source_payload_json.encode("utf-8")
         ).hexdigest()
-        timeline_complexity = self.classify_complexity(source_payload)
+        timeline_complexity = self.classify_complexity(timeline_source)
         user_prompt = build_patient_timeline_user_prompt(
             source_payload_json=source_payload_json,
             source_payload_hash=source_payload_hash,
+            date_order=date_order,
         )
         parsed: PatientTimelineExtraction | None = None
         for attempt in range(1, self.extraction_retry_attempts + 1):
@@ -403,42 +524,43 @@ class PatientTimelineExtractor:
         if parsed is None:
             raise RuntimeError("Failed to extract patient timeline")
 
-        has_unsupported_evidence = any(
-            event.source_evidence
-            and event.source_evidence.strip()
-            and not _has_source_evidence(source_payload, event.source_evidence)
-            for event in parsed.events
-        )
-        if has_unsupported_evidence:
-            raise _UnsupportedTimelineEvidenceError(
-                "Timeline event evidence is not supported by the session source."
-            )
-
-        events_with_verified_sources = [
+        # Each event must quote clinician-entered source text verbatim. Events
+        # whose quote cannot be found are discarded and disclosed, never kept.
+        verified_events = [
             event.model_copy(
                 update={
                     "source": _source_field_for_evidence(
-                        source_payload, event.source_evidence
+                        timeline_source, event.source_evidence
                     )
                 }
             )
             for event in parsed.events
+            if event.source_evidence
+            and event.source_evidence.strip()
+            and _has_source_evidence(timeline_source, event.source_evidence)
         ]
-        normalized_events = self.normalize_events(events_with_verified_sources)
+        discarded_count = len(parsed.events) - len(verified_events)
+        normalized_events = self.normalize_events(verified_events, date_order)
         has_clinical_source_text = any(
-            isinstance(source_payload.get(field_name), str)
-            and source_payload[field_name].strip()
-            for field_name in CANONICAL_TIMELINE_SOURCE_FIELDS
+            name in timeline_source for name in CANONICAL_TIMELINE_SOURCE_FIELDS
         )
         if not normalized_events and has_clinical_source_text:
             raise _EmptyTimelineExtractionError(
                 "Timeline extraction produced no evidence-backed events despite "
                 "populated clinical source fields."
             )
+        generation_note = (
+            f"{discarded_count} model "
+            f"{'event was' if discarded_count == 1 else 'events were'} discarded "
+            "because the quoted evidence was missing or not found in the session source."
+            if discarded_count
+            else None
+        )
         return PatientTimeline(
             session_id=int(session_id),
             generated_at=datetime.now(UTC),
             generation_status="llm_generated",
+            generation_note=generation_note,
             source_payload_hash=source_payload_hash,
             events=normalized_events,
         )

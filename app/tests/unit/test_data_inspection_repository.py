@@ -889,6 +889,7 @@ def test_timeline_generation_persists_classified_provider_fallback(
         ("Therapy started on 2025-01-17.", "2025-01-17", "day"),
         ("Therapy was active in 2025-01.", "2025-01", "month"),
         ("Symptoms began in 2025.", "2025", "year"),
+        ("Therapy started on 17.01.2025 at 1000 mg.", "2025-01-17", "day"),
         (
             "Symptoms began on 2025-01-17 and were reviewed on 2025-01-17.",
             "2025-01-17",
@@ -901,11 +902,11 @@ def test_fallback_date_extraction_preserves_source_precision(
     expected_date: str,
     expected_precision: str,
 ) -> None:
-    interval = extract_single_explicit_timeline_date(source_text)
+    evidence_date = extract_single_explicit_timeline_date(source_text)
 
-    assert interval is not None
-    assert interval.value == expected_date
-    assert interval.precision == expected_precision
+    assert evidence_date is not None
+    assert evidence_date.interval.value == expected_date
+    assert evidence_date.interval.precision == expected_precision
 
 ###############################################################################
 @pytest.mark.parametrize(

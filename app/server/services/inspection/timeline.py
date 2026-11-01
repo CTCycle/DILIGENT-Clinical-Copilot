@@ -195,19 +195,19 @@ def _timeline_fallback_note(
 
 ###############################################################################
 def _fallback_event_context(source_text: str) -> tuple[str, dict[str, Any]]:
-    interval = extract_single_explicit_timeline_date(source_text)
+    evidence_date = extract_single_explicit_timeline_date(source_text)
     source_evidence = source_text[:1000]
-    if interval is None:
+    if evidence_date is None:
         return source_evidence, {}
-    if interval.value not in source_evidence:
-        token_start = source_text.find(interval.value)
+    if evidence_date.text not in source_evidence:
+        token_start = source_text.find(evidence_date.text)
         source_evidence = source_text[max(0, token_start - 400) : token_start + 600]
     return source_evidence, {
         "timing_type": "explicit_date",
-        "event_date": interval.value,
-        "date_precision": interval.precision,
+        "event_date": evidence_date.interval.value,
+        "date_precision": evidence_date.interval.precision,
         "date_certainty": "explicit",
-        "extracted_timing_text": interval.value,
+        "extracted_timing_text": evidence_date.text,
     }
 
 ###############################################################################
@@ -429,12 +429,16 @@ class InspectionTimelineMixin:
                 if source is None:
                     return None
             _raise_if_stopped(stop_check)
+            # Budget every extractor attempt so retryable failures can be retried;
+            # the cap stays below the client's 360 s job polling deadline.
+            attempt_timeout_s = float(
+                getattr(self.timeline_extractor, "timeout_s", 90.0)
+            )
+            attempts = int(
+                getattr(self.timeline_extractor, "extraction_retry_attempts", 1)
+            )
             timeline_timeout_s = max(
-                20.0,
-                min(
-                    300.0,
-                    float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0,
-                ),
+                20.0, min(330.0, attempt_timeout_s * max(1, attempts) + 15.0)
             )
             requested_runtime_settings = self._build_timeline_runtime_settings(
                 source=source
@@ -472,7 +476,6 @@ class InspectionTimelineMixin:
                 timeline = timeline.model_copy(
                     update={
                         "generation_status": "llm_generated",
-                        "generation_note": None,
                         "source_model": source_model,
                         "source_kind": (
                             "cloud"

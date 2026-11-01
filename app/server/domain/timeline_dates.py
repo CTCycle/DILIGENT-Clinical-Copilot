@@ -7,13 +7,63 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 import re
 
+from common.utils.clinical_dates import (
+    NUMERIC_DATE_TOKEN_RE,
+    DateOrder,
+    case_date_order,
+    parse_clinical_date,
+)
+
 
 _DATE_TOKEN_RE = re.compile(
     r"^(?P<year>\d{4})(?:-(?P<month>\d{2})(?:-(?P<day>\d{2}))?)?$"
 )
-_DATE_TOKEN_IN_TEXT_RE = re.compile(r"\b\d{4}(?:-\d{2}(?:-\d{2})?)?\b")
+_ISO_TOKEN_RE = re.compile(r"\b\d{4}-\d{2}(?:-\d{2})?\b")
+_MONTH_YEAR_TOKEN_RE = re.compile(
+    r"(?<![\d./-])(?P<month>0?[1-9]|1[0-2])[./](?P<year>\d{4})\b(?![./-]\d)"
+)
+_YEAR_TOKEN_RE = re.compile(r"(?<![\d./-])\d{4}\b(?![./-]\d)")
 _YEAR_DATE_CONTEXT_RE = re.compile(
-    r"\b(?:in|during|since|from|on|dated|year)\s*$", re.IGNORECASE
+    r"\b(?:in|during|since|from|until|on|dated|year)\s*$", re.IGNORECASE
+)
+_UNIT_SUFFIX_RE = re.compile(
+    r"\s*(?:mg|mcg|µg|ug|g|kg|ml|l|dl|iu|ui|u|mmol|µmol|umol|nmol|meq|%|/)(?![a-z])",
+    re.IGNORECASE,
+)
+_TRAILING_PUNCTUATION = " \t\r\n.,;:!?)]}'\""
+_MIN_YEAR = 1900
+_MAX_YEAR = 2100
+_MONTH_NAMES: dict[str, int] = {
+    name: month
+    for month, names in enumerate(
+        (
+            ("january", "jan", "gennaio", "januar", "janvier"),
+            ("february", "feb", "febbraio", "februar", "février", "fevrier"),
+            ("march", "mar", "marzo", "märz", "maerz", "mars"),
+            ("april", "apr", "aprile", "avril"),
+            ("may", "maggio", "mai"),
+            ("june", "jun", "giugno", "juni", "juin"),
+            ("july", "jul", "luglio", "juli", "juillet"),
+            ("august", "aug", "agosto", "août", "aout"),
+            ("september", "sep", "sept", "settembre", "septembre"),
+            ("october", "oct", "ottobre", "oktober", "octobre"),
+            ("november", "nov", "novembre"),
+            ("december", "dec", "dicembre", "dezember", "décembre", "decembre"),
+        ),
+        start=1,
+    )
+    for name in names
+}
+_MONTH_NAME_PATTERN = "|".join(
+    sorted((re.escape(name) for name in _MONTH_NAMES), key=len, reverse=True)
+)
+_NAMED_DAY_FIRST_RE = re.compile(
+    rf"\b(?:(?P<day>\d{{1,2}})\.?\s+)?(?P<month>{_MONTH_NAME_PATTERN})\.?,?\s+(?P<year>\d{{4}})\b",
+    re.IGNORECASE,
+)
+_NAMED_MONTH_FIRST_RE = re.compile(
+    rf"\b(?P<month>{_MONTH_NAME_PATTERN})\.?\s+(?P<day>\d{{1,2}}),?\s+(?P<year>\d{{4}})\b",
+    re.IGNORECASE,
 )
 
 ###############################################################################
@@ -81,28 +131,88 @@ def normalize_timeline_interval(
     )
 
 ###############################################################################
+@dataclass(frozen=True)
+class EvidenceDate:
+    """A calendar date stated in source text, with the verbatim token."""
+
+    text: str
+    interval: TimelineDateInterval
+
+###############################################################################
+def _is_followed_by_unit(text: str, end: int) -> bool:
+    return bool(_UNIT_SUFFIX_RE.match(text, end))
+
+###############################################################################
+def _named_date_interval(match: re.Match[str]) -> TimelineDateInterval | None:
+    month = _MONTH_NAMES.get(match.group("month").casefold())
+    year = int(match.group("year"))
+    if month is None or not _MIN_YEAR <= year <= _MAX_YEAR:
+        return None
+    day = match.group("day")
+    token = f"{year:04d}-{month:02d}" + (f"-{int(day):02d}" if day else "")
+    return normalize_timeline_interval(token)
+
+###############################################################################
+def find_evidence_dates(
+    text: str | None,
+    order: DateOrder = "day_first",
+) -> list[EvidenceDate]:
+    """Return the distinct calendar dates explicitly stated in source text.
+
+    Recognizes ISO day/month tokens, numeric day/month/year tokens in the
+    record's date order, numeric month/year tokens, and bare years only when
+    the surrounding words mark them as a date. Doses and laboratory values
+    (a number followed by a unit) are never read as dates.
+    """
+    if not text:
+        return []
+    found: list[tuple[int, EvidenceDate]] = []
+    taken: list[tuple[int, int]] = []
+
+    def claim(match: re.Match[str], interval: TimelineDateInterval | None) -> None:
+        if interval is None:
+            return
+        if any(start < match.end() and match.start() < end for start, end in taken):
+            return
+        taken.append((match.start(), match.end()))
+        found.append((match.start(), EvidenceDate(match.group(0), interval)))
+
+    for match in _ISO_TOKEN_RE.finditer(text):
+        claim(match, normalize_timeline_interval(match.group(0)))
+    for pattern in (_NAMED_MONTH_FIRST_RE, _NAMED_DAY_FIRST_RE):
+        for match in pattern.finditer(text):
+            claim(match, _named_date_interval(match))
+    for match in NUMERIC_DATE_TOKEN_RE.finditer(text):
+        parsed = parse_clinical_date(match.group(0), order)
+        claim(match, normalize_timeline_interval(parsed.isoformat()) if parsed else None)
+    for match in _MONTH_YEAR_TOKEN_RE.finditer(text):
+        if _is_followed_by_unit(text, match.end()):
+            continue
+        month, year = int(match.group("month")), int(match.group("year"))
+        if _MIN_YEAR <= year <= _MAX_YEAR:
+            claim(match, normalize_timeline_interval(f"{year:04d}-{month:02d}"))
+    for match in _YEAR_TOKEN_RE.finditer(text):
+        year = int(match.group(0))
+        if not _MIN_YEAR <= year <= _MAX_YEAR or _is_followed_by_unit(text, match.end()):
+            continue
+        prefix = text[: match.start()].rstrip()
+        suffix = text[match.end() :].strip(_TRAILING_PUNCTUATION)
+        if (not prefix and not suffix) or _YEAR_DATE_CONTEXT_RE.search(prefix):
+            claim(match, normalize_timeline_interval(match.group(0)))
+
+    unique: dict[str, EvidenceDate] = {}
+    for _, item in sorted(found, key=lambda pair: pair[0]):
+        unique.setdefault(item.interval.value, item)
+    return list(unique.values())
+
+###############################################################################
 def extract_single_explicit_timeline_date(
     text: str | None,
-) -> TimelineDateInterval | None:
-    """Return one unambiguous, valid ISO date token from source text."""
-    if not text:
-        return None
-
-    tokens: set[str] = set()
-    for match in _DATE_TOKEN_IN_TEXT_RE.finditer(text):
-        token = match.group(0)
-        if len(token) == 4:
-            prefix = text[: match.start()].rstrip()
-            suffix = text[match.end() :].strip(" \t\r\n.,;:!?)]}'\"")
-            whole_field = not prefix and not suffix
-            contextual_year = bool(_YEAR_DATE_CONTEXT_RE.search(prefix)) and not suffix
-            if not whole_field and not contextual_year:
-                continue
-        tokens.add(token)
-
-    if len(tokens) != 1:
-        return None
-    return normalize_timeline_interval(tokens.pop())
+    order: DateOrder | None = None,
+) -> EvidenceDate | None:
+    """Return the one unambiguous calendar date stated in source text."""
+    dates = find_evidence_dates(text, order or case_date_order(text))
+    return dates[0] if len(dates) == 1 else None
 
 ###############################################################################
 def timeline_date_sort_key(value: str | None) -> tuple[int, str]:

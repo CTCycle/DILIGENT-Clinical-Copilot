@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 import pytest
 from domain.patient_timeline import PatientTimeline, PatientTimelineEvent, PatientTimelineExtraction, PatientTimelineGenerationErrorCode, SessionTimelineRegenerateRequest
+from common.utils.clinical_dates import DateOrder
 from domain.timeline_dates import normalize_timeline_interval
 from repositories.serialization.session_timelines import build_timeline_preview_payload
 from services.clinical import timeline as timeline_service
@@ -114,7 +115,7 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 
     assert [event.event_id for event in result.events] == ["grounded"]
 
-def test_timeline_extractor_rejects_unsupported_source_evidence() -> None:
+def test_timeline_extractor_discards_only_unsupported_events_and_discloses_them() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(
             PatientTimelineExtraction(
@@ -127,27 +128,40 @@ def test_timeline_extractor_rejects_unsupported_source_evidence() -> None:
                         source_evidence=(
                             "The patient acquired HBV during a procedure on 2022-05-18."
                         ),
-                    )
+                    ),
+                    PatientTimelineEvent(
+                        event_id="report-quote",
+                        title="Report conclusion",
+                        source_evidence="Synthetic report for timeline recovery validation.",
+                    ),
+                    PatientTimelineEvent(
+                        event_id="alt",
+                        title="ALT result",
+                        event_type="lab",
+                        source_evidence="ALT was 75 U/L on 2025-01-17.",
+                    ),
                 ]
             )
         )
     )
 
-    with pytest.raises(ValueError, match="not supported by the session source") as exc:
-        asyncio.run(
-            extractor.extract_timeline(
-                session_id=12,
-                source_payload={
-                    "report": "Synthetic report for timeline recovery validation.",
-                    "anamnesis": "Symptoms began on 2025-01-17.",
-                    "drugs": "Acetaminophen was taken in 2025-01.",
-                    "laboratory_analysis": "ALT was 75 U/L on 2025-01-17.",
+    result = asyncio.run(
+        extractor.extract_timeline(
+            session_id=12,
+            source_payload={
+                "anamnesis": "Symptoms began on 2025-01-17.",
+                "drugs": "Acetaminophen was taken in 2025-01.",
+                "laboratory_analysis": "ALT was 75 U/L on 2025-01-17.",
+                "session_result_payload": {
+                    "report": "Synthetic report for timeline recovery validation."
                 },
-            )
+            },
         )
+    )
 
-    assert exc.value.error_code == "invalid_response"
-    assert exc.value.retryable is False
+    assert [event.event_id for event in result.events] == ["alt"]
+    assert result.generation_note is not None
+    assert result.generation_note.startswith("2 model events were discarded")
 
 def test_timeline_source_is_derived_from_the_matching_canonical_field() -> None:
     extractor = PatientTimelineExtractor(
@@ -219,10 +233,12 @@ def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> N
 
         # -------------------------------------------------------------------------
         def normalize_events(
-            self, events: list[PatientTimelineEvent]
+            self,
+            events: list[PatientTimelineEvent],
+            date_order: DateOrder = "day_first",
         ) -> list[PatientTimelineEvent]:
             self.events_before_normalize = events
-            return super().normalize_events(events)
+            return super().normalize_events(events, date_order)
 
     extractor = CapturingTimelineExtractor(
         client=FakeTimelineClient(
@@ -249,7 +265,7 @@ def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> N
             )
         )
 
-    assert extractor.events_before_normalize[0].source is None
+    assert extractor.events_before_normalize == []
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
 
@@ -405,6 +421,113 @@ def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens(
     assert normalized[0].date_precision == "month"
     assert normalized[1].event_date is None
 
+@pytest.mark.parametrize(
+    ("model_date", "evidence", "expected_date", "expected_certainty"),
+    [
+        # A dose is never read as a year and never overrides the model date.
+        ("2025-01-18", "Paracetamol 1000 mg once daily.", "2025-01-18", "inferred"),
+        (None, "Paracetamol 1000 mg once daily.", None, "uncertain"),
+        # Day-first numeric evidence corrects a conflicting explicit model date.
+        ("2025-02-18", "Jaundice noted on 17.02.2025.", "2025-02-17", "explicit"),
+        ("2025-02-17", "Jaundice noted on 17.02.2025.", "2025-02-17", "explicit"),
+        # A day the evidence does not state stays a labelled inference.
+        ("2025-01-05", "Obesity was documented in 2025.", "2025-01-05", "inferred"),
+    ],
+)
+def test_timeline_grounds_model_dates_in_the_quoted_evidence(
+    model_date: str | None,
+    evidence: str,
+    expected_date: str | None,
+    expected_certainty: str,
+) -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
+    event = PatientTimelineEvent(
+        event_id="event",
+        title="Event",
+        timing_type="explicit_date" if model_date else "uncertain",
+        event_date=model_date,
+        date_certainty="explicit",
+        source_evidence=evidence,
+    )
+
+    normalized = extractor.normalize_events([event])[0]
+
+    assert normalized.event_date == expected_date
+    assert normalized.date_certainty == expected_certainty
+    if expected_certainty == "inferred":
+        assert normalized.uncertainty_reason
+
+def test_timeline_keeps_relative_dates_derived_from_an_evidence_anchor() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
+    event = PatientTimelineEvent(
+        event_id="rash",
+        title="Rash",
+        timing_type="relative",
+        event_date="2025-02-20",
+        relative_time="3 days after admission",
+        source_evidence="Rash appeared 3 days after admission on 17.02.2025.",
+    )
+
+    normalized = extractor.normalize_events([event])[0]
+
+    assert normalized.event_date == "2025-02-20"
+    assert normalized.date_certainty == "inferred"
+
+def test_timeline_makes_event_ids_unique_and_repairs_links() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
+    events = [
+        PatientTimelineEvent(
+            event_id="e1",
+            title="Therapy started",
+            event_date="2025-01-10",
+            source_evidence="Started on 2025-01-10.",
+            linked_patient_event_ids=["e1", "dup", "missing"],
+        ),
+        PatientTimelineEvent(
+            event_id="e1",
+            title="ALT rise",
+            event_date="2025-01-20",
+            source_evidence="ALT rose on 2025-01-20.",
+            confidence=0.9,
+        ),
+        PatientTimelineEvent(
+            event_id="dup",
+            title="ALT rise",
+            event_date="2025-01-20",
+            source_evidence="ALT rose on 2025-01-20.",
+            confidence=0.1,
+        ),
+    ]
+
+    normalized = extractor.normalize_events(events)
+
+    assert [event.event_id for event in normalized] == ["e1", "e1-2"]
+    assert normalized[0].linked_patient_event_ids == ["e1-2"]
+
+def test_timeline_keeps_undated_events_in_model_order() -> None:
+    extractor = PatientTimelineExtractor(
+        client=FakeTimelineClient(PatientTimelineExtraction())
+    )
+    events = [
+        PatientTimelineEvent(
+            event_id=event_id, title=title, relative_time=relative, source_evidence=title
+        )
+        for event_id, title, relative in (
+            ("first", "Zoster", "before admission"),
+            ("second", "Anemia", "after discharge"),
+        )
+    ]
+
+    normalized = extractor.normalize_events(events)
+
+    assert [event.event_id for event in normalized] == ["first", "second"]
+
 def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() -> None:
     assert normalize_timeline_interval("2024-02-29") is not None
     assert normalize_timeline_interval("2025-02-29") is None
@@ -413,17 +536,34 @@ def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() ->
     assert reversed_range.end_value is None
 
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
-    client = FakeTimelineClient(PatientTimelineExtraction())
+    client = FakeTimelineClient(
+        PatientTimelineExtraction(
+            events=[PatientTimelineEvent(event_id="y", title="Y", source_evidence="y")]
+        )
+    )
     extractor = PatientTimelineExtractor(client=client)
 
     asyncio.run(
-        extractor.extract_timeline(session_id=5, source_payload={"b": 2, "a": "x"})
+        extractor.extract_timeline(
+            session_id=5,
+            source_payload={
+                "patient_name": "Jane Example",
+                "drugs": "x",
+                "anamnesis": "y",
+                "session_result_payload": {"report": "Generated narrative."},
+                "clinical_model": "model-a",
+            },
+        )
     )
 
     prompt = client.last_kwargs["user_prompt"]
-    assert '{"a":"x","b":2}' in prompt
+    assert '{"anamnesis":"y","drugs":"x"}' in prompt
     assert "Source payload SHA-256:" in prompt
-    assert "'a':" not in prompt
+    assert "Numeric date order in this record: DD.MM.YYYY" in prompt
+    assert "Jane Example" not in prompt
+    assert "Generated narrative." not in prompt
+    assert "model-a" not in prompt
+    assert "'anamnesis':" not in prompt
     assert client.last_kwargs["purpose"].value == "timeline_extraction"
     assert client.last_kwargs["timeline_complexity"] == "simple"
     assert "exact canonical field or section name" in client.last_kwargs[
