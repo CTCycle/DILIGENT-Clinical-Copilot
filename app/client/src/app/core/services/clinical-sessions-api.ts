@@ -19,10 +19,12 @@ export async function fetchInspectionSessions(
 ): Promise<InspectionSessionCatalogResponse> {
   const queryString = buildQueryString({
     search: query.search,
-    status: query.status,
+    status: query.statuses,
     sort: query.sort,
-    date_mode: query.date_mode,
-    date: query.date,
+    date_field: query.date_field,
+    date_from: query.date_from,
+    date_to: query.date_to,
+    created_before: query.created_before,
     offset: query.offset ?? 0,
     limit: query.limit ?? 10,
   });

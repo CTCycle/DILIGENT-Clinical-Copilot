@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from inspect import signature
 from threading import Event
 from types import SimpleNamespace
@@ -145,9 +145,6 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search="bob",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -157,9 +154,7 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search=None,
-        status_filter="completed",
-        date_mode=None,
-        filter_date=None,
+        statuses=["completed"],
         offset=0,
         limit=10,
     )
@@ -171,9 +166,6 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search="failure report",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -182,9 +174,8 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search=None,
-        status_filter=None,
-        date_mode="exact",
-        filter_date=date(2025, 1, 2),
+        date_from=datetime(2025, 1, 2, tzinfo=timezone.utc),
+        date_to=datetime(2025, 1, 3, tzinfo=timezone.utc),
         offset=0,
         limit=10,
     )
@@ -193,9 +184,7 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search=None,
-        status_filter=None,
-        date_mode="before",
-        filter_date=date(2025, 1, 2),
+        date_to=datetime(2025, 1, 2, tzinfo=timezone.utc),
         offset=0,
         limit=10,
     )
@@ -204,21 +193,43 @@ def test_session_list_filters_and_search() -> None:
 
     items, total = repository_graph.clinical_session_repository.list_sessions(
         search=None,
-        status_filter=None,
-        date_mode="after",
-        filter_date=date(2025, 1, 2),
+        date_from=datetime(2025, 1, 3, tzinfo=timezone.utc),
         offset=0,
         limit=10,
     )
     assert total == 1
     assert items[0]["patient_name"] == "Carol Archive"
 
-    for status_filter, expected_total in (("failed", 1), ("completed", 0)):
+    items, total = repository_graph.clinical_session_repository.list_sessions(
+        search=None,
+        statuses=["failed", "completed"],
+        offset=0,
+        limit=10,
+    )
+    assert total == 3
+
+    items, total = repository_graph.clinical_session_repository.list_sessions(
+        search=None,
+        created_before=datetime(2025, 1, 2, tzinfo=timezone.utc),
+        offset=0,
+        limit=10,
+    )
+    assert [item["patient_name"] for item in items] == ["Alice Example"]
+
+    session_id = items[0]["session_id"]
+    items, total = repository_graph.clinical_session_repository.list_sessions(
+        search=str(session_id),
+        offset=0,
+        limit=10,
+    )
+    assert session_id in {item["session_id"] for item in items}
+
+    for statuses, expected_total in ((["failed"], 1), (["completed"], 0)):
         _, total = repository_graph.clinical_session_repository.list_sessions(
             search="bob",
-            status_filter=status_filter,
-            date_mode="exact",
-            filter_date=date(2025, 1, 2),
+            statuses=statuses,
+            date_from=datetime(2025, 1, 2, tzinfo=timezone.utc),
+            date_to=datetime(2025, 1, 3, tzinfo=timezone.utc),
             offset=0,
             limit=10,
         )
@@ -253,9 +264,6 @@ def test_session_report_and_text_use_result_payload_only() -> None:
 
     items, _ = repository_graph.clinical_session_repository.list_sessions(
         search=None,
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -666,9 +674,6 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -739,9 +744,6 @@ def test_timeline_generation_marks_fallback_payload() -> None:
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Fallback Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -803,9 +805,6 @@ def test_empty_model_timeline_with_source_persists_deterministic_fallback() -> N
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Empty Extraction Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -853,9 +852,6 @@ def test_timeline_generation_persists_classified_provider_fallback(
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Classified Failure Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -972,9 +968,6 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Stable Runtime Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -1023,9 +1016,6 @@ def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor(
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="OpenCode Go Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -1069,9 +1059,6 @@ def test_timeline_generation_records_effective_local_provider_provenance() -> No
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Local Ollama Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -1118,9 +1105,6 @@ def test_session_payload_timeline_is_not_read_as_history_record() -> None:
     )
     session_rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Payload Timeline Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -1156,8 +1140,7 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
         anamnesis="Symptoms started in January 2025.",
     )
     rows, _ = repository_graph.clinical_session_repository.list_sessions(
-        search="Timeline Snapshot Patient", status_filter=None, date_mode=None,
-        filter_date=None, offset=0, limit=10,
+        search="Timeline Snapshot Patient", offset=0, limit=10,
     )
     session_id = int(rows[0]["session_id"])
     service = build_service(
@@ -1205,9 +1188,6 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
     )
     rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Synthetic Timeline Cancellation",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )
@@ -1317,9 +1297,6 @@ def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() ->
     )
     rows, _ = repository_graph.clinical_session_repository.list_sessions(
         search="Synthetic Timeline Persistence Failure",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )

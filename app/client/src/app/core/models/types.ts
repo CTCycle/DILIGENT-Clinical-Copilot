@@ -406,7 +406,7 @@ export type {
   InspectionTimelineJobStatusResponse,
   InspectionUpdateJobListResponse,
   InspectionSessionStatus,
-  InspectionDateFilterMode,
+  InspectionSessionDateField,
   InspectionSessionItem,
   InspectionSessionCatalogResponse,
   ClinicalSessionDetail,

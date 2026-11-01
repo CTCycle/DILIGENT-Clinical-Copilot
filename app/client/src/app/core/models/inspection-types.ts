@@ -44,11 +44,12 @@ export type InspectionUpdateJobListResponse = {
 
 export type InspectionSessionStatus = ClinicalSessionStatus;
 export type InspectionSessionSort = "updated_desc" | "created_desc" | "created_asc";
-export type InspectionDateFilterMode = "before" | "after" | "exact";
+export type InspectionSessionDateField = "created" | "updated" | "visit";
 
 export type InspectionSessionItem = {
   session_id: number;
   patient_name: string | null;
+  visit_date: string | null;
   session_timestamp: string | null;
   version: number;
   original_session_id: number | null;
@@ -242,10 +243,12 @@ export type InspectionCatalogQuery = {
 };
 
 export type InspectionSessionQuery = InspectionCatalogQuery & {
-  status?: InspectionSessionStatus;
+  statuses?: InspectionSessionStatus[];
   sort?: InspectionSessionSort;
-  date_mode?: InspectionDateFilterMode;
-  date?: string;
+  date_field?: InspectionSessionDateField;
+  date_from?: string;
+  date_to?: string;
+  created_before?: string;
 };
 
 export type InspectionRxNavItem = {

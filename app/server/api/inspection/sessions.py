@@ -5,13 +5,12 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import date
+from datetime import datetime
 
 from fastapi import APIRouter, Body, HTTPException, Query, Response, status
 
 from api.inspection.common import InspectionJobEndpointMixin
 from domain.inspection import (
-    DateFilterMode,
     DeleteEntityResponse,
     ManualReportEditAudit,
     ManualReportEditRequest,
@@ -21,6 +20,7 @@ from domain.inspection import (
     SessionAttachmentUploadRequest,
     SessionCatalogResponse,
     SessionDetailResponse,
+    SessionDateField,
     SessionListFilters,
     SessionSort,
     SessionStatus,
@@ -49,26 +49,32 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
     def list_sessions(
         self,
         search: str | None = Query(default=None),
-        status_filter: SessionStatus | None = Query(default=None, alias="status"),
-        date_mode: DateFilterMode | None = Query(default=None),
-        filter_date: date | None = Query(default=None, alias="date"),
+        statuses: list[SessionStatus] = Query(default=[], alias="status"),
+        date_field: SessionDateField = Query(default="created"),
+        date_from: datetime | None = Query(default=None),
+        date_to: datetime | None = Query(default=None),
+        created_before: datetime | None = Query(default=None),
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=10, ge=1, le=100),
         sort: SessionSort = Query(default="updated_desc"),
     ) -> SessionCatalogResponse:
         filters = SessionListFilters(
             search=search,
-            status=status_filter,
-            date_mode=date_mode,
-            date=filter_date,
+            statuses=statuses,
+            date_field=date_field,
+            date_from=date_from,
+            date_to=date_to,
+            created_before=created_before,
             offset=offset,
             limit=limit,
         )
         payload = self.service.list_sessions(
             search=filters.search,
-            status_filter=filters.status,
-            date_mode=filters.date_mode,
-            filter_date=filters.date,
+            statuses=filters.statuses,
+            date_field=filters.date_field,
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            created_before=filters.created_before,
             offset=filters.offset,
             limit=filters.limit,
             sort=sort,

@@ -232,18 +232,19 @@ export async function requestJson<T>(
 }
 
 export function buildQueryString(
-  params: Record<string, string | number | null | undefined>,
+  params: Record<string, string | number | readonly string[] | null | undefined>,
 ): string {
   const searchParams = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) {
       continue;
     }
-    const serialized = `${value}`.trim();
-    if (!serialized) {
-      continue;
+    for (const entry of typeof value === "object" ? value : [value]) {
+      const serialized = `${entry}`.trim();
+      if (serialized) {
+        searchParams.append(key, serialized);
+      }
     }
-    searchParams.set(key, serialized);
   }
   const queryString = searchParams.toString();
   return queryString ? `?${queryString}` : "";

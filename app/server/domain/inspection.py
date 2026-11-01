@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from datetime import date as DateValue
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -14,7 +14,7 @@ SessionStatus = Literal[
     "draft", "queued", "running", "completed", "cancelled", "failed"
 ]
 SessionSort = Literal["updated_desc", "created_desc", "created_asc"]
-DateFilterMode = Literal["before", "after", "exact"]
+SessionDateField = Literal["created", "updated", "visit"]
 InspectionUpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
 InspectionUpdateJobType = Literal[
     "rxnav_update",
@@ -44,6 +44,7 @@ class SessionCatalogItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: int
     patient_name: str | None = None
+    visit_date: DateValue | None = None
     session_timestamp: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -651,11 +652,21 @@ class DeleteEntityResponse(BaseModel):
 class SessionListFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
     search: str | None = Field(default=None, max_length=MAX_SEARCH_LENGTH)
-    status: SessionStatus | None = None
-    date_mode: DateFilterMode | None = None
-    date: DateValue | None = None
+    statuses: list[SessionStatus] = Field(default_factory=list)
+    date_field: SessionDateField = "created"
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    created_before: datetime | None = None
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=10, ge=1, le=100)
+
+    # -------------------------------------------------------------------------
+    @field_validator("date_from", "date_to", "created_before")
+    @classmethod
+    def require_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
     # -------------------------------------------------------------------------
     @field_validator("search", mode="before")

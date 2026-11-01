@@ -11,7 +11,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import APIRequestContext, Page, Route, expect
 
-LIFECYCLE_FILTERS = ["All", "Draft", "Queued", "Running", "Completed", "Cancelled", "Failed"]
+LIFECYCLE_FILTERS = ["Draft", "Queued", "Running", "Completed", "Cancelled", "Failed"]
 
 def _valid_input(tag: str) -> str:
     return (
@@ -183,10 +183,14 @@ def test_sessions_list_filters_by_lifecycle_status_and_keeps_context_on_refresh(
     session_id = created.json()["session_id"]
 
     page.goto(f"{base_url}/clinical-sessions")
-    status_nav = page.get_by_role("navigation", name="Session status")
-    expect(status_nav.get_by_role("button")).to_have_text(LIFECYCLE_FILTERS)
+    page.get_by_role("button", name=re.compile(r"^Status")).click()
+    status_panel = page.get_by_role("group", name="Session status")
+    expect(status_panel.get_by_role("checkbox")).to_have_count(len(LIFECYCLE_FILTERS))
 
-    status_nav.get_by_role("button", name="Draft").click()
+    status_panel.get_by_role("checkbox", name="Draft").check()
+    status_panel.get_by_role("checkbox", name="Queued").check()
+    page.keyboard.press("Escape")
+    expect(status_panel).to_have_count(0)
     row = page.locator(".clinical-session-row", has_text=case_name)
     expect(row).to_have_count(1)
     expect(row).to_contain_text("Draft")
@@ -201,7 +205,11 @@ def test_sessions_list_filters_by_lifecycle_status_and_keeps_context_on_refresh(
     expect(page.get_by_role("heading", name=case_name)).to_be_visible()
     expect(page.get_by_role("button", name="Generate Timeline")).to_be_visible()
 
-    status_nav.get_by_role("button", name="Failed").click()
+    page.get_by_role("button", name=re.compile(r"^Status")).click()
+    status_panel = page.get_by_role("group", name="Session status")
+    status_panel.get_by_role("checkbox", name="Draft").uncheck()
+    status_panel.get_by_role("checkbox", name="Queued").uncheck()
+    status_panel.get_by_role("checkbox", name="Failed").check()
     expect(page.locator(".clinical-session-row", has_text=case_name)).to_have_count(0)
 
 ###############################################################################

@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date
+from collections.abc import Sequence
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 from string import ascii_uppercase
@@ -162,18 +163,22 @@ class DataInspectionService(
         self,
         *,
         search: str | None,
-        status_filter: str | None,
-        date_mode: str | None,
-        filter_date: date | None,
         offset: int,
         limit: int,
+        statuses: Sequence[str] | None = None,
+        date_field: str = "created",
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        created_before: datetime | None = None,
         sort: str | None = None,
     ) -> dict[str, Any]:
         items, total = self.clinical_session_repository.list_sessions(
             search=search,
-            status_filter=status_filter,
-            date_mode=date_mode,
-            filter_date=filter_date,
+            statuses=statuses,
+            date_field=date_field,
+            date_from=date_from,
+            date_to=date_to,
+            created_before=created_before,
             offset=offset,
             limit=limit,
             sort=sort,

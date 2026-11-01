@@ -13,9 +13,14 @@ Clinical Sessions lists every session in one place: drafts, queued and
 running analyses, completed reports, and cancelled or failed analyses. Each
 row shows the patient or session number, its status, when it was created and
 last updated, a thin progress bar while it is active, and whether a report or
-timeline exists. Filter by status, sort by last update or creation date, and
-search by patient or content. The list refreshes itself while any analysis is
-active; the selected session and tab stay in the address, so refresh and Back
+timeline exists. Sessions created in the last 90 days are loaded once and
+filtered instantly in the browser: tick any combination of statuses, search by
+name or `#id`, pick a date preset or custom range on the created, updated or
+visit date, and sort by last update or creation date. Filters combine (any
+selected status, and the text, and the date). Older sessions are not preloaded;
+choose **Search older** (or pick a created-date range before the 90-day window)
+to query the full history, and the line under the filters always says which
+range is shown. The list refreshes itself while any analysis is active; the selected session and tab stay in the address, so refresh and Back
 keep your place.
 
 - **Open report** shows a running analysis with live progress, or a finished

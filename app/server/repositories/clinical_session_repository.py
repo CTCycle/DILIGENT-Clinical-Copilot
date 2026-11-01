@@ -6,10 +6,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import UTC, date, datetime, timedelta
+from collections.abc import Sequence
+from datetime import UTC, date, datetime
 from typing import Any, cast
 
-from sqlalchemy import and_, exists, func, or_, select, update
+from sqlalchemy import String, and_, exists, func, or_, select, update
+from sqlalchemy import cast as sql_cast
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -593,11 +595,13 @@ class ClinicalSessionRepository:
         self,
         *,
         search: str | None,
-        status_filter: str | None,
-        date_mode: str | None,
-        filter_date: date | None,
         offset: int,
         limit: int,
+        statuses: Sequence[str] | None = None,
+        date_field: str = "created",
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        created_before: datetime | None = None,
         sort: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         safe_offset = max(int(offset), 0)
@@ -626,26 +630,38 @@ class ClinicalSessionRepository:
                     func.lower(func.coalesce(ClinicalSession.patient_name, "")).like(
                         search_pattern, escape="\\"
                     ),
+                    sql_cast(ClinicalSession.id, String).like(
+                        search_pattern, escape="\\"
+                    ),
                     section_match,
                     result_payload_match,
                 )
             )
-        if status_filter in repository_values.SESSION_LIFECYCLE_STATUSES:
-            conditions.append(ClinicalSession.session_status == status_filter)
-        if filter_date is not None and date_mode in {"before", "after", "exact"}:
-            day_start = datetime.combine(filter_date, datetime.min.time(), tzinfo=UTC)
-            next_day = day_start + timedelta(days=1)
-            if date_mode == "before":
-                conditions.append(ClinicalSession.created_at < day_start)
-            elif date_mode == "after":
-                conditions.append(ClinicalSession.created_at >= next_day)
-            else:
-                conditions.extend(
-                    [
-                        ClinicalSession.created_at >= day_start,
-                        ClinicalSession.created_at < next_day,
-                    ]
-                )
+        valid_statuses = [
+            value
+            for value in (statuses or ())
+            if value in repository_values.SESSION_LIFECYCLE_STATUSES
+        ]
+        if valid_statuses:
+            conditions.append(ClinicalSession.session_status.in_(valid_statuses))
+        if created_before is not None:
+            conditions.append(ClinicalSession.created_at < created_before)
+        if date_field == "visit":
+            visit_column = ClinicalSession.visit_date
+            if date_from is not None:
+                conditions.append(visit_column >= date_from.date())
+            if date_to is not None:
+                conditions.append(visit_column < date_to.date())
+        else:
+            date_column = (
+                ClinicalSession.updated_at
+                if date_field == "updated"
+                else ClinicalSession.created_at
+            )
+            if date_from is not None:
+                conditions.append(date_column >= date_from)
+            if date_to is not None:
+                conditions.append(date_column < date_to)
         order_by = {
             "created_desc": (ClinicalSession.created_at.desc(), ClinicalSession.id.desc()),
             "created_asc": (ClinicalSession.created_at.asc(), ClinicalSession.id.asc()),
@@ -691,6 +707,7 @@ class ClinicalSessionRepository:
                     "patient_name": repository_values.normalize_string(
                         session_row.patient_name
                     ),
+                    "visit_date": session_row.visit_date,
                     "session_timestamp": session_row.session_timestamp,
                     "created_at": session_row.created_at,
                     "updated_at": session_row.updated_at,

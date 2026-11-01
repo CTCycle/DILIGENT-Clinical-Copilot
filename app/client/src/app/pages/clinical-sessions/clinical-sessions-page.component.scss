@@ -34,6 +34,11 @@
   overflow-x: clip;
 }
 
+.page-container.clinical-sessions-page {
+  max-width: none;
+  margin: 0;
+}
+
 .clinical-session-link-field {
   display: grid;
   gap: var(--space-sm);
@@ -56,74 +61,9 @@
   margin-top: var(--space-lg);
 }
 
-.clinical-sessions-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: var(--space-sm);
-  align-items: center;
-  margin-bottom: var(--space-sm);
-}
-
-.clinical-sessions-filters {
-  display: grid;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-}
-
-.clinical-sessions-filter-nav {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: center;
-  min-width: 0;
-  border-bottom: 1px solid var(--color-divider);
-}
-
-.clinical-sessions-filter-nav button {
-  min-height: var(--control-height-sm);
-  flex: 1 1 auto;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: var(--font-xs);
-  font-weight: 800;
-  padding: var(--space-xs) var(--space-sm);
-}
-
-.clinical-sessions-filter-nav button.is-active {
-  border-bottom-color: var(--color-brand);
-  color: var(--color-brand);
-}
-
-.clinical-sessions-filter-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
-}
-
-.clinical-sessions-sort {
-  grid-column: 1 / -1;
-}
-
-.clinical-sessions-sort,
-.clinical-sessions-date-mode,
-.clinical-sessions-date-input {
-  min-width: 0;
-  width: 100%;
-  min-height: var(--control-height-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-base);
-  font-weight: 500;
-  padding: var(--space-xs) var(--space-sm);
-}
-
 .clinical-sessions-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   gap: var(--space-lg);
   align-items: stretch;
   flex: 1 1 auto;
@@ -141,7 +81,7 @@
 
 .clinical-sessions-list {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
   padding: var(--space-sm);
@@ -236,10 +176,28 @@
   min-width: 0;
 }
 
-.clinical-session-row-meta {
+.clinical-session-row-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.clinical-session-row-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinical-session-row-title .session-status-chip {
+  flex: 0 0 auto;
+}
+
+.clinical-session-row-updated {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   gap: var(--space-sm);
 }
 
@@ -249,8 +207,7 @@
   line-height: 1.25;
 }
 
-.clinical-session-row-main small,
-.clinical-session-row-meta {
+.clinical-session-row-main small {
   color: var(--cs-faint);
   font-size: var(--font-xs);
 }

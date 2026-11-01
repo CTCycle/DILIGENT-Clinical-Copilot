@@ -1,0 +1,169 @@
+<div class="filters" aria-label="Session filters">
+  <div class="filters-search">
+    <label class="search-field">
+      <svg lucideSearch size="14" aria-hidden="true"></svg>
+      <input
+        type="search"
+        placeholder="Search name or #id"
+        aria-label="Search sessions"
+        [ngModel]="filters().query"
+        (ngModelChange)="setQuery($event)"
+      />
+    </label>
+    <button
+      class="icon-button"
+      type="button"
+      title="Refresh sessions"
+      aria-label="Refresh sessions"
+      [class.is-loading]="store.loading()"
+      [attr.aria-busy]="store.loading()"
+      [disabled]="store.loading()"
+      (click)="refresh.emit()"
+    >
+      <svg lucideRefreshCw size="16" aria-hidden="true"></svg>
+    </button>
+  </div>
+
+  <div class="filters-bar">
+  <div class="filters-controls">
+    <button
+      type="button"
+      class="trigger"
+      aria-haspopup="true"
+      [class.is-set]="filters().statuses.length > 0"
+      [attr.aria-expanded]="openPanel() === 'status'"
+      (click)="togglePanel('status')"
+    >
+      <span>{{ statusSummary() }}</span>
+      <svg lucideChevronDown size="14" aria-hidden="true"></svg>
+    </button>
+    <button
+      type="button"
+      class="trigger"
+      aria-haspopup="true"
+      [class.is-set]="filters().date.preset !== 'any'"
+      [attr.aria-expanded]="openPanel() === 'date'"
+      (click)="togglePanel('date')"
+    >
+      <svg lucideCalendar size="14" aria-hidden="true"></svg>
+      <span>Date</span>
+      <svg lucideChevronDown size="14" aria-hidden="true"></svg>
+    </button>
+    <select
+      class="sort"
+      aria-label="Sort sessions"
+      [ngModel]="filters().sort"
+      (ngModelChange)="setSort($event)"
+    >
+      @for (option of sortOptions; track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+  </div>
+
+  @if (openPanel() === 'status') {
+    <div class="panel" role="group" aria-label="Session status">
+      @for (status of statusOptions; track status) {
+        <label class="panel-option">
+          <input type="checkbox" [checked]="isStatusSelected(status)" (change)="toggleStatus(status)" />
+          <span>{{ statusLabel(status) }}</span>
+        </label>
+      }
+      <div class="panel-footer">
+        <button type="button" class="link-button" [disabled]="!filters().statuses.length" (click)="clearStatuses()">
+          Clear
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (openPanel() === 'date') {
+    <div class="panel" role="group" aria-label="Session date">
+      <div class="segmented" role="radiogroup" aria-label="Date to filter on">
+        @for (field of dateFields; track field.value) {
+          <button
+            type="button"
+            role="radio"
+            [attr.aria-checked]="filters().date.field === field.value"
+            [class.is-active]="filters().date.field === field.value"
+            (click)="setDateField(field.value)"
+          >
+            {{ field.label }}
+          </button>
+        }
+      </div>
+      @for (preset of datePresets; track preset.value) {
+        <label class="panel-option">
+          <input
+            type="radio"
+            name="session-date-preset"
+            [checked]="filters().date.preset === preset.value"
+            (change)="setDatePreset(preset.value)"
+          />
+          <span>{{ preset.label }}</span>
+        </label>
+      }
+      @if (filters().date.preset === 'custom') {
+        <div class="custom-range">
+          <input
+            type="date"
+            aria-label="From date"
+            [ngModel]="filters().date.from"
+            (ngModelChange)="setCustomDate('from', $event)"
+          />
+          <input
+            type="date"
+            aria-label="To date"
+            [ngModel]="filters().date.to"
+            (ngModelChange)="setCustomDate('to', $event)"
+          />
+        </div>
+      }
+    </div>
+  }
+  </div>
+
+  @if (hasChips()) {
+    <div class="chips" aria-label="Active filters">
+      @for (status of filters().statuses; track status) {
+        <button type="button" class="chip" [attr.aria-label]="'Remove ' + statusLabel(status) + ' filter'" (click)="toggleStatus(status)">
+          {{ statusLabel(status) }}
+          <svg lucideX size="12" aria-hidden="true"></svg>
+        </button>
+      }
+      @if (filters().date.preset !== 'any') {
+        <button type="button" class="chip" aria-label="Remove date filter" (click)="clearDate()">
+          {{ dateChipLabel() }}
+          <svg lucideX size="12" aria-hidden="true"></svg>
+        </button>
+      }
+      <button type="button" class="link-button" (click)="store.resetFilters()">Reset all</button>
+    </div>
+  }
+
+  <div class="scope" aria-live="polite">
+    @if (!store.includeOlder()) {
+      <span>Last {{ cacheDays }} days · {{ store.visible().length }} of {{ store.recentCount() }}</span>
+      <button type="button" class="link-button" (click)="store.setIncludeOlder(true)">Search older</button>
+    } @else {
+      <span>
+        All history · {{ store.visible().length }} shown
+        @if (store.olderTotal() !== null) {
+          · {{ store.olderCount() }} of {{ store.olderTotal() }} older loaded
+        }
+      </span>
+      @if (store.hasMoreOlder()) {
+        <button type="button" class="link-button" [disabled]="store.olderLoading()" (click)="store.loadOlder(true)">
+          Load more
+        </button>
+      }
+      <button type="button" class="link-button" (click)="store.setIncludeOlder(false)">Recent only</button>
+    }
+    @if (store.olderLoading()) {
+      <span class="scope-status">Loading older…</span>
+    }
+  </div>
+  @if (store.olderError()) {
+    <p class="scope-error" role="alert">{{ store.olderError() }}</p>
+  }
+</div>

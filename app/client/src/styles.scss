@@ -156,29 +156,6 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Native date fields use the browser UI locale for empty segments. Keep the
-   visible filter hint aligned with the application's English locale. */
-.clinical-sessions-date-input-shell {
-  position: relative;
-  min-width: 0;
-}
-
-.clinical-sessions-date-input-shell.is-empty::after {
-  content: 'dd/mm/yyyy';
-  position: absolute;
-  top: 50%;
-  left: calc(var(--space-sm) + 1px);
-  color: var(--color-text-muted);
-  font-size: var(--font-sm);
-  font-weight: 800;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.clinical-sessions-date-input-shell.is-empty .clinical-sessions-date-input {
-  color: transparent;
-}
-
 body {
   margin: 0;
   height: 100%;
@@ -5791,49 +5768,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     grid-column: 2;
     justify-self: start;
   }
-}
-
-.clinical-sessions-search .clinical-sessions-icon-button {
-  display: inline-grid;
-  place-items: center;
-  width: var(--control-height-sm);
-  padding: 0;
-}
-
-.clinical-sessions-refresh.is-loading svg {
-  animation: clinical-sessions-spin 0.9s linear infinite;
-}
-
-@keyframes clinical-sessions-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .clinical-sessions-refresh.is-loading svg {
-    animation: none;
-  }
-}
-
-.clinical-sessions-search input {
-  min-width: 0;
-  width: 100%;
-  min-height: var(--control-height-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-base);
-}
-
-.clinical-sessions-search .btn {
-  min-height: var(--control-height-sm);
-  height: var(--control-height-sm);
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-base);
 }
 
 .session-status-chip {

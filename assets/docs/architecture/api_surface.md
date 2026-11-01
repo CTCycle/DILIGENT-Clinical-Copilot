@@ -127,7 +127,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 
 ## Inspection Routes
 - `GET /api/inspection/jobs`
-- `GET /api/inspection/sessions` (`status` is any lifecycle status; `sort` is `updated_desc` (default), `created_desc` or `created_asc`; the date filter applies to the creation date)
+- `GET /api/inspection/sessions` (`status` is repeatable and combines with OR; `sort` is `updated_desc` (default), `created_desc` or `created_asc`; `date_field` is `created` (default), `updated` or `visit` with a half-open `date_from`/`date_to` window; `created_before` bounds historical queries; `search` matches name, `#id` and content; items include `visit_date`)
 - `GET /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/sessions/{session_id}/versions`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}`

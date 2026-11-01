@@ -71,9 +71,6 @@ def seed_browser_regression_database() -> tuple[int, int]:
 
     existing_rows, _ = sessions.list_sessions(
         search=SEED_PATIENT_NAME,
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=100,
     )

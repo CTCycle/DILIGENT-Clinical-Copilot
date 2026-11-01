@@ -34,6 +34,7 @@ describe('AppStateService', () => {
   });
 
   it('maps configuration routes to Settings', () => {
+    expect(resolvePageIdFromPath('/clinical-sessions?session=3&tab=preview')).toBe('clinical-sessions');
     expect(resolvePageIdFromPath('/settings/general')).toBe('settings');
     expect(resolvePageIdFromPath('/settings/models')).toBe('settings');
     expect(resolvePathFromPage('settings')).toBe('/settings/general');

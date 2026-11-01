@@ -27,9 +27,6 @@ def test_concurrent_session_writes_remain_isolated(persistence_engine) -> None: 
     ).clinical_session_repository
     items, total = repository.list_sessions(
         search="Concurrent Patient",
-        status_filter=None,
-        date_mode=None,
-        filter_date=None,
         offset=0,
         limit=10,
     )

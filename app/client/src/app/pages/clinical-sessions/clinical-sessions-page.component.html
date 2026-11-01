@@ -1,101 +1,26 @@
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
 <main class="page-container clinical-sessions-page">
-  @if (listError()) {
-    <p class="clinical-sessions-status is-error">{{ listError() }}</p>
+  @if (store.error() ?? listError(); as message) {
+    <p class="clinical-sessions-status is-error">{{ message }}</p>
   }
 
   <div class="clinical-sessions-layout">
     <aside class="clinical-sessions-list" aria-label="Clinical session list">
-      <div class="clinical-sessions-search">
-        <input
-          type="search"
-          placeholder="Search sessions"
-          aria-label="Search sessions"
-          [ngModel]="query()"
-          (ngModelChange)="updateQuery($event)"
-          (keydown.enter)="loadSessions()"
-        />
-        <button
-          class="btn btn-secondary clinical-sessions-icon-button"
-          type="button"
-          title="Search sessions"
-          aria-label="Search sessions"
-          [disabled]="loading()"
-          (click)="loadSessions()"
-        >
-          <svg lucideSearch size="16" aria-hidden="true"></svg>
-        </button>
-        <button
-          class="btn btn-secondary clinical-sessions-icon-button clinical-sessions-refresh"
-          type="button"
-          title="Refresh sessions"
-          aria-label="Refresh sessions"
-          [class.is-loading]="loading()"
-          [attr.aria-busy]="loading()"
-          [disabled]="loading()"
-          (click)="loadSessions()"
-        >
-          <svg lucideRefreshCw size="16" aria-hidden="true"></svg>
-        </button>
-      </div>
-      <div class="clinical-sessions-filters" aria-label="Session filters">
-        <nav class="clinical-sessions-filter-nav" aria-label="Session status">
-          <button
-            type="button"
-            [attr.aria-current]="statusFilter() === 'all' ? 'page' : null"
-            [class.is-active]="statusFilter() === 'all'"
-            (click)="updateStatusFilter('all')"
-          >
-            All
-          </button>
-          @for (status of statusOptions; track status) {
-            <button
-              type="button"
-              [attr.aria-current]="statusFilter() === status ? 'page' : null"
-              [class.is-active]="statusFilter() === status"
-              (click)="updateStatusFilter(status)"
-            >
-              {{ statusLabel(status) }}
-            </button>
-          }
-        </nav>
-        <div class="clinical-sessions-filter-controls">
-          <select
-            class="clinical-sessions-sort"
-            aria-label="Sort sessions"
-            [ngModel]="sort()"
-            (ngModelChange)="updateSort($event)"
-          >
-            @for (option of sortOptions; track option.value) {
-              <option [value]="option.value">{{ option.label }}</option>
-            }
-          </select>
-          <select
-            class="clinical-sessions-date-mode"
-            aria-label="Date filter mode"
-            [ngModel]="dateFilterMode()"
-            (ngModelChange)="updateDateFilterMode($event)"
-          >
-            <option value="any">Any date</option>
-            <option value="after">After</option>
-            <option value="before">Before</option>
-            <option value="exact">On date</option>
-          </select>
-          <input
-            class="clinical-sessions-date-input"
-            type="date"
-            aria-label="Session filter date"
-            [ngModel]="dateFilter()"
-            (ngModelChange)="updateDateFilter($event)"
-          />
-        </div>
-      </div>
+      <app-clinical-sessions-filters (refresh)="loadSessions()" />
       <div class="clinical-sessions-results">
         @if (loading()) {
           <p class="clinical-sessions-empty">Loading sessions...</p>
         } @else if (!sessions().length) {
-          <p class="clinical-sessions-empty">No clinical sessions found.</p>
+          <p class="clinical-sessions-empty">
+            @if (store.olderLoading()) {
+              Searching older sessions...
+            } @else if (store.includeOlder()) {
+              No sessions match these filters in the full history.
+            } @else {
+              No sessions match these filters in the last 90 days. Use "Search older" to include earlier sessions.
+            }
+          </p>
         } @else {
           @for (session of sessions(); track session.session_id) {
             <div class="clinical-session-row-shell" [class.is-active]="selected()?.session_id === session.session_id">
@@ -105,9 +30,17 @@
                 (click)="openSession(session.session_id)"
               >
                 <span class="clinical-session-row-main">
-                  <strong>{{ session.patient_name || 'Session #' + session.session_id }}</strong>
-                  <small>
-                    #{{ session.session_id }} · Created {{ session.created_at | date:'short' }} · Updated {{ session.updated_at | date:'short' }}
+                  <span class="clinical-session-row-title">
+                    <strong [title]="session.patient_name || 'Session #' + session.session_id">{{ session.patient_name || 'Session #' + session.session_id }}</strong>
+                    <span class="session-status-chip" [attr.data-tone]="statusTone(session.status)">
+                      {{ statusLabel(session.status) }}
+                    </span>
+                  </span>
+                  <small>#{{ session.session_id }} · Created {{ session.created_at | date:'d MMM y, HH:mm' }}</small>
+                  <small class="clinical-session-row-updated">
+                    <span>Updated {{ session.updated_at | date:'d MMM y, HH:mm' }}</span>
+                    @if (session.has_report) { <span title="Has report">Report</span> }
+                    @if (session.has_timeline) { <span title="Has timeline">Timeline</span> }
                   </small>
                   @if (session.status === 'running') {
                     <span
@@ -122,15 +55,6 @@
                       <span [style.width.%]="session.progress"></span>
                     </span>
                   }
-                </span>
-                <span class="clinical-session-row-meta">
-                  <span class="session-status-chip" [attr.data-tone]="statusTone(session.status)">
-                    {{ statusLabel(session.status) }}
-                  </span>
-                  <span>
-                    @if (session.has_report) { <span title="Has report">Report</span> }
-                    @if (session.has_timeline) { <span title="Has timeline">Timeline</span> }
-                  </span>
                 </span>
               </button>
               <div class="clinical-session-row-actions">

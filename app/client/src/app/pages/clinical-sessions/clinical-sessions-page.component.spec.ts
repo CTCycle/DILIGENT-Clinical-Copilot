@@ -57,6 +57,7 @@ function sessionItem(sessionId: number): InspectionSessionItem {
   return {
     session_id: sessionId,
     patient_name: `Patient ${sessionId}`,
+    visit_date: null,
     session_timestamp: '2026-09-17T08:00:00Z',
     version: 1,
     original_session_id: null,
@@ -148,7 +149,7 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(component.loading()).toBe(false);
   });
 
-  it('refreshes the list from the refresh button while keeping query, filter and selection', async () => {
+  it('refreshes the cache from the refresh button while keeping filters and selection', async () => {
     const urls: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
@@ -159,7 +160,7 @@ describe('ClinicalSessionsPageComponent request generations', () => {
       throw new Error(`Unexpected request: ${url}`);
     });
     component.selected.set(sessionDetail(2));
-    component.updateQuery('venditti');
+    component.store.setFilters({ query: 'patient', statuses: ['completed', 'failed'] });
     fixture.detectChanges();
 
     const button = fixture.nativeElement.querySelector('button[aria-label="Refresh sessions"]') as HTMLButtonElement;
@@ -167,39 +168,10 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     await fixture.whenStable();
 
     expect(urls).toHaveLength(1);
-    expect(urls[0]).toContain('search=venditti');
-    expect(component.query()).toBe('venditti');
+    expect(new URL(urls[0], 'http://localhost').searchParams.has('search')).toBe(false);
+    expect(component.store.filters().query).toBe('patient');
+    expect(component.store.filters().statuses).toEqual(['completed', 'failed']);
     expect(component.selected()?.session_id).toBe(2);
-  });
-
-  it('sends combined search, status and date filters to the server and clears them', async () => {
-    const urls: string[] = [];
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/inspection/sessions?')) {
-        urls.push(url);
-        return jsonResponse({ items: [], total: 0, offset: 0, limit: 100 });
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    });
-    component.updateQuery('venditti');
-    component.updateStatusFilter('failed');
-    await fixture.whenStable();
-    component.updateDateFilter('2026-10-31');
-    await fixture.whenStable();
-
-    const filtered = new URL(urls[urls.length - 1], 'http://localhost').searchParams;
-    expect(filtered.get('search')).toBe('venditti');
-    expect(filtered.get('status')).toBe('failed');
-    expect(filtered.get('date_mode')).toBe('exact');
-    expect(filtered.get('date')).toBe('2026-10-31');
-
-    component.updateDateFilterMode('any');
-    component.updateStatusFilter('all');
-    await fixture.whenStable();
-    const cleared = new URL(urls[urls.length - 1], 'http://localhost').searchParams;
-    expect(cleared.has('date')).toBe(false);
-    expect(cleared.has('status')).toBe(false);
   });
 
   it('ignores a stale session detail response after navigation', async () => {
@@ -392,20 +364,30 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
     fixture.detectChanges();
   }
 
-  it('offers every lifecycle status filter and sends status and sort to the server', async () => {
+  it('multi-selects statuses and filters and sorts locally without new requests', async () => {
+    items = [
+      { ...sessionItem(1), status: 'failed', created_at: '2026-10-01T08:00:00Z' },
+      { ...sessionItem(2), status: 'queued', created_at: '2026-10-02T08:00:00Z' },
+      { ...sessionItem(3), status: 'completed', created_at: '2026-10-03T08:00:00Z' },
+    ];
     await create();
-    const labels = Array.from(
-      fixture.nativeElement.querySelectorAll('nav[aria-label="Session status"] button'),
-    ).map((button) => (button as HTMLElement).textContent?.trim());
-    expect(labels).toEqual(['All', 'Draft', 'Queued', 'Running', 'Completed', 'Cancelled', 'Failed']);
+    const requests = listUrls.length;
 
-    component.updateStatusFilter('queued');
-    component.updateSort('created_asc');
-    await vi.waitFor(() => expect(listUrls.length).toBeGreaterThanOrEqual(3));
+    (fixture.nativeElement.querySelector('.filters-controls .trigger') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const options = Array.from(
+      fixture.nativeElement.querySelectorAll('[aria-label="Session status"] label'),
+    ) as HTMLLabelElement[];
+    expect(options.map((option) => option.textContent?.trim()))
+      .toEqual(['Draft', 'Queued', 'Running', 'Completed', 'Cancelled', 'Failed']);
+    options[1].querySelector('input')!.click();
+    options[5].querySelector('input')!.click();
+    component.store.setFilters({ sort: 'created_asc' });
+    fixture.detectChanges();
 
-    const params = new URL(listUrls.at(-1)!, 'http://localhost').searchParams;
-    expect(params.get('status')).toBe('queued');
-    expect(params.get('sort')).toBe('created_asc');
+    expect(component.sessions().map((entry) => entry.session_id)).toEqual([1, 2]);
+    expect(fixture.nativeElement.querySelectorAll('.chip')).toHaveLength(2);
+    expect(listUrls).toHaveLength(requests);
   });
 
   it('shows status, progress and indicators on compact rows', async () => {
@@ -415,6 +397,8 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
       { ...sessionItem(3), status: 'queued', has_report: false },
     ];
     await create();
+    component.store.setFilters({ sort: 'created_asc' });
+    fixture.detectChanges();
 
     const rows = fixture.nativeElement.querySelectorAll('.clinical-session-row');
     expect(rows[0].textContent).toContain('Running');
