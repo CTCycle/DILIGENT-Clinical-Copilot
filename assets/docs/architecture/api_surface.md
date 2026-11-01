@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -24,7 +24,9 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 
 ## Session And Clinical Routes
 - `GET /api/health`
-- `GET /api/system/status` (non-cacheable, always HTTP 200: provider availability, Ollama reachability at the configured endpoint, and system-wide CPU, RAM and GPU VRAM; unavailable readings are `null`)
+- `GET /api/system/status` (non-cacheable, always HTTP 200: provider availability, Ollama reachability and `ollama_control` state/ownership, and system-wide CPU, RAM and GPU VRAM; unavailable readings are `null`)
+- `POST /api/system/ollama/start` (launches `ollama serve` on a loopback endpoint; HTTP 409 with a message when it cannot start)
+- `POST /api/system/ollama/stop` (stops only the process DILIGENT launched; HTTP 409 otherwise)
 - `GET /api/jobs` (non-cacheable summary of active and recent jobs for the global Jobs monitor)
 - `DELETE /api/jobs/{job_id}` (cooperative cancel; refused for `session_revision` and `session_timeline`, which are cancelled from their own pages)
 - `GET /api/clinical/section-template`
@@ -126,6 +128,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - `PUT /api/inspection/sessions/{session_id}`
 - `PUT /api/inspection/sessions/{session_id}/report`
 - `GET /api/inspection/sessions/{session_id}/manual-edits`
+- `GET|POST /api/inspection/sessions/{session_id}/attachments` and `GET|DELETE .../attachments/{attachment_id}` (base64 JSON upload, 10 MB limit, idempotent by content hash)
 - `POST /api/inspection/sessions/{session_id}/revision/jobs`
 - `GET /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}`
 - `POST /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry`

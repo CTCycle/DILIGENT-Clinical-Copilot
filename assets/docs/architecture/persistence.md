@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-10-30
+Last updated: 2026-11-01
 
 ## Relational Database
 
@@ -277,7 +277,8 @@ erDiagram
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
-- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`.
+- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`. One observation (marker, date, value, unit) is stored once even when several sections restate it; differing sources are kept as `source: merged` in the lab timeline. Migration `202611010001` collapsed previously duplicated rows.
+- Metadata-tab images, JSON and documents are stored as bytes in `clinical_session_attachments`, scoped to a session and its version (unique on session, version and SHA-256, so repeated uploads are idempotent) and removed with the session or version by cascade.
 - Access-key ciphertext remains in the database; versioned Fernet key material is stored in the protected `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - FDA DILIrank 2.0 rows are stored in `dilirank_records` as a source-complete snapshot. `ltkb_id` is unique. `drug_id` is nullable so unmatched or ambiguous FDA rows remain inspectable without inventing a canonical drug mapping. A linked row also receives a `drug_identifiers` entry using identifier system `dilirank_ltkb`.
