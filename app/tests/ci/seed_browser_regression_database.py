@@ -87,8 +87,12 @@ def seed_browser_regression_database() -> tuple[int, int]:
             "patient_name": SEED_PATIENT_NAME,
             "patient_visit_date": date(2026, 9, 29),
             "session_timestamp": SEED_TIMESTAMP,
-            "session_status": "successful",
+            "session_status": "completed",
             "session_kind": "browser_regression",
+            "clinical_input": (
+                "Synthetic browser regression session with a persisted timeline.\n\n"
+                "Amoxicillin 500 mg BID\n\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+            ),
             "anamnesis": "Synthetic browser regression session with a persisted timeline.",
             "drugs": "Amoxicillin 500 mg BID",
             "laboratory_analysis": "ALT 210 U/L; AST 180 U/L; ALP 130 U/L.",

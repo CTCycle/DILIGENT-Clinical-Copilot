@@ -9,7 +9,11 @@ from decimal import Decimal
 from playwright.sync_api import Page, expect
 
 OPERATIONAL_FIELDS = {
-    "general": ["polling_interval", "llm_output_token_limit"],
+    "general": [
+        "polling_interval",
+        "llm_output_token_limit",
+        "max_concurrent_clinical_jobs",
+    ],
     "data": [
         "drug_name_min_length",
         "drug_name_max_length",
@@ -566,7 +570,7 @@ def test_database_edits_wait_for_confirmation_and_failed_switch_rolls_back(
     failed_switch = switch_info.value
     assert failed_switch.status == 503
     assert _api_state(page, api_base_url, "/api/database/configuration") == initial
-    draft_read = page.request.get(f"{api_base_url}/api/clinical/draft")
-    assert draft_read.status == 200, draft_read.text()
-    assert draft_read.headers.get("cache-control") == "no-store"
+    # The previous database stays active and readable after the failed switch.
+    sessions_read = page.request.get(f"{api_base_url}/api/inspection/sessions?limit=1")
+    assert sessions_read.status == 200, sessions_read.text()
     expect(page.get_by_role("alert")).to_contain_text("A required service is unavailable")
