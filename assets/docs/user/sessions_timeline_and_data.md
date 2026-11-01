@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -62,19 +62,36 @@ the run's provider, model, date range, event count, and evidence-quality
 warnings. Use **Open** to reopen a specific saved timeline or **Delete** to
 remove only that saved timeline after confirmation.
 
-The timetable presents a vertical chronology grouped by canonical date so events on
-the same day remain readable without overlapping cards. Clinical, Medication,
-Laboratory, Uncertain, and Date not reported categories remain explicit through
-labels and category controls. Use its evidence filter, category collapse controls,
-dense/compact/comfortable density, and previous/next navigation to focus review.
-Selecting an event opens the desktop Event inspector. Approximate placement, a **Fallback chronology**, and **Missing
-source evidence** are visible warnings, not clinical confirmation.
+The timetable page has three panels: the generation summary (status, event count,
+events needing timing review, date coverage, model), and the **Clinical chronology**
+panel whose toolbar stays pinned while you scroll. The toolbar switches between two views:
 
-Use the help popover beside **Review controls** when the filter names need context. Evidence filters describe source support, density changes reading comfort, uncertain timing keeps approximate events visible, and **Inspect details** opens the event's source and confidence rationale. These controls do not alter the saved timeline.
+- **List** groups events by date (day, month-only, or year-only). Every event is a
+  one-line row with its category, title, and review flags; select a row to expand its
+  description, timing, precision and certainty, source, model confidence, verbatim source
+  evidence, review note, and linked events. Date groups collapse too, and the
+  **Date not reported** group starts collapsed. **Expand all** / **Collapse all** apply to
+  the visible events. Chips such as `+13 d` between groups show the gap between day-level dates.
+- **Timeline** shows the same dated groups as evenly spaced columns on a horizontally
+  scrollable track, with one lane per category (Clinical, Medications, Laboratory, Other)
+  and gap chips between columns. A bar under a lane marks a date range. Hollow markers are
+  month- or year-only dates; dashed borders mark uncertain or inferred timing. Select an
+  event to show its details below the track. Undated events are listed under the track.
+
+Category chips hide or show categories, **Show uncertain timing** hides approximate and
+undated events, and **Previous** / **Next** step through the visible events (Escape clears
+the selection). **Approximate**, **Inferred date**, a **Fallback chronology**, and
+**Missing evidence** are visible warnings, not clinical confirmation. These controls do
+not alter the saved timeline.
+
+An **Inferred date** is a date the model supplied that the quoted evidence does not state
+at that precision (for example a day derived from relative timing); its review note
+explains why. When the model's quoted evidence cannot be found in the session's clinical
+text, that event is discarded and the summary states how many events were discarded.
 
 Timeline generation may show a fallback notice when model extraction does not complete. For an explicitly selected OpenCode Go model, a temporary model-catalog outage does not prevent the known routed request from being attempted. The notice identifies the failure class, such as provider network unavailable, provider timeout, authentication rejected, rate limited, upstream error, invalid structured response, or incomplete configuration. Transient network, timeout, rate-limit, and upstream failures are retried with bounded backoff before fallback.
 
-Fallback events are built deterministically from persisted session fields. A source field contributes a date only when it contains exactly one distinct, valid ISO day, month, or year token; the fallback preserves that token's original precision and marks it explicit. Missing, invalid, relative, or ambiguous dates remain undated and uncertain. Fallback never infers an event date from the visit timestamp. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
+Fallback events are built deterministically from persisted session fields. A source field contributes a date only when it states exactly one distinct, valid calendar date (ISO, numeric such as `17.02.2025` in the record's day/month order, month-year, a written month name, or a year introduced by words such as "in" or "since"); doses and laboratory values are never read as dates, and the fallback preserves that token's original precision and marks it explicit. Missing, invalid, relative, or ambiguous dates remain undated and uncertain. Fallback never infers an event date from the visit timestamp. Treat fallback events as navigation aids rather than model-extracted chronology, then retry after correcting the reported condition.
 
 For LLM-generated timelines, events without preserved source evidence are not part of the persisted clinical chronology contract. In the UI, missing source evidence should be treated as a warning rather than as clinically grounded support.
 

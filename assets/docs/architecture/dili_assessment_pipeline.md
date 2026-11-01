@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-10-30
+Last updated: 2026-11-01
 
 ## Section Extraction Contract
 `POST /api/clinical/jobs` uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -361,9 +361,32 @@ explicit ULN is given. Range bounds and negative numbers are never emitted as
 values. Recognized units include U/L, µmol/L, µkat/L, mg/dL and g/L, and
 `Bil tot` is a total-bilirubin alias.
 
-LLM-generated timeline events require preserved source evidence to remain in the
-normalized event set. Events without source evidence are dropped rather than
-persisted as clinically grounded chronology.
+The timeline model receives only clinician-entered session text: `visit_date`,
+`anamnesis`, `drugs`, `laboratory_analysis`, and the parsed `sections`
+(`build_timeline_source` in `services/clinical/timeline.py`). Generated reports,
+pipeline artifacts, runtime settings, and the patient name are excluded, so model
+output can never be quoted back as evidence and no identity data reaches the provider.
+
+Every LLM-generated event must quote that scoped text verbatim (case and whitespace
+insensitive). Events with missing or unfound evidence are discarded individually and the
+timeline's `generation_note` states how many; only when nothing survives while clinical
+text exists does extraction fail into the deterministic fallback.
+
+Event dates are reconciled with the dates stated in the quoted evidence
+(`find_evidence_dates` in `domain/timeline_dates.py`: ISO, numeric dates in the record's
+date order, month-year, English/Italian/German/French month names, and bare years only
+with date context; a number followed by a unit is never a date):
+- a model date stated in the evidence at the same precision is `explicit`;
+- a conflicting model date on an explicitly dated event whose evidence states one date
+  is replaced by that date, with the correction recorded in `uncertainty_reason`;
+- any other model date (relative derivations, finer than the evidence, absent from it)
+  is kept as `inferred` with a reason; `date_precision` always follows the final token.
+
+After deduplication, event ids are made unique, links to merged duplicates are
+redirected to the surviving event, and self or unknown links are dropped. Events are
+ordered by start day, coarser precision first, then the model's narrative order, which
+also keeps undated events in source order. The job's overall timeout budgets every
+extractor attempt so retryable failures are actually retried.
 
 Deterministic fallback timeline events keep `timing_type="uncertain"` and do
 not reuse the patient visit date as an invented exact event date.

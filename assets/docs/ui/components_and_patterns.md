@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-10-27
+Last updated: 2026-11-01
 
 ## Page Layout Patterns
 - Primary route pages render inside the shared `.page-container` frame under the root shell. Keep the 59px navigation header and shared content origin stable; route components should not add duplicate outer gutters or independent page-width limits.
@@ -46,7 +46,7 @@ Last updated: 2026-10-27
 ### Tables And Scroll Areas
 - Keep fixed action-column sizing where needed.
 - Preserve bounded desktop overflow behavior for dense inspection views.
-- Patient Timeline filter selects use shared form-control sizing, theme surfaces, and visible focus treatment.
+- Patient Timeline separates its summary and chronology into bordered surface panels with a sticky chronology toolbar. Events are collapsed accordion rows (heading-wrapped buttons with `aria-expanded`) that expand on demand; the horizontal view is a scrollable grid of evenly spaced date columns with sticky category lanes, and both views share one event-details component.
 
 ## Component Usage Rules
 - Prefer shared sizing tokens before introducing new values:
