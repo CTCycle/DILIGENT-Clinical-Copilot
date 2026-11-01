@@ -32,16 +32,14 @@ erDiagram
         datetime session_timestamp
         string session_status
         string session_kind
-    }
-    CLINICAL_INPUT_DRAFTS {
-        int id PK
-        string draft_key
-        int revision
-        boolean is_active
-        string patient_name
-        date visit_date
         text clinical_input
+        string job_id
+        text run_request_json
+        string progress_stage
+        int state_version
+        datetime created_at
         datetime updated_at
+        datetime queued_at
     }
     CLINICAL_SESSION_RESULTS {
         int id PK
@@ -59,6 +57,7 @@ erDiagram
         int session_id FK
         datetime generated_at
         string generation_status
+        string source_text_hash
         json timeline_payload_json
     }
     CLINICAL_LAB_OBSERVATIONS {
@@ -247,7 +246,17 @@ erDiagram
 
 ## Persisted Clinical Session Contract
 
-- `clinical_sessions` is the source of truth for session records and metadata.
+- `clinical_sessions` is the source of truth for session records, metadata,
+  and the analysis lifecycle. `session_status` is one of `draft`, `queued`,
+  `running`, `completed`, `cancelled`, `failed` (CHECK-constrained). The row
+  exists from the first draft save or launch and owns the clinician-entered
+  `clinical_input`, the patient image, the frozen launch request
+  (`run_request_json`), the executing `job_id`, the last persisted progress
+  stage, the sanitized `error_json`, lifecycle timestamps, and a monotonic
+  `state_version` used as a compare-and-swap token for draft edits.
+- Drafts are ordinary sessions in `draft` status. Saving or editing a draft
+  never runs preflight, calls a model, or creates a job; launching moves the
+  same row into the queue. Draft writes require the last-read `updated_at`.
 - `clinical_session_versions` owns immutable version lineage, root-session relationships, version numbers, and manual edits.
 - Revision tables own the bounded revision workflow and canonical artifacts:
   `clinical_session_versions`, `clinical_session_revision_runs`,
@@ -255,7 +264,7 @@ erDiagram
   and `clinical_session_revision_reviews`.
 - Structured revision entities are stored as `structured_case_entity` rows in `clinical_session_revision_artifacts`.
 - Manual report edits create immutable `clinical_session_versions` rows with `revision_kind=manual_edit`.
-- Patient timeline history is persisted only in `clinical_session_timelines`; session result payloads are not a timeline read source.
+- Patient timeline history is persisted only in `clinical_session_timelines`; session result payloads are not a timeline read source. Each timeline stores the SHA-256 of the session input it was generated from (`source_text_hash`); a timeline whose hash differs from the current input is reported as stale, kept, and offered for regeneration.
 - Timeline generation metadata stays on persisted timeline records and does not rewrite original clinical-session runtime metadata.
 - Evidence-locked DILI artifacts in the database-backed session result payload are `normalized_document`, `extraction_artifact`, `fact_graph`, `faithfulness_audit`, generated report metadata, discrepancy report, and `dili_evidence_bundle_index`.
 - Successful clinical workflows require persistence. Repository failures, missing persisted IDs, and failed upserts are service dependency failures rather than silent in-memory success.
@@ -267,8 +276,7 @@ erDiagram
   Alembic head, and apply pending revisions before repositories or services run.
 - SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
 - Fresh databases are upgraded through the linear Alembic history before the
-  application starts. The current head is `202610290001` (drug terminology
-  resolution). The v2.4 baseline and revisions through `202610240001` remain
+  application starts. The current head is `202611010003` (session lifecycle). The v2.4 baseline and revisions through `202610240001` remain
   available, so databases from the v3.5.x releases upgrade to the head without
   losing user rows. Populated
   databases without an Alembic revision and databases with unknown or
@@ -286,27 +294,14 @@ erDiagram
 - Drug terminology (`drugs` concept types, `drug_aliases` validation status and provenance, `drug_concept_relations`, `drug_atc_codes`, `medicinal_products`, `medicinal_product_ingredients`, `terminology_conflicts`, `terminology_import_runs`, `drug_livertox_links`) is described in [drug_terminology.md](drug_terminology.md). Only `verified` and `confirmed` aliases resolve; reviewer decisions use alias source `reviewer` and survive every source refresh.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
 
-## Resumable Clinical Input Draft
+## Session Lifecycle Migration
 
-- `clinical_input_drafts` is a fixed-ID singleton for the DILI Agent's one
-  explicitly saved working draft. It is separate from clinical sessions,
-  reports, revisions, and job records.
-- The draft contains only patient name, visit date, and exact clinical input
-  text. Patient images and session configuration (evidence sources, model
-  overrides) are excluded; the session configuration is stored in the
-  clinical session's `metadata_json` and run snapshot.
-- Draft reads and writes use the active configured SQLite or PostgreSQL
-  database. The database can be remote when PostgreSQL is configured.
-- The browser does not store draft contents in `localStorage` or
-  `sessionStorage`. A read presents a recovery choice without automatically
-  replacing the in-memory form.
-- Saves use the server-issued UUID and monotonic revision as conditional-write
-  tokens. A token mismatch rejects the write, including when the active
-  database changed. Discard clears all patient fields and advances a
-  tombstone revision so delayed writes cannot restore deleted content.
-- Draft endpoints do not run preflight, call a model, create a job, or create a
-  clinical session. Submitting an assessment continues through the existing
-  clinical pipeline.
+Migration `202611010003` maps legacy `successful` (and unset) statuses to
+`completed`, keeps `failed`, backfills lifecycle timestamps from
+`session_timestamp`, and rebuilds `clinical_input` from the stored section
+text. The single legacy `clinical_input_drafts` row, when it held any content,
+becomes a `draft` session before that table is dropped. No legacy draft API or
+storage remains.
 
 ## Focused Repository Ownership
 

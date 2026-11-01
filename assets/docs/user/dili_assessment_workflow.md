@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-10-30
+Last updated: 2026-11-01
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -16,8 +16,7 @@ Typical input areas include:
 - timing information
 - notes or free-text clinical context
 - optional file upload where enabled
-- run or submit action
-- a live progress indicator and a **View report** link
+- **Save as draft** and **Run DILI analysis** actions
 
 On a first empty assessment, the page may show a small optional **Get started with DILI Agent** callout. Use **Show me** for the three-step tour of clinical input, patient name/date, and review/run, or use **Open Settings** to choose a runtime and the four role models. The tour can be closed with its X button and reopened from header **Help**.
 
@@ -75,36 +74,48 @@ until you select **Start analysis**.
 **Cancel** closes the dialog without starting and keeps your input; your
 choices are kept until the analysis starts or you select **Clear all**.
 
-While the analysis runs, the progress panel in the right column shows the
-current pipeline stage (for example *Normalizing drug names* or *Retrieving
-evidence*), the step number, the backend message, and the elapsed time. It
-stays visible when the clinical text is enlarged. DILI runs can take a long
-time; the browser request timeout is one hour and does not cancel the
-background job. **Stop analysis** requests cancellation.
+**Start analysis** saves the input as a session, queues the analysis, and opens
+that session's report page (`/report/:sessionId`). The DILI Agent page is then
+cleared and ready for the next patient: you can start further analyses while
+earlier ones keep running. Analyses run in the background up to the
+**Maximum concurrent DILI analyses** limit in Settings → General; additional
+analyses wait in a queue and start automatically, oldest first.
 
-Open **View report** at any time: while the job runs, the report page shows
-the same progress and fills in when the analysis completes.
+## Follow An Analysis On Its Report Page
 
-9. You may navigate to another page and return to the DILI Agent during the
-   same browser session; the in-memory page state remains available. A full
-   refresh resets input that was never saved as a draft. If an analysis is
-   active, the existing job tracker may reconnect to it after refresh; draft
-   recovery remains a separate action and does not start or reconnect a job.
+The report page is where an analysis is monitored and controlled. Its header
+stays visible while the page scrolls and shows the patient, the session
+status, and the actions that apply:
 
-## Save And Resume A Working Draft
+- **Queued**: the position in the queue. The analysis starts when a slot frees.
+- **Running**: the current pipeline stage (for example *Normalizing drug
+  names* or *Retrieving evidence*), the step, the backend message, and the
+  elapsed time.
+- **Cancel analysis** (queued or running) asks for confirmation. A queued
+  analysis is cancelled at once. A running one stops at its next safe step;
+  a model call already in progress finishes first, and the page says so.
+- **Completed**: the report, with **Copy** and **Download**.
+- **Failed** or **Cancelled**: the reason, and any report produced before the
+  stop. *Interrupted* means the application stopped while the analysis ran; it
+  is not restarted automatically.
 
-Use **Save draft** when you want to keep an unfinished DILI Agent input. The
-first save is explicit; after it succeeds, later edits autosave. On a later
-visit, choose **Resume** to restore the saved patient name, visit date, and
-exact clinical text. The draft is not an assessment, clinical
-session, report, or approval, and Resume does not run preflight or start a job.
+A collapsible **Clinical input** section shows exactly what was submitted.
+You can leave the page, refresh, or close the browser: reopening the report
+(or the session in Clinical Sessions) reconnects to the live progress.
 
-Drafts are stored in the currently configured SQLite or PostgreSQL database.
-PostgreSQL may be on another machine. Draft content is not stored in browser
-storage. Patient images are excluded, so select the optional image again after
-resuming. **Discard** removes the saved draft; **Clear all** also clears the
-current form. Both ask for confirmation. An unsaved initial form still resets
-on refresh by design.
+## Save And Reopen A Draft
+
+Use **Save as draft** to keep an unfinished input without running anything.
+The draft is a session with status *Draft*; later saves update the same
+session, and the page shows when it was last saved or that there are unsaved
+changes. Reopen a draft from **Clinical Sessions** → **Edit draft**; the page
+address keeps the draft open after a refresh. Launching a draft turns that
+same session into the analysis, so no duplicate is created. A draft can also
+generate a Patient Timeline without running the analysis.
+
+Drafts, like all sessions, are stored in the configured SQLite or PostgreSQL
+database, not in browser storage. An input that was never saved is lost on
+refresh.
 
 Expected result:
 - the application submits structured clinical input and the session
@@ -132,11 +143,11 @@ If the run fails:
 - review backend console output for structured errors
 
 ## Review The Generated Report
-Reports open on a dedicated page (**View report** in the workspace, or
-**Open report** from a saved session in Clinical Sessions, `/report/:sessionId`).
-The header shows the patient, visit date, evidence sources, and models used
-(session overrides are tagged). **Back to workspace** returns to the
-unchanged input.
+Reports open on their session's page (`/report/:sessionId`), reached
+automatically after **Start analysis** or through **Open report** in Clinical
+Sessions. The header shows the patient, visit date, evidence sources, and
+models used (session overrides are tagged). **← Clinical Sessions** returns to
+the session list.
 
 Treat the report as a decision-support draft, not a final diagnosis.
 

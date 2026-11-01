@@ -28,17 +28,17 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `POST /api/system/ollama/start` (launches `ollama serve` on a loopback endpoint; HTTP 409 with a message when it cannot start)
 - `POST /api/system/ollama/stop` (stops only the process DILIGENT launched; HTTP 409 otherwise)
 - `GET /api/jobs` (non-cacheable summary of active and recent jobs for the global Jobs monitor)
-- `DELETE /api/jobs/{job_id}` (cooperative cancel; refused for `session_revision` and `session_timeline`, which are cancelled from their own pages)
+- `DELETE /api/jobs/{job_id}` (cooperative cancel; refused for `session_revision` and `session_timeline`, which are cancelled from their own pages). Clinical rows carry `session_id`.
 - `GET /api/clinical/section-template`
-- `GET /api/clinical/draft`
-- `PUT /api/clinical/draft`
-- `DELETE /api/clinical/draft?expected_revision={n}&expected_draft_key={uuid}`
 - `POST /api/clinical/validate-input`
-- `POST /api/clinical/jobs`
-- `GET /api/clinical/jobs/{job_id}`
-- `DELETE /api/clinical/jobs/{job_id}`
+- `POST /api/clinical/sessions` (create a `draft` session; 201)
+- `GET /api/clinical/sessions/{session_id}/input`
+- `PUT /api/clinical/sessions/{session_id}/input` (draft only; `expected_updated_at` token)
+- `POST /api/clinical/sessions/{session_id}/launch` (draft → queued; 202)
+- `GET /api/clinical/sessions/{session_id}/status`
+- `POST /api/clinical/sessions/{session_id}/cancel`
 
-`POST /api/clinical/validate-input` and `POST /api/clinical/jobs` accept the
+`POST /api/clinical/validate-input` and `POST .../launch` accept the
 same session configuration:
 
 - `evidence_sources`: any of `livertox`, `dilirank`, `documents` (the indexed
@@ -57,22 +57,28 @@ an `evidence_sources` list (`source`, `label`, `selected`, `available`,
 non-blocking `dilirank_unavailable`; an invalid override is the blocking
 `session_model_unavailable` (field `model_overrides`).
 
-Clinical job results expose the current pipeline step key in
-`result.progress_stage` (for example `drugs.resolving`,
-`evidence_lookup.selected`, `evidence_lookup.llm_only`) alongside
-`progress_message`; `GET /api/jobs` maps it to the job summary `phase`.
+Every lifecycle route returns `ClinicalSessionState`: `session_id`, `status`
+(`draft|queued|running|completed|cancelled|failed`), patient name and visit
+date, `created_at`/`updated_at`/`queued_at`/`started_at`/`finished_at`,
+`queue_position` (queued only), `progress` (null = indeterminate),
+`progress_stage` (canonical step key such as `drugs.resolving` or
+`report.generating`), `progress_message`, `stop_requested`, `error`
+(`{code, message}`; `interrupted` marks a run stopped by an application
+shutdown), `has_report`, a monotonic `version`, and `poll_interval`. Clients
+poll only `/status`; there are no clinical job ids on the frontend.
 
-The draft routes persist one opt-in DILI Agent working draft in the active
-configured database. `PUT` requires `expected_revision`, `expected_draft_key`,
-and a form containing only `patient_name`, `visit_date`, and
-`clinical_input`. The text is preserved as submitted and is limited to 100,000
-characters. `GET` and successful writes return a snapshot with the UUID,
-revision, update time, and form (null when no recoverable draft exists).
-`DELETE` uses the revision and optional UUID as compare-and-swap tokens, clears
-patient fields, and returns a tombstone. Stale tokens return `409`; validation
-failures return a generic `422`; unavailable persistence returns `503`. Every
-draft response uses `Cache-Control: no-store`, and draft validation errors do
-not echo submitted data.
+- Draft input is created and edited without preflight or model calls. Edits
+  require the `updated_at` the client last read and return `409` when the
+  session is no longer a draft or the token is stale.
+- `launch` runs the same launch checks as before (overrides, provider key,
+  catalogs, sections, RAG readiness). Failures return `4xx` and leave the
+  draft unchanged; a session that is no longer a draft returns `409`, so a
+  repeated request can never start a second analysis.
+- `cancel` makes a queued session `cancelled` at once. A running session keeps
+  `running` with `stop_requested: true` until its worker exits, then becomes
+  `cancelled`. Drafts and terminal sessions return `409`.
+- Responses use `Cache-Control: no-store`; validation errors on these routes
+  do not echo submitted clinical text.
 
 ## Model Catalog And Pull Routes
 - `GET /api/models/list`
@@ -121,7 +127,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 
 ## Inspection Routes
 - `GET /api/inspection/jobs`
-- `GET /api/inspection/sessions`
+- `GET /api/inspection/sessions` (`status` is any lifecycle status; `sort` is `updated_desc` (default), `created_desc` or `created_asc`; the date filter applies to the creation date)
 - `GET /api/inspection/sessions/{session_id}`
 - `GET /api/inspection/sessions/{session_id}/versions`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}`
@@ -199,7 +205,15 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
   `force_regenerate` and returns a job for polling. The job resolves the
   persisted `timeline_model` role at start; provider/model controls are managed
   from Settings → Models. Timeline previews include source-evidence,
-  missing-evidence, uncertain, and undated counts.
+  missing-evidence, uncertain, and undated counts, plus `is_stale` when the
+  session input changed after generation. Drafts can generate timelines from
+  the deterministic section split of their input; this never changes the
+  session status. A non-forced request reuses the latest timeline only while
+  it is current. Timeline job status and cancel resolve only for the job's own
+  session (admission scope `session_timeline:{session_id}`).
+- `DELETE /api/inspection/sessions/{session_id}` returns 409 while the session
+  is queued or running. Revision jobs and manual report edits return 409 until
+  the session has a report.
 - Timeline deletion is scoped by both session and timeline identifiers and returns 404
   when that exact persisted timeline does not exist.
 - Clinical and inspection workflows rely on job polling for long-running work.

@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-10-29
+Last updated: 2026-11-01
 
 ## Scope
 
@@ -55,7 +55,7 @@ are defined by typed application models.
 
 | Category | Ownership | Controls |
 | --- | --- | --- |
-| General | Jobs | Polling interval and the LLM output token limit (reasoning tokens count toward it) |
+| General | Jobs | Polling interval, the LLM output token limit (reasoning tokens count toward it), and the maximum concurrent DILI analyses (1-8, default 2; enforced by the backend scheduler, applied to new starts without a restart) |
 | Models | Application configuration | Provider, access-key workflow, model roles, reasoning, and the complete RAG payload |
 | Data Processing | Ingestion, session pipeline, language detection | Drug-name limits, batch/concurrency limits, and clinical language thresholds |
 | Integrations | Runtime integrations | NCBI/LiverTox contact and download/archive/worker controls, RxNav request timeout, terminology download timeout, and the DrugCentral (connection), ChEMBL (clinical phase), and Swissmedic source switches |

@@ -9,12 +9,21 @@ The selected session's tabs have contextual help that changes with the selected 
 attached evidence and JSON, **Revision** creates a new draft, and **Timeline**
 manages generated chronologies.
 
-Expected capabilities:
-- view a list of sessions
-- select a session
-- review session metadata
-- review generated content
-- filter or refresh records where supported
+Clinical Sessions lists every session in one place: drafts, queued and
+running analyses, completed reports, and cancelled or failed analyses. Each
+row shows the patient or session number, its status, when it was created and
+last updated, a thin progress bar while it is active, and whether a report or
+timeline exists. Filter by status, sort by last update or creation date, and
+search by patient or content. The list refreshes itself while any analysis is
+active; the selected session and tab stay in the address, so refresh and Back
+keep your place.
+
+- **Open report** shows a running analysis with live progress, or a finished
+  report.
+- **Edit draft** reopens a draft in the DILI Agent; launch it from there.
+- Cancelled and failed sessions keep their input and any partial report.
+- Queued or running sessions cannot be deleted; cancel them first.
+- Revisions and manual report edits are available once a report exists.
 
 Recommended workflow:
 1. Open **Clinical Sessions**.
@@ -52,6 +61,11 @@ Recommended workflow:
 4. Generate a new timeline when needed from the session timeline workspace.
 5. Reopen any previously generated timeline from the saved timeline preview list instead of regenerating it.
 6. Review timeline entries in chronological order.
+
+Timelines belong to exactly one session. A draft can generate a timeline from
+its input without running the DILI analysis, and its status stays *Draft*. If
+the input changes after a timeline was generated, the timeline is kept and
+marked as out of date with a **Regenerate** action.
 7. Compare exposure dates against lab abnormalities and symptoms.
 8. Use the timeline to refine DILI Agent input if needed.
 

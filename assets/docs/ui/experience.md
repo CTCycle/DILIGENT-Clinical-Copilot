@@ -1,10 +1,10 @@
 # Experience
-Last updated: 2026-10-30
+Last updated: 2026-11-01
 
 ## Page Structure
 - Routes:
-  - `/` for DILI analysis
-  - `/report` for the active DILI report and `/report/:sessionId` for a saved session's report
+  - `/` for creating a DILI session (`/?session=:id` reopens a draft)
+  - `/report/:sessionId` for a session's execution and report view
   - `/clinical-sessions` for Clinical Sessions
   - `/data` for Knowledge
   - `/settings` (and `/settings/models` for model configuration)
@@ -21,6 +21,10 @@ Last updated: 2026-10-30
 - Use clear user-safe messages from centralized API error normalization.
 - Always provide explicit loading and empty-state messaging.
 - Keep job terminal states explicit: `completed`, `failed`, `cancelled`.
+- Session lifecycle states (`draft`, `queued`, `running`, `completed`,
+  `cancelled`, `failed`) use one shared label and status-chip vocabulary on the
+  report header, the Clinical Sessions list, and the Jobs monitor. The backend
+  status is authoritative; the client never infers progress it was not given.
 
 ## Clinical Sessions UX Rules
 - Session detail is the canonical UI surface for report preview, parser output, metadata, revision audit, and timeline entry points.
@@ -35,40 +39,37 @@ Last updated: 2026-10-30
 - Access-key dialogs keep new keys inactive until explicit activation and expose only masked fingerprints after storage.
 
 ## DILI Agent Workspace
-- The workspace is a single-screen two-column layout: the clinical text on the
-  left fills the viewport height (no fixed heights) and keeps vertical resize;
-  enlarging it lets the page scroll naturally, with no nested scroll area.
-- The right column is sticky and holds patient details, the analysis progress
-  panel, Run/Stop, Clear all, a discreet **View report** link, and draft
-  recovery. Textarea resizing can never push the progress panel out of view.
-- The report canvas is not on the workspace; reports live on `/report`, which
-  reuses the shared report viewer (Copy, Expand, Download) and handles empty,
-  running, failed, cancelled, and completed states.
-- Progress maps backend `progress_stage` keys to eight stages and shows a
-  determinate bar driven by backend progress without a numeric percentage
-  (checkpoint weights are not time-proportional). Stage changes are announced
-  through a polite live region.
+- The workspace creates sessions. It is a single-screen two-column layout:
+  the clinical text on the left fills the viewport height (no fixed heights)
+  and keeps vertical resize; enlarging it lets the page scroll naturally, with
+  no nested scroll area.
+- The right column holds patient details, **Save as draft** with its saved /
+  unsaved state, **Run DILI analysis**, and Clear all. It carries no job
+  progress: execution lives on the report page.
 - **Run DILI analysis** opens the pre-run setup dialog (Preflight, Evidence
   Sources, Models, Review) built on the shared modal shell, with a step list
   using `aria-current="step"`; later steps are disabled while preflight
-  blocks.
+  blocks. **Start analysis** persists the input, launches the session,
+  navigates to `/report/:sessionId`, and only then resets the form, so the
+  workspace is immediately reusable for another session.
+- A draft opened from Clinical Sessions is addressed by `/?session=:id`;
+  saving updates that same session and a stale or no-longer-draft save is
+  reported as a conflict instead of overwriting.
 
-## DILI Agent Draft Recovery
-- Saving is explicit the first time. Only after a successful Save draft, or an
-  explicit Resume, do later form changes autosave after a short debounce.
-- A saved draft appears in a non-modal recovery banner and is never applied
-  automatically. Resume restores patient name, visit date, and clinical text;
-  it clears the image and tells the user to select it again.
-- Resuming over different current input requires confirmation. Resume is
-  disabled while an analysis job is active and does not start or replace a job.
-- Save state is announced through a polite live region. Unsaved changes,
-  failures, and stale-draft/database conflicts remain visible; conflicts pause
-  autosave until the user reloads the saved version.
-- Discard and Clear all confirm before deleting a saved draft. A failed delete
-  leaves the current input intact. Keep the recovery and confirmation controls
-  keyboard reachable with the shared visible focus treatment.
-- Draft contents live in the configured database and are not written to
-  browser storage. Patient images are not part of a draft.
+## Report Page
+- The report page is the execution interface for one session. Its header is
+  sticky (title, status chip, contextual actions) and the page scrolls
+  naturally without nested scroll containers.
+- Queued sessions show their queue position; running sessions reuse the
+  analysis progress component, which maps backend `progress_stage` keys to
+  eight stages with a determinate bar driven by backend progress and no
+  numeric percentage. Stage changes are announced through a polite live region.
+- **Cancel analysis** uses one inline confirmation. After a stop request the
+  header says it is stopping after the current step; it never claims an
+  in-flight model call has been aborted.
+- Completed, failed, cancelled, and interrupted states are explicit; a partial
+  report is shown when one exists. Copy and Download stay compact in the
+  header. The original input is in a collapsible **Clinical input** section.
 
 ## Desktop viewport
 - DILIGENT is a desktop application delivered through web technologies.

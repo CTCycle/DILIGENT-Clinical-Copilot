@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-10-29
+Last updated: 2026-11-01
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -43,7 +43,7 @@ stateDiagram-v2
 
 ## Execution Behavior
 - Jobs run in daemon threads.
-- Job execution state is process-local. Clinical and update job ids are not durable across backend restarts.
+- Job execution state is process-local. Update job ids are not durable across backend restarts. Clinical analyses are durable as persisted session lifecycle rows (see below); their job ids are internal.
 - Revision runs are persisted separately from the in-memory job state; startup reconciliation marks stale `running` revision runs as failed/recoverable when no in-process worker can own them.
 - `start_job` can auto-inject `job_id` into runners.
 - `update_result` merges interim patches with final payload.
@@ -51,10 +51,10 @@ stateDiagram-v2
 - Detailed exception traces remain in server logs only.
 
 ## Active Job Types
-- `clinical`
+- `clinical` (one job per admitted session, scope `clinical:{session_id}`)
   - Preflight: `POST /api/clinical/validate-input`
-  - Start: `POST /api/clinical/jobs`
-  - Poll or cancel: `GET|DELETE /api/clinical/jobs/{job_id}`
+  - Launch: `POST /api/clinical/sessions/{session_id}/launch`
+  - Poll or cancel: `GET .../status`, `POST .../cancel`
 - `ollama_pull`
   - Start: `POST /api/models/pull/jobs`
   - Poll or cancel: `GET|DELETE /api/models/jobs/{job_id}`
@@ -106,16 +106,13 @@ Additional rules:
 - Clinical and session revision jobs must persist their successful result payloads before returning completion. Persistence failures move the job to failed state with sanitized error metadata.
 
 Frontend polling is implemented through the shared
-`app/client/src/app/core/services/job-polling.service.ts`, with feature trackers
-such as `dili-job-tracker.service.ts` interpreting status and progress. Active
-DILI job linkage is persisted in local storage so the UI can reattach after
-route navigation, page refresh, or browser close/reopen while the backend
-worker is still running. Clinical status requests use the global one-hour HTTP
-timeout; the request timeout is independent from the worker duration because
-polling does not execute the clinical job inline.
+`app/client/src/app/core/services/job-polling.service.ts`. The DILI report page
+polls its session's `/status`; the URL `/report/:sessionId` is the only
+reattach mechanism, so navigation, refresh, and browser restarts reconnect to
+the backend-authoritative state without browser storage.
 
 ## Global Jobs Monitor
-`GET /api/jobs` (`api/jobs.py`) returns every active job plus the 20 most recent terminal jobs as `JobSummary` rows: wall-clock `started_at`/`finished_at` (derived from the manager's monotonic timestamps), `phase` and `message` taken from the job `result` (`phase`/`stage`, `progress_message`), and `cancellable`. `progress` is `null` until a worker reports a positive value, so clients render an indeterminate bar rather than a fabricated percentage. The Angular `JobMonitorService` polls it every 2 s while jobs are active or the header panel is open, every 10 s otherwise, pauses while the tab is hidden, and backs off after failures. Job state is in memory, so the list is empty after a backend restart. There is no retry action: a retry is a fresh start request from the owning page.
+`GET /api/jobs` (`api/jobs.py`) returns every active job plus the 20 most recent terminal jobs as `JobSummary` rows: wall-clock `started_at`/`finished_at` (derived from the manager's monotonic timestamps), `phase` and `message` taken from the job `result` (`phase`/`stage`, `progress_message`), `cancellable`, and, for clinical jobs, the owning `session_id` (the monitor links the row to its report). `progress` is `null` until a worker reports a positive value, so clients render an indeterminate bar rather than a fabricated percentage. The Angular `JobMonitorService` polls it every 2 s while jobs are active or the header panel is open, every 10 s otherwise, pauses while the tab is hidden, and backs off after failures. Job state is in memory, so the list is empty after a backend restart. There is no retry action: a retry is a fresh start request from the owning page.
 
 ## Shutdown
 On application shutdown the lifespan stops new jobs, requests cooperative stops, and joins workers for up to 5 s off the event loop. Workers that outlive the join are abandoned with the process; any `running` revision runs are then marked `failed` with a shutdown-specific message (never `completed`), the embedding runtime is closed, and the database engine is disposed. Job state itself is in memory.
@@ -130,16 +127,68 @@ On application shutdown the lifespan stops new jobs, requests cooperative stops,
 
 If a runner does not check stop requests, cancellation is delayed.
 
-## Clinical Job Notes
-- Clinical jobs run input preflight before job creation.
-- Clinical assessment concurrency is explicitly scoped as `clinical:global`.
-- Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts, while unrelated root sessions can follow their configured policy independently.
-- Structured catalog update concurrency uses one shared catalog scope, so individual RxNav, LiverTox, terminology, DILIrank, and combined jobs cannot overlap while shared identity data are changing.
+## Clinical Session Lifecycle
+
+DILI analyses are persisted sessions. `clinical_sessions.session_status` is the
+single authoritative lifecycle; `JobManager` only executes admitted sessions.
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft: create
+    draft --> draft: edit input
+    draft --> queued: launch (validated)
+    queued --> running: scheduler claim
+    queued --> cancelled: cancel
+    running --> completed: report persisted
+    running --> failed: error, soft-fail gate, or interrupted
+    running --> cancelled: worker exits after stop request
+    completed --> [*]
+    failed --> [*]
+    cancelled --> [*]
+```
+
+- Every transition is a guarded conditional `UPDATE` (`transition_session`,
+  `launch_draft`, `claim_next_queued`, `complete_clinical_session`), so a
+  repeated launch or a racing dispatcher cannot start a session twice.
+  Terminal states never transition again.
+- **Queue and admission.** Queued rows, ordered by `queued_at`, are the queue.
+  `ClinicalSessionScheduler` (`services/session/scheduler.py`) claims the
+  oldest queued row while fewer than `jobs.max_concurrent_clinical_jobs`
+  sessions are `running`, then starts its `clinical` job. `dispatch()` runs
+  after a launch, after every worker exit, after a General settings save, at
+  startup, and after a database switch. Lowering the limit never stops running
+  work; it only gates new starts.
+- **Launch.** Launch-time checks are unchanged (overrides, provider key,
+  catalogs, sections, RAG readiness). The validated request and the frozen
+  runtime snapshot are stored in `run_request_json`, so settings edits made
+  while a session waits do not alter it. The worker re-runs the deterministic
+  input preparation before the pipeline.
+- **Isolation.** Each run builds its own `ClinicalSessionService`. Extractors
+  hold event-loop-bound LLM clients and per-run diagnostics; sharing them
+  between concurrent runs would close or corrupt another run's clients. The
+  final save updates the session's own row (`complete_clinical_session`).
+- **Progress.** Each stage change is written to the row (`progress_stage`,
+  `progress_percent`, `progress_message`); finer progress stays in memory and
+  is merged into `/status` while the worker is alive.
+- **Cancellation** is cooperative. A queued session is cancelled immediately.
+  A running one keeps `running` with `stop_requested` until the worker reaches
+  a checkpoint; an in-flight provider call is not aborted. Its capacity slot
+  stays occupied until then.
+- **Failure.** Failed runs persist the sanitized `error` (`clinical_job_failed`
+  or `validation_failed`) and the existing failure payload. The session keeps
+  its clinician-entered input; intermediate extraction artifacts are not
+  persisted mid-run.
+- **Shutdown and recovery.** A stop caused by shutdown is not a user
+  cancellation: the worker persists `failed` with error code `interrupted`.
+  Workers that outlive the shutdown join are failed the same way, and startup
+  reconciles any remaining `running` row without a live worker. Queued sessions
+  never started, so they stay queued and are admitted after startup.
+- A database switch is refused while sessions are queued or running.
 - Completed results include database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`.
-- These artifacts are persisted through the clinical session result payload rather than loose files.
-- Failed clinical results omit raw anamnesis, drug text, laboratory text, and patient image base64 content. Failure payloads expose generic error text plus `failure_metadata` for diagnostics.
 - DILI sessions perform deterministic section validation before clinical extraction and may parallelize parser-model extraction only when parser batch preflight marks concurrency as safe; otherwise the workflow falls back to sequential execution.
 - DILI LiverTox/evidence preparation has a hard bounded timeout. Timeout records a sanitized timeout warning and continues without prepared evidence; it must not be reported as an unavailable or empty knowledge base. RAG-off progress explicitly states that vector retrieval is disabled.
+- Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts.
+- Structured catalog update concurrency uses one shared catalog scope, so individual RxNav, LiverTox, terminology, DILIrank, and combined jobs cannot overlap while shared identity data are changing.
 
 ## New Job Checklist
 1. Add a runner function returning `dict[str, Any]`.
