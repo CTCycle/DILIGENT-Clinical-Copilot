@@ -47,9 +47,8 @@ export class ClinicalSessionDraftService {
       form: {
         patientName: input.patient_name ?? '',
         visitDate: input.visit_date ?? '',
-        patientImageDataUrl: input.patient_image_base64
-          ? `data:image/png;base64,${input.patient_image_base64}`
-          : null,
+        // The backend returns the stored image as a complete data URL.
+        patientImageDataUrl: input.patient_image_base64,
         clinicalInput: input.clinical_input,
       },
       draftSessionId: input.session_id,
