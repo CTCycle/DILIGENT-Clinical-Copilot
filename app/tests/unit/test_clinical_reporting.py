@@ -14,6 +14,8 @@ from services.clinical.report_language import phrase, report_heading, resolve_re
 from services.clinical.validation import build_validation_bundle
 from services.session.session_shared import NarrativeBuilder
 
+
+###############################################################################
 def test_italian_input_yields_italian_language_detection_and_messages() -> None:
     payload = PatientData(
         anamnesis="Paziente con ittero e dolore addominale.",
@@ -25,6 +27,8 @@ def test_italian_input_yields_italian_language_detection_and_messages() -> None:
     bundle = build_validation_bundle(detected.report_language)
     assert bundle.missing_anamnesis.startswith("Fornire")
 
+
+###############################################################################
 def test_english_input_yields_english_output_bundle() -> None:
     payload = PatientData(
         anamnesis="Patient with jaundice and dark urine.",
@@ -36,6 +40,8 @@ def test_english_input_yields_english_output_bundle() -> None:
     bundle = build_validation_bundle(detected.report_language)
     assert bundle.missing_visit_date.startswith("Provide")
 
+
+###############################################################################
 def test_mixed_input_prefers_dominant_section() -> None:
     payload = PatientData(
         anamnesis="Paziente con anamnesi positiva per steatosi epatica e ittero.",
@@ -45,6 +51,8 @@ def test_mixed_input_prefers_dominant_section() -> None:
     detected = detect_clinical_language(payload)
     assert detected.report_language == "it"
 
+
+###############################################################################
 def test_narrative_builder_does_not_force_english_for_italian() -> None:
     report = NarrativeBuilder.build_patient_narrative(
         patient_label="Mario Rossi",
@@ -62,6 +70,8 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
     assert "# Sintesi Visita Clinica" in report
     assert "## Report Clinico" in report
 
+
+###############################################################################
 def test_narrative_builder_combines_pipeline_and_rucam_warnings() -> None:
     report = NarrativeBuilder.build_patient_narrative(
         patient_label="Patient",
@@ -100,6 +110,8 @@ def test_narrative_builder_combines_pipeline_and_rucam_warnings() -> None:
     assert "RxNav alias was not validated" in report
     assert "Structured RUCAM classifies levothyroxine as excluded" in report
 
+
+###############################################################################
 def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
     rendered = ReportFinalizer().render_matched_drug_section(
         DrugClinicalAssessment(
@@ -125,6 +137,8 @@ def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
     assert rendered.index("**Commento clinico**") < rendered.index("**RUCAM**")
     assert rendered.index("**RUCAM**") < rendered.index("**Report**")
 
+
+###############################################################################
 def test_report_heading_labels_exist_in_selected_language() -> None:
     assert report_heading("report_section_summary", "it")
     assert report_heading("report_section_per_drug", "it")
@@ -133,6 +147,8 @@ def test_report_heading_labels_exist_in_selected_language() -> None:
     assert phrase("laboratory_history", "en")
     assert phrase("not_calculated_insufficient_data", "en")
 
+
+###############################################################################
 def test_missing_data_labels_are_stable() -> None:
     assert phrase("not_available", "en") == "not available"
     assert phrase("none", "en") == "None"
@@ -144,6 +160,8 @@ def test_missing_data_labels_are_stable() -> None:
     )
     assert "RUCAM" in rucam_summary_text(assessment, "en")
 
+
+###############################################################################
 def test_deterministic_laboratory_section_rendering() -> None:
     finalizer = ReportFinalizer()
     section = finalizer.render_laboratory_section(
@@ -162,6 +180,8 @@ def test_deterministic_laboratory_section_rendering() -> None:
     assert "## Laboratory history" in section
     assert "ALT: 210.0 U/L" in section
 
+
+###############################################################################
 def test_deterministic_bibliography_section_rendering() -> None:
     finalizer = ReportFinalizer()
     section = finalizer.render_bibliography_section(
@@ -177,6 +197,8 @@ def test_deterministic_bibliography_section_rendering() -> None:
     assert "## Bibliography" in section
     assert "Amoxicillin" in section
 
+
+###############################################################################
 def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
     finalizer = ReportFinalizer()
     section = finalizer.build_rag_bibliography_section(
@@ -209,6 +231,8 @@ def test_rag_bibliography_section_deduplicates_and_merges_ranges() -> None:
     assert "## Bibliography" in section
     assert "- alpha.pdf, pp. 2-4, 7" in section
 
+
+###############################################################################
 def test_rag_bibliography_uses_location_not_available_when_missing() -> None:
     finalizer = ReportFinalizer()
     section = finalizer.build_rag_bibliography_section(
@@ -226,6 +250,8 @@ def test_rag_bibliography_uses_location_not_available_when_missing() -> None:
     assert section is not None
     assert "- alpha.pdf, location not available" in section
 
+
+###############################################################################
 def test_rag_bibliography_omits_raw_retrieved_text() -> None:
     finalizer = ReportFinalizer()
     entry = DrugClinicalAssessment(
@@ -244,6 +270,8 @@ def test_rag_bibliography_omits_raw_retrieved_text() -> None:
     assert "Raw retrieved text" not in section
     assert "- alpha.pdf, p. 9" in section
 
+
+###############################################################################
 def test_rag_bibliography_absent_when_no_references_exist() -> None:
     finalizer = ReportFinalizer()
     section = finalizer.build_rag_bibliography_section(
@@ -253,6 +281,8 @@ def test_rag_bibliography_absent_when_no_references_exist() -> None:
 
     assert section is None
 
+
+###############################################################################
 def test_required_phrase_keys_exist_for_supported_languages() -> None:
     keys = {
         "rucam_source_reported",
@@ -276,6 +306,8 @@ def test_required_phrase_keys_exist_for_supported_languages() -> None:
             else:
                 assert phrase(key, lang)
 
+
+###############################################################################
 def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
     assessment = DrugRucamAssessment(
         drug_name="A",
@@ -288,18 +320,26 @@ def test_rucam_summary_text_returns_localized_or_safe_text() -> None:
         text = rucam_summary_text(assessment, lang)
         assert "6" in text
 
+
+###############################################################################
 def test_unsupported_language_code_resolves_to_english() -> None:
     assert resolve_report_language("xx") == "en"
 
+
+###############################################################################
 def test_portuguese_is_renderable_but_not_deterministically_detectable() -> None:
     assert resolve_supported_language_code("pt-BR") == "pt"
     assert "pt" in SUPPORTED_REPORT_LANGUAGES
     assert "pt" not in DETECTABLE_REPORT_LANGUAGES
 
+
+###############################################################################
 def test_missing_phrase_key_raises_deterministic_error() -> None:
     with pytest.raises(KeyError):
         phrase("missing_key", "en")
 
+
+###############################################################################
 def test_material_report_language_detection_executes_for_non_english() -> None:
     assert is_materially_in_report_language(
         "La valutazione clinica richiede monitoraggio epatico.", "it"

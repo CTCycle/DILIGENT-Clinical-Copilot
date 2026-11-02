@@ -12,9 +12,11 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import APIRequestContext
 
+
 ###############################################################################
 def repeated_words(count: int) -> str:
     return " ".join(f"clinicalword{i}" for i in range(count))
+
 
 ###############################################################################
 def build_minimal_payload() -> dict:
@@ -32,6 +34,7 @@ def build_minimal_payload() -> dict:
         "selected_model_providers": ["openai"],
     }
 
+
 ###############################################################################
 @pytest.fixture
 def draft_session_id(api_context: APIRequestContext) -> Iterator[int]:
@@ -48,6 +51,7 @@ def draft_session_id(api_context: APIRequestContext) -> Iterator[int]:
     yield session_id
     api_context.delete(f"/api/inspection/sessions/{session_id}")
 
+
 ###############################################################################
 def _assert_launch_rejected(
     api_context: APIRequestContext, session_id: int, payload: dict, message: str
@@ -58,11 +62,13 @@ def _assert_launch_rejected(
     status = api_context.get(f"/api/clinical/sessions/{session_id}/status").json()
     assert status["status"] == "draft"
 
+
 ###############################################################################
 def test_clinical_requires_sections(api_context: APIRequestContext, draft_session_id: int):
     _assert_launch_rejected(
         api_context, draft_session_id, {"name": "Test"}, "Clinical input is required."
     )
+
 
 ###############################################################################
 def test_clinical_validate_input_returns_deterministic_diagnostics(
@@ -78,6 +84,7 @@ def test_clinical_validate_input_returns_deterministic_diagnostics(
     assert not codes & {"livertox_catalog_empty", "rxnav_catalog_empty"}
     assert payload["deterministic_diagnostics"]["therapy"]["drug_count"] >= 1
 
+
 ###############################################################################
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     payload = build_minimal_payload()
@@ -85,6 +92,7 @@ def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     response = api_context.post("/api/clinical/validate-input", data=payload)
     assert response.status == 200
     assert "deterministic_diagnostics" in response.json()
+
 
 ###############################################################################
 def test_clinical_rejects_empty_provider_selection(
@@ -96,6 +104,7 @@ def test_clinical_rejects_empty_provider_selection(
     _assert_launch_rejected(
         api_context, draft_session_id, payload, "At least one model provider must be selected."
     )
+
 
 ###############################################################################
 def test_clinical_requires_visit_date(api_context: APIRequestContext, draft_session_id: int):

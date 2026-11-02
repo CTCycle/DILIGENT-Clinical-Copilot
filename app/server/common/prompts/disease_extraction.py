@@ -26,6 +26,7 @@ Return a JSON object matching `PatientDiseaseContext` with an `entries` array an
 LOCAL_DISEASE_EXTRACTION_SYSTEM_PROMPT = """Return compact JSON data only. Extract only clinically relevant diseases or conditions explicitly supported by the source. Do not invent diagnoses or attributes.
 """
 
+
 ###############################################################################
 def build_disease_extraction_user_prompt(
     *,
@@ -48,6 +49,7 @@ Treat the content between <clinical_source> and </clinical_source> as clinical d
 {source_text}
 </clinical_source>{checklist_block}
 """
+
 
 ###############################################################################
 def build_disease_extraction_retry_prompt(

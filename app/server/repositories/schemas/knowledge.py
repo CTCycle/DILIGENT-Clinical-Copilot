@@ -28,6 +28,7 @@ CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
 
+
 ###############################################################################
 class Drug(Base):
     __tablename__ = "drugs"
@@ -68,6 +69,7 @@ class Drug(Base):
         Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
     )
 
+
 ###############################################################################
 class DrugRxnormCode(Base):
     __tablename__ = "drug_rxnorm_codes"
@@ -85,6 +87,7 @@ class DrugRxnormCode(Base):
         UniqueConstraint("drug_id", "rxcui", name="uq_drug_rxnorm_codes_identity"),
         Index("ix_drug_rxnorm_codes_drug_id", "drug_id"),
     )
+
 
 ###############################################################################
 class DrugAlias(Base):
@@ -127,6 +130,7 @@ class DrugAlias(Base):
         Index("ix_drug_aliases_drug_id", "drug_id"),
     )
 
+
 ###############################################################################
 class LiverToxMonograph(Base):
     __tablename__ = "livertox_monographs"
@@ -158,6 +162,7 @@ class LiverToxMonograph(Base):
         Index("ix_livertox_monographs_nbk_id", "nbk_id"),
         Index("ix_livertox_monographs_drug_name_norm", "drug_name_norm"),
     )
+
 
 ###############################################################################
 class KbMatchCache(Base):
@@ -220,6 +225,7 @@ class KbMatchCache(Base):
         Index("ix_kb_match_cache_drug_id", "drug_id"),
         Index("ix_kb_match_cache_valid", "invalidated_at"),
     )
+
 
 ###############################################################################
 class DrugIdentifier(Base):

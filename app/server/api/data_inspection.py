@@ -18,6 +18,7 @@ from services.terminology.index import get_terminology_index_cache
 
 router = APIRouter(prefix="/inspection", tags=["inspection"])
 
+
 ###############################################################################
 def register_inspection_routes(router: APIRouter) -> None:
     service = build_data_inspection_service(get_job_manager())

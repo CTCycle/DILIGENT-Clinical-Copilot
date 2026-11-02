@@ -20,6 +20,7 @@ from repositories.schemas.terminology import (
 )
 from repositories.terminology_repository import RESOLVABLE_STATUSES
 
+
 ###############################################################################
 class TerminologyInspectionRepository:
 

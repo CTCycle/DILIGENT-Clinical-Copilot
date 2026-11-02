@@ -39,6 +39,7 @@ InspectionJobPhase = Literal[
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MAX_SEARCH_LENGTH = 256
 
+
 ###############################################################################
 class SessionCatalogItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -57,6 +58,7 @@ class SessionCatalogItem(BaseModel):
     has_timeline: bool = False
     can_generate_timeline: bool = False
 
+
 ###############################################################################
 class SessionCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -64,6 +66,7 @@ class SessionCatalogResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
 
 ###############################################################################
 class SessionDetailResponse(BaseModel):
@@ -87,6 +90,7 @@ class SessionDetailResponse(BaseModel):
     official_report_text: str | None = None
     manual_edit_history: list["ManualReportEditAudit"] = Field(default_factory=list)
 
+
 ###############################################################################
 class SessionAttachmentSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -100,6 +104,7 @@ class SessionAttachmentSummary(BaseModel):
     sha256: str
     created_at: str | None = None
 
+
 ###############################################################################
 class SessionAttachmentUploadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -107,10 +112,12 @@ class SessionAttachmentUploadRequest(BaseModel):
     media_type: str = Field(default="application/octet-stream", max_length=127)
     content_base64: str = Field(min_length=1, max_length=14_000_000)
 
+
 ###############################################################################
 class SessionAttachmentListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[SessionAttachmentSummary] = Field(default_factory=list)
+
 
 ###############################################################################
 class SessionUpdateRequest(BaseModel):
@@ -121,6 +128,7 @@ class SessionUpdateRequest(BaseModel):
     reviewer_note: str | None = Field(default=None, max_length=2000)
     edited_by: str | None = Field(default=None, max_length=200)
     metadata: dict[str, Any] | None = None
+
 
 ###############################################################################
 class SessionRevisionRequest(BaseModel):
@@ -138,6 +146,7 @@ class SessionRevisionRequest(BaseModel):
     ] = "full_report_revision"
     dry_run: bool = False
 
+
 ###############################################################################
 class ManualReportEditRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -146,6 +155,7 @@ class ManualReportEditRequest(BaseModel):
     reviewer_note: str | None = Field(default=None, max_length=2000)
     edited_by: str | None = Field(default=None, max_length=200)
     metadata: dict[str, Any] | None = None
+
 
 ###############################################################################
 class ManualReportEditAudit(BaseModel):
@@ -166,11 +176,13 @@ class ManualReportEditAudit(BaseModel):
     reviewer_note: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class ManualReportEditResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session: SessionDetailResponse
     audit: ManualReportEditAudit
+
 
 ###############################################################################
 class SessionVersionSummary(BaseModel):
@@ -214,16 +226,19 @@ class SessionVersionSummary(BaseModel):
     updated_at: datetime
     completed_at: datetime | None = None
 
+
 ###############################################################################
 class SessionVersionListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[SessionVersionSummary] = Field(default_factory=list)
+
 
 ###############################################################################
 class SessionVersionDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: SessionVersionSummary
     session: SessionDetailResponse | None = None
+
 
 ###############################################################################
 class RevisionEntityDiff(BaseModel):
@@ -244,6 +259,7 @@ class RevisionEntityDiff(BaseModel):
     left_entity: dict[str, Any] | None = None
     right_entity: dict[str, Any] | None = None
 
+
 ###############################################################################
 class ReportTextDiff(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -254,6 +270,7 @@ class ReportTextDiff(BaseModel):
     right_line_count: int
     similarity_ratio: float
     diff_lines: list[str] = Field(default_factory=list)
+
 
 ###############################################################################
 class RevisionQaSummary(BaseModel):
@@ -272,6 +289,7 @@ class RevisionQaSummary(BaseModel):
     right_finding_count: int = 0
     manual_review_required: bool = False
 
+
 ###############################################################################
 class SessionVersionComparisonResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -285,6 +303,7 @@ class SessionVersionComparisonResponse(BaseModel):
     unchanged_entities: list[RevisionEntityDiff] = Field(default_factory=list)
     report_text_diff: ReportTextDiff
     qa_summary: RevisionQaSummary
+
 
 ###############################################################################
 class RevisionPipelineRunResponse(BaseModel):
@@ -316,6 +335,7 @@ class RevisionPipelineRunResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 ###############################################################################
 class RevisionPipelineStepResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -346,10 +366,12 @@ class RevisionPipelineStepResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 ###############################################################################
 class RevisionPipelineStepListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[RevisionPipelineStepResponse] = Field(default_factory=list)
+
 
 ###############################################################################
 class ReviewerInstructionProfile(BaseModel):
@@ -395,6 +417,7 @@ class ReviewerInstructionProfile(BaseModel):
     prompt_injection_flags: list[str] = Field(default_factory=list)
     pipeline_routing_decision: dict[str, list[str]] = Field(default_factory=dict)
 
+
 ###############################################################################
 class ReviewerInstructionTrace(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -432,6 +455,7 @@ RevisionIssueEvidenceStatus = Literal[
     "unclear",
 ]
 
+
 ###############################################################################
 class RevisionToolIntent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -439,6 +463,7 @@ class RevisionToolIntent(BaseModel):
     reason: str
     target: str | None = None
     proposed_inputs: dict[str, Any] = Field(default_factory=dict)
+
 
 ###############################################################################
 class RevisionIssueFinding(BaseModel):
@@ -453,6 +478,7 @@ class RevisionIssueFinding(BaseModel):
     recommended_next_action: str
     tool_intents: list[RevisionToolIntent] = Field(default_factory=list)
 
+
 ###############################################################################
 class RevisionIssueScanResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -460,6 +486,7 @@ class RevisionIssueScanResult(BaseModel):
     issues: list[RevisionIssueFinding] = Field(default_factory=list)
     tool_intents: list[RevisionToolIntent] = Field(default_factory=list)
     limits: list[str] = Field(default_factory=list)
+
 
 ###############################################################################
 class RevisionArtifactResponse(BaseModel):
@@ -481,10 +508,12 @@ class RevisionArtifactResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 ###############################################################################
 class RevisionArtifactListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[RevisionArtifactResponse] = Field(default_factory=list)
+
 
 ###############################################################################
 class RevisionEntityResponse(BaseModel):
@@ -520,10 +549,12 @@ class RevisionEntityResponse(BaseModel):
     created_at: datetime
     superseded_at: datetime | None = None
 
+
 ###############################################################################
 class RevisionEntityListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[RevisionEntityResponse] = Field(default_factory=list)
+
 
 ###############################################################################
 class RevisionClinicalReviewActionResponse(BaseModel):
@@ -548,10 +579,12 @@ class RevisionClinicalReviewActionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 ###############################################################################
 class RevisionClinicalReviewActionListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[RevisionClinicalReviewActionResponse] = Field(default_factory=list)
+
 
 ###############################################################################
 class RevisionClinicalReviewUpdateRequest(BaseModel):
@@ -565,11 +598,13 @@ class RevisionClinicalReviewUpdateRequest(BaseModel):
     reviewed_by: str | None = Field(default=None, max_length=200)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class RevisionClinicalReviewUpdateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: SessionVersionSummary
     review_action: RevisionClinicalReviewActionResponse
+
 
 ###############################################################################
 class RxNavCatalogItem(BaseModel):
@@ -578,6 +613,7 @@ class RxNavCatalogItem(BaseModel):
     drug_name: str
     last_update: str | None = None
 
+
 ###############################################################################
 class RxNavCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -585,6 +621,7 @@ class RxNavCatalogResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
 
 ###############################################################################
 class RxNavCatalogUpdateRequest(BaseModel):
@@ -600,11 +637,13 @@ class RxNavCatalogUpdateRequest(BaseModel):
             raise ValueError("Drug name is required.")
         return normalized
 
+
 ###############################################################################
 class DrugAliasEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
     alias: str
     alias_kind: str
+
 
 ###############################################################################
 class DrugAliasGroup(BaseModel):
@@ -612,12 +651,14 @@ class DrugAliasGroup(BaseModel):
     source: str
     aliases: list[DrugAliasEntry] = Field(default_factory=list)
 
+
 ###############################################################################
 class DrugAliasesResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     drug_id: int
     drug_name: str
     groups: list[DrugAliasGroup] = Field(default_factory=list)
+
 
 ###############################################################################
 class LiverToxCatalogItem(BaseModel):
@@ -627,6 +668,7 @@ class LiverToxCatalogItem(BaseModel):
     last_update: str | None = None
     has_excerpt: bool
 
+
 ###############################################################################
 class LiverToxCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -634,6 +676,7 @@ class LiverToxCatalogResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
 
 ###############################################################################
 class LiverToxExcerptResponse(BaseModel):
@@ -643,10 +686,12 @@ class LiverToxExcerptResponse(BaseModel):
     excerpt: str
     last_update: str | None = None
 
+
 ###############################################################################
 class DeleteEntityResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     deleted: bool
+
 
 ###############################################################################
 class SessionListFilters(BaseModel):
@@ -677,6 +722,7 @@ class SessionListFilters(BaseModel):
         normalized = CONTROL_CHARACTERS_RE.sub(" ", str(value)).strip()
         return normalized or None
 
+
 ###############################################################################
 class CatalogListFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -693,6 +739,7 @@ class CatalogListFilters(BaseModel):
         normalized = CONTROL_CHARACTERS_RE.sub(" ", str(value)).strip()
         return normalized or None
 
+
 ###############################################################################
 class InspectionUpdateConfigResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -702,10 +749,12 @@ class InspectionUpdateConfigResponse(BaseModel):
     summary: dict[str, Any] = Field(default_factory=dict)
     read_only: bool = False
 
+
 ###############################################################################
 class InspectionRxNavOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     force_full: bool | None = None
+
 
 ###############################################################################
 class InspectionTerminologyOverrideRequest(BaseModel):
@@ -714,6 +763,7 @@ class InspectionTerminologyOverrideRequest(BaseModel):
     drugcentral_enabled: bool | None = None
     chembl_enabled: bool | None = None
     swissmedic_enabled: bool | None = None
+
 
 ###############################################################################
 class InspectionLiverToxOverrideRequest(BaseModel):
@@ -735,10 +785,12 @@ class InspectionLiverToxOverrideRequest(BaseModel):
             raise ValueError("livertox_archive must be a file name only")
         return normalized
 
+
 ###############################################################################
 class InspectionDiliRankOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     redownload: bool | None = None
+
 
 ###############################################################################
 class InspectionStructuredSourcesUpdateRequest(BaseModel):
@@ -755,10 +807,12 @@ class InspectionStructuredSourcesUpdateRequest(BaseModel):
     )
     include_terminology: bool | None = None
 
+
 ###############################################################################
 class InspectionRagUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     documents_path: str | None = Field(default=None, max_length=1024)
+
 
 ###############################################################################
 class RagDocumentListItem(BaseModel):
@@ -779,6 +833,7 @@ class RagDocumentListItem(BaseModel):
     duplicate_alias_paths: list[str] = Field(default_factory=list)
     vector_model: str | None = None
 
+
 ###############################################################################
 class RagDocumentListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -787,12 +842,14 @@ class RagDocumentListResponse(BaseModel):
     offset: int = 0
     limit: int = 0
 
+
 ###############################################################################
 class RagDirectoryItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     path: str
     is_dir: bool = True
+
 
 ###############################################################################
 class RagDirectoryBrowseResponse(BaseModel):
@@ -801,6 +858,7 @@ class RagDirectoryBrowseResponse(BaseModel):
     parent_path: str | None = None
     items: list[RagDirectoryItem] = Field(default_factory=list)
     drives: list[str] = Field(default_factory=list)
+
 
 ###############################################################################
 class LanceVectorStoreSummaryResponse(BaseModel):
@@ -824,12 +882,14 @@ class LanceVectorStoreSummaryResponse(BaseModel):
     unique_ingested_document_count: int = 0
     duplicate_file_count: int = 0
 
+
 ###############################################################################
 class RagUpdateJobSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
     documents: int = 0
     chunks: int = 0
     backend: str = "local"
+
 
 ###############################################################################
 class ReferenceCatalogRuntimeObservationResponse(BaseModel):
@@ -842,6 +902,7 @@ class ReferenceCatalogRuntimeObservationResponse(BaseModel):
     encounter_count: int
     is_active: bool
 
+
 ###############################################################################
 class ReferenceCatalogRuntimeObservationUpsertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -849,6 +910,7 @@ class ReferenceCatalogRuntimeObservationUpsertRequest(BaseModel):
     replacement: str | None = None
     source: str = "runtime"
     is_active: bool = True
+
 
 ###############################################################################
 class RevisionAgentTask(BaseModel):
@@ -860,6 +922,7 @@ class RevisionAgentTask(BaseModel):
     required_tools: list[str] = Field(default_factory=list, max_length=12)
     stop_criteria: str = Field(max_length=2000)
 
+
 ###############################################################################
 class RevisionAgentPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -870,6 +933,7 @@ class RevisionAgentPlan(BaseModel):
         "revised_report"
     )
 
+
 ###############################################################################
 class RevisionAgentToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -877,6 +941,7 @@ class RevisionAgentToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     rationale: str = Field(min_length=1, max_length=4000)
     task_complete: bool = False
+
 
 ###############################################################################
 class RevisionReportPatch(BaseModel):
@@ -886,6 +951,7 @@ class RevisionReportPatch(BaseModel):
     replacement: str = Field(max_length=20000)
     expected_text: str = Field(max_length=20000)
     evidence_references: list[str] = Field(default_factory=list)
+
 
 ###############################################################################
 class RevisionDraftResult(BaseModel):
@@ -898,6 +964,7 @@ class RevisionDraftResult(BaseModel):
     human_review_requirements: list[str] = Field(default_factory=list)
     entity_change_proposals: list[dict[str, Any]] = Field(default_factory=list)
 
+
 ###############################################################################
 class RevisionAgentQaResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -905,6 +972,7 @@ class RevisionAgentQaResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     supported_claim_count: int = Field(default=0, ge=0)
     manual_review_required: bool = True
+
 
 ###############################################################################
 class RevisionAgentFinalResult(BaseModel):

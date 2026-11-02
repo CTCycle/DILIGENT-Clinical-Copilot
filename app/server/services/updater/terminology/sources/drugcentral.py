@@ -34,6 +34,7 @@ PUBLIC_USER = "drugman"
 PUBLIC_PASSWORD = "dosage"
 IDENTIFIER_SYSTEMS = {"UNII": "unii", "ChEMBL_ID": "chembl", "INN_ID": "inn_id"}
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class DrugCentralConnection:
@@ -43,6 +44,7 @@ class DrugCentralConnection:
     user: str = PUBLIC_USER
     connect_timeout: int = 20
     statement_timeout_ms: int = 120_000
+
 
 ###############################################################################
 class DrugCentralSource:

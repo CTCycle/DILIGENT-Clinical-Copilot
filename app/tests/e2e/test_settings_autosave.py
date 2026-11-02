@@ -159,6 +159,7 @@ def _set_control(control, value) -> None:
     else:
         control.fill(str(value))
 
+
 ###############################################################################
 def _assert_control_value(control, value) -> None:
     if control.get_attribute("type") == "checkbox":

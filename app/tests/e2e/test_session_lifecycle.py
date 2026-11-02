@@ -13,6 +13,8 @@ from playwright.sync_api import APIRequestContext, Page, Route, expect
 
 LIFECYCLE_FILTERS = ["Draft", "Queued", "Running", "Completed", "Cancelled", "Failed"]
 
+
+###############################################################################
 def _valid_input(tag: str) -> str:
     return (
         f"## Anamnesis\n{tag}. "
@@ -24,11 +26,13 @@ def _valid_input(tag: str) -> str:
 
 ANY_STATUS = re.compile(r"^(Queued|Running|Completed|Cancelled|Failed)$")
 
+
 ###############################################################################
 def _fill_case(page: Page, patient_name: str, clinical_input: str) -> None:
     page.get_by_label("Patient Name").fill(patient_name)
     page.get_by_label("Visit Date").fill("2026-10-23")
     page.get_by_label("Clinical Input").fill(clinical_input)
+
 
 ###############################################################################
 def _mock_ready_preflight(page: Page) -> None:
@@ -51,6 +55,7 @@ def _mock_ready_preflight(page: Page) -> None:
         ),
     )
 
+
 ###############################################################################
 def _start_from_wizard(page: Page) -> None:
     page.get_by_role("button", name="Run DILI analysis").click()
@@ -62,6 +67,7 @@ def _start_from_wizard(page: Page) -> None:
         next_button.click()
     dialog.get_by_role("button", name="Start analysis").click()
 
+
 ###############################################################################
 def _sessions_named(api_context: APIRequestContext, name: str) -> list[dict]:
     response = api_context.get(
@@ -69,6 +75,7 @@ def _sessions_named(api_context: APIRequestContext, name: str) -> list[dict]:
     )
     assert response.status == 200, response.text()
     return [item for item in response.json()["items"] if item["patient_name"] == name]
+
 
 ###############################################################################
 def _discard_sessions(api_context: APIRequestContext, name: str) -> None:
@@ -84,6 +91,7 @@ def _discard_sessions(api_context: APIRequestContext, name: str) -> None:
     for item in _sessions_named(api_context, name):
         api_context.delete(f"/api/inspection/sessions/{item['session_id']}")
 
+
 ###############################################################################
 @pytest.fixture
 def case_name(api_context: APIRequestContext, request: pytest.FixtureRequest) -> Iterator[str]:
@@ -91,6 +99,7 @@ def case_name(api_context: APIRequestContext, request: pytest.FixtureRequest) ->
     _discard_sessions(api_context, name)
     yield name
     _discard_sessions(api_context, name)
+
 
 ###############################################################################
 def test_draft_save_reopen_edit_and_launch_without_duplicates(
@@ -141,6 +150,7 @@ def test_draft_save_reopen_edit_and_launch_without_duplicates(
     assert [item["session_id"] for item in launched] == [session_id]
     assert launched[0]["status"] != "draft"
 
+
 ###############################################################################
 def test_launch_redirects_to_report_and_resets_the_form(
     page: Page,
@@ -163,6 +173,7 @@ def test_launch_redirects_to_report_and_resets_the_form(
     expect(page.get_by_label("Visit Date")).to_have_value("")
     expect(page.get_by_label("Clinical Input")).to_have_value("")
     expect(page.get_by_role("button", name="Run DILI analysis")).to_be_enabled()
+
 
 ###############################################################################
 def test_sessions_list_filters_by_lifecycle_status_and_keeps_context_on_refresh(
@@ -211,6 +222,7 @@ def test_sessions_list_filters_by_lifecycle_status_and_keeps_context_on_refresh(
     status_panel.get_by_role("checkbox", name="Queued").uncheck()
     status_panel.get_by_role("checkbox", name="Failed").check()
     expect(page.locator(".clinical-session-row", has_text=case_name)).to_have_count(0)
+
 
 ###############################################################################
 def test_cancel_queued_or_running_session_from_the_report(

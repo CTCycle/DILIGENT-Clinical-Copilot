@@ -69,11 +69,13 @@ StructuredCall = Callable[..., Any]
 StopCheck = Callable[[], bool]
 ProgressUpdate = Callable[[dict[str, Any]], None]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RevisionAgentRuntime:
     provider: str
     model: str
+
 
 ###############################################################################
 def _sanitize_error_message(value: object) -> str:
@@ -85,6 +87,7 @@ def _sanitize_error_message(value: object) -> str:
     )
     text = re.sub(r"(?i)\bbearer\s+\S+", "Bearer <redacted>", text)
     return text[:320] or "Revision provider call failed."
+
 
 ###############################################################################
 def revision_error_payload(
@@ -158,9 +161,11 @@ def revision_error_payload(
         payload["request_id"] = _sanitize_error_message(request_id)
     return payload
 
+
 ###############################################################################
 class RevisionAgentCancelled(RuntimeError):
     """Raised when a revision job is cancelled at a cooperative checkpoint."""
+
 
 ###############################################################################
 def _clip_text(value: Any, limit: int) -> str:
@@ -169,6 +174,7 @@ def _clip_text(value: Any, limit: int) -> str:
         return text
     return f"{text[:limit]}\n\n[TRUNCATED: {len(text) - limit} characters omitted]"
 
+
 ###############################################################################
 def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
     try:
@@ -176,6 +182,7 @@ def _safe_json(value: Any, limit: int = MAX_JSON_CHARS) -> str:
     except TypeError:
         serialized = json.dumps(str(value), ensure_ascii=False)
     return _clip_text(serialized, limit)
+
 
 ###############################################################################
 def _requested_append_sentence(instruction: str | None) -> str | None:
@@ -191,6 +198,7 @@ def _requested_append_sentence(instruction: str | None) -> str | None:
     sentence = match.group("sentence").strip()
     return sentence if sentence and sentence[-1] in ".!?" else None
 
+
 ###############################################################################
 def _revision_provider_timeout(provider: str) -> float:
     runtime = get_server_settings().runtime
@@ -204,6 +212,7 @@ def _revision_provider_timeout(provider: str) -> float:
         min(float(runtime.default_llm_timeout), float(cap)),
     )
 
+
 ###############################################################################
 def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
     provider, model = LLMRuntimeConfig.resolve_provider_and_model("revision")
@@ -211,6 +220,7 @@ def resolve_revision_agent_runtime() -> RevisionAgentRuntime:
         provider=provider,
         model=model,
     )
+
 
 ###############################################################################
 def build_revision_agent_user_prompt(
@@ -272,6 +282,7 @@ def build_revision_agent_user_prompt(
             MAX_TEXT_CHARS + MAX_REPORT_CHARS + MAX_JSON_CHARS,
         )
     )
+
 
 ###############################################################################
 class RevisionAgentRunner:

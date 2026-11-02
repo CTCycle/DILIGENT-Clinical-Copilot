@@ -13,6 +13,7 @@ import pytest
 from services.updater import livertox_parse as livertox_module
 from services.updater.livertox_core import LiverToxUpdater
 
+
 ###############################################################################
 def build_archive(path: Path, members: list[tuple[str, str]]) -> None:
     with tarfile.open(path, "w:gz") as archive:
@@ -22,12 +23,14 @@ def build_archive(path: Path, members: list[tuple[str, str]]) -> None:
             info.size = len(data)
             archive.addfile(info, io.BytesIO(data))
 
+
 ###############################################################################
 def make_html(drug_name: str, nbk_id: str) -> str:
     return (
         f"<html><head><title>{drug_name} - LiverTox - NCBI Bookshelf</title></head>"
         f"<body><p>{nbk_id}</p><p>{drug_name} monograph excerpt.</p></body></html>"
     )
+
 
 ###############################################################################
 def test_collect_monographs_deduplicates_duplicate_basenames(tmp_path: Path) -> None:
@@ -54,6 +57,7 @@ def test_collect_monographs_deduplicates_duplicate_basenames(tmp_path: Path) -> 
     assert nbk_ids == {"NBK10001", "NBK10002"}
     assert len(records) == 2
 
+
 ###############################################################################
 class ThreadedProcessPoolExecutor:
 
@@ -74,6 +78,7 @@ class ThreadedProcessPoolExecutor:
     # -------------------------------------------------------------------------
     def submit(self, *args, **kwargs):
         return self._executor.submit(*args, **kwargs)
+
 
 ###############################################################################
 def test_collect_monographs_streams_parallel_batches(
@@ -105,6 +110,7 @@ def test_collect_monographs_streams_parallel_batches(
 
     assert {item["nbk_id"] for item in records} == {"NBK20001", "NBK20002", "NBK20003"}
 
+
 ###############################################################################
 def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
     archive_path = tmp_path / "livertox.tar.gz"
@@ -124,6 +130,7 @@ def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
         livertox_module.collect_monographs(
             updater, str(archive_path), should_stop=lambda: True
         )
+
 
 ###############################################################################
 def test_monograph_progress_keeps_ui_callback_without_repeated_info_log(caplog) -> None:

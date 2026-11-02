@@ -104,6 +104,7 @@ UNKNOWN_RE = re.compile(
 )
 STATUS_PRIORITY: dict[str, int] = {"not_excluded": 2, "unknown": 1, "excluded": 0}
 
+
 ###############################################################################
 class DiliDifferentialEngine:
 

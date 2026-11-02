@@ -14,6 +14,7 @@ from app import app
 from services.runtime.desktop import get_desktop_runtime_service
 
 
+###############################################################################
 class LauncherOwnedServer(uvicorn.Server):
     """Leave Ctrl+C to the launcher so shutdown uses the authenticated API."""
 
@@ -23,6 +24,7 @@ class LauncherOwnedServer(uvicorn.Server):
         yield
 
 
+###############################################################################
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="DILIGENT source-mode web server")
     parser.add_argument("--host", default="127.0.0.1")
@@ -30,6 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+###############################################################################
 def main() -> None:
     arguments = build_parser().parse_args()
     if arguments.host not in {"127.0.0.1", "localhost"}:

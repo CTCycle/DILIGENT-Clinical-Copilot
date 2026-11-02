@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
 ###############################################################################
 class DiliRankCatalogItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -21,6 +22,7 @@ class DiliRankCatalogItem(BaseModel):
     source_url: str | None = None
     source_last_modified: str | None = None
 
+
 ###############################################################################
 class DiliRankCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,6 +31,7 @@ class DiliRankCatalogResponse(BaseModel):
     offset: int
     limit: int
 
+
 ###############################################################################
 class DiliRankDrugResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -36,10 +39,12 @@ class DiliRankDrugResponse(BaseModel):
     drug_name: str
     records: list[DiliRankCatalogItem] = Field(default_factory=list)
 
+
 ###############################################################################
 class DiliRankUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     redownload: bool = False
+
 
 ###############################################################################
 class DiliRankUpdateConfigResponse(BaseModel):

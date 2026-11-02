@@ -24,6 +24,7 @@ StreamEventKind = Literal[
     "error",
 ]
 
+
 ###############################################################################
 class ToolDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -31,6 +32,7 @@ class ToolDefinition(BaseModel):
     name: str = Field(min_length=1)
     description: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
+
 
 ###############################################################################
 class ToolCall(BaseModel):
@@ -40,6 +42,7 @@ class ToolCall(BaseModel):
     name: str = Field(min_length=1)
     arguments: dict[str, Any] = Field(default_factory=dict)
     raw_arguments: str | None = None
+
 
 ###############################################################################
 class ChatMessage(BaseModel):
@@ -52,6 +55,7 @@ class ChatMessage(BaseModel):
     tool_call_id: str | None = None
     reasoning_content: str | None = None
 
+
 ###############################################################################
 class UsageMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -60,6 +64,7 @@ class UsageMetadata(BaseModel):
     output_tokens: int | None = Field(default=None, ge=0)
     reasoning_tokens: int | None = Field(default=None, ge=0)
     total_tokens: int | None = Field(default=None, ge=0)
+
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
@@ -77,6 +82,7 @@ class ChatStreamEvent(BaseModel):
     result: ChatResult | None = None
     error_code: str | None = None
     error_message: str | None = None
+
 
 ###############################################################################
 class ChatRequest(BaseModel):
@@ -101,6 +107,7 @@ class ChatRequest(BaseModel):
     deadline_at: float | None = None
     cancel_check: Callable[[], bool] | None = Field(default=None, exclude=True)
 
+
 ###############################################################################
 class ChatResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -117,6 +124,7 @@ class ChatResult(BaseModel):
 
 ChatStreamEvent.model_rebuild()
 
+
 ###############################################################################
 class StructuredRequest(BaseModel, Generic[T]):
     model_config = ConfigDict(extra="forbid")
@@ -130,11 +138,13 @@ class StructuredRequest(BaseModel, Generic[T]):
     reasoning_reserve: int | None = None
     output_token_limit: int | None = None
 
+
 ###############################################################################
 class ConnectivityResult(BaseModel):
     ok: bool
     response_preview: str | None = None
     error: str | None = None
+
 
 ###############################################################################
 class EmbeddingRequest(BaseModel):

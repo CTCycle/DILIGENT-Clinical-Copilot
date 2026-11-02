@@ -36,6 +36,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 class LLMRuntimeConfig:
     _runtime_override: ContextVar[dict[str, object] | None] = ContextVar(

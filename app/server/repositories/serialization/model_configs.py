@@ -19,6 +19,7 @@ from repositories.serialization.application_configuration import (
 
 UNSET = object()
 
+
 ###############################################################################
 class ModelConfigSerializer:
     """Persist the validated model configuration as one singleton document."""

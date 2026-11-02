@@ -28,25 +28,30 @@ from services.updater.terminology.snapshot import TerminologySource
 UpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
 STRUCTURED_TARGETS: tuple[UpdateTarget, ...] = ("rxnav", "livertox", "terminology", "dilirank")
 
+
 ###############################################################################
 def _override_float(values: Mapping[str, object], key: str) -> float | None:
     value = values.get(key)
     return float(value) if isinstance(value, int | float) else None
+
 
 ###############################################################################
 def _override_int(values: Mapping[str, object], key: str) -> int | None:
     value = values.get(key)
     return int(value) if isinstance(value, int | float) else None
 
+
 ###############################################################################
 def _override_str(values: Mapping[str, object], key: str) -> str | None:
     value = values.get(key)
     return value if isinstance(value, str) else None
 
+
 ###############################################################################
 def _override_bool(values: Mapping[str, object], key: str) -> bool | None:
     value = values.get(key)
     return value if isinstance(value, bool) else None
+
 
 ###############################################################################
 class DataInspectionProgressReporter:
@@ -78,6 +83,7 @@ class DataInspectionProgressReporter:
         result = dict(payload.get("result") or {})
         result["progress_message"] = message
         self.jobs.update_result(self.job_id, result)
+
 
 ###############################################################################
 class DataInspectionUpdateJobRunner:

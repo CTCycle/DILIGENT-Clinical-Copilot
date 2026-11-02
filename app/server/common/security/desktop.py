@@ -27,9 +27,11 @@ _SECURITY_HEADERS = {
     ),
 }
 
+
 ###############################################################################
 def _is_true(value: str) -> bool:
     return value.strip().casefold() in {"1", "true", "yes", "on"}
+
 
 ###############################################################################
 class DesktopSessionSecurity:
@@ -82,11 +84,13 @@ class DesktopSessionSecurity:
         token = request.headers.get(DESKTOP_SESSION_HEADER, "")
         return self.session_token_is_valid(token)
 
+
 ###############################################################################
 def _secured(response: Response) -> Response:
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     return response
+
 
 ###############################################################################
 def _rejected(status_code: int) -> Response:
@@ -95,6 +99,7 @@ def _rejected(status_code: int) -> Response:
             {"detail": "Desktop request is not authorized."}, status_code=status_code
         )
     )
+
 
 ###############################################################################
 class DesktopSecurityMiddleware(BaseHTTPMiddleware):

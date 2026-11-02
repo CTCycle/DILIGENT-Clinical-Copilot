@@ -21,6 +21,7 @@ DILIRANK_PROVENANCE_KEY = "fda_dilirank_2"
 # evidence and is withheld when the session did not select LiverTox.
 LIVERTOX_IDENTITY_FIELDS = frozenset({"drug_id", "drug_name", "drug_name_norm"})
 
+
 ###############################################################################
 class ClinicalKnowledgeComposer:
 

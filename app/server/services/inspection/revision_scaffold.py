@@ -18,17 +18,21 @@ from services.inspection.revision_recovery import (
     REVISION_JOB_MISSING_STATUS_MESSAGE,
 )
 
+
 ###############################################################################
 class SessionRevisionNotFoundError(ValueError):
     pass
+
 
 ###############################################################################
 class SessionRevisionConflictError(ValueError):
     pass
 
+
 ###############################################################################
 class SessionRevisionValidationError(ValueError):
     pass
+
 
 ###############################################################################
 class InspectionRevisionScaffoldMixin:

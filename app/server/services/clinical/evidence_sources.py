@@ -14,6 +14,7 @@ from repositories.context import RepositoryContext
 from repositories.dilirank_repository import DiliRankRepository
 from repositories.knowledge_repository import KnowledgeRepository
 
+
 ###############################################################################
 def dilirank_repository_for(
     knowledge_repository: KnowledgeRepository,

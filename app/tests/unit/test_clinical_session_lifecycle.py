@@ -25,6 +25,7 @@ from services.session.session_service import ClinicalSessionService
 
 TERMINAL = {"completed", "failed", "cancelled"}
 
+
 ###############################################################################
 def clinical_input(marker: str) -> str:
     return (
@@ -40,6 +41,7 @@ def clinical_input(marker: str) -> str:
         "ALT 220 U/L with ULN 50, ALP 180 U/L with ULN 120."
     )
 
+
 ###############################################################################
 def launch_payload(marker: str) -> dict[str, Any]:
     return {
@@ -50,16 +52,19 @@ def launch_payload(marker: str) -> dict[str, Any]:
         "selected_model_providers": ["ollama"],
     }
 
+
 ###############################################################################
 class FakeAnalyses:
     """Stand-in pipeline whose runs can be held open and released per patient."""
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.gates: dict[str, threading.Event] = {}
         self.started: list[str] = []
         self.lock = threading.Lock()
         self.released = False
 
+    # -------------------------------------------------------------------------
     def gate(self, marker: str) -> threading.Event:
         with self.lock:
             event = self.gates.setdefault(marker, threading.Event())
@@ -67,12 +72,14 @@ class FakeAnalyses:
                 event.set()
             return event
 
+    # -------------------------------------------------------------------------
     def release_all(self) -> None:
         with self.lock:
             self.released = True
             for event in self.gates.values():
                 event.set()
 
+    # -------------------------------------------------------------------------
     async def process(
         self, service: ClinicalSessionService, payload: Any, **kwargs: Any
     ) -> dict[str, Any]:
@@ -105,6 +112,7 @@ class FakeAnalyses:
             },
         )
         return result_payload
+
 
 ###############################################################################
 @pytest.fixture
@@ -144,6 +152,7 @@ def analyses(monkeypatch) -> FakeAnalyses:
     )
     return fake
 
+
 ###############################################################################
 @pytest.fixture
 def client(analyses: FakeAnalyses, monkeypatch) -> Iterator[TestClient]:
@@ -154,6 +163,7 @@ def client(analyses: FakeAnalyses, monkeypatch) -> Iterator[TestClient]:
         analyses.release_all()
         wait_until(lambda: not get_job_manager().is_job_running("clinical"))
 
+
 ###############################################################################
 def wait_until(predicate, timeout: float = 5.0) -> None:
     deadline = time.monotonic() + timeout
@@ -162,6 +172,7 @@ def wait_until(predicate, timeout: float = 5.0) -> None:
             return
         time.sleep(0.02)
     raise AssertionError("Condition not reached in time")
+
 
 ###############################################################################
 def create_draft(client: TestClient, marker: str) -> dict[str, Any]:
@@ -172,6 +183,7 @@ def create_draft(client: TestClient, marker: str) -> dict[str, Any]:
     assert response.status_code == 201, response.text
     return response.json()
 
+
 ###############################################################################
 def launch(client: TestClient, marker: str) -> int:
     session_id = create_draft(client, marker)["session_id"]
@@ -181,11 +193,13 @@ def launch(client: TestClient, marker: str) -> int:
     assert response.status_code == 202, response.text
     return session_id
 
+
 ###############################################################################
 def status_of(client: TestClient, session_id: int) -> dict[str, Any]:
     response = client.get(f"/api/clinical/sessions/{session_id}/status")
     assert response.status_code == 200, response.text
     return response.json()
+
 
 ###############################################################################
 def wait_for_status(
@@ -193,6 +207,7 @@ def wait_for_status(
 ) -> dict[str, Any]:
     wait_until(lambda: status_of(client, session_id)["status"] in expected)
     return status_of(client, session_id)
+
 
 ###############################################################################
 def test_draft_edit_and_launch_reuse_one_session(client, analyses) -> None:
@@ -238,6 +253,7 @@ def test_draft_edit_and_launch_reuse_one_session(client, analyses) -> None:
     detail = client.get(f"/api/inspection/sessions/{session_id}").json()
     assert detail["report"] == "Report for A"
 
+
 ###############################################################################
 def test_limit_queues_sessions_and_admits_them_in_order(client, analyses, monkeypatch) -> None:
     monkeypatch.setattr(get_clinical_scheduler(), "limit_provider", lambda: 1)
@@ -258,6 +274,7 @@ def test_limit_queues_sessions_and_admits_them_in_order(client, analyses, monkey
     wait_for_status(client, third, {"running"})
     wait_until(lambda: len(analyses.started) == 3)
     assert analyses.started == ["Q1", "Q2", "Q3"]
+
 
 ###############################################################################
 def test_cancelling_one_session_leaves_others_running(client, analyses, monkeypatch) -> None:
@@ -281,6 +298,7 @@ def test_cancelling_one_session_leaves_others_running(client, analyses, monkeypa
     assert "W" not in analyses.started
     assert client.post(f"/api/clinical/sessions/{stop}/cancel").status_code == 409
 
+
 ###############################################################################
 def test_concurrent_runs_keep_their_own_results(client, analyses) -> None:
     left, right = launch(client, "L"), launch(client, "R")
@@ -297,6 +315,7 @@ def test_concurrent_runs_keep_their_own_results(client, analyses) -> None:
         assert payload["report"] == f"Report for {marker}"
         assert payload["diagnostics"] == {marker: 1}
         assert marker in repository.get_session_input(session_id)["clinical_input"]
+
 
 ###############################################################################
 def test_restart_fails_interrupted_runs_and_keeps_queue(client, analyses, monkeypatch) -> None:
@@ -323,6 +342,7 @@ def test_restart_fails_interrupted_runs_and_keeps_queue(client, analyses, monkey
     assert interrupted["error"]["code"] == "interrupted"
     assert status_of(client, waiting)["status"] == "queued"
     client.post(f"/api/clinical/sessions/{waiting}/cancel")
+
 
 ###############################################################################
 def test_active_sessions_cannot_be_deleted(client, analyses) -> None:

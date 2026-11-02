@@ -23,21 +23,28 @@ def _descriptor(provider_id: str, scope: str, status: str) -> Any:
 
 ###############################################################################
 class _StubModelConfig:
+
+    # -------------------------------------------------------------------------
     def __init__(self, descriptors: list[Any]) -> None:
         self.descriptors = descriptors
 
+    # -------------------------------------------------------------------------
     def load_current_snapshot(self) -> None:
         return None
 
+    # -------------------------------------------------------------------------
     async def discover_provider_descriptors(self, snapshot: None) -> list[Any]:
         return self.descriptors
 
 
 ###############################################################################
 class _StubAccessKeys:
+
+    # -------------------------------------------------------------------------
     def __init__(self, scopes_with_keys: set[str]) -> None:
         self.scopes_with_keys = scopes_with_keys
 
+    # -------------------------------------------------------------------------
     def get_active_key(self, scope: str) -> object | None:
         return object() if scope in self.scopes_with_keys else None
 

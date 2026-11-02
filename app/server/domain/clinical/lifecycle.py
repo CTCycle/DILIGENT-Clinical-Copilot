@@ -12,6 +12,7 @@ SessionLifecycleStatus = Literal[
     "draft", "queued", "running", "completed", "cancelled", "failed"
 ]
 
+
 ###############################################################################
 class ClinicalSessionInputWrite(BaseModel):
     """Clinician-entered input saved as a draft without running analysis."""

@@ -16,6 +16,7 @@ from services.settings.runtime import RuntimeSettingsService
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+
 ###############################################################################
 class SettingsEndpoint:
 

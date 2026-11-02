@@ -9,6 +9,7 @@ import time
 from common.utils.logger import logger
 from repositories.database.initializer import initialize_database
 
+
 ###############################################################################
 def main() -> None:
     parser = argparse.ArgumentParser(description="Initialize the DILIGENT database.")

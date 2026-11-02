@@ -72,6 +72,7 @@ from services.session.workflow_shared import (
 )
 from services.runtime.async_batches import run_batched_in_order
 
+
 ###############################################################################
 def _report_contains_rag_bibliography(
     report_text: str | None,
@@ -83,6 +84,7 @@ def _report_contains_rag_bibliography(
         return False
     heading = f"## {phrase('bibliography', report_language)}"
     return heading.casefold() in text.casefold()
+
 
 ###############################################################################
 def _clinical_report_entries_with_rag_references(
@@ -105,6 +107,7 @@ def _clinical_report_entries_with_rag_references(
         if entry.rag_references:
             entries.append(entry)
     return entries
+
 
 ###############################################################################
 def _build_rag_reference_audit(
@@ -178,6 +181,7 @@ def _build_rag_reference_audit(
         ),
     }
 
+
 ###############################################################################
 def _unavailable_evidence_sources(
     evidence: EvidenceSelection,
@@ -197,6 +201,7 @@ def _unavailable_evidence_sources(
         unavailable.append("dilirank")
     return unavailable
 
+
 ###############################################################################
 def _validate_requested_provider_matches_runtime(
     request_payload: ClinicalSessionRequest,
@@ -215,6 +220,7 @@ def _validate_requested_provider_matches_runtime(
             "The active runtime provider must match the requested provider exactly."
         )
 
+
 ###############################################################################
 def _normalize_drug_dates(drugs: PatientDrugs, date_order: DateOrder) -> PatientDrugs:
     """Rewrite full numeric therapy dates to ISO using the record's day/month order.
@@ -230,6 +236,7 @@ def _normalize_drug_dates(drugs: PatientDrugs, date_order: DateOrder) -> Patient
                 updates[field] = parsed.isoformat()
         entries.append(entry.model_copy(update=updates) if updates else entry)
     return PatientDrugs(entries=entries)
+
 
 ###############################################################################
 async def process_single_patient_workflow(
@@ -967,6 +974,7 @@ async def process_single_patient_workflow(
         raise ClinicalPersistenceError()
     return result_payload
 
+
 ###############################################################################
 def prepare_clinical_run_workflow(
     service: Any,
@@ -990,6 +998,7 @@ def prepare_clinical_run_workflow(
             service.serialize_pipeline_issues(exc.issues)
         ) from exc
     return prepared
+
 
 ###############################################################################
 def validate_clinical_launch_workflow(

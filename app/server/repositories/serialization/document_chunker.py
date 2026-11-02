@@ -8,6 +8,7 @@ import re
 from common.utils.chunking import SmartDocumentChunker
 from domain.documents import Document
 
+
 ###############################################################################
 class DocumentChunker:
 

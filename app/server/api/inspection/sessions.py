@@ -33,6 +33,7 @@ from services.inspection.service import DataInspectionService
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
+
 ###############################################################################
 class InspectionSessionEndpoint(InspectionJobEndpointMixin):
 

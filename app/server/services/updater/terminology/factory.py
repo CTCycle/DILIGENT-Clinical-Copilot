@@ -26,13 +26,13 @@ TERMINOLOGY_SOURCE_LICENSES = {
 }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _flag(overrides: Mapping[str, object], key: str, default: bool) -> bool:
     value = overrides.get(key)
     return value if isinstance(value, bool) else default
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def enabled_terminology_sources() -> dict[str, bool]:
     runtime = get_server_settings().runtime
     return {
@@ -44,7 +44,7 @@ def enabled_terminology_sources() -> dict[str, bool]:
     }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_rxnorm_sources() -> list[TerminologySource]:
     timeout = float(get_server_settings().runtime.terminology_download_timeout)
     return [
@@ -53,7 +53,7 @@ def build_rxnorm_sources() -> list[TerminologySource]:
     ]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_international_sources(overrides: Mapping[str, object]) -> list[TerminologySource]:
     runtime = get_server_settings().runtime
     timeout = float(runtime.terminology_download_timeout)

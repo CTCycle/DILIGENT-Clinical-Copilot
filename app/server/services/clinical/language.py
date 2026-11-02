@@ -19,6 +19,7 @@ from domain.clinical.entities import PatientData
 from domain.clinical.language import LanguageDetectionResult
 from configurations.startup import get_server_settings
 
+
 ###############################################################################
 class ClinicalLanguageDetector:
     DEFAULT_THRESHOLDS: dict[str, float] = {

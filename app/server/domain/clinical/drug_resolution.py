@@ -20,6 +20,7 @@ DrugDecisionStatus = Literal[
 ]
 ACCEPTED_DECISION_STATUSES = frozenset({"accepted_verified", "accepted_probable"})
 
+
 ###############################################################################
 @dataclass(slots=True)
 class NormalizedDrugMention:
@@ -34,6 +35,7 @@ class NormalizedDrugMention:
     is_regimen_parent: bool = False
     regimen_components: list[str] = field(default_factory=list)
 
+
 ###############################################################################
 class LiverToxResolutionCandidate(BaseModel):
     """A LiverTox monograph explicitly linked to the resolved concept."""
@@ -45,6 +47,7 @@ class LiverToxResolutionCandidate(BaseModel):
     has_excerpt: bool
     link_type: str
     accepted: bool = False
+
 
 ###############################################################################
 class DrugResolutionDecision(BaseModel):
@@ -62,6 +65,7 @@ class DrugResolutionDecision(BaseModel):
     decision_status: DrugDecisionStatus
     reasons: list[str] = Field(default_factory=list)
     requires_human_review: bool
+
 
 ###############################################################################
 class DrugIdentityProposal(BaseModel):
@@ -100,6 +104,7 @@ class DrugIdentityProposal(BaseModel):
             if text and text not in cleaned:
                 cleaned.append(text)
         return cleaned
+
 
 ###############################################################################
 class DrugIdentityProposalBatch(BaseModel):

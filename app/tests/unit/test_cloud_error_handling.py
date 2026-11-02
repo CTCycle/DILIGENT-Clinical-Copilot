@@ -16,6 +16,7 @@ from services.llm.generation_policy import GenerationPurpose
 from services.llm.transports.base import call_with_retries
 from services.llm.transports.openai_chat import OpenAIChatTransport
 
+
 ###############################################################################
 def _http_error(status_code: int) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", "https://opencode.ai/zen/go/v1/models")
@@ -23,6 +24,7 @@ def _http_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(
         "provider response", request=request, response=response
     )
+
 
 ###############################################################################
 def test_provider_error_mapping_distinguishes_connection_failure() -> None:
@@ -36,8 +38,10 @@ def test_provider_error_mapping_distinguishes_connection_failure() -> None:
     assert mapped.retryable is True
     assert str(mapped) == "Cloud provider connection failed"
 
+
 ###############################################################################
 def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> None:
+
 
     ###############################################################################
     class Payload(BaseModel):
@@ -85,8 +89,10 @@ def test_deepseek_structured_repair_handles_schema_echo_before_valid_json() -> N
     assert "<format_instructions>" in calls[2]["messages"][1]["content"]  # type: ignore[index]
     assert calls[1]["json_schema"] == Payload.model_json_schema()
 
+
 ###############################################################################
 def test_structured_repair_recovers_from_truncated_patient_drugs_payload() -> None:
+
 
     ###############################################################################
     class Payload(BaseModel):
@@ -132,11 +138,13 @@ def test_structured_repair_recovers_from_truncated_patient_drugs_payload() -> No
         GenerationPurpose.JSON_REPAIR,
     ]
 
+
 ###############################################################################
 def test_openai_chat_transport_extracts_json_from_content_parts() -> None:
     assert OpenAIChatTransport._content_to_text(
         [{"type": "text", "text": '{"ok":true}'}, {"type": "text", "text": "\n"}]
     ) == '{"ok":true}\n'
+
 
 ###############################################################################
 def test_provider_error_mapping_distinguishes_timeout() -> None:
@@ -146,11 +154,13 @@ def test_provider_error_mapping_distinguishes_timeout() -> None:
     assert mapped.error_code == "timeout"
     assert mapped.retryable is True
 
+
 ###############################################################################
 def test_gemini_client_receives_configured_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
+
 
     ###############################################################################
     class FakeGeminiClient:
@@ -176,6 +186,7 @@ def test_gemini_client_receives_configured_timeout(
     finally:
         asyncio.run(client.close())
 
+
 ###############################################################################
 def test_provider_error_mapping_classifies_http_statuses() -> None:
     authentication = CloudLLMClient._map_provider_exception(_http_error(401))
@@ -196,6 +207,7 @@ def test_provider_error_mapping_classifies_http_statuses() -> None:
     assert missing_endpoint.error_code == "configuration"
     assert missing_endpoint.retryable is False
 
+
 ###############################################################################
 def test_revision_retry_policy_retries_http_503_and_530_before_success() -> None:
     attempts = 0
@@ -212,6 +224,7 @@ def test_revision_retry_policy_retries_http_503_and_530_before_success() -> None
     assert asyncio.run(call_with_retries(flaky_provider, max_retries=2)) == "ok"
     assert attempts == 3
 
+
 ###############################################################################
 def test_provider_error_mapping_classifies_openai_sdk_status_errors() -> None:
     request = httpx.Request("POST", "https://api.openai.com/v1/responses")
@@ -222,6 +235,7 @@ def test_provider_error_mapping_classifies_openai_sdk_status_errors() -> None:
 
     assert mapped.error_code == "rate_limited"
     assert mapped.retryable is True
+
 
 ###############################################################################
 def test_provider_error_mapping_preserves_sanitized_contract_detail() -> None:
@@ -265,10 +279,12 @@ def test_provider_error_mapping_preserves_sanitized_contract_detail() -> None:
         == "authorization=<redacted>"
     )
 
+
 ###############################################################################
 def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+
 
     ###############################################################################
     class Payload(BaseModel):
@@ -300,8 +316,10 @@ def test_openai_structured_provider_failure_is_not_downgraded_to_chat(
             )
         )
 
+
 ###############################################################################
 def test_structured_call_fails_instead_of_repairing_an_exhausted_output_budget() -> None:
+
 
     ###############################################################################
     class Payload(BaseModel):

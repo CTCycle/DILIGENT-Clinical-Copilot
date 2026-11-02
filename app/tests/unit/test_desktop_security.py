@@ -11,15 +11,20 @@ from fastapi.testclient import TestClient
 from services.runtime.desktop import DesktopRuntimeService
 
 
+###############################################################################
 class _DesktopServerStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.should_exit = False
 
 
+###############################################################################
 def _model_config() -> dict[str, str]:
     return {"status": "ok"}
 
 
+###############################################################################
 def test_packaged_desktop_api_requires_header_session_and_exact_tauri_origin(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
@@ -93,6 +98,7 @@ def test_packaged_desktop_api_requires_header_session_and_exact_tauri_origin(
         assert server.should_exit is True
 
 
+###############################################################################
 def test_source_shutdown_requires_the_per_launch_token(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("DILIGENT_DESKTOP", "false")
     monkeypatch.setenv("DILIGENT_DESKTOP_SESSION_SECRET", "source-session")

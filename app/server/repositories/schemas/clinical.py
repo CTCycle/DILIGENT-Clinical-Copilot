@@ -28,6 +28,7 @@ from repositories.schemas.base import Base, UtcDateTime
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 
+
 ###############################################################################
 class ClinicalSession(Base):
     __tablename__ = "clinical_sessions"
@@ -103,6 +104,7 @@ class ClinicalSession(Base):
         ),
     )
 
+
 ###############################################################################
 class ClinicalSessionResult(Base):
     __tablename__ = "clinical_session_results"
@@ -129,6 +131,7 @@ class ClinicalSessionResult(Base):
         UniqueConstraint("session_id", name="uq_clinical_session_results_session_id"),
         Index("ix_clinical_session_results_session_id", "session_id"),
     )
+
 
 ###############################################################################
 class ClinicalSessionTimeline(Base):
@@ -171,6 +174,7 @@ class ClinicalSessionTimeline(Base):
         Index("ix_clinical_session_timelines_session_id", "session_id"),
         Index("ix_clinical_session_timelines_generated_at", "generated_at"),
     )
+
 
 ###############################################################################
 class ClinicalSessionVersion(Base):
@@ -264,6 +268,7 @@ class ClinicalSessionVersion(Base):
         Index("ix_clinical_session_versions_status", "version_status"),
     )
 
+
 ###############################################################################
 class ClinicalSessionRevisionRun(Base):
     __tablename__ = "clinical_session_revision_runs"
@@ -350,6 +355,7 @@ class ClinicalSessionRevisionRun(Base):
         Index("ix_clinical_session_revision_runs_started_at", "started_at"),
     )
 
+
 ###############################################################################
 class ClinicalSessionRevisionReview(Base):
     __tablename__ = "clinical_session_revision_reviews"
@@ -411,6 +417,7 @@ class ClinicalSessionRevisionReview(Base):
         Index("ix_clinical_session_revision_reviews_reviewed_at", "reviewed_at"),
     )
 
+
 ###############################################################################
 class ClinicalSessionRevisionStep(Base):
     __tablename__ = "clinical_session_revision_steps"
@@ -471,6 +478,7 @@ class ClinicalSessionRevisionStep(Base):
         Index("ix_clinical_session_revision_steps_status", "status"),
     )
 
+
 ###############################################################################
 class ClinicalSessionRevisionArtifact(Base):
     __tablename__ = "clinical_session_revision_artifacts"
@@ -529,6 +537,7 @@ class ClinicalSessionRevisionArtifact(Base):
         ),
     )
 
+
 ###############################################################################
 class ClinicalSessionSection(Base):
     __tablename__ = "clinical_session_sections"
@@ -555,6 +564,7 @@ class ClinicalSessionSection(Base):
         ),
         Index("ix_clinical_session_sections_session_id", "session_id"),
     )
+
 
 ###############################################################################
 class ClinicalLabObservation(Base):
@@ -592,6 +602,7 @@ class ClinicalLabObservation(Base):
         ),
         Index("ix_clinical_lab_observations_observation_at", "observation_at"),
     )
+
 
 ###############################################################################
 class ClinicalSessionAttachment(Base):
@@ -631,6 +642,7 @@ class ClinicalSessionAttachment(Base):
         ),
         Index("ix_clinical_session_attachments_session_id", "session_id"),
     )
+
 
 ###############################################################################
 class ClinicalDrugMention(Base):

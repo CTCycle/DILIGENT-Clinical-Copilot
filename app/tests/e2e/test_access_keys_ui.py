@@ -9,6 +9,7 @@ import re
 
 from playwright.sync_api import Page, expect
 
+
 ###############################################################################
 def test_access_key_modal_lifecycle_is_metadata_only_and_persistent(
     page: Page, base_url: str

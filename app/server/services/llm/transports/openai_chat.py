@@ -31,6 +31,7 @@ from services.llm.transports.base import (
 from services.llm.transports.errors import TransportCancellation
 from services.llm.model_capabilities import catalog_capability_metadata
 
+
 ###############################################################################
 class OpenAIChatTransport(StructuredTransportMixin):
 

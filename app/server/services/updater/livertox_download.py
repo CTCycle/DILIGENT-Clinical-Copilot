@@ -38,6 +38,7 @@ from services.updater.ncbi_client import (
 MASTER_LIST_MEMBER_PATTERN = re.compile(r"^masterlist.*\.xlsx$", re.IGNORECASE)
 EXPECTED_ARCHIVE_FILENAME = f"livertox_{LIVERTOX_BOOK_ACCESSION}.tar.gz"
 
+
 ###############################################################################
 async def download_file(
     client: httpx.AsyncClient,
@@ -64,6 +65,7 @@ async def download_file(
         progress_span=progress_span,
     )
 
+
 ###############################################################################
 async def download_bulk_data(
     self,
@@ -78,6 +80,7 @@ async def download_bulk_data(
             dest_path,
             progress_callback=progress_callback,
         )
+
 
 ###############################################################################
 def refresh_master_list(
@@ -118,6 +121,7 @@ def refresh_master_list(
     metadata["records"] = len(sanitized.index)
     return metadata, sanitized
 
+
 ###############################################################################
 async def download_master_list(
     self,
@@ -143,6 +147,7 @@ async def download_master_list(
             client,
             progress_callback=progress_callback,
         )
+
 
 ###############################################################################
 async def _download_master_list_from_archive(
@@ -197,6 +202,7 @@ async def _download_master_list_from_archive(
         "downloaded": True,
     }
 
+
 ###############################################################################
 async def resolve_master_list_url(
     self,
@@ -219,6 +225,7 @@ async def resolve_master_list_url(
             "Books-OAI master-list discovery was unavailable; using LitArch fallback"
         )
         return None
+
 
 ###############################################################################
 async def resolve_litarch_archive(
@@ -256,6 +263,7 @@ async def resolve_litarch_archive(
         )
     return _build_litarch_archive_url(next(iter(matches)), accession=accession)
 
+
 ###############################################################################
 def find_master_list_member(archive_path: str | Path) -> str:
     path = Path(archive_path)
@@ -278,6 +286,7 @@ def find_master_list_member(archive_path: str | Path) -> str:
         raise RuntimeError("The LiverTox archive contained conflicting master lists.")
     return candidates[0]
 
+
 ###############################################################################
 def extract_master_list_member(
     archive_path: str | Path,
@@ -298,6 +307,7 @@ def extract_master_list_member(
     with destination_path.open("wb") as output:
         output.write(payload)
 
+
 ###############################################################################
 def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
     path = Path(archive_path)
@@ -308,6 +318,7 @@ def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
         "size": path.stat().st_size,
         "last_modified": modified,
     }
+
 
 ###############################################################################
 async def _download_archive(
@@ -379,6 +390,7 @@ async def _download_archive(
         "downloaded": True,
     }
 
+
 ###############################################################################
 async def _download_master_list_url(
     self,
@@ -445,6 +457,7 @@ async def _download_master_list_url(
         "downloaded": True,
     }
 
+
 ###############################################################################
 async def _fetch_remote_metadata(
     client: httpx.AsyncClient,
@@ -468,6 +481,7 @@ async def _fetch_remote_metadata(
         "last_modified": response.headers.get("Last-Modified"),
         "source_url": str(response.url),
     }
+
 
 ###############################################################################
 def _validate_master_list_file(self, path: Path) -> None:
@@ -494,6 +508,7 @@ def _validate_master_list_file(self, path: Path) -> None:
         if workbook is not None:
             workbook.close()
 
+
 ###############################################################################
 def _validate_archive_file(self, path: Path) -> None:
     if not path.is_file() or path.stat().st_size <= 0 or not tarfile.is_tarfile(path):
@@ -514,6 +529,7 @@ def _validate_archive_file(self, path: Path) -> None:
     if supported_members == 0:
         raise RuntimeError("The LiverTox archive contained no supported monographs.")
 
+
 ###############################################################################
 def _validate_tar_member(member: tarfile.TarInfo) -> None:
     if not member.isfile():
@@ -522,6 +538,7 @@ def _validate_tar_member(member: tarfile.TarInfo) -> None:
             return
         raise RuntimeError("The LiverTox archive contained an unsupported member.")
     _validate_member_name(member.name)
+
 
 ###############################################################################
 def _validate_member_name(member_name: str) -> None:
@@ -535,6 +552,7 @@ def _validate_member_name(member_name: str) -> None:
         or member_name.startswith("..")
     ):
         raise RuntimeError("The LiverTox archive contained an unsafe path.")
+
 
 ###############################################################################
 def _build_litarch_archive_url(path: str, *, accession: str) -> str:
@@ -561,9 +579,11 @@ def _build_litarch_archive_url(path: str, *, accession: str) -> str:
         raise RuntimeError("NLM LitArch returned an unexpected archive host.")
     return url
 
+
 ###############################################################################
 def _contact_email(self) -> str:
     return resolve_ncbi_contact_email(getattr(self, "ncbi_contact_email", None))
+
 
 ###############################################################################
 def _http_client(self) -> httpx.AsyncClient:
@@ -574,9 +594,11 @@ def _http_client(self) -> httpx.AsyncClient:
         follow_redirects=True,
     )
 
+
 ###############################################################################
 def _partial_path(path: Path) -> Path:
     return path.with_name(f"{path.name}.part")
+
 
 ###############################################################################
 def _remove_partial(path: Path) -> None:

@@ -26,7 +26,7 @@ sys.path.insert(0, str(BENCHMARK_DIR))
 from benchmark import Prediction, run_benchmark  # noqa: E402
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def configure_database(path: Path) -> Path:
     from common import paths as common_paths
     from configurations import database_config
@@ -46,7 +46,7 @@ def configure_database(path: Path) -> Path:
     return config_path
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", type=Path, required=True)

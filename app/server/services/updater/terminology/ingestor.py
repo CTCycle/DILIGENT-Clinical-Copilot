@@ -18,6 +18,7 @@ from services.updater.terminology.snapshot import (
     TerminologySourceUnavailable,
 )
 
+
 ###############################################################################
 class TerminologyIngestor:
     """Refresh sources one at a time; each source commits atomically.

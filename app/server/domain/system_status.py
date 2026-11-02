@@ -7,15 +7,18 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+
 ###############################################################################
 class MemoryUsage(BaseModel):
     used_bytes: int
     total_bytes: int
 
+
 ###############################################################################
 class ProviderAvailability(BaseModel):
     active: int
     total: int
+
 
 ###############################################################################
 class OllamaControl(BaseModel):
@@ -27,6 +30,7 @@ class OllamaControl(BaseModel):
     can_stop: bool
     executable_found: bool
     error: str | None = None
+
 
 ###############################################################################
 class SystemStatusResponse(BaseModel):

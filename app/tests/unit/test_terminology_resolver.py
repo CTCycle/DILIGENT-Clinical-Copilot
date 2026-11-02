@@ -20,7 +20,7 @@ from services.terminology.resolver import ResolverSettings, TerminologyResolver
 from terminology_fixtures import build_context, build_sqlite_engine, seed_reference_terminology
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _seeded_context(tmp_path_factory) -> RepositoryContext:  # type: ignore[no-untyped-def]
     context = build_context(build_sqlite_engine(tmp_path_factory.mktemp("terminology") / "t.db"))
     seed_reference_terminology(context)
@@ -33,7 +33,7 @@ def seeded_context(tmp_path_factory) -> RepositoryContext:  # type: ignore[no-un
     return _seeded_context(tmp_path_factory)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_resolver(
     context: RepositoryContext,
     *,
@@ -173,7 +173,7 @@ class FakeRxNav:
         return httpx.Response(200, json={})
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def rxnav_client(handler: Callable[[httpx.Request], httpx.Response]) -> RxNavRuntimeClient:
     return RxNavRuntimeClient(timeout=1.0, transport=httpx.MockTransport(handler))
 

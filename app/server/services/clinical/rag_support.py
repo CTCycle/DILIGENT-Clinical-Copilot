@@ -22,11 +22,13 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RagRetrievalBundle:
     context_text: str | None
     references: tuple[RagDocumentReference, ...]
+
 
 ###############################################################################
 class RagSupportService:

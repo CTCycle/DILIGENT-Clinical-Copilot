@@ -31,6 +31,7 @@ CapabilityEvidence = Literal[
     "catalog", "documented", "probe", "provider", "fallback"
 ]
 
+
 ###############################################################################
 class ProviderCapabilities(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -40,6 +41,7 @@ class ProviderCapabilities(BaseModel):
     model_listing: bool
     embeddings: bool
     vision: bool
+
 
 ###############################################################################
 class ModelCapabilityMetadata(BaseModel):
@@ -80,6 +82,7 @@ class ModelCapabilityMetadata(BaseModel):
     supports_finish_reason: bool | None = None
     evidence: CapabilityEvidence = "fallback"
 
+
 ###############################################################################
 class CloudProviderDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -105,6 +108,7 @@ class CloudProviderDefinition(BaseModel):
         ):
             raise ValueError("default_model must exist in the provider model catalog")
         return self
+
 
 ###############################################################################
 class CloudModelDescriptor(BaseModel):

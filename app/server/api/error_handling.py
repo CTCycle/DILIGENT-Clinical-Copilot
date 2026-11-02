@@ -64,6 +64,7 @@ def make_json_safe(value: object) -> object:
 
 ###############################################################################
 class RequestIdMiddleware(BaseHTTPMiddleware):
+
     # -------------------------------------------------------------------------
     async def dispatch(
         self,

@@ -61,6 +61,7 @@ LIVERTOX_MONOGRAPHS = (
     ("Methotrexate", "NBK548219"),
 )
 
+
 ###############################################################################
 @dataclass
 class StaticSource:
@@ -88,7 +89,7 @@ class StaticSource:
         return self.snapshot
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_sqlite_engine(path: Path) -> Engine:
     engine = create_engine(
         f"sqlite+pysqlite:///{path}",
@@ -108,13 +109,13 @@ def build_sqlite_engine(path: Path) -> Engine:
     return engine
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_context(engine: Engine) -> RepositoryContext:
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
     return RepositoryContext.create(engine=engine, session_factory=factory)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def rxnorm_snapshot(version: str = "rxnorm-test-1") -> TerminologySnapshot:
     snapshot = TerminologySnapshot(source="rxnorm", version=version, license="Public domain")
     for rxcui, (name, concept_type, parent, components, aliases) in RXNORM_CONCEPTS.items():
@@ -144,7 +145,7 @@ def rxnorm_snapshot(version: str = "rxnorm-test-1") -> TerminologySnapshot:
     return snapshot
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def swissmedic_snapshot(version: str = "swissmedic-test-1") -> TerminologySnapshot:
     snapshot = TerminologySnapshot(
         source="swissmedic", version=version, license="Open use", brand_families=True
@@ -170,7 +171,7 @@ def swissmedic_snapshot(version: str = "swissmedic-test-1") -> TerminologySnapsh
     return snapshot
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def add_livertox_monographs(context: RepositoryContext) -> None:
     """Mirror the LiverTox updater: one monograph per drug row found by name."""
     with context.session_factory() as db_session:
@@ -194,7 +195,7 @@ def add_livertox_monographs(context: RepositoryContext) -> None:
         db_session.commit()
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def ingest(repository: TerminologyRepository, *sources: object, force_full: bool = False) -> dict:
     return TerminologyIngestor(repository, sources).run(  # type: ignore[arg-type]
         force_full=force_full,
@@ -203,7 +204,7 @@ def ingest(repository: TerminologyRepository, *sources: object, force_full: bool
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def seed_reference_terminology(context: RepositoryContext) -> TerminologyRepository:
     """RxNorm, LiverTox monographs, curated catalog aliases and Swiss products."""
     repository = TerminologyRepository(context)

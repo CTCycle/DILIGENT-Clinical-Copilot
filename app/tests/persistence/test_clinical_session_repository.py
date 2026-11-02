@@ -9,6 +9,7 @@ from repositories.schemas.clinical import ClinicalLabObservation
 from repository_fixtures import build_repository_graph
 from sqlalchemy import select
 
+
 ###############################################################################
 def test_persisted_lab_sample_date_populates_observation_at(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     repository = build_repository_graph(
@@ -47,6 +48,7 @@ def test_persisted_lab_sample_date_populates_observation_at(persistence_engine) 
     assert observation.metadata_json is not None
     assert observation.metadata_json["sample_date"] == "2026-03-01"
 
+
 ###############################################################################
 def test_repeated_lab_representations_persist_one_observation(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     repository = build_repository_graph(
@@ -70,6 +72,7 @@ def test_repeated_lab_representations_persist_one_observation(persistence_engine
             )
         ).all()
     assert len(rows) == 1
+
 
 ###############################################################################
 def test_attachments_are_idempotent_version_scoped_and_cascade(persistence_engine) -> None:  # type: ignore[no-untyped-def]

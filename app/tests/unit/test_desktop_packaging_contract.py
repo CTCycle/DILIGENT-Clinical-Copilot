@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 
 
+###############################################################################
 def test_desktop_runtime_archive_excludes_frontend_assets() -> None:
     payload = json.loads(
         (ROOT / "app/desktop/build/runtime_payload.json").read_text(encoding="utf-8")
@@ -22,6 +23,7 @@ def test_desktop_runtime_archive_excludes_frontend_assets() -> None:
     assert 'FORBIDDEN_PREFIXES = ("app/client/dist/browser/",)' in validator
 
 
+###############################################################################
 def test_tauri_release_bundles_frontend_and_uses_a_local_session_api() -> None:
     launcher = (ROOT / "start_on_windows.ps1").read_text(encoding="utf-8")
     tauri_main = (ROOT / "app/desktop/src-tauri/src/main.rs").read_text(

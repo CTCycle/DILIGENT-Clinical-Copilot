@@ -15,6 +15,7 @@ config = context.config
 
 target_metadata = Base.metadata
 
+
 ###############################################################################
 def _build_connectable():
     settings = get_server_settings().database
@@ -24,6 +25,7 @@ def _build_connectable():
     if settings.backend == "postgresql":
         return build_postgres_engine(settings)
     raise ValueError(f"Unsupported database backend: {settings.backend}")
+
 
 ###############################################################################
 def _configure(connection: Connection) -> None:
@@ -37,11 +39,13 @@ def _configure(connection: Connection) -> None:
         transaction_per_migration=False,
     )
 
+
 ###############################################################################
 def _run_migrations(connection: Connection) -> None:
     _configure(connection)
     with context.begin_transaction():
         context.run_migrations()
+
 
 ###############################################################################
 def run_migrations_offline() -> None:
@@ -62,6 +66,7 @@ def run_migrations_offline() -> None:
     )
     with context.begin_transaction():
         context.run_migrations()
+
 
 ###############################################################################
 def run_migrations_online() -> None:

@@ -38,6 +38,7 @@ from services.clinical.report_finalizer import ReportFinalizer
 from services.clinical.exposure_timeline import ExposureTimelineService
 from services.clinical.rag_support import RagSupportService
 
+
 ###############################################################################
 def build_test_consultation() -> HepatoxConsultation:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
@@ -53,6 +54,7 @@ def build_test_consultation() -> HepatoxConsultation:
         pipeline_issues=[],
     )
     return consultation
+
 
 ###############################################################################
 class FlakyChatClient:
@@ -70,6 +72,7 @@ class FlakyChatClient:
         if self.calls <= self.fail_count:
             raise RuntimeError("temporary provider failure")
         return self.response
+
 
 ###############################################################################
 def test_assess_payload_returns_determined_score_when_labs_present() -> None:
@@ -100,6 +103,7 @@ def test_assess_payload_returns_determined_score_when_labs_present() -> None:
     assert assessment.score.classification == "cholestatic"
     assert assessment.score.r_score == pytest.approx(1.0)
 
+
 ###############################################################################
 def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
@@ -113,6 +117,7 @@ def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
         issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues
     )
     assert any(issue.severity == "warning" for issue in assessment.issues)
+
 
 ###############################################################################
 def test_request_drug_analysis_retries_on_transient_failure() -> None:
@@ -170,6 +175,7 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
 
     assert result == "Recovered clinical paragraph."
     assert consultation.llm_client.calls == 2
+
 
 ###############################################################################
 def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
@@ -256,6 +262,7 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
     assert "Local evidence match: weak_alias_or_class_match" in rendered
     assert "Drug match is not a direct canonical match." in rendered
 
+
 ###############################################################################
 def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     consultation = build_test_consultation()
@@ -283,6 +290,7 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     assert report is not None
     assert "## Global Synthesis and Clinical Recommendations" in report
     assert "## Conclusion" not in report
+
 
 ###############################################################################
 def test_finalize_patient_report_lists_drug_identification_with_original_names() -> None:
@@ -323,6 +331,7 @@ def test_finalize_patient_report_lists_drug_identification_with_original_names()
     assert "| Augmentin | amoxicillin, clavulanate | verified | rxnorm |" in report
     # An ambiguous identity never shows a resolved ingredient.
     assert "| Hydroxazine | — |" in report
+
 
 ###############################################################################
 def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> (
@@ -379,6 +388,7 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
     assert "ulteriore ciclo (originariamente previsto il" in report
     assert "No matching drug record found in the local knowledge base." in report
 
+
 ###############################################################################
 def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     consultation = build_test_consultation()
@@ -410,6 +420,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
         "Matched drug record found, but no local LiverTox excerpt is available."
         in report
     )
+
 
 ###############################################################################
 def test_finalize_patient_report_renders_probable_identity_as_matched() -> (
@@ -444,6 +455,7 @@ def test_finalize_patient_report_renders_probable_identity_as_matched() -> (
     assert "Abiraterone clinical narrative." in report
     assert "## Unresolved Drug Mentions" not in report
 
+
 ###############################################################################
 def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() -> None:
     resolved = {
@@ -471,6 +483,7 @@ def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() 
 
     assert payload["match_status"] == "accepted_verified"
     assert payload["matched_livertox_row"]["drug_name"] == "Piperacillin"
+
 
 ###############################################################################
 def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() -> None:
@@ -520,6 +533,7 @@ def test_build_drug_assessment_base_attaches_claim_narrative_for_matched_drug() 
     assert entry.claims[0].evidence_quote == excerpts[0]
     assert knowledge_prompt == ""
 
+
 ###############################################################################
 def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
     consultation = build_test_consultation()
@@ -566,6 +580,7 @@ def test_build_drug_assessment_base_normalizes_oversized_match_reason() -> None:
     assert entry.match_reason == reasons[0]
     assert entry.match_notes == reasons
 
+
 ###############################################################################
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     consultation = build_test_consultation()
@@ -598,6 +613,7 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     assert "### UnknownX" in section
     assert "before causality is assigned" in section
 
+
 ###############################################################################
 def test_unresolved_candidate_details_render_names_without_raw_payloads() -> None:
     consultation = build_test_consultation()
@@ -615,6 +631,7 @@ def test_unresolved_candidate_details_render_names_without_raw_payloads() -> Non
     assert section is not None
     assert "Diazepam oral, Diazepam intravenous" in section
     assert "{'drug_name':" not in section
+
 
 ###############################################################################
 def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
@@ -634,6 +651,7 @@ def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
 
     assert sanitized == "Clinical narrative before appendix."
 
+
 ###############################################################################
 def test_remove_redundant_report_sentence_truncates_structured_dili_section() -> None:
     raw = (
@@ -647,6 +665,7 @@ def test_remove_redundant_report_sentence_truncates_structured_dili_section() ->
     cleaned = ReportFinalizer.remove_redundant_report_sentence(raw)
 
     assert cleaned == "Clinical narrative before appendix."
+
 
 ###############################################################################
 def test_source_text_evidence_produces_high_confidence_claim() -> None:
@@ -666,6 +685,7 @@ def test_source_text_evidence_produces_high_confidence_claim() -> None:
     assert narrative.claims[0].confidence == "high"
     assert narrative.claims[0].requires_review is False
 
+
 ###############################################################################
 def test_long_source_text_evidence_is_truncated_for_claim_quote() -> None:
     long_excerpt = "OVERVIEW " + ("Abiraterone liver injury evidence. " * 80)
@@ -684,6 +704,7 @@ def test_long_source_text_evidence_is_truncated_for_claim_quote() -> None:
     assert evidence_quote.endswith("[truncated]")
     assert long_excerpt.startswith(evidence_quote.removesuffix(" [truncated]"))
 
+
 ###############################################################################
 def test_blank_source_text_evidence_falls_back_to_review_claim() -> None:
     narrative = AnalysisRunner.build_clinical_narrative(
@@ -698,6 +719,7 @@ def test_blank_source_text_evidence_falls_back_to_review_claim() -> None:
     assert narrative.claims[0].evidence_quote is None
     assert narrative.claims[0].confidence == "low"
     assert narrative.claims[0].requires_review is True
+
 
 ###############################################################################
 def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
@@ -733,12 +755,14 @@ def test_missing_evidence_claim_requires_review_and_renders_warning() -> None:
     assert "Clinical review is required" in rendered
     assert "insufficient follow-up labs" in rendered
 
+
 ###############################################################################
 def test_summarize_drug_source_context_uses_entry_source() -> None:
     therapy = DrugEntry(name="Drug A", source="therapy")
     anamnesis = DrugEntry(name="Drug B", source="anamnesis")
     assert "therapy" in summarize_drug_source_context(therapy).lower()
     assert "anamnesis" in summarize_drug_source_context(anamnesis).lower()
+
 
 ###############################################################################
 def test_temporal_plausibility_reflects_available_timing_fields() -> None:
@@ -750,6 +774,7 @@ def test_temporal_plausibility_reflects_available_timing_fields() -> None:
     poor = DrugEntry(name="Drug B")
     assert "sequence" in assess_temporal_plausibility(rich, None).lower()
     assert "limited" in assess_temporal_plausibility(poor, None).lower()
+
 
 ###############################################################################
 def test_pattern_compatibility_handles_missing_excerpt() -> None:

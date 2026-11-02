@@ -11,6 +11,7 @@ from typing import Literal
 
 ContextPlanStatus = Literal["complete", "unknown_capacity", "required_overflow"]
 
+
 ###############################################################################
 def estimate_tokens(text: str) -> int:
     """Estimate tokens without a provider tokenizer, conservatively and deterministically."""
@@ -20,6 +21,7 @@ def estimate_tokens(text: str) -> int:
     word_like = len(re.findall(r"\w+|[^\w\s]", normalized, flags=re.UNICODE))
     character_estimate = math.ceil(len(normalized) / 4)
     return max(1, word_like, character_estimate)
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ class ContextSegment:
         normalized = " ".join(self.text.split()).casefold()
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ContextPlan:
@@ -56,6 +59,7 @@ class ContextPlan:
     status: ContextPlanStatus
     required_overflow: bool
     selection_report: dict[str, object] = field(default_factory=dict)
+
 
 ###############################################################################
 def calculate_input_budget(
@@ -73,6 +77,7 @@ def calculate_input_budget(
         + max(0, safety_reserve)
     )
     return max(0, context_limit - reserved)
+
 
 ###############################################################################
 def _deduplicate_segments(
@@ -98,6 +103,7 @@ def _deduplicate_segments(
         item[1] for item in sorted(selected_by_key.values(), key=lambda item: item[0])
     ]
     return deduplicated, duplicate_count
+
 
 ###############################################################################
 def build_context_plan(

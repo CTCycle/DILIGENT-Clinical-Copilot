@@ -46,6 +46,7 @@ _STAND_RE = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
 _BRAND_NOISE_RE = re.compile(r"\([^)]*\)|\b\d+(?:[.,']\d+)*\s*(?:mg|g|µg|μg|mcg|ml|%|i\.e\.|u\.i\.)?(?=\s|$)", re.IGNORECASE)
 _STRENGTH_TEMPLATE = r"\s+(\d+(?:[.,]\d+)?)\s*(mg|g|µg|μg|mcg|ml|u\.i\.|%)(?![a-z])"
 
+
 ###############################################################################
 class SwissmedicSource:
     key = "swissmedic"

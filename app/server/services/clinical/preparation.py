@@ -38,6 +38,7 @@ from services.text.normalization import normalize_drug_query_name
 
 FALLBACK_STATUSES = frozenset({"missing_livertox", "ambiguous_requires_review", "unresolved"})
 
+
 ###############################################################################
 class ClinicalKnowledgePreparation:
 

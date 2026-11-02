@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from repositories.database.session import resolve_engine, resolve_session_factory
 from repositories.schemas.configuration import ProviderModelCatalogCache
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderModelCatalogCacheRecord:
@@ -24,6 +25,7 @@ class ProviderModelCatalogCacheRecord:
     last_attempt_at: datetime
     last_attempt_status: str
     last_error: str | None
+
 
 ###############################################################################
 class ProviderModelCatalogCacheSerializer:

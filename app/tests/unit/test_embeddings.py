@@ -20,6 +20,8 @@ from services.llm.ollama_client import OllamaClient, OllamaError
 from pytest import MonkeyPatch
 import services.retrieval.embeddings as embeddings_module
 
+
+###############################################################################
 def _manifest(*, chunk_size: int | None = None, chunk_overlap: int | None = None):
     return build_embedding_index_manifest(
         generation_id="generation-1",
@@ -33,6 +35,8 @@ def _manifest(*, chunk_size: int | None = None, chunk_overlap: int | None = None
         chunk_overlap=chunk_overlap,
     )
 
+
+###############################################################################
 def test_manifest_records_effective_non_default_chunking_and_fingerprints_it() -> None:
     default_manifest = _manifest()
     custom_manifest = _manifest(chunk_size=333, chunk_overlap=44)
@@ -46,6 +50,8 @@ def test_manifest_records_effective_non_default_chunking_and_fingerprints_it() -
         default_manifest.embedding_fingerprint
     )
 
+
+###############################################################################
 class FakeTokenizer:
 
     # -------------------------------------------------------------------------
@@ -56,6 +62,8 @@ class FakeTokenizer:
     def decode(self, ids, *, skip_special_tokens: bool = True) -> str:
         return "decoded " + " ".join(map(str, ids))
 
+
+###############################################################################
 class FakeSession:
 
     # -------------------------------------------------------------------------
@@ -94,6 +102,8 @@ class FakeSession:
         batch = inputs["input_ids"].shape[0]
         return [np.tile(self.output, (batch, 1, 1))]
 
+
+###############################################################################
 def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
     config = config or CANONICAL_EMBEDDING_CONFIG
     snapshot = tmp_path / config.revision
@@ -115,6 +125,8 @@ def _runtime(tmp_path: Path, *, session=None, batch_size=2, config=None):
         session_factory=lambda path, **kwargs: session,
     ), session
 
+
+###############################################################################
 def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     tmp_path: Path,
 ) -> None:
@@ -128,11 +140,15 @@ def test_runtime_is_lazy_reuses_session_and_exposes_chunking_adapter(
     assert runtime.get_tokenizer().decode([1, 2]) == "decoded 1 2"
     assert len(session.calls) == 2
 
+
+###############################################################################
 def test_offline_runtime_rejects_incomplete_cache(tmp_path: Path) -> None:
     runtime = EmbeddingRuntime(cache_directory=tmp_path, offline_mode=True)
     with pytest.raises(EmbeddingRuntimeUnavailable, match="incomplete"):
         runtime.embed_documents(["document"])
 
+
+###############################################################################
 def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
     runtime, _ = _runtime(tmp_path)
     artifact = (
@@ -144,12 +160,16 @@ def test_runtime_rejects_corrupted_artifact(tmp_path: Path) -> None:
     with pytest.raises(EmbeddingRuntimeUnavailable, match="SHA-256"):
         runtime.embed_documents(["document"])
 
+
+###############################################################################
 def test_runtime_rejects_wrong_dimension(tmp_path: Path) -> None:
     output = np.zeros((1, 3, 12), dtype=np.float32)
     runtime, _ = _runtime(tmp_path, session=FakeSession(output))
     with pytest.raises(EmbeddingVectorValidationError, match="dimension"):
         runtime.embed_documents(["document"])
 
+
+###############################################################################
 def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> None:
     runtime, _ = _runtime(tmp_path)
     runtime.embed_queries(["query"])
@@ -158,8 +178,11 @@ def test_runtime_close_releases_session_and_can_be_recreated(tmp_path: Path) -> 
     with pytest.raises(Exception, match="shutting down"):
         runtime.embed_queries(["query"])
 
+
+###############################################################################
 def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
     created = []
+
 
     ###############################################################################
     class FakeRuntime:
@@ -197,6 +220,8 @@ def test_cached_accessor_reuses_and_close_clears_runtime(monkeypatch) -> None:
     finally:
         embedding_runtime_module.get_embedding_runtime.cache_clear()
 
+
+###############################################################################
 def test_close_before_first_accessor_use_is_noop(monkeypatch) -> None:
     monkeypatch.setattr(
         embedding_runtime_module,
@@ -206,12 +231,15 @@ def test_close_before_first_accessor_use_is_noop(monkeypatch) -> None:
     embedding_runtime_module.get_embedding_runtime.cache_clear()
     embedding_runtime_module.close_embedding_runtime()
 
+
+###############################################################################
 def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     captured: dict[str, object] = {}
 
     async def fake_ready(model: str) -> None:
         _ = model
+
 
     ###############################################################################
     class FakeResponse:
@@ -237,6 +265,8 @@ def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) 
     assert captured["json"] == {"model": "nomic-embed-text", "input": ["a", "bb"]}
     asyncio.run(client.close())
 
+
+###############################################################################
 def test_ollama_embedding_payload_validation_errors() -> None:
     try:
         normalize_embedding_payload({}, 1)
@@ -256,7 +286,10 @@ def test_ollama_embedding_payload_validation_errors() -> None:
     except OllamaError:
         pass
 
+
+###############################################################################
 def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) -> None:
+
 
     ###############################################################################
     class FakeResponsesTransport:
@@ -279,6 +312,7 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
         provider="openai", default_model="text-embedding-3-small"
     )
     monkeypatch.setattr(client, "raise_for_status", lambda resp: None)
+
 
     ###############################################################################
     class FakeResponse:
@@ -311,7 +345,10 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
     assert vectors == [[1.0, 2.0], [3.0, 4.0]]
     asyncio.run(client.close())
 
+
+###############################################################################
 def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
+
 
     ###############################################################################
     class FakeGeminiClient:
@@ -334,6 +371,7 @@ def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
         provider="gemini", default_model="gemini-2.5-pro"
     )
     monkeypatch.setattr(client, "raise_for_status", lambda resp: None)
+
 
     ###############################################################################
     class FakeResponse:
@@ -364,6 +402,8 @@ def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
         pass
     asyncio.run(client.close())
 
+
+###############################################################################
 def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
@@ -378,6 +418,8 @@ def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     assert isinstance(provider, embeddings_module.CloudEmbeddingGenerator)
     assert provider.provider == "openai"
 
+
+###############################################################################
 def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
@@ -392,6 +434,8 @@ def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     assert isinstance(provider, embeddings_module.CloudEmbeddingGenerator)
     assert provider.provider == "gemini"
 
+
+###############################################################################
 def test_ollama_embedding_provider_selection() -> None:
     provider = embeddings_module.select_embedding_provider(
         backend="ollama",
@@ -399,12 +443,15 @@ def test_ollama_embedding_provider_selection() -> None:
     )
     assert isinstance(provider, embeddings_module.OllamaEmbeddingGenerator)
 
+
+###############################################################################
 def test_single_query_embedding_return_shape(monkeypatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
         "resolve_provider_access_key",
         staticmethod(lambda provider: "openai-key"),
     )
+
 
     ###############################################################################
     class FakeClient:
@@ -437,7 +484,10 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
     assert isinstance(vector, list)
     assert vector == [1.0, 2.0]
 
+
+###############################################################################
 def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
+
 
     ###############################################################################
     class FakeClient:
@@ -466,6 +516,8 @@ def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
     vectors = asyncio.run(generator.embed_texts(["first", "second", "third"]))
     assert vectors == [[0.0], [1.0], [2.0]]
 
+
+###############################################################################
 def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
     try:
         embeddings_module.select_embedding_provider(
@@ -482,6 +534,7 @@ def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
         "resolve_provider_access_key",
         staticmethod(lambda provider: "openai-key"),
     )
+
 
     ###############################################################################
     class FailingClient:

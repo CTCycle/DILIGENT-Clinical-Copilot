@@ -17,7 +17,7 @@ from common.utils.logger import logger
 from services.terminology.normalization import orthographic_skeleton
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def trigrams(value: str) -> set[str]:
     padded = f"  {value} "
     return {padded[index : index + 3] for index in range(len(padded) - 2)}
@@ -117,6 +117,6 @@ class TerminologyIndexCache:
 _INDEX_CACHE = TerminologyIndexCache()
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def get_terminology_index_cache() -> TerminologyIndexCache:
     return _INDEX_CACHE

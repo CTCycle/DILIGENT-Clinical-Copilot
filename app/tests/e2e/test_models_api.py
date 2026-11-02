@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 from playwright.sync_api import APIRequestContext
 
+
 ###############################################################################
 def wait_for_pull_job(api_context: APIRequestContext, job_id: str) -> dict:
     for _ in range(120):
@@ -23,6 +24,7 @@ def wait_for_pull_job(api_context: APIRequestContext, job_id: str) -> dict:
         time.sleep(0.25)
     raise AssertionError("Model pull job did not finish in time")
 
+
 ###############################################################################
 def test_models_list_returns_payload(api_context: APIRequestContext):
     response = api_context.get("/api/models/list")
@@ -33,6 +35,7 @@ def test_models_list_returns_payload(api_context: APIRequestContext):
     assert "count" in payload
     assert isinstance(payload["models"], list)
     assert payload["count"] == len(payload["models"])
+
 
 ###############################################################################
 def test_models_pull_job_noop_when_model_available(api_context: APIRequestContext):

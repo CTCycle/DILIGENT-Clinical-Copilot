@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
+
 ###############################################################################
 def build_hepatotoxicity_pattern_context(
     *,
@@ -35,11 +36,13 @@ def build_hepatotoxicity_pattern_context(
     )
     return " ".join(segments)
 
+
 ###############################################################################
 def build_livertox_knowledge_fragment(*, livertox_excerpt: str) -> str:
     excerpt = livertox_excerpt if livertox_excerpt else "No local LiverTox excerpt available."
     return f"""LiverTox excerpt:
 {excerpt}"""
+
 
 ###############################################################################
 def build_dilirank_knowledge_fragment(

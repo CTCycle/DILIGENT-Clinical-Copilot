@@ -12,6 +12,7 @@ from common.utils.clinical_dates import (
 )
 from services.clinical.labs import ClinicalLabExtractor
 
+
 ###############################################################################
 def test_unambiguous_token_sets_month_first_order_for_the_record() -> None:
     text = "05/06/2024: ALT 400 U/L. 05/20/2024: ALT 150 U/L."
@@ -20,10 +21,12 @@ def test_unambiguous_token_sets_month_first_order_for_the_record() -> None:
     assert parse_clinical_date("05/06/2024", order) == date(2024, 5, 6)
     assert not has_ambiguous_date_order(text)
 
+
 ###############################################################################
 def test_unsettled_day_month_order_is_flagged() -> None:
     assert has_ambiguous_date_order("03/05/2024: ALT 300 U/L")
     assert not has_ambiguous_date_order("2024-03-05: ALT 300 U/L")
+
 
 ###############################################################################
 def test_two_digit_years_and_yearless_dates_are_normalized() -> None:

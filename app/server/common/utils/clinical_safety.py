@@ -39,6 +39,7 @@ _NEGATIVE_RECHALLENGE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 def _sentences(text: str) -> list[str]:
     normalized = re.sub(r"\s+", " ", str(text or "")).strip()
@@ -47,6 +48,7 @@ def _sentences(text: str) -> list[str]:
         for sentence in re.split(r"(?<=[.!?])\s+|\r?\n+", normalized)
         if sentence.strip()
     ]
+
 
 ###############################################################################
 def contains_rechallenge_recommendation(text: str | None) -> bool:
@@ -103,6 +105,7 @@ def contains_rechallenge_recommendation(text: str | None) -> bool:
                 continue
             return True
     return False
+
 
 ###############################################################################
 def contains_explicitly_negative_rechallenge(text: str | None) -> bool:

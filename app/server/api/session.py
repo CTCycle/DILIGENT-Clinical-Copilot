@@ -31,11 +31,13 @@ from services.session.session_service import ClinicalSessionService
 
 router = APIRouter(tags=["session"])
 
+
 ###############################################################################
 def _no_store(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+
 
 ###############################################################################
 class ClinicalSessionEndpoint:

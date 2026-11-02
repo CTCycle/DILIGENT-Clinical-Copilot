@@ -31,7 +31,7 @@ from terminology_fixtures import (
 )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def table_state(repository: TerminologyRepository) -> dict[str, object]:
     with repository.session_factory() as db_session:
         return {
@@ -54,7 +54,7 @@ def table_state(repository: TerminologyRepository) -> dict[str, object]:
         }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def drug_id(repository: TerminologyRepository, name: str) -> int:
     with repository.session_factory() as db_session:
         return int(db_session.execute(select(Drug.id).where(Drug.canonical_name == name)).scalar_one())
@@ -101,7 +101,11 @@ def test_failed_source_keeps_last_good_snapshot(persistence_engine: Engine) -> N
     repository = seed_reference_terminology(build_context(persistence_engine))
     before = table_state(repository)
 
+
+    ###############################################################################
     class Unreachable(StaticSource):
+
+        # -------------------------------------------------------------------------
         def fetch(self, progress, should_stop):  # type: ignore[no-untyped-def]
             raise TerminologySourceUnavailable("download truncated")
 

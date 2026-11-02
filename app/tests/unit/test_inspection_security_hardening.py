@@ -24,6 +24,7 @@ from pydantic import ValidationError
 from repositories.drug_catalog_repository import _build_search_pattern
 from services.inspection import DataInspectionService
 
+
 ###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
     for route in router.routes:
@@ -33,11 +34,13 @@ def get_route_owner(router: Any, route_path: str) -> Any:
                 return owner
     raise AssertionError(f"Route not found: {route_path}")
 
+
 ###############################################################################
 def test_session_search_filter_strips_control_characters() -> None:
     filters = SessionListFilters(search=" \x00  metformin\t\n ")
 
     assert filters.search == "metformin"
+
 
 ###############################################################################
 def test_catalog_search_filter_rejects_oversized_values() -> None:
@@ -46,11 +49,13 @@ def test_catalog_search_filter_rejects_oversized_values() -> None:
     with pytest.raises(ValidationError):
         CatalogListFilters(search=oversized)
 
+
 ###############################################################################
 def test_search_pattern_escapes_like_wildcards() -> None:
     pattern = _build_search_pattern(r"  100%_match\check  ")
 
     assert pattern == r"%100\%\_match\\check%"
+
 
 ###############################################################################
 def test_new_inspection_models_validate_shapes() -> None:
@@ -68,8 +73,10 @@ def test_new_inspection_models_validate_shapes() -> None:
     rag_request = InspectionRagUpdateRequest(documents_path="C:/data/rag")
     assert rag_request.documents_path == "C:/data/rag"
 
+
 ###############################################################################
 def test_livertox_update_config_route_is_not_shadowed() -> None:
+
 
     ###############################################################################
     class ServiceStub:
@@ -98,6 +105,7 @@ def test_livertox_update_config_route_is_not_shadowed() -> None:
     assert response.status_code == 200
     assert response.json()["target"] == "livertox"
 
+
 ###############################################################################
 def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     service = object.__new__(DataInspectionService)
@@ -107,6 +115,7 @@ def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     assert payload["target"] == "livertox"
     assert "redownload" in payload["allowed_fields"]
     assert "redownload" in payload["defaults"]
+
 
 ###############################################################################
 def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
@@ -122,8 +131,10 @@ def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
     assert "documents_path" not in payload["summary"]
     assert "retrieval_candidate_count" not in payload["summary"]
 
+
 ###############################################################################
 def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
+
 
     ###############################################################################
     class ServiceStub:
@@ -165,6 +176,7 @@ def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
     assert accepted.status_code == 202
     assert accepted.json()["job_type"] == "rag_update"
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("path", "request_body"),
@@ -182,17 +194,25 @@ def test_ncbi_update_routes_start_with_or_without_contact(
     contact_email: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+
+
+    ###############################################################################
     class JobsProbe:
+
+        # -------------------------------------------------------------------------
         def __init__(self) -> None:
             self.created: list[dict[str, object]] = []
 
+        # -------------------------------------------------------------------------
         def is_job_running(self, *args: object, **kwargs: object) -> bool:
             return False
 
+        # -------------------------------------------------------------------------
         def start_job(self, **kwargs: object) -> str:
             self.created.append(kwargs)
             return "contact-configured-job"
 
+        # -------------------------------------------------------------------------
         def get_job_status(self, job_id: str) -> dict[str, object]:
             job = self.created[0]
             return {
@@ -227,6 +247,7 @@ def test_ncbi_update_routes_start_with_or_without_contact(
     assert response.status_code == 202
     assert len(jobs.created) == 1
 
+
 ###############################################################################
 def test_rag_directory_browse_lists_canonical_child_directories(
     tmp_path: Path,
@@ -256,6 +277,7 @@ def test_rag_directory_browse_lists_canonical_child_directories(
     ]
     assert all(item["is_dir"] for item in payload["items"])
     assert all(Path(item["path"]).is_absolute() for item in payload["items"])
+
 
 ###############################################################################
 def test_rag_directory_browse_handles_roots_and_rejects_invalid_paths(
@@ -287,6 +309,7 @@ def test_rag_directory_browse_handles_roots_and_rejects_invalid_paths(
     with pytest.raises(NotADirectoryError):
         service.browse_rag_directories(str(file_path))
 
+
 ###############################################################################
 def test_rag_directory_browse_respects_filesystem_access_flag(
     monkeypatch: pytest.MonkeyPatch,
@@ -303,8 +326,10 @@ def test_rag_directory_browse_respects_filesystem_access_flag(
     with pytest.raises(PermissionError):
         service.browse_rag_directories()
 
+
 ###############################################################################
 def test_rag_directory_browse_route_returns_typed_payload() -> None:
+
 
     ###############################################################################
     class ServiceStub:
@@ -337,6 +362,7 @@ def test_rag_directory_browse_route_returns_typed_payload() -> None:
     ]["200"]["content"]["application/json"]["schema"]
     assert response_schema["$ref"].endswith("/RagDirectoryBrowseResponse")
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("service_error", "expected_status", "expected_detail"),
@@ -364,6 +390,7 @@ def test_rag_directory_browse_route_sanitizes_filesystem_errors(
     expected_detail: str,
 ) -> None:
 
+
     ###############################################################################
     class ServiceStub:
 
@@ -390,6 +417,7 @@ def test_rag_directory_browse_route_sanitizes_filesystem_errors(
     assert response.json() == {"detail": expected_detail}
     assert "C:\\private" not in response.text
 
+
 ###############################################################################
 def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
     tmp_path: Path,
@@ -402,6 +430,7 @@ def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
     duplicate_path.write_bytes(supported_path.read_bytes())
     unsupported_path = tmp_path / "nested" / "legacy.doc"
     unsupported_path.write_bytes(b"legacy binary Word document")
+
 
     ###############################################################################
     class FakeVectorDatabase:
@@ -456,6 +485,7 @@ def test_rag_document_listing_exposes_unsupported_files_as_not_ingestible(
     ]
     assert rows["legacy.doc"]["supported_for_ingestion"] is False
 
+
 ###############################################################################
 def test_rag_cancel_route_uses_delete_only() -> None:
     app = FastAPI()
@@ -468,6 +498,7 @@ def test_rag_cancel_route_uses_delete_only() -> None:
 
     assert ("DELETE", "/inspection/rag/jobs/{job_id}") in routes
     assert ("POST", "/inspection/rag/jobs/{job_id}/cancel") not in routes
+
 
 ###############################################################################
 def test_reference_catalog_runtime_observation_routes_are_registered() -> None:

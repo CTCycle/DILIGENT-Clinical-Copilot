@@ -44,6 +44,7 @@ BLOCKED_ALIAS_KIND = "error_prone_abbreviation"
 
 MAX_CANDIDATES = 5
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ResolverSettings:
@@ -58,6 +59,7 @@ class ResolverSettings:
     external_max_requests_per_name: int = 4
     external_negative_cache_days: int = 7
 
+
 ###############################################################################
 @dataclass
 class _Match:
@@ -65,6 +67,7 @@ class _Match:
     method: ResolutionMethod
     key: str
     distance: int | None = None
+
 
 ###############################################################################
 class TerminologyResolver:

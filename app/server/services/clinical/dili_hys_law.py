@@ -18,6 +18,7 @@ from services.clinical.dili_timeline import DiliTimelineEngine
 # sample within this many days (FDA 2009: no initial cholestasis).
 ONSET_ALP_WINDOW_DAYS = 7
 
+
 ###############################################################################
 class HysLawDetector:
 

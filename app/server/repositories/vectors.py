@@ -52,6 +52,7 @@ VECTOR_TABLE_SCHEMA = pa.schema(
 DistanceType = Literal["l2", "cosine", "dot"]
 IndexType = Literal["IVF_FLAT", "IVF_PQ", "IVF_HNSW_SQ", "IVF_HNSW_PQ"]
 
+
 ###############################################################################
 class LanceVectorDatabase:
 

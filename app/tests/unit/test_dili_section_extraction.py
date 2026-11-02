@@ -14,6 +14,7 @@ from services.session.text_section_parser import (
     parse_initial_text_sections,
 )
 
+
 ###############################################################################
 def test_extract_preferred_markdown_headings() -> None:
     text = "## Anamnesis\nA details\n\n## Therapy\nT details\n\n## Laboratory history\nL details"
@@ -22,6 +23,7 @@ def test_extract_preferred_markdown_headings() -> None:
     assert sections["anamnesis"].text == "A details"
     assert sections["therapy"].text == "T details"
     assert sections["laboratory_history"].text == "L details"
+
 
 ###############################################################################
 def test_markdown_sections_ignore_body_subheadings() -> None:
@@ -44,6 +46,7 @@ def test_markdown_sections_ignore_body_subheadings() -> None:
     assert "Terapia specialistica eseguita:" in sections["anamnesis"].text
     assert "Terapia farmacologica" in sections["therapy"].text
 
+
 ###############################################################################
 def test_final_report_heading_is_not_anamnesis_typo() -> None:
     text = (
@@ -57,6 +60,7 @@ def test_final_report_heading_is_not_anamnesis_typo() -> None:
 
     assert missing_required_section_names(sections) == []
     assert sections["laboratory_history"].text == "L"
+
 
 ###############################################################################
 def test_unclassified_markdown_headings_bound_sections_generically() -> None:
@@ -73,11 +77,13 @@ def test_unclassified_markdown_headings_bound_sections_generically() -> None:
     assert missing_required_section_names(sections) == []
     assert sections["laboratory_history"].text == "L"
 
+
 ###############################################################################
 def test_phrase_aware_typo_matching_accepts_heading_typos() -> None:
     text = "## Clinical History\nA\n\n## Medicatons\nT\n\n## Laboratroy tests\nL"
     sections = extract_required_dili_sections(text)
     assert missing_required_section_names(sections) == []
+
 
 ###############################################################################
 def test_accepts_common_variants() -> None:
@@ -86,6 +92,7 @@ def test_accepts_common_variants() -> None:
     )
     sections = extract_required_dili_sections(text)
     assert missing_required_section_names(sections) == []
+
 
 ###############################################################################
 def test_clinical_question_heading_does_not_duplicate_anamnesis() -> None:
@@ -100,6 +107,7 @@ def test_clinical_question_heading_does_not_duplicate_anamnesis() -> None:
 
     assert missing_required_section_names(sections) == []
     assert sections["anamnesis"].text == "A"
+
 
 ###############################################################################
 def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
@@ -116,11 +124,13 @@ def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
     assert missing_required_section_names(sections) == []
     assert "Fortecortin" in sections["therapy"].text
 
+
 ###############################################################################
 def test_rejects_missing_required_section() -> None:
     text = "## Anamnesis\nA\n\n## Therapy\nT"
     sections = extract_required_dili_sections(text)
     assert "laboratory_history" in missing_required_section_names(sections)
+
 
 ###############################################################################
 def test_rejects_untitled_prose_inference() -> None:
@@ -134,16 +144,19 @@ def test_rejects_untitled_prose_inference() -> None:
         "laboratory_history",
     ]
 
+
 ###############################################################################
 def test_duplicate_competing_headings_raise() -> None:
     text = "## Therapy\nT1\n\n## Current medications\nT2\n\n## Anamnesis\nA\n\n## Laboratory history\nL"
     with pytest.raises(ValueError):
         extract_required_dili_sections(text)
 
+
 ###############################################################################
 def test_blank_lines_do_not_create_markers() -> None:
     text = "line one\n\nline two\n\nline three"
     assert scan_dili_section_headings(text).section_headings == []
+
 
 ###############################################################################
 def test_section_parser_preserves_exact_body_slice_and_metadata() -> None:
@@ -172,6 +185,7 @@ def test_section_parser_preserves_exact_body_slice_and_metadata() -> None:
         for section in extraction.metadata["sections"].values()
     )
     assert extraction.metadata["requires_review"] is False
+
 
 ###############################################################################
 def test_section_parser_marks_low_confidence_inferred_sections_for_review() -> None:

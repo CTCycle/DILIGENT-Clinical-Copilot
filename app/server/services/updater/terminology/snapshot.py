@@ -14,6 +14,7 @@ IDENTITY_SYSTEMS = ("unii", "chembl", "drugcentral", "inchikey")
 ProgressFn = Callable[[float, str], None]
 StopFn = Callable[[], bool]
 
+
 ###############################################################################
 @dataclass
 class StagedConcept:
@@ -29,6 +30,7 @@ class StagedConcept:
     component_keys: tuple[str, ...] = ()
     parent_key: str | None = None
 
+
 ###############################################################################
 @dataclass
 class StagedAlias:
@@ -39,6 +41,7 @@ class StagedAlias:
     language: str | None = None
     country: str | None = None
     source_record_id: str | None = None
+
 
 ###############################################################################
 @dataclass
@@ -53,6 +56,7 @@ class StagedNamedAlias:
     country: str | None = None
     source_record_id: str | None = None
 
+
 ###############################################################################
 @dataclass
 class StagedProductIngredient:
@@ -63,6 +67,7 @@ class StagedProductIngredient:
     lookup_names: tuple[str, ...] = ()
     strength_value: float | None = None
     strength_unit: str | None = None
+
 
 ###############################################################################
 @dataclass
@@ -76,6 +81,7 @@ class StagedProduct:
     route: str | None = None
     atc_code: str | None = None
     language: str | None = None
+
 
 ###############################################################################
 @dataclass
@@ -96,9 +102,11 @@ class TerminologySnapshot:
         if text and concept_key in self.concepts:
             self.aliases.append(StagedAlias(concept_key, text, alias_kind, **extra))
 
+
 ###############################################################################
 class TerminologySourceUnavailable(RuntimeError):
     """Raised when a source cannot be reached or its download is incomplete."""
+
 
 ###############################################################################
 class TerminologySource(Protocol):
@@ -107,10 +115,12 @@ class TerminologySource(Protocol):
     attribution: str
     precedence: int
 
+    # -------------------------------------------------------------------------
     def probe_version(self) -> str | None:
         """Return the upstream release identifier, or None when unknown."""
         ...
 
+    # -------------------------------------------------------------------------
     def fetch(self, progress: ProgressFn, should_stop: StopFn) -> TerminologySnapshot:
         """Download and stage one complete snapshot; never writes the database."""
         ...

@@ -20,6 +20,7 @@ from repositories.schemas.configuration import (
     ReferenceCatalogManifest,
 )
 
+
 ###############################################################################
 class ReferenceCatalogSerializer:
 

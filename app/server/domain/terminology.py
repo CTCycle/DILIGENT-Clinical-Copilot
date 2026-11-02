@@ -21,6 +21,7 @@ ResolutionMethod = Literal[
     "none",
 ]
 
+
 ###############################################################################
 class TerminologyIngredient(BaseModel):
     """One active ingredient of a resolved concept (salt form kept separately)."""
@@ -32,6 +33,7 @@ class TerminologyIngredient(BaseModel):
     concept_type: str
     parent_drug_id: int | None = None
     parent_name: str | None = None
+
 
 ###############################################################################
 class TerminologyCandidate(BaseModel):
@@ -47,6 +49,7 @@ class TerminologyCandidate(BaseModel):
     edit_distance: int | None = None
     # Raw string similarity in [0, 1]; a ranking signal, not a probability.
     similarity: float | None = None
+
 
 ###############################################################################
 class TerminologyResolution(BaseModel):
@@ -75,12 +78,14 @@ class TerminologyResolution(BaseModel):
     external_calls: int = 0
     terminology_revision: int | None = None
 
+
 ###############################################################################
 class TerminologyResolveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., min_length=1, max_length=200)
     allow_external: bool = True
+
 
 ###############################################################################
 class TerminologyAliasDecisionRequest(BaseModel):
@@ -89,11 +94,13 @@ class TerminologyAliasDecisionRequest(BaseModel):
     alias: str = Field(..., min_length=1, max_length=200)
     drug_id: int = Field(..., ge=1)
 
+
 ###############################################################################
 class TerminologyAliasDecisionResponse(BaseModel):
     alias: str
     drug_id: int
     validation_status: Literal["confirmed", "rejected"]
+
 
 ###############################################################################
 class TerminologySourceSummary(BaseModel):
@@ -111,6 +118,7 @@ class TerminologySourceSummary(BaseModel):
     open_conflicts: int = 0
     last_error: str | None = None
 
+
 ###############################################################################
 class TerminologySummaryResponse(BaseModel):
     revision: int | None
@@ -127,6 +135,7 @@ class TerminologySummaryResponse(BaseModel):
     index: dict[str, Any] = Field(default_factory=dict)
     sources: list[TerminologySourceSummary] = Field(default_factory=list)
 
+
 ###############################################################################
 class TerminologyImportRunItem(BaseModel):
     id: int
@@ -139,9 +148,11 @@ class TerminologyImportRunItem(BaseModel):
     stats: dict[str, Any] | None = None
     error: str | None = None
 
+
 ###############################################################################
 class TerminologyImportRunsResponse(BaseModel):
     items: list[TerminologyImportRunItem]
+
 
 ###############################################################################
 class TerminologyConflictItem(BaseModel):
@@ -154,6 +165,7 @@ class TerminologyConflictItem(BaseModel):
     detail: str | None
     status: str
     detected_at: datetime
+
 
 ###############################################################################
 class TerminologyConflictsResponse(BaseModel):

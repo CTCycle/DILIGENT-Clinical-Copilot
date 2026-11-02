@@ -26,6 +26,7 @@ from services.updater.terminology.snapshot import (  # noqa: E402
 )
 
 
+###############################################################################
 def _seed_rxnorm_fixture(repository: TerminologyRepository) -> None:
     snapshot = TerminologySnapshot(
         source="rxnorm", version="live-provider-fixture", license="Public domain"
@@ -40,6 +41,7 @@ def _seed_rxnorm_fixture(repository: TerminologyRepository) -> None:
     )
 
 
+###############################################################################
 def seed_live_provider_database() -> tuple[int, int]:
     database_settings = get_server_settings().database
     if database_settings.backend != "sqlite":

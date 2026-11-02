@@ -66,6 +66,7 @@ _PROVIDER_FAILURE_HINT = (
 )
 _MAX_STRUCTURED_REPAIR_TEXT_CHARS = 30000
 
+
 ###############################################################################
 class LLMError(RuntimeError):
 
@@ -141,6 +142,7 @@ class LLMError(RuntimeError):
             f"{self.model} during {self.operation}{status}{detail}"
         )
 
+
 ###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
@@ -165,9 +167,11 @@ class LLMTimeout(LLMError):
             operation=operation,
         )
 
+
 ###############################################################################
 def short_output_hash(output_text: str) -> str:
     return hashlib.sha256((output_text or "").encode("utf-8")).hexdigest()[:12]
+
 
 ###############################################################################
 def clip_structured_repair_text(value: object) -> str:
@@ -183,6 +187,7 @@ def clip_structured_repair_text(value: object) -> str:
         f"{text[-tail_length:]}"
     )
 
+
 ###############################################################################
 def looks_like_schema_echo(text: str) -> bool:
     lowered = text.casefold()
@@ -195,6 +200,7 @@ def looks_like_schema_echo(text: str) -> bool:
         '"$ref"',
     )
     return sum(1 for marker in schema_markers if marker in lowered) >= 3
+
 
 ###############################################################################
 class CloudLLMClient:

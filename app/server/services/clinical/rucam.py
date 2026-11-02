@@ -31,6 +31,7 @@ from services.clinical.livertox_likelihood import normalize_livertox_likelihood
 from services.clinical.report_language import phrase, resolve_report_language
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 def _compile_terms_regex(category: str) -> re.Pattern[str]:
     values = get_reference_catalog_snapshot().values(
@@ -43,9 +44,11 @@ def _compile_terms_regex(category: str) -> re.Pattern[str]:
         return re.compile(r"\b(" + "|".join(terms) + r")\b", re.IGNORECASE)
     return re.compile(r"$^")
 
+
 ###############################################################################
 def _alcohol_re() -> re.Pattern[str]:
     return _compile_terms_regex("rucam_alcohol_terms")
+
 
 ###############################################################################
 def _exclusion_re() -> re.Pattern[str]:
@@ -93,6 +96,7 @@ RucamCausalityCategory = Literal[
     "highly probable",
     "not assessable",
 ]
+
 
 ###############################################################################
 class RucamScoreEstimator:

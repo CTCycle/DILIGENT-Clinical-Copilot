@@ -10,7 +10,7 @@ from services.terminology.index import get_terminology_index_cache
 from services.terminology.resolver import ResolverSettings, TerminologyResolver
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_resolver_settings() -> ResolverSettings:
     matcher = get_server_settings().drugs_matcher
     return ResolverSettings(
@@ -27,7 +27,7 @@ def build_resolver_settings() -> ResolverSettings:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_terminology_resolver(
     lookup: TerminologyLookupRepository,
     *,

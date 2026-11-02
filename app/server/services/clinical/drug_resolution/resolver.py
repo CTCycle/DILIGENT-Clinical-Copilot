@@ -24,6 +24,7 @@ from services.terminology.normalization import fold
 from services.terminology.resolver import TerminologyResolver
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 class DrugResolutionService:
     """Resolve extracted mentions to terminology concepts and linked LiverTox evidence."""

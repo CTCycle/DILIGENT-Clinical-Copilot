@@ -14,6 +14,7 @@ from domain.jobs import (
 )
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionEndpointBase:
 
@@ -26,6 +27,7 @@ class InspectionEndpointBase:
     ) -> None:
         self.router = router
         self.service = service
+
 
 ###############################################################################
 class InspectionJobEndpointMixin(InspectionEndpointBase):

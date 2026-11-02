@@ -29,6 +29,7 @@ INTERRUPTED_ERROR = {
     ),
 }
 
+
 ###############################################################################
 class ClinicalSessionScheduler:
     """Admit queued clinical sessions up to the configured concurrency limit.
@@ -219,6 +220,8 @@ class ClinicalSessionScheduler:
 
 ###############################################################################
 class SessionNotCancellableError(RuntimeError):
+
+    # -------------------------------------------------------------------------
     def __init__(self, status: str) -> None:
         super().__init__(f"A {status} session cannot be cancelled.")
         self.status = status

@@ -35,12 +35,14 @@ _NARRATIVE_PREDICATE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 def normalize_parser_filter_key(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", str(value or ""))
     normalized = normalized.encode("ascii", "ignore").decode("ascii").lower()
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
     return re.sub(r"\s+", " ", normalized).strip()
+
 
 ###############################################################################
 def is_sentence_like_non_drug_name(value: str | None) -> bool:
@@ -52,6 +54,7 @@ def is_sentence_like_non_drug_name(value: str | None) -> bool:
         _NARRATIVE_SUBJECT_RE.match(normalized)
         and _NARRATIVE_PREDICATE_RE.search(normalized)
     )
+
 
 ###############################################################################
 def is_obvious_non_drug_name(value: str | None) -> bool:
@@ -78,6 +81,7 @@ def is_obvious_non_drug_name(value: str | None) -> bool:
         if item
     }
     return normalized in catalog_names
+
 
 ###############################################################################
 @lru_cache(maxsize=1)

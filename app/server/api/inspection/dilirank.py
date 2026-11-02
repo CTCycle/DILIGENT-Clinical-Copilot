@@ -15,6 +15,7 @@ from domain.dilirank import (
 from domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionDiliRankEndpoint(InspectionJobEndpointMixin):
 

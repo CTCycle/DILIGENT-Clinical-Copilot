@@ -38,6 +38,7 @@ _LEGACY_VERSION_STATUS_SQL = (
     ")"
 )
 
+
 ###############################################################################
 def upgrade() -> None:
     with op.batch_alter_table("clinical_session_versions", schema=None) as batch_op:
@@ -104,6 +105,7 @@ def upgrade() -> None:
             """
         )
     )
+
 
 ###############################################################################
 def downgrade() -> None:

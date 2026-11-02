@@ -25,6 +25,7 @@ down_revision: Union[str, Sequence[str], None] = "202610300001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+
 ###############################################################################
 def _entry_key(entry: dict[str, Any]) -> tuple[str, str, str, str]:
     value = entry.get("value")
@@ -37,6 +38,7 @@ def _entry_key(entry: dict[str, Any]) -> tuple[str, str, str, str]:
         value_token.strip().lower(),
         str(entry.get("unit") or "").strip().lower(),
     )
+
 
 ###############################################################################
 def _merge_timeline(entries: list[Any]) -> list[Any]:
@@ -57,6 +59,7 @@ def _merge_timeline(entries: list[Any]) -> list[Any]:
                 if kept.get(field) is None and entry.get(field) is not None:
                     kept[field] = entry[field]
     return ordered
+
 
 ###############################################################################
 def upgrade() -> None:
@@ -90,6 +93,7 @@ def upgrade() -> None:
             "upper_limit_numeric, unit)"
         )
     )
+
 
 ###############################################################################
 def downgrade() -> None:

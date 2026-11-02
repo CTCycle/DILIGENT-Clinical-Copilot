@@ -27,10 +27,12 @@ _AGE_SEX_PROSE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 def _is_name_component(value: str) -> bool:
     tokens = normalize_drug_query_name(value).split()
     return any(any(char.isalpha() for char in token) and len(token) > 1 for token in tokens)
+
 
 ###############################################################################
 def split_regimen_components(value: str) -> list[str]:
@@ -52,6 +54,7 @@ def split_regimen_components(value: str) -> list[str]:
         raw_parts = [part.strip(" 	,;:.") for part in protected.split(" / ")]
     parts = [part.replace(numeric_slash, "/") for part in raw_parts if _is_name_component(part)]
     return parts or [text]
+
 
 ###############################################################################
 class DrugMentionNormalizer:

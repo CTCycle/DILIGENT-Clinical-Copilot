@@ -12,6 +12,7 @@ KeyT = TypeVar("KeyT", bound=Hashable)
 ValueT = TypeVar("ValueT")
 CACHE_MISS = object()
 
+
 ###############################################################################
 class BoundedCache(Generic[KeyT, ValueT]):
     """Small deterministic least-recently-used cache."""

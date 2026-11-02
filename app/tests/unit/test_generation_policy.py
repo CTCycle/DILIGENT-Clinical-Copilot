@@ -16,6 +16,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("model", "reasoning_level", "expected"),
@@ -40,6 +41,7 @@ def test_local_policy_matrix(
     )
     assert policy.temperature == expected
 
+
 ###############################################################################
 def test_known_provider_defaults_use_base_temperature() -> None:
     for provider, model in (
@@ -54,6 +56,7 @@ def test_known_provider_defaults_use_base_temperature() -> None:
         )
         assert policy.temperature == 0.0
         assert not policy.uses_model_default
+
 
 ###############################################################################
 def test_structured_extraction_budgets_cover_multi_entry_payloads() -> None:
@@ -72,6 +75,7 @@ def test_structured_extraction_budgets_cover_multi_entry_payloads() -> None:
     assert repair.output_token_limit == 3072
     assert structured.policy_version == "2026-09-10"
 
+
 ###############################################################################
 def test_complex_timeline_budget_covers_long_event_lists() -> None:
     simple = resolve_generation_policy(
@@ -89,6 +93,7 @@ def test_complex_timeline_budget_covers_long_event_lists() -> None:
 
     assert simple.output_token_limit == 2048
     assert complex_timeline.output_token_limit == 4096
+
 
 ###############################################################################
 def test_openai_and_deepseek_are_purpose_specific() -> None:
@@ -125,6 +130,7 @@ def test_openai_and_deepseek_are_purpose_specific() -> None:
         is None
     )
 
+
 ###############################################################################
 def test_gpt5_and_gpt_oss_omit_temperature() -> None:
     for provider, model in (
@@ -144,6 +150,7 @@ def test_gpt5_and_gpt_oss_omit_temperature() -> None:
         )
         assert effective.temperature is None
 
+
 ###############################################################################
 def test_policy_is_immutable_and_catalog_validates() -> None:
     validate_catalog()
@@ -156,6 +163,7 @@ def test_policy_is_immutable_and_catalog_validates() -> None:
     assert isinstance(policy, GenerationPolicy)
     with pytest.raises(AttributeError):
         policy.temperature = 0.9  # type: ignore[misc]
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -221,6 +229,7 @@ def test_responsibility_reasoning_matrix(
     ]
 
     assert actual == expected
+
 
 ###############################################################################
 def test_reasoning_target_is_monotonic_for_each_responsibility() -> None:

@@ -15,6 +15,7 @@ from services.text.normalization import normalize_drug_query_name
 # outer bound for keeping a stopped drug in the consultation set.
 MAX_DAYS_FROM_STOP_TO_ONSET = 30
 
+
 ###############################################################################
 def _timing_fits_injury(entry: DrugEntry, reference_date: date | None) -> bool:
     """A stopped exposure whose start and stop dates fit the injury onset."""
@@ -25,6 +26,7 @@ def _timing_fits_injury(entry: DrugEntry, reference_date: date | None) -> bool:
     if start is not None and start > reference_date:
         return False
     return (reference_date - stop).days <= MAX_DAYS_FROM_STOP_TO_ONSET
+
 
 ###############################################################################
 def _score_drug(
@@ -52,9 +54,11 @@ def _score_drug(
         score -= 3
     return score
 
+
 ###############################################################################
 def _parse_therapy_date(value: str | None) -> date | None:
     return parse_clinical_date(value)
+
 
 ###############################################################################
 def select_relevant_candidates(
@@ -111,6 +115,7 @@ def select_relevant_candidates(
         unresolved=unresolved,
         ordered_analysis_drugs=PatientDrugs(entries=selected_entries),
     )
+
 
 ###############################################################################
 def _deduplicate_candidates(

@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+
 ###############################################################################
 class JobStartResponse(BaseModel):
     job_id: str
@@ -14,6 +15,7 @@ class JobStartResponse(BaseModel):
     status: str
     message: str
     poll_interval: float
+
 
 ###############################################################################
 class JobStatusResponse(BaseModel):
@@ -28,9 +30,11 @@ class JobStatusResponse(BaseModel):
     version: int | None = None
     stop_requested: bool = False
 
+
 ###############################################################################
 class JobListResponse(BaseModel):
     jobs: list[JobStatusResponse]
+
 
 ###############################################################################
 class JobSummary(BaseModel):
@@ -47,9 +51,11 @@ class JobSummary(BaseModel):
     session_id: int | None = None
     cancellable: bool = False
 
+
 ###############################################################################
 class JobSummaryListResponse(BaseModel):
     jobs: list[JobSummary]
+
 
 ###############################################################################
 class JobCancelResponse(BaseModel):

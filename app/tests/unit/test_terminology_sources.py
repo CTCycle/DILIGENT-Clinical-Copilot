@@ -17,14 +17,14 @@ from services.updater.terminology.sources.rxnorm import RxNormPrescribableSource
 from services.updater.terminology.sources.swissmedic import SwissmedicSource
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def conso(rxcui: str, tty: str, text: str) -> str:
     fields = [""] * 18
     fields[0], fields[11], fields[12], fields[14], fields[16] = rxcui, "RXNORM", tty, text, "N"
     return "|".join(fields)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def rel(rxcui1: str, rela: str, rxcui2: str) -> str:
     fields = [""] * 16
     fields[0], fields[4], fields[7], fields[10] = rxcui1, rxcui2, rela, "RXNORM"

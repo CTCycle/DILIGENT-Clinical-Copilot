@@ -12,6 +12,7 @@ from services.clinical.pattern_analyzer import (
     HepatotoxicityPatternCalculator,
 )
 
+
 ###############################################################################
 class DiliPatternEngine:
 

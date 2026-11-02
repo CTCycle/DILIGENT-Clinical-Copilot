@@ -19,6 +19,7 @@ RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 BACKOFF_SECONDS = (1.0, 3.0, 9.0)
 CHUNK_BYTES = 1 << 20
 
+
 ###############################################################################
 def request_json(
     client: httpx.Client,
@@ -47,6 +48,7 @@ def request_json(
         response.raise_for_status()
         return response.json()
     raise TerminologySourceUnavailable(f"Request failed for {url}: {last_error}")
+
 
 ###############################################################################
 def download_file(

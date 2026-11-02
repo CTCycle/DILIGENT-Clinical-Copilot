@@ -8,6 +8,7 @@ from datetime import date
 from common.utils.clinical_dates import parse_clinical_date
 from domain.clinical.entities import DrugEntry, DrugSuspensionContext
 
+
 ###############################################################################
 class ExposureTimelineService:
 

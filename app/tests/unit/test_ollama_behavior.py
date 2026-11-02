@@ -13,6 +13,8 @@ from services.llm.ollama_client import OllamaClient
 from services.llm.ollama_runtime import OllamaError
 from services.llm import ollama_structured
 
+
+###############################################################################
 def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(
     monkeypatch,
 ) -> None:
@@ -35,7 +37,10 @@ def test_ollama_gpt_oss_preserves_level_reasoning_and_omits_temperature(
     assert think == "high"
     assert options is None
 
+
+###############################################################################
 def test_ollama_context_window_is_task_sized_and_intersects_runtime_capacity() -> None:
+
 
     ###############################################################################
     class FakeOllama:
@@ -68,7 +73,10 @@ def test_ollama_context_window_is_task_sized_and_intersects_runtime_capacity() -
     assert context_window is not None
     assert 2048 <= context_window <= 4096
 
+
+###############################################################################
 def test_ollama_payload_omits_think_when_transport_does_not_support_reasoning() -> None:
+
 
     ###############################################################################
     class FakeOllama:
@@ -103,7 +111,10 @@ def test_ollama_payload_omits_think_when_transport_does_not_support_reasoning() 
 
     assert "think" not in payload
 
+
+###############################################################################
 def test_ollama_chat_payload_preserves_json_format_and_thinking() -> None:
+
 
     ###############################################################################
     class FakeOllama:
@@ -139,6 +150,8 @@ def test_ollama_chat_payload_preserves_json_format_and_thinking() -> None:
     assert payload["format"] == "json"
     assert payload["think"] == "high"
 
+
+###############################################################################
 def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     gib = 1_073_741_824
     client = OllamaClient(base_url="http://127.0.0.1:11434")
@@ -176,6 +189,8 @@ def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     assert plan["required_ram"] == 9 * gib
     assert plan["required_vram"] == 7 * gib
 
+
+###############################################################################
 def test_predict_next_target_model_prefers_frequent_transition() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     now = time.monotonic()
@@ -199,6 +214,8 @@ def test_predict_next_target_model_prefers_frequent_transition() -> None:
 
     assert predicted == "text-model"
 
+
+###############################################################################
 def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     client.residency_dual_keep_alive = "8h"
@@ -223,6 +240,8 @@ def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
 
     assert keep_alive == "8h"
 
+
+###############################################################################
 def test_maybe_prefetch_target_model_prefetches_only_when_dual_safe(
     monkeypatch,
 ) -> None:
@@ -257,6 +276,8 @@ def test_maybe_prefetch_target_model_prefetches_only_when_dual_safe(
 
     assert started == [("text-model", client.residency_dual_keep_alive)]
 
+
+###############################################################################
 def test_maybe_prefetch_target_model_skips_when_dual_unsafe(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     started: list[str] = []
@@ -287,9 +308,12 @@ def test_maybe_prefetch_target_model_skips_when_dual_unsafe(monkeypatch) -> None
     assert started == []
     assert client.residency_usage_history[-1][1] == "clinical-model"
 
+
+###############################################################################
 def test_prefetch_model_oom_is_non_fatal(monkeypatch) -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434")
     monkeypatch.setattr(client, "ensure_model_ready", AsyncMock(return_value=None))
+
 
     ###############################################################################
     class FakeHttpClient:
@@ -318,7 +342,10 @@ def test_prefetch_model_oom_is_non_fatal(monkeypatch) -> None:
     asyncio.run(client.prefetch_model(model="text-model", keep_alive="30m"))
     asyncio.run(client.close())
 
+
+###############################################################################
 def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
+
 
     ###############################################################################
     class FakeClient:
@@ -334,6 +361,8 @@ def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
 
     assert models == ["qwen3.5:2b", "qwen3.5:9b"]
 
+
+###############################################################################
 def test_looks_like_schema_echo_detects_schema_payload() -> None:
     schema_like = (
         '{"$defs":{"Item":{"properties":{"name":{"type":"string"}}}},'
@@ -342,7 +371,10 @@ def test_looks_like_schema_echo_detects_schema_payload() -> None:
 
     assert ollama_structured.looks_like_schema_echo(schema_like) is True
 
+
+###############################################################################
 def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> None:
+
 
     ###############################################################################
     class FakeParser:
@@ -357,6 +389,7 @@ def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> No
             if self.calls == 1:
                 raise ValueError("schema echo")
             return {"ok": text}
+
 
     ###############################################################################
     class FakeClient:
@@ -393,7 +426,10 @@ def test_parse_with_repairs_uses_compact_repair_messages_for_schema_echo() -> No
     assert client.captured_messages is not None
     assert "schema or wrapper instead of the requested data" in client.captured_messages[1]["content"]
 
+
+###############################################################################
 def test_chat_structured_model_forwards_generation_purpose() -> None:
+
 
     ###############################################################################
     class FakeClient:
@@ -420,6 +456,8 @@ def test_chat_structured_model_forwards_generation_purpose() -> None:
     assert result == '{"ok": true}'
     assert client.captured_purpose is GenerationPurpose.STRUCTURED_EXTRACTION
 
+
+###############################################################################
 def test_ollama_client_forwards_generation_purpose_to_structured_models(
     monkeypatch,
 ) -> None:
@@ -453,6 +491,8 @@ def test_ollama_client_forwards_generation_purpose_to_structured_models(
     assert result == {"ok": True}
     assert captured["purpose"] is GenerationPurpose.STRUCTURED_EXTRACTION
 
+
+###############################################################################
 def test_ollama_client_forwards_generation_purpose_to_structured_chat(
     monkeypatch,
 ) -> None:

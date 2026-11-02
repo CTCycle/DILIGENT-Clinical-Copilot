@@ -13,6 +13,7 @@ from common.constants import (
 from common.prompts.retrieval import build_dili_rag_query
 from domain.clinical.entities import PatientDrugs
 
+
 ###############################################################################
 class DILIQueryBuilder:
 

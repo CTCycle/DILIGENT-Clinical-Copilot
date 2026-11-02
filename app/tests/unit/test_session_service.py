@@ -27,9 +27,13 @@ from services.clinical.parser import DrugsParser
 from services.runtime.jobs import JobManager
 from services.session import extraction_pipeline, factory
 
+
+###############################################################################
 def _build_service() -> ClinicalSessionService:
     return build_clinical_session_service(get_job_manager())
 
+
+###############################################################################
 def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None:
     input_text = (
         "# Anamnesis\nA1\nA2\n\n# Current therapy\nD\n\n# Laboratory analysis\nL"
@@ -46,6 +50,8 @@ def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None
     assert preprocessed.laboratory_analysis == "L"
     assert returned_extraction is not None
 
+
+###############################################################################
 def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     service = _build_service()
     request = ClinicalSessionRequest(clinical_input="raw input")
@@ -55,6 +61,8 @@ def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     ):
         asyncio.run(service.preprocess_unified_input(request))
 
+
+###############################################################################
 def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     monkeypatch,
 ) -> None:
@@ -100,10 +108,13 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     assert prepared["patient_payload"].drugs == "Drug 10 mg 1-0-0-0"
     assert prepared["patient_payload"].laboratory_analysis == "ALT 120 U/L"
 
+
+###############################################################################
 def test_launch_requires_active_cloud_key_before_extraction(
     monkeypatch,
 ) -> None:
     service = _build_service()
+
 
     ###############################################################################
     class FakeExtractor:
@@ -113,6 +124,7 @@ def test_launch_requires_active_cloud_key_before_extraction(
             self, *, clinical_input: str
         ) -> ClinicalSectionExtractionResult:
             raise AssertionError("extractor should not run without a cloud key")
+
 
     ###############################################################################
     class FakeAccessKeyService:
@@ -144,6 +156,8 @@ def test_launch_requires_active_cloud_key_before_extraction(
     ):
         validate_clinical_launch_workflow(service, request)
 
+
+###############################################################################
 def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) -> None:
     monkeypatch.setattr(
         "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
@@ -154,6 +168,8 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
 
     assert resolved == 7200.0
 
+
+###############################################################################
 def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
     fake_settings = SimpleNamespace(
         runtime=SimpleNamespace(
@@ -177,6 +193,8 @@ def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
 
     assert resolved == 3600.0
 
+
+###############################################################################
 def test_job_error_sanitizer_reports_local_model_oom_safely() -> None:
     error = RuntimeError(
         "LLM call failed: Ollama HTTP 500: llama-server reported out-of-memory "
@@ -187,6 +205,8 @@ def test_job_error_sanitizer_reports_local_model_oom_safely() -> None:
 
     assert message == JobErrorSanitizer.LOCAL_MODEL_MEMORY_MESSAGE
 
+
+###############################################################################
 def test_extraction_failure_classification_reports_schema_error() -> None:
     code, message = ClinicalSessionService.classify_extraction_failure(
         RuntimeError("Structured parsing failed: validation error"),
@@ -197,6 +217,8 @@ def test_extraction_failure_classification_reports_schema_error() -> None:
     assert code == "structured_extraction_schema_invalid"
     assert "required schema" in message
 
+
+###############################################################################
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
     fake_settings = SimpleNamespace(
         runtime=SimpleNamespace(
@@ -222,6 +244,8 @@ def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) ->
 
     assert resolved == 30.0
 
+
+###############################################################################
 def test_run_revision_consultation_uses_revision_analysis_entrypoint(
     monkeypatch,
 ) -> None:
@@ -233,6 +257,7 @@ def test_run_revision_consultation_uses_revision_analysis_entrypoint(
         pattern_prompt="Pattern prompt",
         clinical_context="Revision context",
     )
+
 
     ###############################################################################
     class FakeConsultation:
@@ -316,6 +341,8 @@ ITALIAN_THERAPY_TEXT = """
 ■ Invanz sol iniet [g] 0-0-0-0 i.
 """
 
+
+###############################################################################
 class FailingLabClient:
 
     # -------------------------------------------------------------------------
@@ -323,6 +350,8 @@ class FailingLabClient:
         _ = kwargs
         raise RuntimeError("simulated lab extraction failure")
 
+
+###############################################################################
 class SlowLabClient:
 
     # -------------------------------------------------------------------------
@@ -331,6 +360,8 @@ class SlowLabClient:
         await asyncio.sleep(1.0)
         return LabExtractionPayload(entries=[], onset_context=None)
 
+
+###############################################################################
 def test_clinical_session_factory_uses_configured_parser_timeouts(
     monkeypatch: Any,
 ) -> None:
@@ -348,6 +379,8 @@ def test_clinical_session_factory_uses_configured_parser_timeouts(
     assert service.lab_extractor.timeout_s == 120.0
     assert service.disease_extractor.timeout_s == 150.0
 
+
+###############################################################################
 def test_italian_therapy_text_parses_multiple_drugs_without_llm() -> None:
     parser = DrugsParser(client=object())
 
@@ -359,6 +392,8 @@ def test_italian_therapy_text_parses_multiple_drugs_without_llm() -> None:
     assert "Clopidogrel Spirig HC" in names
     assert "Aspirin Cardio" in names
 
+
+###############################################################################
 def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     extractor = ClinicalLabExtractor(client=FailingLabClient())
     payload = PatientData(
@@ -378,6 +413,8 @@ def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     assert ("AST", "2025-01-16", 344.0) in observed
     assert ("ALT", "2025-02-13", 591.0) in observed
 
+
+###############################################################################
 def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> None:
     extractor = ClinicalLabExtractor(client=SlowLabClient(), timeout_s=3600.0)
     monkeypatch.setattr(extractor, "LOCAL_LLM_CHUNK_TIMEOUT_CAP_S", 0.01)
@@ -396,11 +433,15 @@ def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> 
     assert ("ALT", "2025-01-10", 345.0) in observed
     assert ("ALP", "2025-01-10", 1055.0) in observed
 
+
+###############################################################################
 def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> None:
     timeout = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=120.0)
 
     assert timeout > 6.0
 
+
+###############################################################################
 def test_stage_stop_check_cancels_inflight_extraction_task() -> None:
     cancelled = False
     stop_calls = 0
@@ -429,9 +470,12 @@ def test_stage_stop_check_cancels_inflight_extraction_task() -> None:
 
     assert cancelled is True
 
+
+###############################################################################
 def test_livertox_timeout_does_not_claim_knowledge_base_is_unavailable(
     monkeypatch: Any,
 ) -> None:
+
 
     ###############################################################################
     class Owner:

@@ -34,6 +34,7 @@ from services.security.access_keys import AccessKeyService
 from services.session.robust_pipeline import build_extraction_artifact
 from services.session.text_section_parser import parse_initial_text_sections
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class LocalModelBatchPreflightResult:
@@ -41,6 +42,7 @@ class LocalModelBatchPreflightResult:
     provider: str
     model: str | None
     reason: str | None = None
+
 
 ###############################################################################
 async def check_parser_batch_capacity(
@@ -154,6 +156,7 @@ async def check_parser_batch_capacity(
                     await cast(Any, close_result)
             except Exception:
                 pass
+
 
 ###############################################################################
 def validate_clinical_input_preflight(
@@ -498,6 +501,7 @@ def _validate_clinical_input_preflight(
         evidence_statuses,
     )
 
+
 ###############################################################################
 def _validate_evidence_sources(
     statuses: list[EvidenceSourceStatus],
@@ -528,6 +532,7 @@ def _validate_evidence_sources(
                     field="evidence_sources",
                 )
             )
+
 
 ###############################################################################
 def _validate_knowledge_bases(
@@ -585,6 +590,7 @@ def _validate_knowledge_bases(
             )
         )
 
+
 ###############################################################################
 def _validate_ui_metadata(
     request_payload: ClinicalSessionRequest,
@@ -599,6 +605,7 @@ def _validate_ui_metadata(
                 field="visit_date",
             )
         )
+
 
 ###############################################################################
 def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
@@ -623,6 +630,7 @@ def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
                 field="selected_model_providers",
             )
         )
+
 
 ###############################################################################
 def _validate_requested_provider(
@@ -660,6 +668,7 @@ def _validate_requested_provider(
             )
         )
 
+
 ###############################################################################
 def _validate_persistence(
     service: Any,
@@ -682,6 +691,7 @@ def _validate_persistence(
             )
         )
 
+
 ###############################################################################
 def _runtime_settings() -> dict[str, Any]:
     parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
@@ -699,6 +709,7 @@ def _runtime_settings() -> dict[str, Any]:
         "clinical_provider": clinical_provider,
         "clinical_model": clinical_model,
     }
+
 
 ###############################################################################
 def _result(
@@ -720,6 +731,7 @@ def _result(
         rag_readiness=rag_readiness,
         evidence_sources=evidence_statuses,
     )
+
 
 ###############################################################################
 def _present_preflight_issue(

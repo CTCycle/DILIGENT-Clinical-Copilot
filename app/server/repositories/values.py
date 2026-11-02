@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 
+
 ###############################################################################
 def normalize_string(value: Any) -> str | None:
     if isinstance(value, str):
@@ -28,6 +29,7 @@ def normalize_string(value: Any) -> str | None:
     }:
         return None
     return normalized
+
 
 ###############################################################################
 def normalize_date_value(value: Any) -> date | None:
@@ -51,10 +53,12 @@ def normalize_date_value(value: Any) -> date | None:
         parsed = pd.to_datetime(normalized, errors="coerce", utc=True)
     return None if pd.isna(parsed) else parsed.date()
 
+
 ###############################################################################
 def normalize_date(value: Any) -> str | None:
     parsed = normalize_date_value(value)
     return parsed.isoformat() if parsed is not None else normalize_string(value)
+
 
 ###############################################################################
 def normalize_flag(value: Any) -> int | None:
@@ -83,6 +87,7 @@ SESSION_LIFECYCLE_STATUSES = (
 ACTIVE_SESSION_STATUSES = frozenset({"queued", "running"})
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "cancelled", "failed"})
 
+
 ###############################################################################
 def normalize_session_status(value: Any) -> str:
     normalized = (normalize_string(value) or "").casefold()
@@ -90,9 +95,11 @@ def normalize_session_status(value: Any) -> str:
         raise ValueError(f"Unsupported clinical session status: {value!r}")
     return normalized
 
+
 ###############################################################################
 def join_values(values: set[str]) -> str | None:
     return "; ".join(sorted({item.strip() for item in values if item.strip()})) or None
+
 
 ###############################################################################
 def to_int(value: Any) -> int | None:
@@ -101,6 +108,7 @@ def to_int(value: Any) -> int | None:
         return int(normalized) if normalized is not None else None
     except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def to_float(value: Any) -> float | None:

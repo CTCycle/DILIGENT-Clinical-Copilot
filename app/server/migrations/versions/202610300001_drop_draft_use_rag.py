@@ -23,10 +23,12 @@ down_revision: Union[str, Sequence[str], None] = "202610290001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+
 ###############################################################################
 def upgrade() -> None:
     with op.batch_alter_table("clinical_input_drafts") as batch_op:
         batch_op.drop_column("use_rag")
+
 
 ###############################################################################
 def downgrade() -> None:

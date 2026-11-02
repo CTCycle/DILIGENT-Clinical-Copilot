@@ -16,6 +16,7 @@ from domain.patient_timeline import (
 from domain.inspection import DeleteEntityResponse
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
 

@@ -9,6 +9,7 @@ from typing import Literal
 
 from domain.clinical.entities import RucamComponentAssessment
 
+
 ###############################################################################
 @dataclass(slots=True)
 class RucamAnchor:
@@ -21,6 +22,7 @@ class RucamAnchor:
     source: Literal["qualifying_lab", "onset_context", "visit_proxy", "none"] = "none"
     is_score_eligible: bool = False
 
+
 ###############################################################################
 @dataclass(slots=True)
 class RucamSourceReportedScore:
@@ -30,11 +32,13 @@ class RucamSourceReportedScore:
     evidence: str
     stated_category: str | None = None
 
+
 ###############################################################################
 @dataclass(slots=True)
 class RucamDataSufficiency:
     sufficient: bool
     blocking_reasons: list[str]
+
 
 ###############################################################################
 @dataclass(slots=True)

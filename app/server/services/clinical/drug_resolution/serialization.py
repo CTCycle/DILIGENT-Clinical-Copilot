@@ -16,6 +16,7 @@ UNLINKED_STATUSES = frozenset(
     {"missing_livertox", "ambiguous_requires_review", "unresolved", "rejected_false_positive"}
 )
 
+
 ###############################################################################
 def decision_to_payload(
     mention: NormalizedDrugMention,
@@ -72,6 +73,7 @@ def decision_to_payload(
         "terminology": terminology.model_dump(mode="json"),
         "resolution_decision": decision.model_dump(mode="json"),
     }
+
 
 ###############################################################################
 def index_resolved_drugs(

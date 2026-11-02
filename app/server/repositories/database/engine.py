@@ -15,6 +15,7 @@ from repositories.database.utils import (
     validate_postgres_database_name,
 )
 
+
 ###############################################################################
 def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
     return sqlalchemy.create_engine(
@@ -23,6 +24,7 @@ def build_sqlite_engine(database_path: str, *, timeout: float = 30.0) -> Engine:
         future=True,
         connect_args={"timeout": timeout, "autocommit": False},
     )
+
 
 ###############################################################################
 def build_postgres_engine(settings: DatabaseSettings) -> Engine:

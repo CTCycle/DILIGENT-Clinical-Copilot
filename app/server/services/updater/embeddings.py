@@ -14,6 +14,7 @@ from services.rag.vector_serializer import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
 
+
 ###############################################################################
 class RagEmbeddingUpdater:
 

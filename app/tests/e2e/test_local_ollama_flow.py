@@ -20,6 +20,7 @@ from playwright.sync_api import APIRequestContext, Page, expect
 MODEL = os.getenv("DILIGENT_LOCAL_OLLAMA_MODEL", "qwen3.5:2b")
 JOB_TIMEOUT_SECONDS = 1500
 
+
 ###############################################################################
 def _clinical_input() -> str:
     return (
@@ -35,6 +36,7 @@ def _clinical_input() -> str:
         "On 2026-09-08 ALT was 210 U/L with ULN 40 U/L, AST was 170 U/L, ALP was "
         "130 U/L with ULN 120 U/L, and total bilirubin was 2.1 mg/dL."
     )
+
 
 ###############################################################################
 def test_completed_assessment_on_local_ollama(

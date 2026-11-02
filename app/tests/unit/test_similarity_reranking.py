@@ -7,6 +7,7 @@ from typing import Any
 
 from services.retrieval.embeddings import LocalHeuristicReranker, SimilaritySearch
 
+
 ###############################################################################
 class SearchTableStub:
 
@@ -38,6 +39,7 @@ class SearchTableStub:
             return list(self.rows)
         return list(self.rows[: self.limit_value])
 
+
 ###############################################################################
 class VectorDatabaseStub:
 
@@ -57,6 +59,7 @@ class VectorDatabaseStub:
     def assert_query_model_matches_index(self, active_signature: str) -> None:
         _ = active_signature
         return None
+
 
 ###############################################################################
 class EmbeddingGeneratorStub:
@@ -83,6 +86,7 @@ class EmbeddingGeneratorStub:
             },
         )()
 
+
 ###############################################################################
 class CrossEncoderStub:
 
@@ -91,6 +95,7 @@ class CrossEncoderStub:
         lookup = {"alpha": 0.1, "beta": 0.8, "gamma": 0.9}
         return [lookup[text] for _, text in pairs]
 
+
 ###############################################################################
 class FailingCrossEncoderStub:
 
@@ -98,6 +103,7 @@ class FailingCrossEncoderStub:
     def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
         _ = pairs
         raise RuntimeError("synthetic rerank failure")
+
 
 ###############################################################################
 def sample_rows() -> list[dict[str, Any]]:
@@ -128,6 +134,7 @@ def sample_rows() -> list[dict[str, Any]]:
         },
     ]
 
+
 ###############################################################################
 def sample_vectors() -> dict[str, list[float]]:
     return {
@@ -136,6 +143,7 @@ def sample_vectors() -> dict[str, list[float]]:
         "beta": [0.98, 0.2],
         "gamma": [0.8, 0.1],
     }
+
 
 ###############################################################################
 def test_local_heuristic_reranker_prefers_stronger_lexical_match() -> None:
@@ -150,11 +158,13 @@ def test_local_heuristic_reranker_prefers_stronger_lexical_match() -> None:
 
     assert scores[1] > scores[0]
 
+
 ###############################################################################
 def test_local_heuristic_reranker_unknown_profile_defaults_to_balanced() -> None:
     reranker = LocalHeuristicReranker("unknown-profile-name")
 
     assert reranker.model_name == "lightweight-balanced-v1"
+
 
 ###############################################################################
 def test_local_heuristic_reranker_profiles_shift_relative_scores() -> None:
@@ -180,6 +190,7 @@ def test_local_heuristic_reranker_profiles_shift_relative_scores() -> None:
         lexical_scores[0] - lexical_scores[1]
     )
 
+
 ###############################################################################
 def test_search_with_reranking_reorders_and_trims_results() -> None:
     search = SimilaritySearch(
@@ -200,6 +211,7 @@ def test_search_with_reranking_reorders_and_trims_results() -> None:
     assert len(results) == 2
     assert all("rerank_score" in item for item in results)
 
+
 ###############################################################################
 def test_search_with_reranking_skips_reorder_when_disabled() -> None:
     search = SimilaritySearch(
@@ -217,6 +229,7 @@ def test_search_with_reranking_skips_reorder_when_disabled() -> None:
 
     assert [item.get("text") for item in results] == ["alpha", "beta"]
     assert all("rerank_score" not in item for item in results)
+
 
 ###############################################################################
 def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
@@ -236,6 +249,7 @@ def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
 
     assert len(results) == 3
     assert vector_db.table.limit_value == 3
+
 
 ###############################################################################
 def test_search_with_reranking_falls_back_when_reranker_fails() -> None:

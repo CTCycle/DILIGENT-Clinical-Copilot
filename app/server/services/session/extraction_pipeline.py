@@ -32,6 +32,7 @@ from services.clinical.job_progress import ClinicalJobCancelled
 ###############################################################################
 T = TypeVar("T")
 
+
 ###############################################################################
 async def _await_with_stop_check(
     awaitable: Awaitable[T],
@@ -58,6 +59,7 @@ async def _await_with_stop_check(
             await task
         raise
 
+
 ###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):
     drugs_parser: Any
@@ -80,6 +82,7 @@ class ClinicalSessionExtractionOwner(Protocol):
     classify_structured_failure_kind: Callable[..., str]
     build_fallback_therapy_drugs: Callable[..., PatientDrugs]
     append_knowledge_base_unavailable_issue: Callable[..., None]
+
 
 ###############################################################################
 class ClinicalSessionExtractionPipelineMixin:

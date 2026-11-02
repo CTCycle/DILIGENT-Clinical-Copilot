@@ -42,6 +42,7 @@ EXACT_ONLY_KINDS = ("abbreviation", "research_code")
 FUZZY_MIN_ALIAS_LENGTH = 5
 RUNTIME_SOURCE = "rxnav_runtime"
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class AliasHit:
@@ -54,6 +55,7 @@ class AliasHit:
     validation_status: str
     source_version: str | None
 
+
 ###############################################################################
 @dataclass
 class ConceptInfo:
@@ -62,6 +64,7 @@ class ConceptInfo:
     concept_type: str
     parent_id: int | None = None
     component_ids: list[int] = field(default_factory=list)
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -73,12 +76,14 @@ class LiverToxLinkInfo:
     drug_name: str
     link_type: str
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class UnverifiedProduct:
     name: str
     country: str | None
     ingredient_names: tuple[str, ...]
+
 
 ###############################################################################
 class TerminologyLookupRepository:

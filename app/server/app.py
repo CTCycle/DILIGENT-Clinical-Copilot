@@ -87,9 +87,11 @@ _CLIENT_ASSET_SUFFIXES = {
     ".woff2",
 }
 
+
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -102,9 +104,11 @@ def _resolve_client_file(full_path: str) -> Path | None:
         return requested_path
     return None
 
+
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
+
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -118,9 +122,11 @@ def serve_client_path(full_path: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
+
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_URL)
+
 
 ###############################################################################
 async def _release_application_resources() -> None:
@@ -142,6 +148,7 @@ async def _release_application_resources() -> None:
     except Exception:
         logger.exception("Could not dispose the database engine during shutdown")
 
+
 ###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -162,6 +169,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await _release_application_resources()
+
 
 ###############################################################################
 def create_app() -> FastAPI:

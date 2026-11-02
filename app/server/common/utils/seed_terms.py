@@ -9,6 +9,7 @@ from typing import Any
 
 from common.paths import CATALOGS_PATH
 
+
 ###############################################################################
 class SeedTermCatalog(tuple):
     __slots__ = ()
@@ -34,9 +35,11 @@ class SeedTermCatalog(tuple):
     def groups(self) -> dict[str, set[str]]:
         return self[2]
 
+
 ###############################################################################
 def _normalize(text: str) -> str:
     return unicodedata.normalize("NFKC", text).casefold().strip()
+
 
 ###############################################################################
 def load_seed_term_catalog() -> SeedTermCatalog:
@@ -58,6 +61,7 @@ def load_seed_term_catalog() -> SeedTermCatalog:
         else:
             keywords.update(normalized_values)
     return SeedTermCatalog(keywords=keywords, stopwords=stopwords, groups=groups)
+
 
 ###############################################################################
 def detect_seed_matches(text: str, catalog: SeedTermCatalog) -> dict[str, Any]:

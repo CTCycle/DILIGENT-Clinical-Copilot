@@ -19,6 +19,7 @@ REVISION_JOB_SHUTDOWN_MESSAGE = (
     "Start a new revision run if needed."
 )
 
+
 ###############################################################################
 def reconcile_interrupted_revision_jobs(
     jobs: JobManager,
@@ -39,6 +40,7 @@ def reconcile_interrupted_revision_jobs(
         active_job_ids=active_job_ids,
         error={"message": REVISION_JOB_MISSING_STATUS_MESSAGE},
     )
+
 
 ###############################################################################
 def fail_revision_runs_interrupted_by_shutdown(

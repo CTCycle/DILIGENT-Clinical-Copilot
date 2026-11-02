@@ -34,6 +34,7 @@ SYNONYM_KINDS = {
     "RESEARCH_CODE": "research_code",
 }
 
+
 ###############################################################################
 class ChemblSource:
     key = "chembl"

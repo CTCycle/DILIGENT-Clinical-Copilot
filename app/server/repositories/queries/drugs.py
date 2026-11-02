@@ -9,6 +9,7 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
+
 ###############################################################################
 class DrugRepositoryQueries:
 

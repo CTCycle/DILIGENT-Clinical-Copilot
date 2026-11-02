@@ -22,6 +22,7 @@ from repositories.database.upsert import (
 )
 from repositories.schemas.configuration import ApplicationConfiguration
 
+
 ###############################################################################
 class ApplicationConfigurationSerializer:
     _write_lock = RLock()

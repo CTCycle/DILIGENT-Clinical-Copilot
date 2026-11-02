@@ -20,6 +20,7 @@ down_revision: Union[str, Sequence[str], None] = "202609170001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+
 ###############################################################################
 def upgrade() -> None:
     op.create_table(
@@ -35,6 +36,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_clinical_input_drafts")),
     )
+
 
 ###############################################################################
 def downgrade() -> None:

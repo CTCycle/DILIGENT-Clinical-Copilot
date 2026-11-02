@@ -14,9 +14,11 @@ from typing import Any
 from common.paths import LOGS_PATH
 
 
+###############################################################################
 class HttpxRequestFilter(logging.Filter):
     """Keep unsuccessful HTTP responses visible and successful ones at debug."""
 
+    # -------------------------------------------------------------------------
     def filter(self, record: logging.LogRecord) -> bool:
         if record.msg == 'HTTP Request: %s %s "%s %d %s"' and len(record.args) == 5:
             status = record.args[3]

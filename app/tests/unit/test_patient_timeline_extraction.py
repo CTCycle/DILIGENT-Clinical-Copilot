@@ -16,6 +16,8 @@ from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection.timeline import _timeline_error_code, _timeline_fallback_note
 from services.llm.cloud import LLMError
 
+
+###############################################################################
 class FakeTimelineClient:
 
     # -------------------------------------------------------------------------
@@ -30,6 +32,8 @@ class FakeTimelineClient:
         self.call_count += 1
         return self.payload
 
+
+###############################################################################
 def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(
@@ -83,6 +87,8 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     assert result.events[1].title == "ALT peak"
     assert result.events[1].confidence == 0.9
 
+
+###############################################################################
 def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(
@@ -115,6 +121,8 @@ def test_timeline_extractor_rejects_events_without_source_evidence() -> None:
 
     assert [event.event_id for event in result.events] == ["grounded"]
 
+
+###############################################################################
 def test_timeline_extractor_discards_only_unsupported_events_and_discloses_them() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(
@@ -163,6 +171,8 @@ def test_timeline_extractor_discards_only_unsupported_events_and_discloses_them(
     assert result.generation_note is not None
     assert result.generation_note.startswith("2 model events were discarded")
 
+
+###############################################################################
 def test_timeline_source_is_derived_from_the_matching_canonical_field() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(
@@ -197,6 +207,8 @@ def test_timeline_source_is_derived_from_the_matching_canonical_field() -> None:
 
     assert result.events[0].source == "laboratory_analysis"
 
+
+###############################################################################
 def test_timeline_source_is_cleared_when_evidence_matches_distinct_fields() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(
@@ -225,7 +237,10 @@ def test_timeline_source_is_cleared_when_evidence_matches_distinct_fields() -> N
 
     assert result.events[0].source is None
 
+
+###############################################################################
 def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> None:
+
 
     ###############################################################################
     class CapturingTimelineExtractor(PatientTimelineExtractor):
@@ -269,6 +284,8 @@ def test_timeline_source_resolution_returns_none_when_evidence_is_missing() -> N
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
 
+
+###############################################################################
 def test_timeline_extractor_rejects_empty_result_with_clinical_source_text() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(PatientTimelineExtraction())
@@ -291,6 +308,8 @@ def test_timeline_extractor_rejects_empty_result_with_clinical_source_text() -> 
     assert exc.value.error_code == "invalid_response"
     assert exc.value.retryable is False
 
+
+###############################################################################
 def test_timeline_extractor_allows_empty_result_without_clinical_source_text() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(PatientTimelineExtraction())
@@ -309,9 +328,13 @@ def test_timeline_extractor_allows_empty_result_without_clinical_source_text() -
 
     assert result.events == []
 
+
+###############################################################################
 def test_normalize_date_token_keeps_month_precision_without_promoting_day() -> None:
     assert PatientTimelineExtractor.normalize_date_token("2025-02") == "2025-02"
 
+
+###############################################################################
 def test_timeline_sort_orders_year_month_and_day_without_changing_display_values() -> (
     None
 ):
@@ -353,6 +376,8 @@ def test_timeline_sort_orders_year_month_and_day_without_changing_display_values
         "2025-02-03",
     ]
 
+
+###############################################################################
 def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(PatientTimelineExtraction())
@@ -369,6 +394,8 @@ def test_timeline_uses_the_single_explicit_date_in_source_evidence() -> None:
 
     assert normalized[0].event_date == "2026-07-21"
 
+
+###############################################################################
 def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year() -> (
     None
 ):
@@ -390,6 +417,8 @@ def test_timeline_preserves_precise_model_date_when_evidence_only_matches_year()
     assert normalized[0].event_date == "2026-07-18"
     assert normalized[0].date_precision == "day"
 
+
+###############################################################################
 def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens() -> (
     None
 ):
@@ -421,6 +450,8 @@ def test_timeline_preserves_partial_date_ranges_and_rejects_invalid_date_tokens(
     assert normalized[0].date_precision == "month"
     assert normalized[1].event_date is None
 
+
+###############################################################################
 @pytest.mark.parametrize(
     ("model_date", "evidence", "expected_date", "expected_certainty"),
     [
@@ -459,6 +490,8 @@ def test_timeline_grounds_model_dates_in_the_quoted_evidence(
     if expected_certainty == "inferred":
         assert normalized.uncertainty_reason
 
+
+###############################################################################
 def test_timeline_keeps_relative_dates_derived_from_an_evidence_anchor() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(PatientTimelineExtraction())
@@ -477,6 +510,8 @@ def test_timeline_keeps_relative_dates_derived_from_an_evidence_anchor() -> None
     assert normalized.event_date == "2025-02-20"
     assert normalized.date_certainty == "inferred"
 
+
+###############################################################################
 def test_timeline_makes_event_ids_unique_and_repairs_links() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(PatientTimelineExtraction())
@@ -510,6 +545,8 @@ def test_timeline_makes_event_ids_unique_and_repairs_links() -> None:
     assert [event.event_id for event in normalized] == ["e1", "e1-2"]
     assert normalized[0].linked_patient_event_ids == ["e1-2"]
 
+
+###############################################################################
 def test_timeline_keeps_undated_events_in_model_order() -> None:
     extractor = PatientTimelineExtractor(
         client=FakeTimelineClient(PatientTimelineExtraction())
@@ -528,6 +565,8 @@ def test_timeline_keeps_undated_events_in_model_order() -> None:
 
     assert [event.event_id for event in normalized] == ["first", "second"]
 
+
+###############################################################################
 def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() -> None:
     assert normalize_timeline_interval("2024-02-29") is not None
     assert normalize_timeline_interval("2025-02-29") is None
@@ -535,6 +574,8 @@ def test_timeline_date_interval_validates_calendar_days_and_reversed_ranges() ->
     assert reversed_range is not None
     assert reversed_range.end_value is None
 
+
+###############################################################################
 def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
     client = FakeTimelineClient(
         PatientTimelineExtraction(
@@ -570,6 +611,8 @@ def test_timeline_prompt_uses_canonical_json_and_hash() -> None:
         "system_prompt"
     ]
 
+
+###############################################################################
 def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads() -> (
     None
 ):
@@ -579,6 +622,8 @@ def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads()
     complex_payload = {"note": "2026-01-01 " * 30, "details": "x" * 60000}
     assert PatientTimelineExtractor.classify_complexity(complex_payload) == "complex"
 
+
+###############################################################################
 def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> (
     None
 ):
@@ -592,12 +637,16 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
         }
     ) == ("opencode_go", "deepseek-v4-flash")
 
+
+###############################################################################
 def test_timeline_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValueError):
         SessionTimelineRegenerateRequest.model_validate(
             {"model_overrides": {"cloud_model": "gpt-4.1-mini"}}
         )
 
+
+###############################################################################
 def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -645,6 +694,8 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
     assert extractor.client_provider == "opencode_go"
     assert extractor.model == "deepseek-v4-flash"
 
+
+###############################################################################
 def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
     preview = build_timeline_preview_payload(
         PatientTimeline(
@@ -670,6 +721,8 @@ def test_timeline_preview_includes_evidence_and_timing_quality_counts() -> None:
     assert preview["uncertain_event_count"] == 2
     assert preview["undated_event_count"] == 2
 
+
+###############################################################################
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
@@ -693,6 +746,8 @@ def test_timeline_error_code_classifies_timeout_authentication_and_rate_limit(
 
     assert _timeline_error_code(wrapped) == expected
 
+
+###############################################################################
 def test_timeline_fallback_note_includes_provider_contract_detail() -> None:
     note = _timeline_fallback_note(
         use_cloud_services=True,
@@ -710,6 +765,8 @@ def test_timeline_fallback_note_includes_provider_contract_detail() -> None:
     assert "during structured_output (HTTP 400)" in note
     assert len(note) <= 500
 
+
+###############################################################################
 def test_timeline_fallback_note_truncates_long_diagnostics() -> None:
     note = _timeline_fallback_note(
         use_cloud_services=True,
@@ -721,6 +778,8 @@ def test_timeline_fallback_note_truncates_long_diagnostics() -> None:
 
     assert len(note) == 500
 
+
+###############################################################################
 @pytest.mark.parametrize(
     ("error_code", "expected"),
     [
@@ -741,6 +800,8 @@ def test_cloud_timeline_fallback_note_explains_provider_failure(
 
     assert expected in note
 
+
+###############################################################################
 class RetryThenSuccessClient:
 
     # -------------------------------------------------------------------------
@@ -769,6 +830,8 @@ class RetryThenSuccessClient:
             ]
         )
 
+
+###############################################################################
 class NonRetryableClient:
 
     # -------------------------------------------------------------------------
@@ -785,6 +848,8 @@ class NonRetryableClient:
             error_code=self.error_code,
         )
 
+
+###############################################################################
 def test_timeline_extractor_retries_transient_provider_failures() -> None:
     client = RetryThenSuccessClient()
     extractor = PatientTimelineExtractor(client=client)
@@ -799,6 +864,8 @@ def test_timeline_extractor_retries_transient_provider_failures() -> None:
     assert client.call_count == 2
     assert result.events[0].title == "Symptoms started"
 
+
+###############################################################################
 @pytest.mark.parametrize("error_code", ["timeout", "rate_limited"])
 def test_timeline_extractor_retries_timeout_and_rate_limit_failures(
     error_code: str,
@@ -816,6 +883,8 @@ def test_timeline_extractor_retries_timeout_and_rate_limit_failures(
     assert client.call_count == 2
     assert result.events[0].source_evidence == "Symptoms started on 2026-07-20."
 
+
+###############################################################################
 @pytest.mark.parametrize("error_code", ["invalid_response", "authentication"])
 def test_timeline_extractor_does_not_retry_non_transient_provider_failures(
     error_code: str,

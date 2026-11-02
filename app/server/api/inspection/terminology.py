@@ -25,6 +25,7 @@ from domain.terminology import (
 )
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionTerminologyEndpoint(InspectionJobEndpointMixin):
 

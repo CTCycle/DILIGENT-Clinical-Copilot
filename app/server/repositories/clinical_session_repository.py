@@ -31,6 +31,7 @@ from repositories.schemas.clinical import (
 )
 from repositories.serialization import session_result_data
 
+
 ###############################################################################
 def _build_search_pattern(value: str | None) -> str | None:
     normalized = repository_values.normalize_string(value)
@@ -39,13 +40,16 @@ def _build_search_pattern(value: str | None) -> str | None:
     escaped = re.sub(r"([%_\\])", r"\\\1", normalized.casefold())
     return f"%{escaped}%"
 
+
 ###############################################################################
 class SessionStateConflictError(RuntimeError):
     """A lifecycle guard rejected a write because the session state changed."""
 
+
 ###############################################################################
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
 
 ###############################################################################
 def _same_instant(stored: datetime | None, expected: datetime) -> bool:
@@ -55,13 +59,16 @@ def _same_instant(stored: datetime | None, expected: datetime) -> bool:
         return value.replace(tzinfo=UTC) if value.tzinfo is None else value
     return as_utc(stored) == as_utc(expected)
 
+
 ###############################################################################
 def session_input_text(row: ClinicalSession) -> str:
     return row.clinical_input or ""
 
+
 ###############################################################################
 def session_input_hash(row: ClinicalSession) -> str:
     return hashlib.sha256(session_input_text(row).encode("utf-8")).hexdigest()
+
 
 ###############################################################################
 class ClinicalSessionRepository:

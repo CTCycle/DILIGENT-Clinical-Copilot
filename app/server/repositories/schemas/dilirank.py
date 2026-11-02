@@ -12,6 +12,7 @@ from repositories.schemas.base import Base
 
 DRUGS_ID_FK = "drugs.id"
 
+
 ###############################################################################
 class DiliRankRecord(Base):
     __tablename__ = "dilirank_records"

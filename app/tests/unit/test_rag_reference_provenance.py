@@ -12,6 +12,7 @@ from domain.clinical.entities import PipelineIssue, RagDocumentReference
 from services.retrieval.embeddings import EmbeddingModelMismatchError
 from services.clinical.rag_support import RagSupportService
 
+
 ###############################################################################
 def test_line_metadata_is_propagated() -> None:
     reference = RagSupportService.build_document_reference(
@@ -28,6 +29,7 @@ def test_line_metadata_is_propagated() -> None:
     assert reference == RagDocumentReference(
         file_name="alpha.pdf", page_start=2, page_end=3, line_start=18, line_end=54
     )
+
 
 ###############################################################################
 def test_duplicate_metadata_keeps_canonical_citation_path() -> None:
@@ -51,6 +53,7 @@ def test_duplicate_metadata_keeps_canonical_citation_path() -> None:
         duplicate_source_paths=["first/guide.txt", "second/guide.txt"],
     )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "kwargs",
@@ -63,6 +66,7 @@ def test_duplicate_metadata_keeps_canonical_citation_path() -> None:
 def test_invalid_location_ranges_are_rejected(kwargs: dict[str, int]) -> None:
     with pytest.raises(ValidationError):
         RagDocumentReference(file_name="alpha.pdf", **kwargs)
+
 
 ###############################################################################
 def test_embedding_mismatch_degrades_to_a_recorded_rag_warning() -> None:

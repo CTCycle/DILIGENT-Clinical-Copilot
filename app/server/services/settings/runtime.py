@@ -34,6 +34,7 @@ from repositories.serialization.application_configuration import (
 
 _RUNTIME_SETTINGS_WRITE_LOCK = RLock()
 
+
 ###############################################################################
 class RuntimeSettingsService:
 

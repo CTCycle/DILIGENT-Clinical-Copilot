@@ -25,6 +25,7 @@ from services.session.session_service import ClinicalSessionService
 from services.session.lifecycle import ClinicalSessionLifecycleService
 from services.session.scheduler import get_clinical_scheduler
 
+
 ###############################################################################
 def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionService:
     parser_timeout_s = float(get_server_settings().runtime.parser_llm_timeout)
@@ -50,6 +51,7 @@ def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionSe
         job_manager=job_manager,
         model_config_service=ModelConfigService(serializer=ModelConfigSerializer()),
     )
+
 
 ###############################################################################
 def build_clinical_lifecycle_service(

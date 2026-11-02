@@ -16,6 +16,7 @@ from common.paths import DATA_PATH, ROOT_DIR
 DEFAULT_KEY_PURPOSE = "provider_access_keys"
 EXTERNAL_KEY_FILE_ENV = "DILIGENT_ACCESS_KEY_MATERIAL_FILE"
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ExternalEncryptionMaterial:
@@ -27,6 +28,7 @@ class ExternalEncryptionMaterial:
     activated_at: datetime
     deactivated_at: datetime | None = None
     id: int | None = None
+
 
 ###############################################################################
 class AccessKeyEncryptionMaterialSerializer:

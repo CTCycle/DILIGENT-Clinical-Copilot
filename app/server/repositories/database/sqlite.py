@@ -14,9 +14,11 @@ from domain.settings.configuration import DatabaseSettings
 from repositories.database.engine import build_sqlite_engine
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
+
 ###############################################################################
 def resolve_sqlite_database_path(settings: DatabaseSettings) -> Path:
     return Path(settings.sqlite_path) if settings.sqlite_path else DATABASE_FILE_PATH
+
 
 ###############################################################################
 class SQLiteRepository:

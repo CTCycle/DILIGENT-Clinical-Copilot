@@ -14,9 +14,11 @@ RuntimeSettingsCategory = Literal[
     "general", "data", "integrations", "matching", "advanced"
 ]
 
+
 ###############################################################################
 class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
 
 ###############################################################################
 class _PatchModel(_StrictModel):
@@ -31,17 +33,20 @@ class _PatchModel(_StrictModel):
                 raise ValueError(f"{field_name} cannot be null.")
         return self
 
+
 ###############################################################################
 class GeneralRuntimeSettings(_StrictModel):
     polling_interval: float = Field(gt=0.0, le=60.0)
     llm_output_token_limit: int = Field(ge=256, le=1_000_000)
     max_concurrent_clinical_jobs: int = Field(ge=1, le=8)
 
+
 ###############################################################################
 class GeneralRuntimeSettingsPatch(_PatchModel):
     polling_interval: float | None = Field(default=None, gt=0.0, le=60.0)
     llm_output_token_limit: int | None = Field(default=None, ge=256, le=1_000_000)
     max_concurrent_clinical_jobs: int | None = Field(default=None, ge=1, le=8)
+
 
 ###############################################################################
 class DataRuntimeSettings(_StrictModel):
@@ -77,6 +82,7 @@ class DataRuntimeSettings(_StrictModel):
             )
         return self
 
+
 ###############################################################################
 class DataRuntimeSettingsPatch(_PatchModel):
     drug_name_min_length: int | None = Field(default=None, ge=1, le=200)
@@ -93,6 +99,7 @@ class DataRuntimeSettingsPatch(_PatchModel):
     high_confidence_min_margin: float | None = Field(default=None, ge=0.0, le=100.0)
     moderate_confidence_min_score: float | None = Field(default=None, ge=0.0, le=100.0)
     moderate_confidence_min_margin: float | None = Field(default=None, ge=0.0, le=100.0)
+
 
 ###############################################################################
 class IntegrationRuntimeSettings(_StrictModel):
@@ -112,6 +119,7 @@ class IntegrationRuntimeSettings(_StrictModel):
     chembl_enabled: bool
     chembl_max_phase: int = Field(ge=1, le=4)
     swissmedic_enabled: bool
+
 
 ###############################################################################
 class IntegrationRuntimeSettingsPatch(_PatchModel):
@@ -134,6 +142,7 @@ class IntegrationRuntimeSettingsPatch(_PatchModel):
     chembl_max_phase: int | None = Field(default=None, ge=1, le=4)
     swissmedic_enabled: bool | None = None
 
+
 ###############################################################################
 class MatchingRuntimeSettings(_StrictModel):
     resolution_cache_limit: int = Field(ge=1, le=2_000_000)
@@ -147,6 +156,7 @@ class MatchingRuntimeSettings(_StrictModel):
     external_max_requests_per_name: int = Field(ge=1, le=10)
     external_negative_cache_days: int = Field(ge=1, le=365)
 
+
 ###############################################################################
 class MatchingRuntimeSettingsPatch(_PatchModel):
     resolution_cache_limit: int | None = Field(default=None, ge=1, le=2_000_000)
@@ -159,6 +169,7 @@ class MatchingRuntimeSettingsPatch(_PatchModel):
     external_fallback_enabled: bool | None = None
     external_max_requests_per_name: int | None = Field(default=None, ge=1, le=10)
     external_negative_cache_days: int | None = Field(default=None, ge=1, le=365)
+
 
 ###############################################################################
 class AdvancedRuntimeSettings(_StrictModel):
@@ -186,6 +197,7 @@ class AdvancedRuntimeSettings(_StrictModel):
             )
         return self
 
+
 ###############################################################################
 class AdvancedRuntimeSettingsPatch(_PatchModel):
     default_llm_timeout: float | None = Field(default=None, gt=0.0, le=86400.0)
@@ -199,6 +211,7 @@ class AdvancedRuntimeSettingsPatch(_PatchModel):
     ollama_server_start_timeout: float | None = Field(default=None, gt=0.0, le=3600.0)
     max_excerpt_length: int | None = Field(default=None, ge=500, le=100000)
 
+
 ###############################################################################
 class RuntimeSettingsValues(_StrictModel):
     general: GeneralRuntimeSettings
@@ -206,6 +219,7 @@ class RuntimeSettingsValues(_StrictModel):
     integrations: IntegrationRuntimeSettings
     matching: MatchingRuntimeSettings
     advanced: AdvancedRuntimeSettings
+
 
 ###############################################################################
 class RuntimeSettingsUpdateRequest(_StrictModel):
@@ -224,6 +238,7 @@ class RuntimeSettingsUpdateRequest(_StrictModel):
             if getattr(self, field_name) is None:
                 raise ValueError(f"{field_name} cannot be null.")
         return self
+
 
 ###############################################################################
 class RuntimeSettingsStateResponse(_StrictModel):

@@ -28,6 +28,7 @@ from services.inspection.revision_scaffold import (
 )
 from services.inspection.service import DataInspectionService
 
+
 ###############################################################################
 class InspectionRevisionEndpoint(InspectionJobEndpointMixin):
 

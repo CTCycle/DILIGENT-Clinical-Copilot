@@ -8,6 +8,7 @@ from configurations.management import (
     build_settings_payload,
 )
 
+
 ###############################################################################
 def _env() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
@@ -15,6 +16,7 @@ def _env() -> EnvironmentSnapshot:
         ollama_host="localhost",
         ollama_port=11434,
     )
+
 
 ###############################################################################
 def test_build_rag_settings_reads_retrieval_counts() -> None:
@@ -47,6 +49,7 @@ def test_build_rag_settings_reads_retrieval_counts() -> None:
     assert settings["allow_local_filesystem_access"] is True
     assert "embedding_backend" not in settings
 
+
 ###############################################################################
 def test_build_rag_settings_enforces_candidate_floor() -> None:
     payload = build_settings_payload(
@@ -56,6 +59,7 @@ def test_build_rag_settings_enforces_candidate_floor() -> None:
     settings = payload["rag"]
     assert settings["retrieval_selected_count"] == 10
     assert settings["retrieval_candidate_count"] == 10
+
 
 ###############################################################################
 def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
@@ -69,6 +73,7 @@ def test_build_rag_settings_defaults_to_lightweight_reranker_profile() -> None:
     assert settings["embedding_offline_mode"] is False
     assert settings["allow_local_filesystem_access"] is True
     assert "reset_vector_collection" not in settings
+
 
 ###############################################################################
 def test_build_rag_settings_can_disable_local_filesystem_access() -> None:

@@ -11,6 +11,7 @@ from typing import NamedTuple, cast
 
 from common.utils.seed_terms import SeedTermCatalog, detect_seed_matches
 
+
 ###############################################################################
 class TextLineIndex(NamedTuple):
     text: str
@@ -19,6 +20,7 @@ class TextLineIndex(NamedTuple):
     def line_for_offset(self, offset: int) -> int:
         bounded = max(0, min(offset, len(self.text)))
         return self.text.count("\n", 0, bounded) + 1
+
 
 ###############################################################################
 class ChunkSourceSpan(NamedTuple):
@@ -29,6 +31,7 @@ class ChunkSourceSpan(NamedTuple):
     char_start: int
     char_end: int
 
+
 ###############################################################################
 class SmartChunk(NamedTuple):
     text: str
@@ -36,6 +39,7 @@ class SmartChunk(NamedTuple):
     chunk_index: str
     chunk_index_number: int
     metadata: dict[str, object]
+
 
 ###############################################################################
 class SmartDocumentChunker:
@@ -282,6 +286,7 @@ class SmartDocumentChunker:
     def _slug(value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
         return slug[:48] or "section"
+
 
 ###############################################################################
 class TokenWindowDocumentChunker:

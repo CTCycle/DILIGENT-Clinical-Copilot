@@ -49,6 +49,7 @@ _COMPONENT_RE = re.compile(
 )
 _QUANTITY_PREFIX_RE = re.compile(r"^\d+(?:\.\d+)? [A-Z]+ ")
 
+
 ###############################################################################
 @dataclass
 class _ConceptTable:
@@ -58,12 +59,14 @@ class _ConceptTable:
     products: dict[str, str] = field(default_factory=dict)
     synonyms: dict[str, list[str]] = field(default_factory=lambda: defaultdict(list))
 
+
 ###############################################################################
 @dataclass
 class _RelationTable:
     parents: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
     components: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
     brand_ingredients: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+
 
 ###############################################################################
 class RxNormPrescribableSource:

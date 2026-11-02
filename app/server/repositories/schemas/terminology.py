@@ -25,6 +25,7 @@ from repositories.schemas.base import Base, JsonPayload
 DRUGS_ID_FK = "drugs.id"
 IMPORT_RUNS_ID_FK = "terminology_import_runs.id"
 
+
 ###############################################################################
 class TerminologyImportRun(Base):
     """Provenance and import report for one terminology source refresh."""
@@ -57,6 +58,7 @@ class TerminologyImportRun(Base):
             "finished_at",
         ),
     )
+
 
 ###############################################################################
 class DrugConceptRelation(Base):
@@ -93,6 +95,7 @@ class DrugConceptRelation(Base):
         Index("ix_drug_concept_relations_related_drug_id", "related_drug_id"),
     )
 
+
 ###############################################################################
 class DrugAtcCode(Base):
     __tablename__ = "drug_atc_codes"
@@ -113,6 +116,7 @@ class DrugAtcCode(Base):
         ),
         Index("ix_drug_atc_codes_atc_code", "atc_code"),
     )
+
 
 ###############################################################################
 class MedicinalProduct(Base):
@@ -150,6 +154,7 @@ class MedicinalProduct(Base):
         Index("ix_medicinal_products_drug_id", "drug_id"),
     )
 
+
 ###############################################################################
 class MedicinalProductIngredient(Base):
     __tablename__ = "medicinal_product_ingredients"
@@ -176,6 +181,7 @@ class MedicinalProductIngredient(Base):
         ),
         Index("ix_medicinal_product_ingredients_drug_id", "drug_id"),
     )
+
 
 ###############################################################################
 class TerminologyConflict(Base):
@@ -217,6 +223,7 @@ class TerminologyConflict(Base):
         Index("ix_terminology_conflicts_status", "status"),
         Index("ix_terminology_conflicts_source", "source"),
     )
+
 
 ###############################################################################
 class DrugLiverToxLink(Base):

@@ -40,6 +40,7 @@ from services.llm.generation_policy import GenerationPurpose
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine
 
+
 ###############################################################################
 def build_file_serializer(tmp_path: Path) -> Any:
     engine = create_engine(
@@ -47,6 +48,7 @@ def build_file_serializer(tmp_path: Path) -> Any:
     )
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine)
+
 
 ###############################################################################
 def save_revision_source_session(serializer: Any) -> int:
@@ -72,6 +74,7 @@ def save_revision_source_session(serializer: Any) -> int:
     assert session_id is not None
     return int(session_id)
 
+
 ###############################################################################
 def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
     graph = build_repository_graph(
@@ -87,6 +90,7 @@ def build_service(serializer: Any, jobs: JobManager) -> DataInspectionService:
         jobs=jobs,
     )
 
+
 ###############################################################################
 def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
     graph = build_repository_graph(
@@ -99,6 +103,7 @@ def build_runner(serializer: Any, **kwargs: Any) -> RevisionAgentRunner:
         knowledge_repository=graph.knowledge_repository,
         **kwargs,
     )
+
 
 ###############################################################################
 def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
@@ -147,6 +152,7 @@ def fake_issue_scan_call(**kwargs: Any) -> dict[str, Any]:
         return {"summary": "No issues detected."}
     raise AssertionError(f"Unexpected schema: {schema_name}")
 
+
 ###############################################################################
 def fake_mismatched_patch_call(**kwargs: Any) -> dict[str, Any]:
     if kwargs["schema"].__name__ != "RevisionDraftResult":
@@ -170,6 +176,7 @@ def fake_mismatched_patch_call(**kwargs: Any) -> dict[str, Any]:
         "human_review_requirements": ["Clinical review required."],
         "entity_change_proposals": [],
     }
+
 
 ###############################################################################
 def fake_unsafe_revision_call(**kwargs: Any) -> dict[str, Any]:
@@ -195,6 +202,7 @@ def fake_unsafe_revision_call(**kwargs: Any) -> dict[str, Any]:
         "entity_change_proposals": [],
     }
 
+
 ###############################################################################
 def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
     with pytest.raises(ValidationError):
@@ -214,6 +222,7 @@ def test_revision_issue_scan_schema_rejects_unknown_category() -> None:
             }
         )
 
+
 ###############################################################################
 def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> None:
     decision = RevisionAgentToolCall.model_validate(
@@ -227,12 +236,14 @@ def test_revision_agent_tool_call_accepts_provider_rationale_within_budget() -> 
 
     assert len(decision.rationale) > 1000
 
+
 ###############################################################################
 def test_revision_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValidationError):
         SessionRevisionRequest.model_validate(
             {"model_overrides": {"clinical_model": "x"}}
         )
+
 
 ###############################################################################
 def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
@@ -259,6 +270,7 @@ def test_revision_prompt_merges_session_report_and_user_instruction() -> None:
     assert "may steer review focus but is not clinical evidence" in prompt
     assert "No tools are available" in prompt
 
+
 ###############################################################################
 def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     prompt = editor_prompt(
@@ -270,6 +282,7 @@ def test_revision_editor_prompt_requires_exact_source_patches() -> None:
     assert "expected_text` must equal the exact source substring character-for-character" in prompt
     assert "return an empty `patches` list" in prompt
 
+
 ###############################################################################
 def test_revision_prompts_serialize_context_as_strict_json() -> None:
     prompt = planner_prompt(
@@ -280,6 +293,7 @@ def test_revision_prompts_serialize_context_as_strict_json() -> None:
     assert '"enabled":true' in prompt
     assert "'enabled'" not in prompt
     assert "True" not in prompt
+
 
 ###############################################################################
 def test_revision_plan_accepts_25_evident_issues_but_keeps_eight_task_bound() -> None:
@@ -311,6 +325,7 @@ def test_revision_plan_accepts_25_evident_issues_but_keeps_eight_task_bound() ->
             }
         )
 
+
 ###############################################################################
 def test_revision_error_payload_persists_sanitized_provider_status() -> None:
     error = LLMError(
@@ -335,6 +350,7 @@ def test_revision_error_payload_persists_sanitized_provider_status() -> None:
     assert payload["request_id"] == "req-revision-530"
     assert "secret-value" not in str(payload)
     assert "provider_detail" not in payload
+
 
 ###############################################################################
 def test_structured_parse_failure_is_retryable_and_keeps_details_private() -> None:
@@ -364,6 +380,7 @@ def test_structured_parse_failure_is_retryable_and_keeps_details_private() -> No
     assert step_payload["provider"] == runtime.provider
     assert step_payload["model"] == runtime.model
     assert "private-response-fragment" not in str(step_payload)
+
 
 ###############################################################################
 def test_revision_context_exposes_exact_section_offsets_and_truncation_state() -> None:
@@ -408,6 +425,7 @@ def test_revision_context_exposes_exact_section_offsets_and_truncation_state() -
     assert truncated["editability"]["editable"] is False
     assert truncated["source_length"] == len(truncated_report)
 
+
 ###############################################################################
 @pytest.mark.parametrize("report", ["Canonical report.", ""])
 def test_revision_context_always_includes_report_editability(report: str) -> None:
@@ -424,6 +442,7 @@ def test_revision_context_always_includes_report_editability(report: str) -> Non
     assert editability["available"] is bool(report)
     assert editability["editable"] is bool(report)
     assert editability["source_length"] == len(report)
+
 
 ###############################################################################
 @pytest.mark.parametrize("prefix", ["", "Read the session context once, then "])
@@ -454,6 +473,7 @@ def test_revision_runner_does_not_auto_append_when_canonical_context_is_truncate
     assert normalized.patches == []
     assert any("not fully available" in issue for issue in normalized.unresolved_issues)
 
+
 ###############################################################################
 @pytest.mark.parametrize("prefix", ["", "Read the session context once, then "])
 def test_requested_append_sentence_is_extracted_from_explicit_instruction(
@@ -482,6 +502,7 @@ def test_requested_append_sentence_is_extracted_from_explicit_instruction(
     )
     assert normalized.revised_report_text == applied
 
+
 ###############################################################################
 def test_revision_context_preserves_long_canonical_report() -> None:
     report = "Canonical report text. " * 700
@@ -502,6 +523,7 @@ def test_revision_context_preserves_long_canonical_report() -> None:
     assert canonical["text"] == report
     assert canonical["truncated"] is False
     assert canonical["sha256"]
+
 
 ###############################################################################
 def test_revision_agent_assigns_stage_specific_generation_purposes(
@@ -534,12 +556,14 @@ def test_revision_agent_assigns_stage_specific_generation_purposes(
         GenerationPurpose.REVISION_SCAN,
     ]
 
+
 ###############################################################################
 def test_revision_issue_scan_allows_bounded_provider_repair_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
     provider_factory: dict[str, object] = {}
+
 
     ###############################################################################
     class FakeProvider:
@@ -570,6 +594,7 @@ def test_revision_issue_scan_allows_bounded_provider_repair_retries(
     assert captured["purpose"] is GenerationPurpose.REVISION_SCAN
     assert REVISION_PROVIDER_MAX_RETRIES == 2
     assert provider_factory["max_retries"] == 2
+
 
 ###############################################################################
 def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> None:
@@ -633,6 +658,7 @@ def test_revision_job_persists_issue_scan_step_and_artifact(tmp_path: Path) -> N
         "revision_agent_qa",
     }
 
+
 ###############################################################################
 def test_revision_job_persists_job_identity_before_worker_start(
     tmp_path: Path,
@@ -640,6 +666,7 @@ def test_revision_job_persists_job_identity_before_worker_start(
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
     observed: dict[str, Any] = {}
+
 
     ###############################################################################
     class ObservingJobManager(JobManager):
@@ -689,6 +716,7 @@ def test_revision_job_persists_job_identity_before_worker_start(
         "version_revision_id": started["result"]["revision_version_id"],
         "requested_job_id": started["job_id"],
     }
+
 
 ###############################################################################
 def test_revision_repairs_noop_draft_once_before_accepting_validated_patch(
@@ -768,6 +796,7 @@ def test_revision_repairs_noop_draft_once_before_accepting_validated_patch(
         "Clinician review required: Possible DILI from amoxicillin."
     )
 
+
 ###############################################################################
 def test_revision_persists_deterministic_patch_when_model_text_differs(
     tmp_path: Path,
@@ -814,6 +843,7 @@ def test_revision_persists_deterministic_patch_when_model_text_differs(
     assert revised_session is not None
     assert revised_session["report"] == draft["payload"]["revised_report_text"]
     assert revised_session["sections"]["drugs"] == "Amoxicillin started 2026-01-01."
+
 
 ###############################################################################
 def test_accepted_revision_reload_and_subsequent_revision_preserve_lineage(
@@ -916,6 +946,7 @@ def test_accepted_revision_reload_and_subsequent_revision_preserve_lineage(
     assert original_session is not None
     assert original_session["report"] == first_source
 
+
 ###############################################################################
 def test_revision_safety_gate_keeps_rechallenge_draft_out_of_sessions(
     tmp_path: Path,
@@ -956,6 +987,7 @@ def test_revision_safety_gate_keeps_rechallenge_draft_out_of_sessions(
     assert version_detail is not None
     assert version_detail["version"]["session_id"] is None
     assert version_detail["version"]["version_status"] == "qa_failed"
+
 
 ###############################################################################
 def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> None:
@@ -1006,6 +1038,7 @@ def test_revision_agent_recovers_from_invalid_tool_arguments(tmp_path: Path) -> 
         "error": "Tool ids must be positive integers.",
         "invalid_tool_input": True,
     }
+
 
 ###############################################################################
 def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
@@ -1060,6 +1093,7 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
     )
     assert context_artifact["payload"]["audit"]["version_lineage"]
 
+
 ###############################################################################
 def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -1094,6 +1128,7 @@ def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> 
     assert version["version_number"] == 4
     assert version["revision_kind"] == "manual_edit"
 
+
 ###############################################################################
 class SlowRevisionRunner:
 
@@ -1102,12 +1137,14 @@ class SlowRevisionRunner:
         time.sleep(0.4)
         return {}
 
+
 ###############################################################################
 class FailingRevisionRunner:
 
     # -------------------------------------------------------------------------
     def run_agentic(self, **_kwargs: Any) -> dict[str, Any]:
         raise RuntimeError("Synthetic revision failure")
+
 
 ###############################################################################
 def test_running_revision_persists_job_recovery_metadata(tmp_path: Path) -> None:
@@ -1132,6 +1169,7 @@ def test_running_revision_persists_job_recovery_metadata(tmp_path: Path) -> None
         if status and status["status"] != "running":
             break
         time.sleep(0.05)
+
 
 ###############################################################################
 def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
@@ -1160,6 +1198,7 @@ def test_failed_revision_marks_persisted_run_failed(tmp_path: Path) -> None:
     assert run["error"]["model"] == run["configuration"]["model_name"]
     assert run["error"]["retryable"] is False
 
+
 ###############################################################################
 def test_unattributed_retryable_revision_failure_keeps_runtime_metadata(
     tmp_path: Path,
@@ -1167,9 +1206,11 @@ def test_unattributed_retryable_revision_failure_keeps_runtime_metadata(
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
 
+
     ###############################################################################
     class RetryableFailure(RuntimeError):
         retryable = True
+
 
     ###############################################################################
     class RetryableRevisionRunner:
@@ -1199,6 +1240,7 @@ def test_unattributed_retryable_revision_failure_keeps_runtime_metadata(
     assert run["error"]["model"] == run["configuration"]["model_name"]
     assert run["error"]["retryable"] is True
     assert "Transient provider failure" not in run["error"]["message"]
+
 
 ###############################################################################
 def test_revision_provider_failure_persists_sanitized_retry_metadata(
@@ -1250,6 +1292,7 @@ def test_revision_provider_failure_persists_sanitized_retry_metadata(
     )
     assert planner_step["error"]["status_code"] == 503
     assert planner_step["error"]["retryable"] is True
+
 
 ###############################################################################
 def test_revision_timeout_persists_retryable_provider_metadata(
@@ -1306,6 +1349,7 @@ def test_revision_timeout_persists_retryable_provider_metadata(
     source = serializer.clinical_session_repository.get_session_detail(session_id)
     assert source is not None
     assert source["report"] == "Possible DILI from amoxicillin."
+
 
 ###############################################################################
 def test_service_cancellation_preserves_source_and_allows_retry_after_worker_exit(
@@ -1386,6 +1430,7 @@ def test_service_cancellation_preserves_source_and_allows_retry_after_worker_exi
     source_after_retry = service.get_session_detail(session_id)
     assert source_after_retry is not None
     assert source_after_retry["report"] == source_before_retry["report"]
+
 
 ###############################################################################
 def test_missing_revision_worker_is_recoverable_and_retry_preserves_source(
@@ -1470,6 +1515,7 @@ def test_missing_revision_worker_is_recoverable_and_retry_preserves_source(
     source_after_retry = service.get_session_detail(session_id)
     assert source_after_retry is not None
     assert source_after_retry["report"] == source_before_retry["report"]
+
 
 ###############################################################################
 def test_startup_reconciles_orphaned_revision_after_process_restart(
@@ -1565,6 +1611,7 @@ def test_startup_reconciles_orphaned_revision_after_process_restart(
     assert source_after_retry is not None
     assert source_after_retry["report"] == source_before_retry["report"]
 
+
 ###############################################################################
 def test_revision_tool_failure_fails_closed_without_leaking_detail(
     tmp_path: Path,
@@ -1625,6 +1672,7 @@ def test_revision_tool_failure_fails_closed_without_leaking_detail(
     source = serializer.clinical_session_repository.get_session_detail(session_id)
     assert source is not None
     assert source["report"] == "Possible DILI from amoxicillin."
+
 
 ###############################################################################
 def test_cancelled_revision_finalizes_version_and_steps(tmp_path: Path) -> None:
@@ -1726,6 +1774,7 @@ def test_cancelled_revision_finalizes_version_and_steps(tmp_path: Path) -> None:
         )
     ] == ["cancelled"]
 
+
 ###############################################################################
 def test_finalized_revision_wins_over_late_cancellation(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -1781,6 +1830,7 @@ def test_finalized_revision_wins_over_late_cancellation(tmp_path: Path) -> None:
     assert version_detail["version"]["llm_qa_status"] == "passed"
     assert version_detail["version"]["session_id"] == session_id
 
+
 ###############################################################################
 def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -1819,6 +1869,7 @@ def test_session_delete_cleans_revision_shell_and_run(tmp_path: Path) -> None:
         serializer.session_revision_repository.get_revision_run(pipeline_run_id) is None
     )
 
+
 ###############################################################################
 def test_incomplete_revision_shell_cannot_be_clinically_reviewed(
     tmp_path: Path,
@@ -1841,6 +1892,7 @@ def test_incomplete_revision_shell_cannot_be_clinically_reviewed(
             reviewed_by="QA",
         )
 
+
 ###############################################################################
 def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
@@ -1859,6 +1911,7 @@ def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None
         if status and status["status"] in {"completed", "failed", "cancelled"}:
             break
         time.sleep(0.05)
+
 
 ###############################################################################
 def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:

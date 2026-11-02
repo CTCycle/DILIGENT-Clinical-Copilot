@@ -7,6 +7,7 @@ import re
 
 from domain.clinical.dili import DiliInjuryPattern, DiliPhenotypeAssessment
 
+
 ###############################################################################
 class DiliPhenotypeClassifier:
 

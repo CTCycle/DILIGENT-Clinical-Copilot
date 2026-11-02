@@ -116,7 +116,7 @@ class IngredientCanonicalizer:
         return expanded
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def load_cases(path: Path = CASES_PATH) -> list[BenchmarkCase]:
     cases: list[BenchmarkCase] = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -137,7 +137,7 @@ def load_cases(path: Path = CASES_PATH) -> list[BenchmarkCase]:
     return cases
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def percentile(values: list[float], fraction: float) -> float:
     if not values:
         return 0.0
@@ -176,7 +176,7 @@ class CaseOutcome:
         }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def score_case(
     case: BenchmarkCase,
     prediction: Prediction,
@@ -198,7 +198,7 @@ def score_case(
     return CaseOutcome(case, prediction, top1_correct, in_top5, auto_correct, auto_wrong)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def summarize(outcomes: list[CaseOutcome]) -> dict[str, Any]:
     accept_cases = [item for item in outcomes if item.case.expect == "accept"]
     abstain_cases = [item for item in outcomes if item.case.expect == "abstain"]
@@ -231,7 +231,7 @@ def summarize(outcomes: list[CaseOutcome]) -> dict[str, Any]:
     }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def breakdown(outcomes: list[CaseOutcome], attribute: str) -> dict[str, Any]:
     groups: dict[str, list[CaseOutcome]] = {}
     for item in outcomes:
@@ -248,7 +248,7 @@ def breakdown(outcomes: list[CaseOutcome], attribute: str) -> dict[str, Any]:
     }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def run_benchmark(
     resolve: ResolveFn,
     *,

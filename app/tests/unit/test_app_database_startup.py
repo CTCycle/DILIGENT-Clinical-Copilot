@@ -11,6 +11,8 @@ import pytest
 from configurations.startup import get_server_settings
 from services import startup_validation
 
+
+###############################################################################
 def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ignore[no-untyped-def]
     events: list[str] = []
     settings = SimpleNamespace(database=SimpleNamespace(backend=database_backend))
@@ -61,6 +63,8 @@ def _run_lifespan(database_backend: str, monkeypatch) -> list[str]:  # type: ign
     asyncio.run(exercise())
     return events
 
+
+###############################################################################
 def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     assert _run_lifespan("sqlite", monkeypatch) == [
         "database",
@@ -73,6 +77,8 @@ def test_application_startup_synchronizes_sqlite_before_validation(monkeypatch) 
         "close",
     ]
 
+
+###############################################################################
 def test_application_startup_synchronizes_postgresql_before_validation(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
@@ -87,6 +93,8 @@ def test_application_startup_synchronizes_postgresql_before_validation(
         "close",
     ]
 
+
+###############################################################################
 class _FakeModelConfigService:
 
     # -------------------------------------------------------------------------
@@ -102,6 +110,8 @@ class _FakeModelConfigService:
     def load_current_snapshot(self) -> SimpleNamespace:
         return self._snapshot
 
+
+###############################################################################
 def test_run_startup_validations_requires_reference_catalogs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

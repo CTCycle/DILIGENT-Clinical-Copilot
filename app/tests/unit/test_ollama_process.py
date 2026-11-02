@@ -10,26 +10,33 @@ import pytest
 from services.runtime import ollama_process as process_module
 from services.runtime.ollama_process import OllamaProcessError, OllamaProcessManager
 
+
 ###############################################################################
 class _FakeProcess:
     pid = 4242
     returncode: int | None = None
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.terminated = False
 
+    # -------------------------------------------------------------------------
     def poll(self) -> int | None:
         return self.returncode
 
+    # -------------------------------------------------------------------------
     def terminate(self) -> None:
         self.terminated = True
         self.returncode = 0
 
+    # -------------------------------------------------------------------------
     def kill(self) -> None:
         self.terminate()
 
+    # -------------------------------------------------------------------------
     def wait(self, timeout: float | None = None) -> int:
         return 0
+
 
 ###############################################################################
 def _start(manager: OllamaProcessManager, url: str, online: list[bool]) -> None:
@@ -39,6 +46,7 @@ def _start(manager: OllamaProcessManager, url: str, online: list[bool]) -> None:
     asyncio.run(
         manager.start(url, is_online=is_online, wait_timeout_s=2, poll_interval_s=0.01)
     )
+
 
 ###############################################################################
 def test_start_launches_once_and_only_owned_process_can_be_stopped(
@@ -62,6 +70,7 @@ def test_start_launches_once_and_only_owned_process_can_be_stopped(
     assert spawned[0].terminated and not manager.owned
     assert manager.stop() is False
 
+
 ###############################################################################
 def test_start_does_not_spawn_when_service_is_already_reachable(
     monkeypatch: pytest.MonkeyPatch,
@@ -78,6 +87,7 @@ def test_start_does_not_spawn_when_service_is_already_reachable(
 
     assert not manager.owned
     assert manager.stop() is False
+
 
 ###############################################################################
 @pytest.mark.parametrize(

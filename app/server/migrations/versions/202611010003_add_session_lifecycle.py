@@ -32,6 +32,7 @@ _STATUS_SQL = (
     "'cancelled', 'failed')"
 )
 
+
 ###############################################################################
 def upgrade() -> None:
     with op.batch_alter_table("clinical_sessions", schema=None) as batch_op:
@@ -135,6 +136,7 @@ def upgrade() -> None:
         batch_op.add_column(
             sa.Column("source_text_hash", sa.String(length=64), nullable=True)
         )
+
 
 ###############################################################################
 def downgrade() -> None:

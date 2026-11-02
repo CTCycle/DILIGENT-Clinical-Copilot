@@ -39,6 +39,7 @@ KNOWLEDGE_TABLES = (
 SEED_PATIENT_NAME = "CI Browser Regression Subject"
 SEED_TIMESTAMP = datetime(2026, 9, 29, 8, 0)
 
+
 ###############################################################################
 def seed_knowledge_base(context: RepositoryContext) -> None:
     """Load one real LiverTox/RxNav/DILIrank drug so analysis preflight can pass."""
@@ -56,6 +57,7 @@ def seed_knowledge_base(context: RepositoryContext) -> None:
                 connection.execute(
                     text(f"INSERT INTO {table} ({columns}) VALUES ({values})"), row
                 )
+
 
 ###############################################################################
 def seed_browser_regression_database() -> tuple[int, int]:

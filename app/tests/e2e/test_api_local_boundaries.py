@@ -127,6 +127,7 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/settings/reset/{category}"): "settings.persistence-and-reset",
 }
 
+
 ###############################################################################
 def _seed_session(api_context: APIRequestContext) -> tuple[int, dict[str, Any]]:
     response = api_context.get(
@@ -145,10 +146,12 @@ def _seed_session(api_context: APIRequestContext) -> tuple[int, dict[str, Any]]:
     assert detail["session_id"] == session_id
     return session_id, detail
 
+
 ###############################################################################
 def _assert_not_found(response: Any) -> None:
     assert response.status == 404, response.text()
     assert isinstance(response.json().get("detail"), str)
+
 
 ###############################################################################
 def test_openapi_operations_are_explicitly_classified(
@@ -172,6 +175,7 @@ def test_openapi_operations_are_explicitly_classified(
     )
     assert all(API_OPERATION_MATRIX[operation] for operation in operations)
 
+
 ###############################################################################
 def test_root_runtime_contracts_are_reachable(
     api_context: APIRequestContext,
@@ -193,6 +197,7 @@ def test_root_runtime_contracts_are_reachable(
     assert bootstrap.status in {401, 422}
     shutdown = api_context.post("/api/desktop/shutdown")
     assert shutdown.status == 401
+
 
 ###############################################################################
 def test_catalog_rag_and_runtime_observation_boundaries(
@@ -253,6 +258,7 @@ def test_catalog_rag_and_runtime_observation_boundaries(
     )
     assert deleted.status == 200, deleted.text()
     assert deleted.json()["deleted"] is True
+
 
 ###############################################################################
 def test_route_family_validation_and_missing_job_contracts(
@@ -320,6 +326,7 @@ def test_route_family_validation_and_missing_job_contracts(
         response = getattr(api_context, method)(path)
         _assert_not_found(response)
 
+
 ###############################################################################
 def test_clinical_session_lifecycle_contracts(api_context: APIRequestContext) -> None:
     created = api_context.post(
@@ -375,6 +382,7 @@ def test_clinical_session_lifecycle_contracts(api_context: APIRequestContext) ->
         )
         assert response.status in {404, 422}, (suffix, response.text())
 
+
 ###############################################################################
 def test_session_version_detail_and_timeline_job_lifecycle(
     api_context: APIRequestContext,
@@ -403,6 +411,7 @@ def test_session_version_detail_and_timeline_job_lifecycle(
         f"/api/inspection/sessions/{session_id}/timeline-jobs/{job_id}"
     )
     assert timeline_cancel.status == 200, timeline_cancel.text()
+
 
 ###############################################################################
 def test_session_inspection_mutations_and_timeline_errors(
@@ -532,6 +541,7 @@ def test_session_inspection_mutations_and_timeline_errors(
         ),
     ):
         _assert_not_found(response)
+
 
 ###############################################################################
 def test_revision_route_error_contracts(

@@ -19,6 +19,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
+
 ###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -37,11 +38,13 @@ def make_sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
+
 ###############################################################################
 def _make_temp_db_root(prefix: str) -> Path:
     temp_root = Path(tempfile.gettempdir()) / f"{prefix}-{uuid.uuid4().hex}"
     temp_root.mkdir(parents=True, exist_ok=True)
     return temp_root
+
 
 ###############################################################################
 def test_sqlite_fresh_creation_uses_external_material(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -69,6 +72,7 @@ def test_sqlite_fresh_creation_uses_external_material(monkeypatch) -> None:  # t
         assert material_path.exists()
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
+
 
 ###############################################################################
 def test_sqlite_reopen_with_existing_db_reuses_external_material(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -98,6 +102,7 @@ def test_sqlite_reopen_with_existing_db_reuses_external_material(monkeypatch) ->
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
+
 ###############################################################################
 def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch,
@@ -121,6 +126,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     order: list[str] = []
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
 
+
     ###############################################################################
     class FakeConnection:
 
@@ -135,6 +141,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
         # -------------------------------------------------------------------------
         def execute(self, _stmt):
 
+
             ###############################################################################
             class ScalarResult:
 
@@ -145,6 +152,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
             return ScalarResult()
 
+
     ###############################################################################
     class FakeAdminEngine:
 
@@ -152,6 +160,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
         @staticmethod
         def connect():
             return FakeConnection()
+
 
     ###############################################################################
     class FakePostgresRepository:
@@ -167,12 +176,14 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     def fake_seed_model_configuration(_repository):
         order.append("model_config_seeded")
 
+
     ###############################################################################
     class FakeCatalogSerializer:
 
         # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:
             pass
+
 
     ###############################################################################
     class FakeCatalogSeedResult:
@@ -199,6 +210,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 
     assert db_name == "diligent"
     assert order == ["migration", "model_config_seeded", "catalog_seeded"]
+
 
 ###############################################################################
 def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -227,6 +239,7 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
+
 ###############################################################################
 def test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing(
     monkeypatch, tmp_path: Path
@@ -245,6 +258,7 @@ def test_sqlite_startup_initializes_and_seeds_when_database_file_is_missing(
 
     assert initializer.ensure_database_ready(settings) is True
     assert calls == [{"seed_catalogs": True}]
+
 
 ###############################################################################
 def test_sqlite_startup_initializes_existing_empty_database(
@@ -266,6 +280,7 @@ def test_sqlite_startup_initializes_existing_empty_database(
 
     assert initializer.ensure_database_ready(settings) is True
     assert calls == [{"seed_catalogs": True}]
+
 
 ###############################################################################
 def test_sqlite_initialization_seeds_an_existing_file_without_app_schema(
@@ -294,12 +309,14 @@ def test_sqlite_initialization_seeds_an_existing_file_without_app_schema(
     assert migration_calls == [{"database_was_empty": True, "drop_existing": False}]
     assert catalog_calls == ["seeded"]
 
+
 ###############################################################################
 def test_postgres_startup_seeds_catalogs_for_existing_empty_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     engine = create_engine("sqlite:///:memory:")
     events: list[tuple[str, object]] = []
+
 
     ###############################################################################
     class FakePostgresRepository:
@@ -337,6 +354,7 @@ def test_postgres_startup_seeds_catalogs_for_existing_empty_database(
         ("catalogs", {"backend_label": "PostgreSQL", "force": False}),
     ]
 
+
 ###############################################################################
 def test_database_initialization_converts_unavailable_connection_to_exit(
     monkeypatch: pytest.MonkeyPatch,
@@ -350,6 +368,7 @@ def test_database_initialization_converts_unavailable_connection_to_exit(
         initializer.initialize_database()
 
     assert exc_info.value.code == 1
+
 
 ###############################################################################
 def _sqlite_settings() -> DatabaseSettings:
@@ -370,6 +389,7 @@ def _sqlite_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
+
 ###############################################################################
 def _postgres_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -389,6 +409,7 @@ def _postgres_settings() -> DatabaseSettings:
         select_page_size=1000,
     )
 
+
 ###############################################################################
 def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
     monkeypatch: pytest.MonkeyPatch,
@@ -397,6 +418,7 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
     localized_error = SQLAlchemyError(
         'connection failed: FATALE: il database "diligent" non esiste'
     )
+
 
     ###############################################################################
     class FakeTargetEngine:
@@ -410,6 +432,7 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
         def dispose(self) -> None:
             events.append("target_dispose")
 
+
     ###############################################################################
     class FakePostgresRepository:
 
@@ -417,12 +440,14 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
         def __init__(self, _settings) -> None:
             self.engine = FakeTargetEngine()
 
+
     ###############################################################################
     class FakeResult:
 
         # -------------------------------------------------------------------------
         def scalar(self):
             return None
+
 
     ###############################################################################
     class FakeAdminConnection:
@@ -448,6 +473,7 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
             elif "pg_advisory_unlock" in sql:
                 events.append("unlock")
             return None
+
 
     ###############################################################################
     class FakeAdminEngine:
@@ -484,6 +510,7 @@ def test_postgres_database_creation_uses_server_catalog_for_localized_errors(
         "admin_dispose",
     ]
 
+
 ###############################################################################
 def test_run_database_initialization_uses_sqlite_path_when_embedded(
     monkeypatch,
@@ -510,6 +537,7 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(
     initializer.run_database_initialization()
 
     assert calls == ["sqlite"]
+
 
 ###############################################################################
 def test_run_database_initialization_uses_postgres_path_when_external(

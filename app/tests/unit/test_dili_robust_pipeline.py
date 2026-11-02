@@ -31,6 +31,7 @@ from services.session.robust_pipeline import (
 
 import app as server_app_module
 
+
 ###############################################################################
 def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
     raw_text = (
@@ -43,6 +44,7 @@ def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
     assert "Clinical note text" in normalized.clean_text
     assert any(block.block_type == "bibliography" for block in normalized.blocks)
     assert normalized.span_mappings[0].raw_end == len(raw_text)
+
 
 ###############################################################################
 def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> None:
@@ -71,6 +73,7 @@ def test_extraction_artifact_uses_ui_metadata_outside_document_sections() -> Non
     assert artifact.sections["therapy"].text == "Zetamycin 10 mg 1-0-0-0"
     assert artifact.timed_drugs[0].drug == "Zetamycin 10 mg 1-0-0-0"
 
+
 ###############################################################################
 def test_timed_drug_extraction_rejects_status_and_symptom_fragments() -> None:
     payload = PatientData(
@@ -98,6 +101,7 @@ def test_timed_drug_extraction_rejects_status_and_symptom_fragments() -> None:
     assert not any("dark urine" in name for name in timed_names)
     assert not any(name.startswith("and ") for name in timed_names)
 
+
 ###############################################################################
 def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> None:
     graph = FactGraph(
@@ -116,6 +120,7 @@ def test_fact_graph_validation_blocks_source_verbatim_nodes_without_spans() -> N
     validation = validate_fact_graph(graph)
 
     assert validation.hard_issues[0]["code"] == "source_span_missing"
+
 
 ###############################################################################
 def test_report_metadata_links_claims_to_fact_nodes() -> None:
@@ -160,6 +165,7 @@ def test_report_metadata_links_claims_to_fact_nodes() -> None:
         build_run_bundle_index(run_id="1", session_id=1).storage
         == "database_session_result_payload"
     )
+
 
 ###############################################################################
 def test_fact_graph_report_localizes_italian_audit_labels() -> None:
@@ -209,6 +215,7 @@ def test_fact_graph_report_localizes_italian_audit_labels() -> None:
     assert "Clinical Report" not in report
     assert metadata.claim_references
 
+
 ###############################################################################
 def test_audit_blocks_report_without_claim_references() -> None:
     audit = audit_report(
@@ -237,6 +244,7 @@ def test_audit_blocks_report_without_claim_references() -> None:
         for decision in audit.gate_decisions
     )
     assert audit.outcome == "partially_faithful_with_major_issues"
+
 
 ###############################################################################
 def test_audit_exposes_failed_no_rechallenge_gate() -> None:
@@ -273,6 +281,7 @@ def test_audit_exposes_failed_no_rechallenge_gate() -> None:
     )
     assert gate["passed"] is False
     assert audit.manual_review_required is True
+
 
 ###############################################################################
 def test_revision_routes_report_missing_resources_without_501() -> None:

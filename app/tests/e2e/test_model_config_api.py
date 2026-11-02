@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from playwright.sync_api import APIRequestContext
 
+
 ###############################################################################
 def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext):
     response = api_context.get("/api/model-config")
@@ -34,6 +35,7 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "cloud_temperature" not in payload
     assert "ollama_temperature" not in payload
 
+
 ###############################################################################
 def test_model_config_put_rejects_removed_reasoning_boolean(
     api_context: APIRequestContext,
@@ -45,6 +47,7 @@ def test_model_config_put_rejects_removed_reasoning_boolean(
     assert response.status == 422
     detail = response.json().get("detail") or []
     assert any("ollama_reasoning" in str(item.get("loc", [])) for item in detail)
+
 
 ###############################################################################
 def test_model_config_put_rejects_removed_temperature_field(
@@ -60,6 +63,7 @@ def test_model_config_put_rejects_removed_temperature_field(
     assert detail
     assert any("cloud_temperature" in str(item.get("loc", [])) for item in detail)
 
+
 ###############################################################################
 def test_model_config_put_rejects_unknown_nested_rag_field(
     api_context: APIRequestContext,
@@ -71,6 +75,7 @@ def test_model_config_put_rejects_unknown_nested_rag_field(
     assert response.status == 422
     detail = response.json().get("detail") or []
     assert any("future_setting" in str(item.get("loc", [])) for item in detail)
+
 
 ###############################################################################
 def test_model_config_put_returns_persisted_values_without_catalog_refresh(

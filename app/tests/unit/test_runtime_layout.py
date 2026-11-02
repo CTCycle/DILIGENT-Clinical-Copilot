@@ -9,6 +9,8 @@ import os
 from common.paths import EMBEDDING_MODELS_PATH
 from configurations.runtime_bootstrap import configure_cache_environment
 
+
+###############################################################################
 def test_source_data_default_and_override(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("DILIGENT_RUNTIME_ROOT", raising=False)
     monkeypatch.delenv("DILIGENT_DATA_ROOT", raising=False)
@@ -35,6 +37,8 @@ def test_source_data_default_and_override(monkeypatch, tmp_path: Path) -> None:
     finally:
         resolve_runtime_layout.cache_clear()
 
+
+###############################################################################
 def test_packaged_immutable_data_and_persistent_data_roots(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -55,6 +59,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 CANONICAL_CACHE_ROOT = REPO_ROOT / "runtimes" / "cache"
 
+
+###############################################################################
 def test_source_and_packaged_layouts_have_one_cache_root(tmp_path: Path, monkeypatch) -> None:
     source_layout = resolve_runtime_layout()
     assert source_layout.packaged is False

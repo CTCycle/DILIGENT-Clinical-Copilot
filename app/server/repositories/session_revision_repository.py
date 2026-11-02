@@ -41,6 +41,7 @@ from repositories.serialization.session_result_data import (
     serialize_json_payload,
 )
 
+
 ###############################################################################
 class SessionRevisionRepository:
 

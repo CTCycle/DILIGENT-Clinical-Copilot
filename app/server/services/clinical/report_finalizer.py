@@ -35,6 +35,7 @@ from services.clinical.hepatox_constants import (
 DILIRANK_PROVENANCE_KEY = "fda_dilirank_2"
 DILIRANK_SOURCE_LABEL = "FDA DILIrank 2.0"
 
+
 ###############################################################################
 class ReportFinalizer:
     """Builds the final patient report and conclusion from per-drug assessments."""

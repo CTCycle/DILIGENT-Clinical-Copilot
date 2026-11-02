@@ -16,6 +16,7 @@ _REPORT_HEADING_RE = re.compile(
     r"(?m)^(?P<marker>#{1,6})[ \t]+(?P<title>[^\r\n]+?)[ \t]*$"
 )
 
+
 ###############################################################################
 def _bounded(value: Any, limit: int) -> dict[str, Any]:
     text = str(value or "")
@@ -24,6 +25,7 @@ def _bounded(value: Any, limit: int) -> dict[str, Any]:
         "truncated": len(text) > limit,
         "sha256": hashlib.sha256(text.encode()).hexdigest(),
     }
+
 
 ###############################################################################
 def _report_section_metadata(report_text: str) -> list[dict[str, Any]]:
@@ -67,6 +69,7 @@ def _report_section_metadata(report_text: str) -> list[dict[str, Any]]:
         )
     return sections
 
+
 ###############################################################################
 def _report_editability(
     report: dict[str, Any],
@@ -94,9 +97,11 @@ def _report_editability(
         ),
     }
 
+
 ###############################################################################
 def _json_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+
 
 ###############################################################################
 def _selected_context_value(
@@ -106,6 +111,7 @@ def _selected_context_value(
     default: Any = None,
 ) -> Any:
     return values[key] if key in selected_keys else default
+
 
 ###############################################################################
 def build_revision_context(

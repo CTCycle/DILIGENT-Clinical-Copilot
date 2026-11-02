@@ -14,6 +14,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 def test_capability_resolution_prefers_exact_then_family_then_provider() -> None:
     exact = resolve_model_capabilities(provider="ollama", model="gpt-oss:20b")
@@ -29,6 +30,7 @@ def test_capability_resolution_prefers_exact_then_family_then_provider() -> None
     assert family.source == "model_family"
     assert provider.source == "provider"
 
+
 ###############################################################################
 def test_unknown_model_uses_conservative_fallback_without_assumed_capacity() -> None:
     capabilities = resolve_model_capabilities(
@@ -41,6 +43,7 @@ def test_unknown_model_uses_conservative_fallback_without_assumed_capacity() -> 
     assert capabilities.output_token_limit is None
     assert capabilities.supported_reasoning_levels == (ReasoningLevel.OFF,)
     assert capabilities.supports_temperature is False
+
 
 ###############################################################################
 def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
@@ -70,6 +73,7 @@ def test_live_descriptor_metadata_overrides_catalog_limits() -> None:
     assert capabilities.supports_json_mode is True
     assert capabilities.supports_native_json_schema is True
 
+
 ###############################################################################
 def test_current_provider_contract_capabilities_are_explicit() -> None:
     gemini = resolve_model_capabilities(provider="gemini", model="gemini-3-pro")
@@ -89,6 +93,7 @@ def test_current_provider_contract_capabilities_are_explicit() -> None:
     assert anthropic.supports_native_json_schema is True
     assert opencode.supports_json_mode is True
     assert opencode.supports_native_json_schema is False
+
 
 ###############################################################################
 def test_effective_config_preserves_request_and_reports_provider_coercion() -> None:
@@ -116,6 +121,7 @@ def test_effective_config_preserves_request_and_reports_provider_coercion() -> N
     assert effective.input_budget is not None
     assert effective.context_selection_report["selected_input_tokens"] == 1000
 
+
 ###############################################################################
 def test_effective_config_never_steals_reserved_generation_capacity() -> None:
     policy = resolve_generation_policy(
@@ -136,6 +142,7 @@ def test_effective_config_never_steals_reserved_generation_capacity() -> None:
     assert effective.input_budget == 0
     assert effective.context_selection_report["overflow_tokens"] == 4096
     assert effective.output_token_limit >= policy.output_token_limit
+
 
 ###############################################################################
 def test_general_output_token_limit_overrides_policy_default() -> None:

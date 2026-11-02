@@ -44,6 +44,7 @@ from services.runtime.jobs import JobManager
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "terminology", "dilirank", "rag"]
 
+
 ###############################################################################
 class DataInspectionService(
     InspectionUpdateConfigMixin,

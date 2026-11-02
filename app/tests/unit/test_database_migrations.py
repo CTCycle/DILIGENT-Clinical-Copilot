@@ -16,6 +16,7 @@ from repositories.database.migrations import (
 )
 from sqlalchemy import create_engine, event, inspect, text
 
+
 ###############################################################################
 def _engine(path: Path):
     engine = create_engine(
@@ -25,6 +26,7 @@ def _engine(path: Path):
     )
     event.listen(engine, "connect", _enable_foreign_keys)
     return engine
+
 
 ###############################################################################
 def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:  # type: ignore[no-untyped-def]
@@ -36,6 +38,7 @@ def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:  # type:
     finally:
         if previous_autocommit is not None:
             dbapi_connection.autocommit = previous_autocommit
+
 
 ###############################################################################
 def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) -> None:
@@ -60,6 +63,7 @@ def test_fresh_sqlite_database_reaches_head_and_is_idempotent(tmp_path: Path) ->
             )
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_populated_unversioned_schema_is_rejected_without_stamping(
@@ -98,6 +102,7 @@ def test_populated_unversioned_schema_is_rejected_without_stamping(
     finally:
         engine.dispose()
 
+
 ###############################################################################
 def test_unversioned_current_schema_is_rejected_without_recreating_tables(
     tmp_path: Path,
@@ -129,6 +134,7 @@ def test_unversioned_current_schema_is_rejected_without_recreating_tables(
     finally:
         engine.dispose()
 
+
 ###############################################################################
 def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
     tmp_path: Path,
@@ -146,6 +152,7 @@ def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
             assert not inspect(connection).has_table("alembic_version")
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_unknown_versioned_schema_is_rejected_without_changing_revision(
@@ -173,6 +180,7 @@ def test_unknown_versioned_schema_is_rejected_without_changing_revision(
     finally:
         engine.dispose()
 
+
 ###############################################################################
 def test_failed_migration_rolls_back_schema_and_version_changes(
     monkeypatch: pytest.MonkeyPatch,
@@ -197,6 +205,7 @@ def test_failed_migration_rolls_back_schema_and_version_changes(
             assert not inspector.has_table("alembic_version")
     finally:
         engine.dispose()
+
 
 ###############################################################################
 def test_drop_existing_resets_managed_database_through_alembic(tmp_path: Path) -> None:
@@ -232,6 +241,7 @@ def test_drop_existing_resets_managed_database_through_alembic(tmp_path: Path) -
     finally:
         engine.dispose()
 
+
 ###############################################################################
 def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
     database_path = tmp_path / "concurrent.db"
@@ -251,6 +261,7 @@ def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
         results = list(executor.map(lambda _item: run_startup(), range(2)))
 
     assert results == [(HEAD_REVISION,), (HEAD_REVISION,)]
+
 
 ###############################################################################
 def test_lifecycle_migration_preserves_reports_and_the_legacy_draft(

@@ -33,6 +33,7 @@ from services.llm.model_capabilities import (
     resolve_model_capabilities,
 )
 
+
 ###############################################################################
 class RoutedGatewayTransport(StructuredTransportMixin):
     _opencode_go_models_path = "/zen/go/v1/models"

@@ -21,6 +21,8 @@ from configurations.startup import get_server_settings
 from services.clinical import job_progress as clinical_job_progress
 from services.session import session_shared
 
+
+###############################################################################
 def _patch_configuration_paths(monkeypatch, tmp_path: Path) -> Path:  # type: ignore[no-untyped-def]
     config_path = tmp_path / "database_config.json"
     env_path = tmp_path / "settings" / ".env"
@@ -29,6 +31,8 @@ def _patch_configuration_paths(monkeypatch, tmp_path: Path) -> Path:  # type: ig
     monkeypatch.setattr(database_config.paths, "ENV_FILE_PATH", env_path)
     return config_path
 
+
+###############################################################################
 def test_missing_configuration_file_defaults_to_sqlite_and_writes_file(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
@@ -51,6 +55,8 @@ def test_missing_configuration_file_defaults_to_sqlite_and_writes_file(
     assert "FASTAPI_PORT=7777" in remaining_env
     assert "DATABASE_HOST=ignored.invalid" in remaining_env
 
+
+###############################################################################
 def test_database_file_is_authoritative_over_environment(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     config_path = _patch_configuration_paths(monkeypatch, tmp_path)
     expected = database_config.DatabaseConfiguration(
@@ -66,6 +72,8 @@ def test_database_file_is_authoritative_over_environment(monkeypatch, tmp_path: 
     assert loaded == expected
     assert json.loads(config_path.read_text(encoding="utf-8"))["database"]["backend"] == "sqlite"
 
+
+###############################################################################
 def test_corrupt_database_file_fails_closed_without_legacy_fallback(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
@@ -78,6 +86,8 @@ def test_corrupt_database_file_fails_closed_without_legacy_fallback(
 
     assert config_path.read_text(encoding="utf-8") == '{"schema_version":99}'
 
+
+###############################################################################
 def test_database_configuration_is_excluded_from_general_environment_snapshot(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
@@ -88,6 +98,8 @@ def test_database_configuration_is_excluded_from_general_environment_snapshot(
     assert "database" not in snapshot.model_dump()
     assert "DATABASE_URL" not in str(snapshot.model_dump())
 
+
+###############################################################################
 @pytest.mark.skipif(os.name != "nt", reason="Credential protection uses Windows DPAPI")
 def test_postgres_password_is_dpapi_protected_in_configuration_file(
     monkeypatch, tmp_path: Path
@@ -110,6 +122,8 @@ def test_postgres_password_is_dpapi_protected_in_configuration_file(
     assert database_config.unprotect_database_password(protected) == secret
     assert Path(config_path).read_bytes()
 
+
+###############################################################################
 def test_cors_origins_parse_and_normalize_exact_http_origins() -> None:
     assert parse_cors_allow_origins(None) == ()
     assert parse_cors_allow_origins("  ") == ()
@@ -117,6 +131,8 @@ def test_cors_origins_parse_and_normalize_exact_http_origins() -> None:
         "http://localhost:9847, https://example.org:443/, http://localhost:9847"
     ) == ("http://localhost:9847", "https://example.org")
 
+
+###############################################################################
 @pytest.mark.parametrize(
     "value",
     [
@@ -132,6 +148,8 @@ def test_cors_origins_reject_wildcards_and_non_origins(value: str) -> None:
     with pytest.raises(ValueError, match="CORS_ALLOW_ORIGINS"):
         parse_cors_allow_origins(value)
 
+
+###############################################################################
 def _create_app(monkeypatch, *, desktop_enabled: bool):  # type: ignore[no-untyped-def]
     monkeypatch.setattr(server_app_module, "initialize_settings", lambda: None)
     monkeypatch.setattr(
@@ -143,6 +161,8 @@ def _create_app(monkeypatch, *, desktop_enabled: bool):  # type: ignore[no-untyp
     )
     return server_app_module.create_app()
 
+
+###############################################################################
 def test_source_mode_cors_uses_only_configured_origins(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "http://localhost:9847")
     application = _create_app(monkeypatch, desktop_enabled=False)
@@ -168,12 +188,16 @@ def test_source_mode_cors_uses_only_configured_origins(monkeypatch) -> None:  # 
     assert rejected.status_code == 400
     assert "access-control-allow-origin" not in rejected.headers
 
+
+###############################################################################
 def test_empty_cors_configuration_keeps_same_origin_default(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.delenv("CORS_ALLOW_ORIGINS", raising=False)
     application = _create_app(monkeypatch, desktop_enabled=False)
 
     assert all(middleware.cls is not CORSMiddleware for middleware in application.user_middleware)
 
+
+###############################################################################
 def test_packaged_desktop_ignores_source_mode_cors_configuration(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "this is invalid")
     application = _create_app(monkeypatch, desktop_enabled=True)
@@ -186,6 +210,8 @@ def test_packaged_desktop_ignores_source_mode_cors_configuration(monkeypatch) ->
         "X-DILIGENT-Desktop-Session",
     ]
 
+
+###############################################################################
 def test_packaged_desktop_cors_preflight_is_exactly_tauri_origin(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("DILIGENT_DESKTOP", "true")
     monkeypatch.setenv("DILIGENT_DESKTOP_SESSION_SECRET", "session-secret")
@@ -221,6 +247,8 @@ def test_packaged_desktop_cors_preflight_is_exactly_tauri_origin(monkeypatch) ->
     assert rejected.status_code == 400
     assert "access-control-allow-origin" not in rejected.headers
 
+
+###############################################################################
 def get_route_owner(router: Any, route_path: str) -> Any:
     for route in router.routes:
         if getattr(route, "path", "").endswith(route_path):
@@ -229,6 +257,8 @@ def get_route_owner(router: Any, route_path: str) -> Any:
                 return owner
     raise AssertionError(f"Route not found: {route_path}")
 
+
+###############################################################################
 class JobManagerStub:
 
     # -------------------------------------------------------------------------
@@ -268,6 +298,8 @@ class JobManagerStub:
             "error": None,
         }
 
+
+###############################################################################
 def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
     endpoint = get_route_owner(ollama_routes.router, "/pull/jobs")
@@ -280,7 +312,10 @@ def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
 
     assert response.poll_interval == get_server_settings().jobs.polling_interval
 
+
+###############################################################################
 def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> None:
+
 
     ###############################################################################
     class StopRequestedJobManagerStub:

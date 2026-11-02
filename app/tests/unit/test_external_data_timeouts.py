@@ -8,6 +8,7 @@ from configurations.management import (
     build_settings_payload,
 )
 
+
 ###############################################################################
 def _env() -> EnvironmentSnapshot:
     return EnvironmentSnapshot(
@@ -15,6 +16,7 @@ def _env() -> EnvironmentSnapshot:
         ollama_host="localhost",
         ollama_port=11434,
     )
+
 
 ###############################################################################
 def test_runtime_timeouts_respect_values_and_minimums() -> None:
@@ -48,6 +50,7 @@ def test_runtime_timeouts_respect_values_and_minimums() -> None:
     assert settings["ollama_server_start_timeout"] == 22.0
     assert settings["livertox_download_timeout"] == 44.0
 
+
 ###############################################################################
 def test_runtime_timeouts_floor_to_positive_values() -> None:
     payload = build_settings_payload(
@@ -80,6 +83,7 @@ def test_runtime_timeouts_floor_to_positive_values() -> None:
     assert settings["ollama_server_start_timeout"] == 1.0
     assert settings["livertox_download_timeout"] == 1.0
 
+
 ###############################################################################
 def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> None:
     payload = build_settings_payload(
@@ -95,6 +99,7 @@ def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> Non
 
     assert settings["default_llm_timeout"] == 7200.0
     assert settings["clinical_llm_timeout"] == 9000.0
+
 
 ###############################################################################
 def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
@@ -114,6 +119,7 @@ def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
     assert settings["cloud_llm_timeout_cap"] == 8.0
     assert settings["local_llm_timeout_cap"] == 8.0
 
+
 ###############################################################################
 def test_runtime_settings_allow_missing_or_blank_ncbi_contact() -> None:
     for config in ({}, {"ncbi_contact_email": ""}, {"ncbi_contact_email": "   "}):
@@ -122,6 +128,7 @@ def test_runtime_settings_allow_missing_or_blank_ncbi_contact() -> None:
             _env(),
         )["runtime"]
         assert runtime["ncbi_contact_email"] == ""
+
 
 ###############################################################################
 def test_runtime_settings_normalize_custom_ncbi_contact() -> None:

@@ -22,6 +22,7 @@ from domain.llm.transports import (
 )
 from services.llm.transports.errors import TransportCancellation, TransportUnsupportedCapability
 
+
 ###############################################################################
 def normalize_finish_reason(value: object) -> str | None:
     """Normalize provider finish/status enums into the shared result contract."""
@@ -56,6 +57,7 @@ def normalize_finish_reason(value: object) -> str | None:
         "error": "error",
     }
     return aliases.get(normalized, normalized)
+
 
 ###############################################################################
 def validate_request_capabilities(request: ChatRequest) -> None:
@@ -116,6 +118,7 @@ def validate_request_capabilities(request: ChatRequest) -> None:
             "tool_choice requires at least one tool definition."
         )
 
+
 ###############################################################################
 def request_output_token_limit(request: ChatRequest) -> int | None:
     """Return the provider limit needed for visible output plus reasoning."""
@@ -131,6 +134,7 @@ def request_output_token_limit(request: ChatRequest) -> int | None:
     ):
         return limit + request.reasoning_reserve
     return limit
+
 
 ###############################################################################
 def provider_exception_is_retryable(exc: BaseException) -> bool:
@@ -158,6 +162,7 @@ def provider_exception_is_retryable(exc: BaseException) -> bool:
         )
     )
 
+
 ###############################################################################
 async def call_with_retries(
     operation: Callable[[], Awaitable[Any]],
@@ -182,6 +187,7 @@ async def call_with_retries(
                 raise TransportCancellation("LLM request cancelled") from exc
             await asyncio.sleep(min(2.0, 0.25 * (2**attempt)))
     raise RuntimeError("Provider operation did not produce a result")
+
 
 ###############################################################################
 async def enter_async_context_with_retries(
@@ -214,6 +220,7 @@ async def enter_async_context_with_retries(
         cancel_check=cancel_check,
     )
 
+
 ###############################################################################
 class CloudTransport(Protocol):
 
@@ -237,11 +244,13 @@ class CloudTransport(Protocol):
     # -------------------------------------------------------------------------
     async def close(self) -> None: ...
 
+
 ###############################################################################
 class EmbeddingTransport(Protocol):
 
     # -------------------------------------------------------------------------
     async def embed(self, request: EmbeddingRequest) -> list[list[float]]: ...
+
 
 ###############################################################################
 class StructuredTransportMixin:

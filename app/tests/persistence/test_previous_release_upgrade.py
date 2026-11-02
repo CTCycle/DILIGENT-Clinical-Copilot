@@ -18,6 +18,7 @@ from sqlalchemy import Engine, create_engine, inspect, text
 PREVIOUS_RELEASE_HEAD = "202609170001"
 CURRENT_RELEASE_HEAD = HEAD_REVISION
 
+
 ###############################################################################
 def _engine(path: Path) -> Engine:
     return create_engine(
@@ -26,12 +27,14 @@ def _engine(path: Path) -> Engine:
         connect_args={"timeout": 30.0, "autocommit": False},
     )
 
+
 ###############################################################################
 def _upgrade_to(engine: Engine, revision: str) -> None:
     config = build_alembic_config()
     with engine.connect() as connection, connection.begin():
         config.attributes["connection"] = connection
         command.upgrade(config, revision)
+
 
 ###############################################################################
 def _schema_signature(engine: Engine) -> tuple[tuple[object, ...], ...]:
@@ -70,6 +73,7 @@ def _schema_signature(engine: Engine) -> tuple[tuple[object, ...], ...]:
         )
         tables.append((table_name, columns, indexes, foreign_keys))
     return tuple(tables)
+
 
 ###############################################################################
 def _seed_previous_release_data(engine: Engine) -> None:
@@ -161,6 +165,7 @@ def _seed_previous_release_data(engine: Engine) -> None:
                 "'Legacy LiverTox excerpt')"
             )
         )
+
 
 ###############################################################################
 def test_v350_database_is_accepted_at_current_head_without_losing_data(

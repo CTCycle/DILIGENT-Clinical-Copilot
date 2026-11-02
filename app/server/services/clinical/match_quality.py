@@ -10,6 +10,7 @@ RELATED_FORM_LINKS = frozenset({"form_of_parent", "form_of_child"})
 # Statuses with an accepted drug identity, with or without a LiverTox record.
 IDENTITY_ACCEPTED_STATUSES = ACCEPTED_STATUSES | {"missing_livertox"}
 
+
 ###############################################################################
 def classify_match_evidence(
     *,
@@ -70,7 +71,7 @@ def classify_match_evidence(
     return {"evidence_quality": quality, "evidence_warnings": warnings}
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def accepted_link_type(payload: dict[str, Any]) -> str | None:
     return next(
         (

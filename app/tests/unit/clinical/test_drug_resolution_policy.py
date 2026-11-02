@@ -13,7 +13,7 @@ from services.clinical.drug_resolution.policy import DrugResolutionPolicy
 from services.clinical.preparation import ClinicalKnowledgePreparation
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def mention(name: str) -> NormalizedDrugMention:
     return NormalizedDrugMention(
         extracted_name=name,
@@ -26,7 +26,7 @@ def mention(name: str) -> NormalizedDrugMention:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def terminology(status: str, *, accepted: bool, **extra: Any) -> TerminologyResolution:
     return TerminologyResolution(
         original="x",
@@ -40,7 +40,7 @@ def terminology(status: str, *, accepted: bool, **extra: Any) -> TerminologyReso
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def candidate(link_type: str, name: str = "Metoprolol") -> LiverToxResolutionCandidate:
     return LiverToxResolutionCandidate(
         nbk_id="NBK1", drug_name=name, normalized_name=name.casefold(), has_excerpt=True, link_type=link_type

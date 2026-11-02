@@ -7,6 +7,7 @@ import os
 from urllib.parse import urlsplit
 
 
+###############################################################################
 def parse_cors_allow_origins(value: str | None) -> tuple[str, ...]:
     """Parse a comma-separated list of exact HTTP(S) origins."""
     if value is None or not value.strip():
@@ -58,5 +59,6 @@ def parse_cors_allow_origins(value: str | None) -> tuple[str, ...]:
     return tuple(origins)
 
 
+###############################################################################
 def get_cors_allow_origins() -> tuple[str, ...]:
     return parse_cors_allow_origins(os.getenv("CORS_ALLOW_ORIGINS"))

@@ -63,14 +63,15 @@ PRODUCT_SOURCES = frozenset({"rxnorm", "swissmedic"})
 TERMINOLOGY_LINK_SOURCES = ("curated", "rxnorm", "rxnav_runtime", "drugcentral", "chembl")
 _COMBINATION_RE = re.compile(r"\s*(?:-|/|\+|\band\b)\s*", re.IGNORECASE)
 
-# -----------------------------------------------------------------------------
+
+###############################################################################
 def chunks(values: list[Any], size: int) -> Iterator[list[Any]]:
     safe = max(1, size)
     for start in range(0, len(values), safe):
         yield values[start : start + safe]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def identity_alias_filter() -> Any:
     return and_(
         *(

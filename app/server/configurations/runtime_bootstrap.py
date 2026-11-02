@@ -9,6 +9,7 @@ from pathlib import Path
 
 from common.runtime_layout import resolve_runtime_layout
 
+
 ###############################################################################
 def configure_cache_environment() -> None:
     """Keep packaged dependency and model caches inside the runtime cache root."""
@@ -34,6 +35,7 @@ def configure_cache_environment() -> None:
         f'--basetemp="{pytest_root / "basetemp"}" -o cache_dir="{pytest_root}"'
     )
 
+
 ###############################################################################
 def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
     """Atomically seed one persistent file without overwriting user data."""
@@ -50,6 +52,7 @@ def copy_initial_file_if_missing(source: Path, destination: Path) -> bool:
         temporary.unlink(missing_ok=True)
     return True
 
+
 ###############################################################################
 def create_mutable_data_directories() -> None:
     layout = resolve_runtime_layout()
@@ -63,6 +66,7 @@ def create_mutable_data_directories() -> None:
         "state",
     ):
         (mutable_root / relative_path).mkdir(parents=True, exist_ok=True)
+
 
 ###############################################################################
 def ensure_runtime_data_layout() -> None:

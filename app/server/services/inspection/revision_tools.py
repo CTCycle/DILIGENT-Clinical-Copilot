@@ -15,6 +15,7 @@ EMPTY_TOOL_PARAMETERS = {
     "additionalProperties": False,
 }
 
+
 ###############################################################################
 class RevisionToolRegistry:
     names = frozenset(

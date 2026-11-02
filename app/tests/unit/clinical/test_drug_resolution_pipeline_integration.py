@@ -43,7 +43,7 @@ def preparation(seeded_context: RepositoryContext, monkeypatch: pytest.MonkeyPat
     return ClinicalKnowledgePreparation(knowledge_repository=KnowledgeRepository(seeded_context))
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def prepare(
     preparation: ClinicalKnowledgePreparation,
     names: list[str],
@@ -62,7 +62,7 @@ def prepare(
     return prepared.resolved_drugs
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def by_mention(resolved: dict[str, dict[str, Any]], mention: str) -> dict[str, Any]:
     matches = [payload for payload in resolved.values() if mention in payload["raw_mentions"]]
     assert matches, f"no payload for {mention}"

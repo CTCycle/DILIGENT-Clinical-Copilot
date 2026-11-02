@@ -11,6 +11,7 @@ from services.inspection.update_jobs import DataInspectionUpdateJobRunner
 from services.runtime.jobs import JobManager
 from services.runtime.state import JobState
 
+
 ###############################################################################
 def build_runner(jobs: JobManager) -> DataInspectionUpdateJobRunner:
     return DataInspectionUpdateJobRunner(
@@ -24,6 +25,7 @@ def build_runner(jobs: JobManager) -> DataInspectionUpdateJobRunner:
         write_rag_manifest=lambda *_args: Path("rag_index_manifest.json"),
     )
 
+
 ###############################################################################
 def make_job(jobs: JobManager, job_id: str = "structured-job") -> str:
     jobs.jobs[job_id] = JobState(
@@ -33,6 +35,7 @@ def make_job(jobs: JobManager, job_id: str = "structured-job") -> str:
         scope_key="catalog:structured_sources",
     )
     return job_id
+
 
 ###############################################################################
 def test_structured_sources_run_in_dependency_order() -> None:
@@ -86,6 +89,7 @@ def test_structured_sources_run_in_dependency_order() -> None:
     assert result["summaries"]["dilirank"] == {"records": 3}
     assert jobs.get_job_status(job_id)["progress"] == 100
 
+
 ###############################################################################
 def test_structured_sources_can_exclude_terminology() -> None:
     jobs = JobManager()
@@ -121,6 +125,7 @@ def test_structured_sources_can_exclude_terminology() -> None:
     assert result["sources"]["dilirank"]["status"] == "completed"
     assert jobs.get_job_status(job_id)["progress"] == 100
 
+
 ###############################################################################
 def test_structured_sources_cancellation_does_not_start_following_sources() -> None:
     jobs = JobManager()
@@ -154,6 +159,7 @@ def test_structured_sources_cancellation_does_not_start_following_sources() -> N
     assert result["sources"]["terminology"]["status"] == "cancelled"
     assert result["sources"]["dilirank"]["status"] == "cancelled"
 
+
 ###############################################################################
 def test_structured_source_cancellation_exception_is_not_reported_as_failure() -> None:
     jobs = JobManager()
@@ -185,6 +191,7 @@ def test_structured_source_cancellation_exception_is_not_reported_as_failure() -
         "Cancellation requested for the structured source updates."
     )
 
+
 ###############################################################################
 def test_structured_source_failure_marks_remaining_sources_skipped() -> None:
     jobs = JobManager()
@@ -213,6 +220,7 @@ def test_structured_source_failure_marks_remaining_sources_skipped() -> None:
     assert result["sources"]["livertox"]["status"] == "failed"
     assert result["sources"]["terminology"]["status"] == "failed"
     assert result["sources"]["dilirank"]["status"] == "failed"
+
 
 ###############################################################################
 @pytest.mark.parametrize("failing_target", ["rxnav", "livertox", "terminology", "dilirank"])
@@ -263,6 +271,7 @@ def test_structured_source_failure_stops_at_each_ordered_boundary(
         == "Skipped because an earlier source update failed."
         for target in targets[failed_index + 1 :]
     )
+
 
 ###############################################################################
 def test_structured_sources_cancelled_while_pending_do_not_start_any_source() -> None:

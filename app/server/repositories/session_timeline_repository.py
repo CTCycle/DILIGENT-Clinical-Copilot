@@ -28,6 +28,7 @@ from repositories.clinical_session_repository import (
 )
 from repositories.values import normalize_string
 
+
 ###############################################################################
 class SessionTimelineRepository:
 

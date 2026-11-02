@@ -33,6 +33,7 @@ DILIRANK_CONCERN_CANONICAL_BY_CASEFOLD = {
     "ambiguous-dili-concern": "Ambiguous-DILI-concern",
 }
 
+
 ###############################################################################
 class DiliRankUpdater:
 

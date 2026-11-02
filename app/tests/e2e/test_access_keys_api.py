@@ -7,6 +7,7 @@ import re
 
 from playwright.sync_api import APIRequestContext
 
+
 ###############################################################################
 def _assert_metadata_only(payload: object, plaintext_keys: tuple[str, ...]) -> None:
     serialized = str(payload)
@@ -18,6 +19,7 @@ def _assert_metadata_only(payload: object, plaintext_keys: tuple[str, ...]) -> N
     fingerprint = payload.get("fingerprint")
     assert isinstance(fingerprint, str)
     assert re.fullmatch(r"[0-9a-f]{64}", fingerprint)
+
 
 ###############################################################################
 def _list_provider_keys(
@@ -32,6 +34,7 @@ def _list_provider_keys(
     for row in payload:
         _assert_metadata_only(row, plaintext_keys)
     return payload
+
 
 ###############################################################################
 def test_access_keys_complete_synthetic_lifecycle(
@@ -128,6 +131,7 @@ def test_access_keys_complete_synthetic_lifecycle(
         for key_id in created_ids:
             api_context.delete(f"/api/access-keys/{key_id}?provider={provider}")
 
+
 ###############################################################################
 def test_activate_and_delete_require_provider(api_context: APIRequestContext) -> None:
     provider = "openai"
@@ -148,6 +152,7 @@ def test_activate_and_delete_require_provider(api_context: APIRequestContext) ->
         assert delete_response.status == 422
     finally:
         api_context.delete(f"/api/access-keys/{key_id}?provider={provider}")
+
 
 ###############################################################################
 def test_access_key_creation_rejects_short_secret(

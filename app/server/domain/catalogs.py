@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+
 ###############################################################################
 def normalize_catalog_value(value: str) -> str:
     normalized = (
@@ -17,6 +18,7 @@ def normalize_catalog_value(value: str) -> str:
     normalized = normalized.lower()
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
     return re.sub(r"\s+", " ", normalized).strip()
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -35,6 +37,7 @@ class CatalogEntry:
     metadata: MappingProxyType[str, Any]
     active: bool = True
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class CatalogManifest:
@@ -43,12 +46,14 @@ class CatalogManifest:
     description: str
     entries: tuple[CatalogEntry, ...]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class CatalogSeedResult:
     manifests_seen: int
     manifests_seeded: int
     entries_written: int
+
 
 ###############################################################################
 @dataclass(frozen=True)

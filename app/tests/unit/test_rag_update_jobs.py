@@ -13,6 +13,7 @@ from services.runtime.jobs import JobManager
 from services.runtime.state import JobState
 from services.updater.embeddings import RagEmbeddingUpdater
 
+
 ###############################################################################
 def build_runner(
     jobs: JobManager,
@@ -32,6 +33,7 @@ def build_runner(
         ),
     )
 
+
 ###############################################################################
 def make_job(jobs: JobManager, job_id: str = "rag-job") -> str:
     jobs.jobs[job_id] = JobState(
@@ -41,6 +43,7 @@ def make_job(jobs: JobManager, job_id: str = "rag-job") -> str:
         scope_key="catalog:rag_update",
     )
     return job_id
+
 
 ###############################################################################
 class _FakeRagEmbeddingUpdater:
@@ -57,6 +60,7 @@ class _FakeRagEmbeddingUpdater:
     # -------------------------------------------------------------------------
     def refresh_embeddings(self) -> dict[str, Any]:
         return dict(self.result)
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -106,6 +110,7 @@ def test_rag_update_fails_closed_without_replacing_manifest(
 
     assert manifest_calls == []
 
+
 ###############################################################################
 def test_rag_update_writes_manifest_only_after_chunks_exist(
     monkeypatch: pytest.MonkeyPatch,
@@ -145,6 +150,7 @@ def test_rag_update_writes_manifest_only_after_chunks_exist(
     assert manifest_summary["source_manifest_hash"] == "duplicate-fixture-hash"
     assert "backend" not in manifest_summary
     assert manifest_path == str(tmp_path)
+
 
 ###############################################################################
 @pytest.mark.parametrize(

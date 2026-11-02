@@ -22,9 +22,11 @@ from common.utils.logger import logger
 HEAD_REVISION = "202611010003"
 MIGRATION_LOCK_KEY = 7362381
 
+
 ###############################################################################
 class MigrationError(RuntimeError):
     """Raised when a database cannot be safely migrated."""
+
 
 ###############################################################################
 @dataclass(frozen=True, slots=True)
@@ -39,6 +41,7 @@ class MigrationResult:
     def upgraded(self) -> bool:
         return self.current_heads != self.target_heads or self.reset
 
+
 ###############################################################################
 def resolve_migrations_path() -> Path:
     frozen_root = getattr(sys, "_MEIPASS", None)
@@ -52,6 +55,7 @@ def resolve_migrations_path() -> Path:
         return source_path
     raise MigrationError(f"Alembic migration directory is missing: {source_path}")
 
+
 ###############################################################################
 def build_alembic_config() -> Config:
     migrations_path = resolve_migrations_path()
@@ -61,9 +65,11 @@ def build_alembic_config() -> Config:
     config.attributes["connection"] = None
     return config
 
+
 ###############################################################################
 def _script_directory(config: Config) -> ScriptDirectory:
     return ScriptDirectory.from_config(config)
+
 
 ###############################################################################
 def _target_heads(config: Config) -> tuple[str, ...]:
@@ -74,14 +80,17 @@ def _target_heads(config: Config) -> tuple[str, ...]:
         )
     return heads
 
+
 ###############################################################################
 def _current_heads(connection: Connection) -> tuple[str, ...]:
     context = MigrationContext.configure(connection)
     return tuple(sorted(context.get_current_heads()))
 
+
 ###############################################################################
 def _user_tables(connection: Connection) -> set[str]:
     return set(inspect(connection).get_table_names()) - {"alembic_version"}
+
 
 ###############################################################################
 def _begin_sqlite_exclusive(connection: Connection) -> None:
@@ -95,6 +104,7 @@ def _begin_sqlite_exclusive(connection: Connection) -> None:
         if previous_autocommit is not None:
             driver_connection.autocommit = previous_autocommit
 
+
 ###############################################################################
 def _sqlite_foreign_keys_enabled(connection: Connection) -> bool:
     driver_connection: Any = connection.connection.driver_connection
@@ -106,6 +116,7 @@ def _sqlite_foreign_keys_enabled(connection: Connection) -> bool:
     finally:
         if previous_autocommit is not None:
             driver_connection.autocommit = previous_autocommit
+
 
 ###############################################################################
 def _set_sqlite_foreign_keys(connection: Connection, enabled: bool) -> None:
@@ -120,6 +131,7 @@ def _set_sqlite_foreign_keys(connection: Connection, enabled: bool) -> None:
     finally:
         if previous_autocommit is not None:
             driver_connection.autocommit = previous_autocommit
+
 
 ###############################################################################
 @contextmanager
@@ -172,6 +184,7 @@ def _migration_transaction(engine: Engine) -> Iterator[Connection]:
         if exclusive_listener is not None:
             event.remove(engine, "begin", exclusive_listener)
 
+
 ###############################################################################
 def _run_command(
     connection: Connection,
@@ -191,6 +204,7 @@ def _run_command(
     except Exception as exc:
         raise MigrationError(f"Alembic {action} {revision} failed: {exc}") from exc
 
+
 ###############################################################################
 def _validate_known_revision(config: Config, current_heads: tuple[str, ...]) -> None:
     script = _script_directory(config)
@@ -201,6 +215,7 @@ def _validate_known_revision(config: Config, current_heads: tuple[str, ...]) -> 
             "Database references unknown Alembic revision(s): "
             f"{', '.join(unknown)}. Restore a compatible migration set or obtain a backup."
         )
+
 
 ###############################################################################
 def migrate_database(

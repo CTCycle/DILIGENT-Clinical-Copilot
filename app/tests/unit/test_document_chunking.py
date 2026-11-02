@@ -10,6 +10,7 @@ from domain.documents import Document
 from repositories.serialization.document_chunker import DocumentChunker
 from repositories.serialization.document_serializer import DocumentSerializer
 
+
 ###############################################################################
 def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -> None:
     file_path = tmp_path / "study.txt"
@@ -24,6 +25,7 @@ def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -
     assert metadata["document_title"] == "HEPATOTOXICITY OVERVIEW"
     assert metadata["content_type"] == "txt"
 
+
 ###############################################################################
 def test_document_serializer_accepts_path_objects_and_collects_relative_ids(tmp_path: Path) -> None:
     nested_dir = tmp_path / "nested"
@@ -37,6 +39,7 @@ def test_document_serializer_accepts_path_objects_and_collects_relative_ids(tmp_
     expected_relative = Path("nested") / "study.txt"
     expected_id = hashlib.sha256(str(expected_relative).encode("utf-8")).hexdigest()
     assert serializer.compute_document_id(file_path) == expected_id
+
 
 ###############################################################################
 def test_document_serializer_lists_all_files_but_ingests_only_supported_formats(
@@ -65,6 +68,7 @@ def test_document_serializer_lists_all_files_but_ingests_only_supported_formats(
         "study.TXT"
     ]
 
+
 ###############################################################################
 def test_document_serializer_returns_no_documents_for_empty_or_unsupported_folders(
     tmp_path: Path,
@@ -89,6 +93,7 @@ def test_document_serializer_returns_no_documents_for_empty_or_unsupported_folde
     assert unsupported_serializer.collect_document_paths() == []
     assert unsupported_serializer.load_documents() == []
 
+
 ###############################################################################
 def test_document_serializer_ignores_empty_and_malformed_supported_files(
     tmp_path: Path,
@@ -104,6 +109,7 @@ def test_document_serializer_ignores_empty_and_malformed_supported_files(
         str(malformed_docx),
     }
     assert serializer.load_documents() == []
+
 
 ###############################################################################
 def test_duplicate_content_is_deduplicated_with_stable_canonical_provenance(
@@ -140,6 +146,7 @@ def test_duplicate_content_is_deduplicated_with_stable_canonical_provenance(
         first_path
     )
 
+
 ###############################################################################
 def test_same_filename_with_different_bytes_remains_two_documents(
     tmp_path: Path,
@@ -159,6 +166,7 @@ def test_same_filename_with_different_bytes_remains_two_documents(
         "second/guide.txt",
     }
 
+
 ###############################################################################
 def test_different_filenames_with_identical_bytes_are_deduplicated(
     tmp_path: Path,
@@ -177,6 +185,7 @@ def test_different_filenames_with_identical_bytes_are_deduplicated(
         "beta.txt",
     ]
 
+
 ###############################################################################
 def test_modified_content_stops_being_considered_a_duplicate(tmp_path: Path) -> None:
     first_path = tmp_path / "first.txt"
@@ -192,6 +201,7 @@ def test_modified_content_stops_being_considered_a_duplicate(tmp_path: Path) -> 
 
     assert len(documents) == 2
     assert all(document.metadata["is_duplicate"] is False for document in documents)
+
 
 ###############################################################################
 def test_structure_aware_chunking_preserves_heading_metadata() -> None:

@@ -11,12 +11,14 @@ from services.runtime.desktop import DesktopRuntimeService
 
 router = APIRouter(prefix="/desktop", tags=["desktop"])
 
+
 ###############################################################################
 def _runtime(request: Request) -> DesktopRuntimeService:
     runtime = getattr(request.app.state, "desktop_runtime", None)
     if not isinstance(runtime, DesktopRuntimeService):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return runtime
+
 
 ###############################################################################
 @router.post("/bootstrap", status_code=status.HTTP_204_NO_CONTENT)
@@ -32,6 +34,8 @@ def bootstrap_desktop_session(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Desktop request is not authorized.",
         ) from exc
+
+
 ###############################################################################
 @router.post(
     "/shutdown",

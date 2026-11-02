@@ -18,6 +18,7 @@ from repositories.schemas.configuration import (
 )
 from sqlalchemy import create_engine, func, inspect, select
 
+
 ###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
@@ -37,11 +38,13 @@ def _build_settings() -> DatabaseSettings:
         select_page_size=2000,
     )
 
+
 ###############################################################################
 def _make_temp_db_root(prefix: str) -> Path:
     temp_root = Path(tempfile.gettempdir()) / f"{prefix}-{uuid.uuid4().hex}"
     temp_root.mkdir(parents=True, exist_ok=True)
     return temp_root
+
 
 ###############################################################################
 def test_sqlite_initializer_creates_schema_when_db_file_missing(
@@ -65,6 +68,7 @@ def test_sqlite_initializer_creates_schema_when_db_file_missing(
         assert inspector.has_table("application_configuration")
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
+
 
 ###############################################################################
 def test_sqlite_repository_does_not_seed_catalogs_during_construction(
@@ -96,6 +100,7 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
     finally:
         engine.dispose()
         shutil.rmtree(temp_root, ignore_errors=True)
+
 
 ###############################################################################
 def test_sqlite_repository_exposes_orm_session_factory(
@@ -130,6 +135,7 @@ def test_sqlite_repository_exposes_orm_session_factory(
     assert len(loaded) == 1
     assert loaded[0].payload["clinical_model"] == "llama3.1:8b"
 
+
 ###############################################################################
 def test_sqlite_initializer_seeds_complete_application_configuration(
     monkeypatch, tmp_path: Path
@@ -161,6 +167,7 @@ def test_sqlite_initializer_seeds_complete_application_configuration(
     }.issubset(payload)
     assert set(payload["rag_settings"]) == set(DEFAULT_RAG_SETTINGS)
     assert "rag" not in payload
+
 
 ###############################################################################
 def test_existing_model_configuration_receives_missing_defaults_without_replacement(

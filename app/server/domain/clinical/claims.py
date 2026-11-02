@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+
 ###############################################################################
 class ClinicalClaim(BaseModel):
     claim: str = Field(..., min_length=1, max_length=1000)
@@ -23,6 +24,7 @@ class ClinicalClaim(BaseModel):
             return None
         stripped = str(value).strip()
         return stripped or None
+
 
 ###############################################################################
 class DrugClinicalNarrative(BaseModel):

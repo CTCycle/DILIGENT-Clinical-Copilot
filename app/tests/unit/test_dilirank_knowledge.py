@@ -30,6 +30,7 @@ from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.report_finalizer import ReportFinalizer
 from services.updater.dilirank import DiliRankUpdater
 
+
 ###############################################################################
 def build_repository() -> tuple[DiliRankRepository, RepositoryContext]:
     engine = create_engine(
@@ -45,6 +46,7 @@ def build_repository() -> tuple[DiliRankRepository, RepositoryContext]:
         session_factory=session_factory,
     )
     return DiliRankRepository(context), context
+
 
 ###############################################################################
 def seed_drugs(context: RepositoryContext) -> None:
@@ -101,6 +103,7 @@ def seed_drugs(context: RepositoryContext) -> None:
             ]
         )
         db_session.commit()
+
 
 ###############################################################################
 def test_replace_records_links_canonical_and_unique_alias_without_guessing() -> None:
@@ -167,6 +170,7 @@ def test_replace_records_links_canonical_and_unique_alias_without_guessing() -> 
         ).scalars().all()
     assert {item.identifier_value for item in identifiers} == {"LT001", "LT002"}
 
+
 ###############################################################################
 def test_replace_records_ignores_session_observed_aliases_for_linkage() -> None:
     repository, context = build_repository()
@@ -189,6 +193,7 @@ def test_replace_records_ignores_session_observed_aliases_for_linkage() -> None:
     assert total == 1
     assert rows[0]["drug_id"] is None
 
+
 ###############################################################################
 def test_replace_records_preserves_unlinked_source_rows() -> None:
     repository, _ = build_repository()
@@ -209,6 +214,7 @@ def test_replace_records_preserves_unlinked_source_rows() -> None:
     assert total == 1
     assert rows[0]["drug_id"] is None
     assert rows[0]["compound_name"] == "Acetaminophen"
+
 
 ###############################################################################
 def test_dilirank_parser_preserves_official_schema_and_rejects_unknown_category(
@@ -240,6 +246,7 @@ def test_dilirank_parser_preserves_official_schema_and_rejects_unknown_category(
     with pytest.raises(RuntimeError, match="unsupported concern category"):
         updater._parse_records(invalid_frame, {})
 
+
 ###############################################################################
 def test_dilirank_parser_normalizes_official_category_capitalization(
     tmp_path: Path,
@@ -262,6 +269,7 @@ def test_dilirank_parser_normalizes_official_category_capitalization(
     records = updater._parse_records(frame, {})
 
     assert records[0]["dili_concern"] == "vMost-DILI-concern"
+
 
 ###############################################################################
 def test_dilirank_updater_reads_official_version_two_sheet_header(
@@ -311,6 +319,7 @@ def test_dilirank_updater_reads_official_version_two_sheet_header(
         "engine": "openpyxl",
     }
 
+
 ###############################################################################
 def test_failed_download_candidate_preserves_last_known_good_cache(
     tmp_path: Path,
@@ -340,6 +349,7 @@ def test_failed_download_candidate_preserves_last_known_good_cache(
     assert updater.workbook_path.read_bytes() == b"stable-workbook"
     assert json.loads(updater.metadata_path.read_text(encoding="utf-8")) == old_metadata
     assert not updater.candidate_path.exists()
+
 
 ###############################################################################
 def test_cancelled_download_candidate_preserves_last_known_good_cache(
@@ -372,6 +382,7 @@ def test_cancelled_download_candidate_preserves_last_known_good_cache(
     assert json.loads(updater.metadata_path.read_text(encoding="utf-8")) == old_metadata
     assert not updater.candidate_path.exists()
 
+
 ###############################################################################
 def test_dilirank_prompt_keeps_drug_level_prior_separate_from_patient_causality() -> None:
     fragment = build_dilirank_knowledge_fragment(
@@ -390,8 +401,10 @@ def test_dilirank_prompt_keeps_drug_level_prior_separate_from_patient_causality(
     assert "patient-specific causality score" in fragment
     assert "do not override chronology" in fragment
 
+
 ###############################################################################
 def test_dilirank_inspection_routes_use_shared_update_contract() -> None:
+
 
     ###############################################################################
     class ServiceStub:
@@ -525,6 +538,7 @@ def test_dilirank_inspection_routes_use_shared_update_contract() -> None:
     assert status_response.status_code == 200
     assert cancelled.status_code == 200
 
+
 ###############################################################################
 def test_clinical_composer_adds_linked_dilirank_evidence_and_provenance() -> None:
     dilirank_repository, context = build_repository()
@@ -577,6 +591,7 @@ def test_clinical_composer_adds_linked_dilirank_evidence_and_provenance() -> Non
             "ltkb_ids": ["LT00004"],
         }
     ]
+
 
 ###############################################################################
 def test_clinical_composer_scopes_component_dilirank_evidence_for_combinations() -> None:
@@ -662,6 +677,7 @@ def test_clinical_composer_scopes_component_dilirank_evidence_for_combinations()
         "LiverTox; RxNav (RxCUI 12345); FDA DILIrank 2.0 (component-level)"
     )
 
+
 ###############################################################################
 def test_report_source_attribution_is_conditional_on_dilirank_provenance() -> None:
     without_dilirank = DrugClinicalAssessment(drug_name="Acetaminophen")
@@ -680,6 +696,7 @@ def test_report_source_attribution_is_conditional_on_dilirank_provenance() -> No
     assert ReportFinalizer.bibliography_source_label(with_dilirank) == (
         "LiverTox; FDA DILIrank 2.0"
     )
+
 
 ###############################################################################
 def test_report_source_attribution_includes_validated_rxnav_identity() -> None:
@@ -700,6 +717,7 @@ def test_report_source_attribution_includes_validated_rxnav_identity() -> None:
         "LiverTox; RxNav (RxCUI 12345); FDA DILIrank 2.0 (component-level)"
     )
 
+
 ###############################################################################
 class _CountingDiliRankRepository:
 
@@ -716,6 +734,7 @@ class _CountingDiliRankRepository:
     def get_records_for_drug(self, drug_id: int) -> list[dict[str, Any]]:
         self.lookups += 1
         return self.inner.get_records_for_drug(drug_id)
+
 
 ###############################################################################
 def _routing_fixture(
@@ -748,6 +767,7 @@ def _routing_fixture(
     composer.dilirank_repository = counting  # type: ignore[assignment]
     return composer, counting, drug_id
 
+
 ###############################################################################
 def _resolved_acetaminophen(drug_id: int) -> dict[str, dict[str, Any]]:
     return {
@@ -761,6 +781,7 @@ def _resolved_acetaminophen(drug_id: int) -> dict[str, dict[str, Any]]:
             "extracted_excerpts": ["LiverTox evidence."],
         }
     }
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -803,6 +824,7 @@ def test_composer_consults_only_selected_sources(
     if not sources:
         assert payload["knowledge_prompt"] == ""
 
+
 ###############################################################################
 def test_composer_marks_selected_but_unimported_dilirank_as_unavailable() -> None:
     composer, dilirank, drug_id = _routing_fixture(with_dilirank_records=False)
@@ -814,6 +836,7 @@ def test_composer_marks_selected_but_unimported_dilirank_as_unavailable() -> Non
 
     assert resolved["acetaminophen"]["evidence_status"]["dilirank"] == "unavailable"
     assert dilirank.lookups == 0
+
 
 ###############################################################################
 def test_report_labels_unconsulted_livertox_and_session_evidence_scope() -> None:

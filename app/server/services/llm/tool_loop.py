@@ -16,6 +16,7 @@ ChatCall = Callable[..., Awaitable[ChatResult]]
 ToolExecutor = Callable[[str, dict[str, Any]], object | Awaitable[object]]
 StopCheck = Callable[[], bool]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ToolLoopResult:
@@ -25,6 +26,7 @@ class ToolLoopResult:
     iterations: int
     tool_call_count: int
     stopped: bool = False
+
 
 ###############################################################################
 class ToolLoopExecutor:

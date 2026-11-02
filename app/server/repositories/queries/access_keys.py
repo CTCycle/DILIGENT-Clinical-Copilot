@@ -11,6 +11,7 @@ from repositories.schemas.security import AccessKey
 
 AccessKeyTable = type[AccessKey]
 
+
 ###############################################################################
 class AccessKeyRepositoryQueries:
 

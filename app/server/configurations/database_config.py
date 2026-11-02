@@ -70,6 +70,7 @@ def _dpapi_transform(value: bytes, *, protect: bool) -> bytes:
     if os.name != "nt":
         raise RuntimeError("Database credentials require Windows DPAPI.")
 
+
     ###############################################################################
     class DataBlob(ctypes.Structure):
         _fields_ = [

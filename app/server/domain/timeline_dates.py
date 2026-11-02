@@ -66,6 +66,7 @@ _NAMED_MONTH_FIRST_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class TimelineDateInterval:
@@ -74,6 +75,7 @@ class TimelineDateInterval:
     start_day: int
     end_day: int
     precision: str
+
 
 ###############################################################################
 def normalize_timeline_interval(
@@ -130,6 +132,7 @@ def normalize_timeline_interval(
         precision=precision,
     )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class EvidenceDate:
@@ -138,9 +141,11 @@ class EvidenceDate:
     text: str
     interval: TimelineDateInterval
 
+
 ###############################################################################
 def _is_followed_by_unit(text: str, end: int) -> bool:
     return bool(_UNIT_SUFFIX_RE.match(text, end))
+
 
 ###############################################################################
 def _named_date_interval(match: re.Match[str]) -> TimelineDateInterval | None:
@@ -151,6 +156,7 @@ def _named_date_interval(match: re.Match[str]) -> TimelineDateInterval | None:
     day = match.group("day")
     token = f"{year:04d}-{month:02d}" + (f"-{int(day):02d}" if day else "")
     return normalize_timeline_interval(token)
+
 
 ###############################################################################
 def find_evidence_dates(
@@ -205,6 +211,7 @@ def find_evidence_dates(
         unique.setdefault(item.interval.value, item)
     return list(unique.values())
 
+
 ###############################################################################
 def extract_single_explicit_timeline_date(
     text: str | None,
@@ -213,6 +220,7 @@ def extract_single_explicit_timeline_date(
     """Return the one unambiguous calendar date stated in source text."""
     dates = find_evidence_dates(text, order or case_date_order(text))
     return dates[0] if len(dates) == 1 else None
+
 
 ###############################################################################
 def timeline_date_sort_key(value: str | None) -> tuple[int, str]:

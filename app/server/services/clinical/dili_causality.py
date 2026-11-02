@@ -47,6 +47,7 @@ LAB_RECURRENCE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class DiliCausalityEngine:
 

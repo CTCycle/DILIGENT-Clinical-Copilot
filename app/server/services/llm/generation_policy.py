@@ -15,6 +15,7 @@ from common.catalogs.model_choices import (
 from common.paths import CATALOGS_PATH
 from domain.model_configs import ReasoningLevel
 
+
 ###############################################################################
 class GenerationPurpose(StrEnum):
     STRUCTURED_EXTRACTION = "structured_extraction"
@@ -32,12 +33,14 @@ class GenerationPurpose(StrEnum):
 
 TimelineComplexity = str
 
+
 ###############################################################################
 class PolicyMatchKind(StrEnum):
     EXACT_MODEL = "exact_model"
     MODEL_FAMILY = "model_family"
     PROVIDER = "provider"
     FALLBACK = "fallback"
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -62,6 +65,7 @@ class GenerationPolicy:
 
 _CATALOG_PATH = CATALOGS_PATH / "llm_generation_policies.json"
 _LOCAL_CATALOG_PATH = CATALOGS_PATH / "local_models.json"
+
 
 ###############################################################################
 def _load_catalog() -> dict[str, Any]:
@@ -93,6 +97,7 @@ _REVISION_PURPOSES = frozenset(
     }
 )
 
+
 ###############################################################################
 def _values(
     rule: dict[str, Any], purpose: GenerationPurpose, reasoning_level: ReasoningLevel
@@ -115,6 +120,7 @@ def _values(
     if isinstance(selected, dict) and "all" in selected:
         return selected["all"]
     return selected.get(purpose.value)
+
 
 ###############################################################################
 def _reasoning_target(
@@ -151,6 +157,7 @@ def _reasoning_target(
             return ReasoningLevel.MEDIUM
         return ReasoningLevel.LOW
     return user_reasoning_level
+
 
 ###############################################################################
 def _requirements(
@@ -200,6 +207,7 @@ def _requirements(
         reasoning_reserve = max(512, base_reasoning * 2)
     return visible_output, reasoning_reserve, visible_output, safety + padding, strategy
 
+
 ###############################################################################
 def _policy(
     *,
@@ -242,6 +250,7 @@ def _policy(
         match_kind=match_kind,
         rationale=rationale,
     )
+
 
 ###############################################################################
 def resolve_generation_policy(
@@ -347,6 +356,7 @@ def resolve_generation_policy(
         rationale="Unknown model uses the provider/model default",
         timeline_complexity=timeline_complexity,
     )
+
 
 ###############################################################################
 def validate_catalog() -> None:

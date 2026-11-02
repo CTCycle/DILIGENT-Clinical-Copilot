@@ -96,7 +96,7 @@ _LATIN_HYDRATES = {
 _LATIN_QUALIFIERS = ("ut", "corresp", "correspondens")
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _latin_word(token: str, table: dict[str, str]) -> str | None:
     """Match a Latin salt word regardless of adjective ending (-um, -us, -a)."""
     if token in table:
@@ -138,7 +138,7 @@ class NormalizedDrugInput:
         return tuple(token for token in self.qualifiers if token in _RELEASE_WORDS)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def fold(value: str | None) -> str:
     """Fold Unicode, case and punctuation into the canonical alias key."""
     if not value:
@@ -146,7 +146,7 @@ def fold(value: str | None) -> str:
     return normalize_drug_name(unicodedata.normalize("NFKC", value))
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def parse_strengths(value: str) -> tuple[Strength, ...]:
     strengths: list[Strength] = []
     for number, unit, per in _STRENGTH_RE.findall(value):
@@ -159,7 +159,7 @@ def parse_strengths(value: str) -> tuple[Strength, ...]:
     return tuple(strengths)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _ignored_tokens() -> frozenset[str]:
     snapshot = get_text_normalization_snapshot()
     return (
@@ -169,7 +169,7 @@ def _ignored_tokens() -> frozenset[str]:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _key_tokens(value: str, ignored: frozenset[str]) -> tuple[list[str], list[str], list[str]]:
     """Return (key tokens, qualifier tokens, key tokens with qualifiers in place)."""
     kept: list[str] = []
@@ -191,7 +191,7 @@ def _key_tokens(value: str, ignored: frozenset[str]) -> tuple[list[str], list[st
     return kept, qualifiers, full
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def normalize_drug_input(value: str) -> NormalizedDrugInput:
     """Build the lookup key while keeping strengths and qualifiers separate."""
     original = value
@@ -223,7 +223,7 @@ def normalize_drug_input(value: str) -> NormalizedDrugInput:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def orthographic_skeleton(key: str) -> str:
     """Collapse spelling conventions that differ across languages (ph/f, th/t,
     y/i, k/c, doubled letters). Used only to look up exact aliases."""
@@ -238,7 +238,7 @@ def orthographic_skeleton(key: str) -> str:
     return "".join(collapsed)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _latin_stem_options(token: str) -> list[str]:
     if token.endswith("um") and len(token) > 4:
         return [token[:-2], token[:-2] + "e"]
@@ -247,7 +247,7 @@ def _latin_stem_options(token: str) -> list[str]:
     return [token]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def latin_to_english_variants(key: str) -> list[str]:
     """Translate a folded Latin pharmacopoeial name into English candidates.
 
@@ -305,7 +305,7 @@ def latin_to_english_variants(key: str) -> list[str]:
     return list(dict.fromkeys(variant for variant in variants if variant and variant != key))
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def language_variants(key: str) -> list[str]:
     """Curated orthographic variants for common European spelling conventions."""
     variants: list[str] = list(latin_to_english_variants(key))
@@ -340,7 +340,7 @@ def language_variants(key: str) -> list[str]:
     return list(dict.fromkeys(variant for variant in variants if variant and variant != key))
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _product(options: list[list[str]]) -> list[tuple[str, ...]]:
     combinations: list[tuple[str, ...]] = [()]
     for choices in options:

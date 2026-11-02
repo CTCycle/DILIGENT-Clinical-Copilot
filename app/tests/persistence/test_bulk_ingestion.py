@@ -19,6 +19,7 @@ from repository_fixtures import build_repository_graph
 from services.updater.terminology.snapshot import StagedConcept, TerminologySnapshot
 from sqlalchemy import event, select
 
+
 ###############################################################################
 def test_terminology_snapshot_uses_batched_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     statements: Counter[str] = Counter()
@@ -51,6 +52,7 @@ def test_terminology_snapshot_uses_batched_set_based_writes(persistence_engine) 
     # Rows are written in parameter-bounded batches, never one statement per row.
     assert 1 <= statements["DRUG_RXNORM_CODES"] <= 10
     assert 1 <= statements["DRUG_ALIASES"] <= 20
+
 
 ###############################################################################
 def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  # type: ignore[no-untyped-def]
@@ -118,6 +120,7 @@ def test_livertox_ingestion_uses_set_based_writes(persistence_engine) -> None:  
     )
     assert commits == 1
 
+
 ###############################################################################
 def test_rxnorm_refresh_replaces_only_rxnorm_owned_rows(
     persistence_engine,
@@ -157,6 +160,7 @@ def test_rxnorm_refresh_replaces_only_rxnorm_owned_rows(
         assert {("reviewer alias", "curated"), ("runtime alias", "rxnav_runtime")} <= kept
         assert db_session.scalar(select(Drug).where(Drug.canonical_name_norm == "drug gamma")) is not None
 
+
 ###############################################################################
 def _large_rxnorm_snapshot(size: int = 350) -> TerminologySnapshot:
     snapshot = TerminologySnapshot(source="rxnorm", version=f"bulk-{size}", license="Public domain")
@@ -168,11 +172,13 @@ def _large_rxnorm_snapshot(size: int = 350) -> TerminologySnapshot:
         snapshot.add_alias(key, f"Repair Synonym {index}", "synonym")
     return snapshot
 
+
 ###############################################################################
 def _persist(repository: TerminologyRepository, snapshot: TerminologySnapshot) -> None:
     run_id = repository.start_run(source=snapshot.source, mode="full", license_text=snapshot.license)
     stats = repository.persist_snapshot(snapshot, run_id)
     repository.finish_run(run_id, status="completed", version=snapshot.version, stats=stats.to_dict())
+
 
 ###############################################################################
 def test_session_drug_persistence_retains_terminology_and_source_provenance(
@@ -210,6 +216,7 @@ def test_session_drug_persistence_retains_terminology_and_source_provenance(
         assert mention.evidence_json["source_provenance"]["dilirank"][
             "evidence_scope"
         ] == "regimen_component"
+
 
 ###############################################################################
 def test_livertox_snapshot_replacement_reconciles_source_owned_rows(

@@ -17,6 +17,7 @@ from repositories.schemas.knowledge import Drug, DrugAlias, DrugIdentifier
 DILIRANK_IDENTIFIER_SYSTEM = "dilirank_ltkb"
 DILIRANK_TRUSTED_ALIAS_SOURCES = ("livertox", "rxnorm")
 
+
 ###############################################################################
 class DiliRankRepository:
 

@@ -14,6 +14,7 @@ from typing import Any
 
 DEFAULT_MODEL = "qwen3.5:2b"
 
+
 ###############################################################################
 class FakeOllamaState:
 
@@ -32,6 +33,7 @@ class FakeOllamaState:
     def add_model(self, model: str) -> None:
         with self.lock:
             self.models.add(model)
+
 
 ###############################################################################
 class FakeOllamaHandler(BaseHTTPRequestHandler):
@@ -137,6 +139,7 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
     def log_message(self, _format: str, *_args: object) -> None:
         return
 
+
 ###############################################################################
 class FakeOllamaServer(ThreadingHTTPServer):
 
@@ -144,6 +147,7 @@ class FakeOllamaServer(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], model: str, chat_delay: float = 0.0) -> None:
         self.state = FakeOllamaState(model, chat_delay)
         super().__init__(address, FakeOllamaHandler)
+
 
 ###############################################################################
 def main() -> None:

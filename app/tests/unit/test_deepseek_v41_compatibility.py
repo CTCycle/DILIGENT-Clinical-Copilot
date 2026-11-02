@@ -30,6 +30,7 @@ from services.llm.transports.gemini import GeminiTransport
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
 
+
 ###############################################################################
 def _deepseek_request(**overrides: Any) -> ChatRequest:
     values: dict[str, Any] = {
@@ -45,6 +46,7 @@ def _deepseek_request(**overrides: Any) -> ChatRequest:
     }
     values.update(overrides)
     return ChatRequest(**values)
+
 
 ###############################################################################
 def test_deepseek_v41_flash_has_one_explicit_contract_per_exposing_provider() -> None:
@@ -73,6 +75,7 @@ def test_deepseek_v41_flash_has_one_explicit_contract_per_exposing_provider() ->
     assert resolve_model_capabilities(
         provider="opencode_zen", model="deepseek-v4.1-flash"
     ).endpoint_family is None
+
 
 ###############################################################################
 def test_live_catalog_metadata_does_not_erase_exact_deepseek_contract_fields() -> None:
@@ -110,6 +113,7 @@ def test_live_catalog_metadata_does_not_erase_exact_deepseek_contract_fields() -
         "tool_choice",
     )
 
+
 ###############################################################################
 def test_deepseek_reasoning_mode_is_explicit_and_rejects_unsupported_parameters() -> None:
     payload = OpenAIChatTransport._request_payload(
@@ -129,6 +133,7 @@ def test_deepseek_reasoning_mode_is_explicit_and_rejects_unsupported_parameters(
     with pytest.raises(TransportUnsupportedCapability, match="tool_choice"):
         validate_request_capabilities(_deepseek_request(tool_choice="auto"))
 
+
 ###############################################################################
 def test_deepseek_non_thinking_request_disables_provider_default_thinking() -> None:
     payload = OpenAIChatTransport._request_payload(
@@ -144,9 +149,11 @@ def test_deepseek_non_thinking_request_disables_provider_default_thinking() -> N
     assert payload["temperature"] == 0.2
     assert "reasoning_effort" not in payload
 
+
 ###############################################################################
 def test_openai_chat_parses_deepseek_tool_calls_usage_and_finish_reason() -> None:
     captured: dict[str, Any] = {}
+
 
     ###############################################################################
     class FakeResponse:
@@ -188,6 +195,7 @@ def test_openai_chat_parses_deepseek_tool_calls_usage_and_finish_reason() -> Non
                 },
             }
 
+
     ###############################################################################
     class FakeClient:
 
@@ -225,11 +233,13 @@ def test_openai_chat_parses_deepseek_tool_calls_usage_and_finish_reason() -> Non
     assert captured["payload"]["tools"][0]["function"]["name"] == "lookup"
     assert "tool_choice" not in captured["payload"]
 
+
 ###############################################################################
 def test_openai_chat_cancels_an_inflight_request() -> None:
     async def exercise() -> None:
         started = asyncio.Event()
         request_cancelled = False
+
 
         ###############################################################################
         class FakeClient:
@@ -255,6 +265,7 @@ def test_openai_chat_cancels_an_inflight_request() -> None:
             await asyncio.wait_for(operation, timeout=2.0)
 
     asyncio.run(exercise())
+
 
 ###############################################################################
 def test_openai_chat_reinjects_reasoning_and_empty_assistant_content_for_tools() -> None:
@@ -297,8 +308,10 @@ def test_openai_chat_reinjects_reasoning_and_empty_assistant_content_for_tools()
         "tool_call_id": "call-1",
     }
 
+
 ###############################################################################
 def test_openai_chat_stream_aggregates_reasoning_tool_deltas_and_usage() -> None:
+
 
     ###############################################################################
     class FakeResponse:
@@ -320,6 +333,7 @@ def test_openai_chat_stream_aggregates_reasoning_tool_deltas_and_usage() -> None
         def raise_for_status(self) -> None:
             return None
 
+
     ###############################################################################
     class FakeStreamContext:
 
@@ -330,6 +344,7 @@ def test_openai_chat_stream_aggregates_reasoning_tool_deltas_and_usage() -> None
         # -------------------------------------------------------------------------
         async def __aexit__(self, *_: object) -> None:
             return None
+
 
     ###############################################################################
     class FakeClient:
@@ -351,6 +366,7 @@ def test_openai_chat_stream_aggregates_reasoning_tool_deltas_and_usage() -> None
     assert completed.result.tool_calls[0].id == "call-1"
     assert completed.result.usage is not None
     assert completed.result.usage.total_tokens == 12
+
 
 ###############################################################################
 def test_openai_responses_and_anthropic_adapters_normalize_tool_results() -> None:
@@ -413,6 +429,7 @@ def test_openai_responses_and_anthropic_adapters_normalize_tool_results() -> Non
     assert anthropic_result.finish_reason == "tool_calls"
     assert anthropic_result.tool_calls[0].id == "call-1"
 
+
 ###############################################################################
 def test_gemini_adapter_maps_tool_result_and_normalizes_finish_reason() -> None:
     _, contents = GeminiTransport._contents(
@@ -456,6 +473,7 @@ def test_gemini_adapter_maps_tool_result_and_normalizes_finish_reason() -> None:
     assert result.finish_reason == "stop"
     assert result.usage is not None
     assert result.usage.total_tokens == 12
+
 
 ###############################################################################
 def test_tool_loop_reinjects_multiple_tool_results_and_continues() -> None:
@@ -510,6 +528,7 @@ def test_tool_loop_reinjects_multiple_tool_results_and_continues() -> None:
         "call-1",
         "call-2",
     ]
+
 
 ###############################################################################
 async def _collect(iterator: AsyncIterator[Any]) -> list[Any]:

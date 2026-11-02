@@ -52,11 +52,13 @@ from domain.settings.configuration import (
 )
 from domain.settings.environment import EnvironmentSnapshot
 
+
 ###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
 
 ###############################################################################
 class ConfigurationManager:
@@ -124,6 +126,7 @@ class ConfigurationManager:
         block = self.get_block(block_name)
         return block.get(key, default)
 
+
 ###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
@@ -144,12 +147,14 @@ def _resolve_ollama_url_with_scheme(
     resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
+
 ###############################################################################
 def _normalize_ollama_host(host: str) -> str:
     normalized = host.strip()
     if normalized.lower() in {"localhost", "::1", "[::1]"}:
         return "127.0.0.1"
     return normalized
+
 
 ###############################################################################
 def resolve_ollama_base_url(
@@ -177,6 +182,7 @@ def resolve_ollama_base_url(
         return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
     return fallback.rstrip("/")
 
+
 ###############################################################################
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
     raw_port = os.getenv("OLLAMA_PORT")
@@ -190,6 +196,7 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ollama_host=coerce_str_or_none(os.getenv("OLLAMA_HOST")),
         ollama_port=port,
     )
+
 
 ###############################################################################
 def _default_llm_runtime_defaults(
@@ -217,6 +224,7 @@ def _default_llm_runtime_defaults(
         ),
     )
 
+
 ###############################################################################
 def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
@@ -224,6 +232,7 @@ def _build_fastapi_settings() -> FastAPISettings:
         version=resolve_application_version(),
         description=FASTAPI_DESCRIPTION,
     )
+
 
 ###############################################################################
 def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
@@ -243,6 +252,7 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
         max_concurrent_clinical_jobs=max_concurrent_clinical_jobs,
     )
 
+
 ###############################################################################
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     defaults = DEFAULT_DRUG_MATCHER_SETTINGS
@@ -253,6 +263,7 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         else:
             values[key] = coerce_int(data.get(key), int(default), minimum=0)
     return DrugsMatcherSettings(**values)
+
 
 ###############################################################################
 def _build_rag_settings(
@@ -327,6 +338,7 @@ def _build_rag_settings(
             DEFAULT_RAG_SETTINGS["embedding_offline_mode"],
         ),
     )
+
 
 ###############################################################################
 def _build_runtime_settings(
@@ -409,6 +421,7 @@ def _build_runtime_settings(
         swissmedic_enabled=coerce_bool(data.get("swissmedic_enabled"), True),
     )
 
+
 ###############################################################################
 def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
@@ -420,6 +433,7 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
         drug_name_max_length=max_length,
         drug_name_max_tokens=coerce_positive_int(data.get("drug_name_max_tokens"), 8),
     )
+
 
 ###############################################################################
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
@@ -448,6 +462,7 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
         ),
     )
 
+
 ###############################################################################
 def _build_clinical_language_detection_settings(
     data: dict[str, Any],
@@ -467,6 +482,7 @@ def _build_clinical_language_detection_settings(
             data.get("moderate_confidence_min_margin"), 1.0
         ),
     )
+
 
 ###############################################################################
 def build_settings_payload(
@@ -502,6 +518,7 @@ def build_settings_payload(
         ).model_dump(),
         "llm_defaults": llm_defaults.model_dump(),
     }
+
 
 ###############################################################################
 def build_default_application_configuration_payload(

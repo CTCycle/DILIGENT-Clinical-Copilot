@@ -25,6 +25,7 @@ GATES = (
     "release-security-preflight",
 )
 
+
 ###############################################################################
 def _responses() -> dict:
     base = f"repos/{REPO}"
@@ -55,6 +56,7 @@ def _responses() -> dict:
             ],
         },
     }
+
 
 ###############################################################################
 def _invoke(
@@ -113,6 +115,7 @@ def _invoke(
         check=False,
     )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "failure",
@@ -154,6 +157,7 @@ def test_release_rejects_incomplete_or_unrelated_evidence(
     assert expected in result.stderr
     assert not (tmp_path / "output").exists()
 
+
 ###############################################################################
 def test_release_rejects_modified_candidate_before_publication(tmp_path: Path) -> None:
     qa = tmp_path / "qa"
@@ -177,6 +181,7 @@ def test_release_rejects_modified_candidate_before_publication(tmp_path: Path) -
     assert result.returncode != 0
     assert "Candidate digest mismatch" in result.stderr
     assert "Unexpected mutation" not in result.stderr
+
 
 ###############################################################################
 def test_complete_candidate_reaches_approval_without_publication(

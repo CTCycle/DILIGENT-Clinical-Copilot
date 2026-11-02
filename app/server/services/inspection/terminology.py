@@ -19,6 +19,7 @@ from services.updater.terminology.factory import (
 # User decisions use their own source so no terminology refresh replaces them.
 REVIEWER_SOURCE = "reviewer"
 
+
 ###############################################################################
 class InspectionTerminologyMixin:
     """Terminology coverage, import reports, conflicts and reviewer decisions."""

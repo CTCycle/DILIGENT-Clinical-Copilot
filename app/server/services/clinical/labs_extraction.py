@@ -17,6 +17,7 @@ from domain.clinical.entities import (
 from domain.clinical.extras import LabExtractionPayload
 from services.clinical.extraction_strategy import decide_extraction_strategy
 
+
 ###############################################################################
 async def extract_from_payload(
     extractor: Any,
@@ -147,6 +148,7 @@ async def extract_from_payload(
     normalized.sort(key=extractor.lab_entry_sort_key)
     extractor.emit_progress(progress_callback, 1.0)
     return PatientLabTimeline(entries=normalized), onset_context
+
 
 ###############################################################################
 async def extract_from_payload_with_audit(

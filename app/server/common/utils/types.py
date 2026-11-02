@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+
 ###############################################################################
 def _extract_int_from_str(value: str) -> int | None:
     stripped = value.strip()
@@ -15,6 +16,7 @@ def _extract_int_from_str(value: str) -> int | None:
         return int(stripped)
     match = re.search(r"\d+", stripped)
     return int(match.group(0)) if match else None
+
 
 ###############################################################################
 def extract_positive_int(value: Any) -> int | None:
@@ -35,10 +37,12 @@ def extract_positive_int(value: Any) -> int | None:
         return None
     return candidate
 
+
 ###############################################################################
 def coerce_positive_int(value: Any, default: int = 1) -> int:
     candidate = extract_positive_int(value)
     return candidate if candidate is not None else default
+
 
 ###############################################################################
 def coerce_bool(value: Any, default: bool) -> bool:
@@ -55,6 +59,7 @@ def coerce_bool(value: Any, default: bool) -> bool:
         return bool(value)
     return default
 
+
 ###############################################################################
 def coerce_bool_or_unknown(value: bool | None) -> str:
     if value is True:
@@ -62,6 +67,7 @@ def coerce_bool_or_unknown(value: bool | None) -> str:
     if value is False:
         return "no"
     return "unknown"
+
 
 ###############################################################################
 def coerce_int(
@@ -81,6 +87,7 @@ def coerce_int(
         candidate = maximum
     return candidate
 
+
 ###############################################################################
 def coerce_float(
     value: Any,
@@ -98,6 +105,7 @@ def coerce_float(
         candidate = maximum
     return candidate
 
+
 ###############################################################################
 def coerce_str(value: Any, default: str) -> str:
     if isinstance(value, str):
@@ -106,6 +114,7 @@ def coerce_str(value: Any, default: str) -> str:
     if value is None:
         return default
     return str(value).strip() or default
+
 
 ###############################################################################
 def coerce_str_or_none(value: Any) -> str | None:

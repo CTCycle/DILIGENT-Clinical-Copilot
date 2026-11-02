@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import Page, Route, expect
 
+
 ###############################################################################
 def _fill_valid_fields(page: Page) -> None:
     page.get_by_label("Clinical Input").fill(
@@ -19,12 +20,14 @@ def _fill_valid_fields(page: Page) -> None:
     )
     page.get_by_label("Visit Date").fill("2026-07-17")
 
+
 ###############################################################################
 def _open_wizard(page: Page):
     page.get_by_role("button", name="Run DILI analysis").click()
     dialog = page.get_by_role("dialog", name="Prepare analysis")
     expect(dialog).to_be_visible()
     return dialog
+
 
 ###############################################################################
 def _issue(severity: str, code: str, field: str) -> dict:
@@ -40,6 +43,7 @@ def _issue(severity: str, code: str, field: str) -> dict:
         "continuation_allowed": severity == "non_blocking",
     }
 
+
 ###############################################################################
 def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
     return json.dumps(
@@ -53,6 +57,7 @@ def _preflight_body(blocking: list[dict], warnings: list[dict]) -> str:
             "rag_readiness": None,
         }
     )
+
 
 ###############################################################################
 def _session_state(status: str, session_id: int = 9, **overrides) -> dict:
@@ -79,9 +84,11 @@ def _session_state(status: str, session_id: int = 9, **overrides) -> dict:
     state.update(overrides)
     return state
 
+
 ###############################################################################
 def _json(route: Route, body: dict, status: int = 200) -> None:
     route.fulfill(status=status, content_type="application/json", body=json.dumps(body))
+
 
 ###############################################################################
 def test_blocking_preflight_modal_prevents_job_submission(
@@ -126,6 +133,7 @@ def test_blocking_preflight_modal_prevents_job_submission(
         )
     finally:
         page.unroute("**/api/clinical/sessions**", count_sessions)
+
 
 ###############################################################################
 def test_warning_acceptance_launches_one_session_and_opens_its_report(
@@ -204,6 +212,7 @@ def test_warning_acceptance_launches_one_session_and_opens_its_report(
         page.unroute("**/api/clinical/validate-input")
         page.unroute("**/api/clinical/sessions**", handle_sessions)
 
+
 ###############################################################################
 def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     page: Page,
@@ -249,6 +258,7 @@ def test_long_preflight_list_scrolls_without_hiding_header_or_actions(
     finally:
         page.unroute("**/api/clinical/validate-input")
 
+
 ###############################################################################
 def test_focus_is_trapped_inside_warning_modal(
     page: Page,
@@ -280,6 +290,7 @@ def test_focus_is_trapped_inside_warning_modal(
         expect(close_button).to_be_focused()
     finally:
         page.unroute("**/api/clinical/validate-input")
+
 
 ###############################################################################
 def test_escape_cancels_wizard_and_fix_in_input_returns_to_field(
@@ -314,6 +325,7 @@ def test_escape_cancels_wizard_and_fix_in_input_returns_to_field(
         expect(page.get_by_label("Visit Date")).to_be_focused()
     finally:
         page.unroute("**/api/clinical/validate-input")
+
 
 ###############################################################################
 def test_seeded_knowledge_base_lets_unmocked_preflight_reach_review(

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from repository_fixtures import build_repository_graph
 
+
 ###############################################################################
 def test_concurrent_session_writes_remain_isolated(persistence_engine) -> None:  # type: ignore[no-untyped-def]
     def save(index: int) -> int:

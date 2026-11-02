@@ -35,6 +35,7 @@ ReasoningParameter = Literal[
 ]
 ReasoningToggle = ReasoningToggleParameter
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelCapabilities:
@@ -65,6 +66,7 @@ class ModelCapabilities:
     requires_reasoning_content_for_tool_calls: bool | None = None
     requires_assistant_content_for_tool_calls: bool | None = None
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class EffectiveInferenceConfig:
@@ -93,6 +95,7 @@ class EffectiveInferenceConfig:
 
 _CATALOG_PATH = CATALOGS_PATH / "llm_model_capabilities.json"
 
+
 ###############################################################################
 def _load_catalog() -> dict[str, object]:
     with _CATALOG_PATH.open(encoding="utf-8") as handle:
@@ -106,10 +109,12 @@ def _load_catalog() -> dict[str, object]:
 
 _CATALOG = _load_catalog()
 
+
 ###############################################################################
 def _fallback_rule() -> dict[str, object]:
     fallback = _CATALOG.get("fallback")
     return fallback if isinstance(fallback, dict) else {}
+
 
 ###############################################################################
 def _find_catalog_rule(
@@ -149,6 +154,7 @@ def _find_catalog_rule(
             return provider_rule, "provider"
     return _fallback_rule(), "fallback"
 
+
 ###############################################################################
 def _coerce_optional_positive_int(value: object) -> int | None:
     if value is None:
@@ -158,6 +164,7 @@ def _coerce_optional_positive_int(value: object) -> int | None:
     except TypeError, ValueError:
         return None
     return parsed if parsed > 0 else None
+
 
 ###############################################################################
 def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
@@ -175,6 +182,7 @@ def _coerce_reasoning_levels(value: object) -> tuple[ReasoningLevel, ...]:
             levels.append(level)
     return tuple(levels) or (ReasoningLevel.OFF,)
 
+
 ###############################################################################
 def _coerce_string_tuple(value: object) -> tuple[str, ...]:
     if isinstance(value, str):
@@ -184,6 +192,7 @@ def _coerce_string_tuple(value: object) -> tuple[str, ...]:
     else:
         return ()
     return tuple(str(item) for item in values if str(item).strip())
+
 
 ###############################################################################
 def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
@@ -197,6 +206,7 @@ def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
     )
     normalized = str(value or "none")
     return normalized if normalized in allowed else "none"  # type: ignore[return-value]
+
 
 ###############################################################################
 def resolve_model_capabilities(
@@ -404,6 +414,7 @@ def resolve_model_capabilities(
         ),
     )
 
+
 ###############################################################################
 def _optional_bool(value: object) -> bool | None:
     if value is None:
@@ -419,16 +430,19 @@ def _optional_bool(value: object) -> bool | None:
         return False
     return None
 
+
 ###############################################################################
 def _coerce_tool_call_mode(value: object) -> ToolCallMode:
     normalized = str(value or "unsupported").strip().lower()
     return normalized if normalized in {"native", "structured", "unsupported"} else "unsupported"  # type: ignore[return-value]
+
 
 ###############################################################################
 def _coerce_reasoning_toggle(value: object) -> ReasoningToggle:
     normalized = str(value or "provider_default").strip().lower()
     allowed = {"none", "thinking", "reasoning", "provider_default"}
     return normalized if normalized in allowed else "provider_default"  # type: ignore[return-value]
+
 
 ###############################################################################
 def capability_metadata(
@@ -484,6 +498,7 @@ def capability_metadata(
             else "catalog"
         ),
     )
+
 
 ###############################################################################
 def catalog_capability_metadata(
@@ -616,6 +631,7 @@ def catalog_capability_metadata(
         values["evidence"] = "provider"
     return ModelCapabilityMetadata.model_validate(values)
 
+
 ###############################################################################
 def enrich_model_descriptor(
     *, provider: str, descriptor: CloudModelDescriptor
@@ -635,6 +651,7 @@ def enrich_model_descriptor(
         }
     )
 
+
 ###############################################################################
 def _select_supported_reasoning_level(
     requested: ReasoningLevel, supported: tuple[ReasoningLevel, ...]
@@ -650,6 +667,7 @@ def _select_supported_reasoning_level(
     return min(
         supported, key=lambda level: (abs(rank[level] - rank[requested]), rank[level])
     )
+
 
 ###############################################################################
 def resolve_effective_inference_config(

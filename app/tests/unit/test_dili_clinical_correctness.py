@@ -36,6 +36,7 @@ from services.clinical.rucam import RucamScoreEstimator
 from services.inspection.revision_clinical_safety import audit_revised_dili_report
 from services.text.normalization import normalize_drug_query_name
 
+
 ###############################################################################
 def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
     assessment = DiliCausalityEngine.rucam(
@@ -62,6 +63,7 @@ def test_non_source_rucam_score_is_not_promoted_into_dili_bundle() -> None:
     assert assessment.components[0].status == "not_assessable"
     assert any("provenance" in item for item in assessment.limitations)
 
+
 ###############################################################################
 def _qualification_lab(
     marker: str, value: float, uln: float | None, unit: str | None = None
@@ -74,6 +76,7 @@ def _qualification_lab(
         sample_date="2026-01-10",
         source="laboratory_analysis",
     )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -135,6 +138,7 @@ def test_case_qualification_follows_easl_biochemical_criteria(
     if any(entry.marker_name == "INR" for entry in entries):
         assert any("not a qualifying criterion" in item for item in result.rationale)
 
+
 ###############################################################################
 def test_case_qualification_accepts_repeated_aminotransferase_threshold() -> None:
     labs = PatientLabTimeline(
@@ -158,6 +162,7 @@ def test_case_qualification_accepts_repeated_aminotransferase_threshold() -> Non
     result = DiliCaseQualificationEngine().assess(labs=labs, drugs=[])
     assert result.status == "meets_typical_detection_criteria"
     assert any("ALT/AST" in criterion for criterion in result.qualifying_criteria)
+
 
 ###############################################################################
 def test_case_qualification_uses_abnormal_pretreatment_value_as_reference() -> None:
@@ -191,6 +196,7 @@ def test_case_qualification_uses_abnormal_pretreatment_value_as_reference() -> N
     assert result.baseline_abnormal is True
     assert result.baseline_date == "2026-01-01"
     assert result.status == "below_typical_detection_criteria"
+
 
 ###############################################################################
 def test_dechallenge_is_calculated_for_each_drug_stop_date() -> None:
@@ -234,6 +240,7 @@ def test_dechallenge_is_calculated_for_each_drug_stop_date() -> None:
     )
     assert early == "improving_after_stop"
     assert late == "improving_after_stop"
+
 
 ###############################################################################
 def test_weak_livertox_prior_does_not_cap_patient_specific_support() -> None:
@@ -281,6 +288,7 @@ def test_weak_livertox_prior_does_not_cap_patient_specific_support() -> None:
     assert exposure.causality.known_hepatotoxic_potential == "E"
     assert exposure.causality.drug_signature_concordance == "reference_evidence_sparse"
 
+
 ###############################################################################
 def test_injury_before_exposure_argues_against_causality() -> None:
     engine = DiliCausalityEngine()
@@ -299,6 +307,7 @@ def test_injury_before_exposure_argues_against_causality() -> None:
     assert exposure.causality is not None
     assert exposure.causality.temporal_compatibility == "incompatible_pre_exposure"
     assert exposure.causality.category == "argues_against"
+
 
 ###############################################################################
 def test_long_latency_requires_review_instead_of_automatic_exclusion() -> None:
@@ -321,6 +330,7 @@ def test_long_latency_requires_review_instead_of_automatic_exclusion() -> None:
         == "long_latency_requires_drug_specific_review"
     )
     assert exposure.causality.category == "limited"
+
 
 ###############################################################################
 def test_revision_safety_reuses_structured_dili_evidence_gate() -> None:
@@ -367,6 +377,7 @@ def test_revision_safety_reuses_structured_dili_evidence_gate() -> None:
     assert any("competing causes" in issue.lower() for issue in issues)
     assert any("definitive" in issue.lower() for issue in issues)
 
+
 ###############################################################################
 def _alt(value: float, sample_date: str) -> ClinicalLabEntry:
     return ClinicalLabEntry(
@@ -377,10 +388,12 @@ def _alt(value: float, sample_date: str) -> ClinicalLabEntry:
         source="laboratory_analysis",
     )
 
+
 ###############################################################################
 def _cause_status(text: str, cause: str) -> str:
     assessment = DiliDifferentialEngine().assess(text)
     return {item.cause: item.status for item in assessment.causes}[cause]
+
 
 ###############################################################################
 def test_documented_competing_cause_is_not_excluded_by_nearby_negative_test() -> None:
@@ -410,6 +423,7 @@ def test_documented_competing_cause_is_not_excluded_by_nearby_negative_test() ->
         == "not_excluded"
     )
 
+
 ###############################################################################
 def test_negated_cause_is_excluded_and_substrings_do_not_match() -> None:
     assert (
@@ -426,6 +440,7 @@ def test_negated_cause_is_excluded_and_substrings_do_not_match() -> None:
         _cause_status("HEV infection cannot be excluded.", "viral_hepatitis_a_b_c_d_e")
         == "unknown"
     )
+
 
 ###############################################################################
 def test_persistent_injury_after_withdrawal_is_not_reported_as_resolved() -> None:
@@ -444,6 +459,7 @@ def test_persistent_injury_after_withdrawal_is_not_reported_as_resolved() -> Non
     )
     assert timeline.dechallenge_status == "chronic_or_persistent"
     assert timeline.recovery_date is None
+
 
 ###############################################################################
 def test_dechallenge_uses_rucam_window_and_resolution_to_reference() -> None:
@@ -465,6 +481,7 @@ def test_dechallenge_uses_rucam_window_and_resolution_to_reference() -> None:
     assert resolved.dechallenge_status == "resolved_to_baseline"
     assert resolved.recovery_date == "2024-04-10"
 
+
 ###############################################################################
 def _lab(
     marker: str, value: float, uln: float, sample_date: str, unit: str | None = None
@@ -477,6 +494,7 @@ def _lab(
         sample_date=sample_date,
         source="laboratory_analysis",
     )
+
 
 ###############################################################################
 def _hys_law_status(
@@ -492,6 +510,7 @@ def _hys_law_status(
         source_text="",
     )
     return result.status, result.initial_cholestasis_present
+
 
 ###############################################################################
 def test_hys_law_uses_alp_at_aminotransferase_rise() -> None:
@@ -517,6 +536,7 @@ def test_hys_law_uses_alp_at_aminotransferase_rise() -> None:
         "possible",
         False,
     )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -545,11 +565,13 @@ def test_severity_follows_dilin_scale_with_negation_aware_events(
     labs = [_lab("ALT", 400, 40, "2024-03-01"), *labs]
     assert DiliSeverityGrader().assess(PatientLabTimeline(entries=labs), text).grade == grade
 
+
 ###############################################################################
 def _resolve_rucam(text: str) -> tuple[int, str | None, str | None]:
     result = RucamScoreEstimator().resolve_provided_rucam_score(text)
     assert result is not None
     return result.score, result.causality_category, result.stated_category
+
 
 ###############################################################################
 def test_patient_record_rucam_score_is_parsed_without_years_or_category_override() -> None:
@@ -570,6 +592,7 @@ def test_patient_record_rucam_score_is_parsed_without_years_or_category_override
     assert assessment.causality_category == "possible"
     assert any("'probable'" in item for item in assessment.limitations)
 
+
 ###############################################################################
 def _first_abnormal(labs: list[ClinicalLabEntry]) -> str | None:
     return DiliTimelineEngine().build(
@@ -577,12 +600,14 @@ def _first_abnormal(labs: list[ClinicalLabEntry]) -> str | None:
         PatientLabTimeline(entries=labs),
     ).first_abnormal_liver_test_date
 
+
 ###############################################################################
 def test_first_abnormal_liver_test_ignores_baseline_and_non_liver_markers() -> None:
     # EASL 2019: an abnormal pre-treatment baseline replaces the ULN.
     assert _first_abnormal([_alt(72, "2023-12-01"), _alt(70, "2024-02-01"), _alt(290, "2024-03-01")]) == "2024-03-01"
     assert _first_abnormal([_lab("INR", 1.3, 1.1, "2024-02-01"), _alt(30, "2024-02-01"), _alt(400, "2024-03-01")]) == "2024-03-01"
     assert _first_abnormal([_alt(30, "2024-02-01"), _alt(35, "2024-03-01")]) is None
+
 
 ###############################################################################
 def test_abnormal_baseline_does_not_make_later_exposure_argue_against() -> None:
@@ -614,6 +639,7 @@ def test_abnormal_baseline_does_not_make_later_exposure_argue_against() -> None:
     assert causality.temporal_compatibility != "incompatible_pre_exposure"
     assert causality.category != "argues_against"
 
+
 ###############################################################################
 def test_timeline_ignores_negated_jaundice_and_ranks_bilirubin_by_multiple() -> None:
     timeline = DiliTimelineEngine().build(
@@ -634,6 +660,7 @@ def test_timeline_ignores_negated_jaundice_and_ranks_bilirubin_by_multiple() -> 
     ]
     assert timeline.peak_dates["BILIRUBIN"] == "2024-03-08"
 
+
 ###############################################################################
 def _parse_lab_text(text: str) -> list[tuple[str, float | None, str | None, float | None]]:
     return [
@@ -643,6 +670,7 @@ def _parse_lab_text(text: str) -> list[tuple[str, float | None, str | None, floa
         )
     ]
 
+
 ###############################################################################
 def test_lab_text_reference_ranges_units_and_aliases() -> None:
     assert _parse_lab_text("2024-01-08: ALT 120 U/L (ref 10-40)") == [("ALT", 120.0, "U/L", 40.0)]
@@ -651,12 +679,14 @@ def test_lab_text_reference_ranges_units_and_aliases() -> None:
     assert _parse_lab_text("2024-01-08: Albumin 38 g/L") == [("ALB", 38.0, "g/L", None)]
     assert _parse_lab_text("2024-01-08: Bil tot 3.2 mg/dL, ULN 1.2") == [("TBIL", 3.2, "mg/dL", 1.2)]
 
+
 ###############################################################################
 def _narrative_codes(narrative: str, *, bundle: DiliEvidenceBundle) -> set[str]:
     issues = DiliEvidenceBuilder.audit_generated_narrative(
         clinical_narrative=narrative, bundle=bundle
     )
     return {issue["code"] for issue in issues}
+
 
 ###############################################################################
 def _gate_bundle(alp: float) -> DiliEvidenceBundle:
@@ -685,6 +715,7 @@ def _gate_bundle(alp: float) -> DiliEvidenceBundle:
         rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
     )
 
+
 ###############################################################################
 def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
     bundle = _gate_bundle(alp=180)
@@ -709,6 +740,7 @@ def test_narrative_gate_checks_claims_against_structured_bundle() -> None:
         "excluded given detectable HCV RNA. Alcohol was excluded. Latency was about "
         "4 weeks. Amoxicillin-clavulanate typically has a latency of 1 to 8 weeks."
     )
+
 
 ###############################################################################
 def test_narrative_gate_ignores_drug_level_and_rounded_patient_statements() -> None:
@@ -744,6 +776,7 @@ def test_narrative_gate_ignores_drug_level_and_rounded_patient_statements() -> N
         "cause of clinically apparent liver injury)."
     )
 
+
 ###############################################################################
 def _rechallenge_exposure(evidence: str, *, causes_excluded: bool) -> dict:
     exposure = DiliCausalityEngine().exposure(
@@ -765,6 +798,7 @@ def _rechallenge_exposure(evidence: str, *, causes_excluded: bool) -> dict:
         "rechallenge": exposure.rechallenge_status,
         "category": exposure.causality.category,
     }
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -800,6 +834,7 @@ def test_positive_rechallenge_requires_recurrence_and_is_capped_by_competing_cau
 
     assert result == {"rechallenge": rechallenge, "category": category}
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("evidence", "stop_date"),
@@ -832,6 +867,7 @@ def test_therapy_stop_date_is_recovered_from_explicit_range(
     assert entry.suspension_date == stop_date
     assert entry.suspension_status is (True if stop_date else None)
 
+
 ###############################################################################
 def test_recently_stopped_anamnesis_drug_stays_in_consultation_set() -> None:
     # Live C02: amoxicillin-clavulanate stopped 18 days before onset.
@@ -859,6 +895,7 @@ def test_recently_stopped_anamnesis_drug_stays_in_consultation_set() -> None:
 
     assert [item["drug"] for item in selection.relevant] == ["Amoxicillin-clavulanate"]
     assert "Isoniazid" not in [item["drug"] for item in selection.relevant]
+
 
 ###############################################################################
 def test_conflicting_therapy_and_anamnesis_dates_raise_blocking_issue() -> None:
@@ -898,6 +935,7 @@ def test_conflicting_therapy_and_anamnesis_dates_raise_blocking_issue() -> None:
     )
     assert find_drug_date_conflicts(therapy, agreeing) == []
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("raw", "grade"),
@@ -915,6 +953,7 @@ def test_livertox_likelihood_is_validated_against_the_livertox_scale(
     raw: object, grade: str | None
 ) -> None:
     assert normalize_livertox_likelihood(raw) == grade
+
 
 ###############################################################################
 def test_malformed_livertox_likelihood_is_reported_as_unknown() -> None:
@@ -936,6 +975,7 @@ def test_malformed_livertox_likelihood_is_reported_as_unknown() -> None:
     assert exposure.livertox_likelihood is None
     assert exposure.causality is not None
     assert exposure.causality.known_hepatotoxic_potential == "unknown"
+
 
 ###############################################################################
 def test_identity_fallback_payload_is_found_by_extracted_mention() -> None:

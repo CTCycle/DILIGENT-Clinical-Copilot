@@ -24,6 +24,7 @@ from services.clinical.disease import DiseaseExtractor
 from services.clinical.job_progress import ClinicalJobCancelled
 from services.session.session_service import ClinicalSessionService
 
+
 ###############################################################################
 class FakeDiseaseClient:
 
@@ -41,6 +42,7 @@ class FakeDiseaseClient:
         if self.responses:
             return self.responses.pop(0)
         return schema(entries=[])
+
 
 ###############################################################################
 class FlakyDiseaseClient:
@@ -67,6 +69,7 @@ class FlakyDiseaseClient:
             ]
         )
 
+
 ###############################################################################
 class CancellationAwareDiseaseClient:
 
@@ -76,9 +79,11 @@ class CancellationAwareDiseaseClient:
         assert cancel_check() is True
         raise CancelledStructuredCallError("LLM request cancelled")
 
+
 ###############################################################################
 class CancelledStructuredCallError(RuntimeError):
     error_code = "cancelled"
+
 
 ###############################################################################
 def test_extract_diseases_propagates_stop_into_cloud_structured_call() -> None:
@@ -102,6 +107,7 @@ def test_extract_diseases_propagates_stop_into_cloud_structured_call() -> None:
         assert stop_calls >= 2
     else:
         raise AssertionError("stop request was not propagated")
+
 
 ###############################################################################
 def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
@@ -159,6 +165,7 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
     assert steatosis.chronic is True
     assert steatosis.hepatic_related is True
 
+
 ###############################################################################
 def test_extract_diseases_from_anamnesis_retries_transient_failures(
     monkeypatch,
@@ -180,6 +187,7 @@ def test_extract_diseases_from_anamnesis_retries_transient_failures(
 
     assert client.call_count == 2
     assert [entry.name for entry in parsed.entries] == ["Steatosi epatica"]
+
 
 ###############################################################################
 def test_case_style_anamnesis_merges_missed_grounded_disease_candidates() -> None:
@@ -228,6 +236,7 @@ def test_case_style_anamnesis_merges_missed_grounded_disease_candidates() -> Non
     assert "Cardiopatia ischemica" in names
     assert "Colecistolitiasi" in names
     assert len(names) >= 14
+
 
 ###############################################################################
 def test_build_structured_clinical_context_includes_disease_timeline() -> None:
@@ -279,6 +288,7 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     assert "2025-04-14" in context
     assert "class=mixed | R=1.67" in context
 
+
 ###############################################################################
 def test_disease_evidence_validation_sets_span_and_attribution() -> None:
     extractor = DiseaseExtractor()
@@ -292,6 +302,7 @@ def test_disease_evidence_validation_sets_span_and_attribution() -> None:
     assert result.source_span == [11, 28]
     assert result.confidence == "high"
     assert result.attribution == "patient"
+
 
 ###############################################################################
 def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> (

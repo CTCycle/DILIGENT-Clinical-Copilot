@@ -17,6 +17,7 @@ from common.embedding.config import (
 )
 from common.paths import RAG_ACTIVE_GENERATION_POINTER_PATH
 
+
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class EmbeddingIndexManifest:
@@ -48,6 +49,7 @@ class EmbeddingIndexManifest:
             "source": self.source,
             "built_at": self.built_at,
         }
+
 
 ###############################################################################
 def build_embedding_index_manifest(
@@ -125,6 +127,7 @@ def build_embedding_index_manifest(
         built_at=datetime.now(UTC).isoformat(),
     )
 
+
 ###############################################################################
 def assert_manifest_compatible(
     manifest: dict[str, Any],
@@ -143,6 +146,7 @@ def assert_manifest_compatible(
         raise ValueError("RAG index vector dimension is incompatible")
     if model.get("distance_metric") != "cosine":
         raise ValueError("RAG index distance metric is incompatible")
+
 
 ###############################################################################
 def read_active_collection_name(default: str) -> str:

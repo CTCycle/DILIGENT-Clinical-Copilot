@@ -7,6 +7,7 @@ import hashlib
 
 from cryptography.fernet import Fernet, InvalidToken
 
+
 ###############################################################################
 def _load_fernet_from_material(key_material: str) -> Fernet:
     normalized = str(key_material or "").strip()
@@ -17,6 +18,7 @@ def _load_fernet_from_material(key_material: str) -> Fernet:
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError("Encryption key material is invalid") from exc
 
+
 ###############################################################################
 def encrypt_with_key_material(plaintext: str, key_material: str) -> str:
     normalized = str(plaintext or "").strip()
@@ -24,6 +26,7 @@ def encrypt_with_key_material(plaintext: str, key_material: str) -> str:
         raise ValueError("Access key must not be empty")
     token = _load_fernet_from_material(key_material).encrypt(normalized.encode("utf-8"))
     return token.decode("utf-8")
+
 
 ###############################################################################
 def decrypt_with_key_material(ciphertext: str, key_material: str) -> str:
@@ -39,6 +42,7 @@ def decrypt_with_key_material(ciphertext: str, key_material: str) -> str:
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError("Failed to decrypt access key") from exc
     return decoded.decode("utf-8")
+
 
 ###############################################################################
 def fingerprint_plaintext(plaintext: str) -> str:

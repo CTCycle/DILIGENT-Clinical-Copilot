@@ -28,6 +28,7 @@ HepatotoxicityClassification = Literal[
     "hepatocellular", "cholestatic", "mixed", "indeterminate"
 ]
 
+
 ###############################################################################
 class HepatotoxicityPatternCalculator:
 
@@ -71,6 +72,7 @@ class HepatotoxicityPatternCalculator:
         if value is None or reference is None or reference <= 0:
             return None
         return value / reference
+
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:

@@ -17,6 +17,7 @@ RXNAV_BASE_URL = "https://rxnav.nlm.nih.gov/REST"
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 INGREDIENT_TYPES = ("IN", "PIN", "MIN")
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RxNavConcept:
@@ -24,9 +25,11 @@ class RxNavConcept:
     name: str
     tty: str
 
+
 ###############################################################################
 class RxNavBudgetExceeded(RuntimeError):
     """Raised when a single resolution would exceed its request budget."""
+
 
 ###############################################################################
 class RxNavRuntimeClient:

@@ -28,6 +28,7 @@ from services.session.text_section_parser import parse_initial_text_sections
 ###############################################################################
 T = TypeVar("T")
 
+
 ###############################################################################
 def with_input_sections(source: dict[str, Any]) -> dict[str, Any]:
     """Derive section text from the raw input when no analysis has split it.
@@ -50,9 +51,11 @@ def with_input_sections(source: dict[str, Any]) -> dict[str, Any]:
         derived["anamnesis"] = raw_input.strip()
     return {**source, **derived}
 
+
 ###############################################################################
 class TimelineGenerationCancelled(Exception):
     """Raised when a timeline job is stopped before its result is persisted."""
+
 
 ###############################################################################
 async def _await_with_stop_check(
@@ -82,10 +85,12 @@ async def _await_with_stop_check(
             await task
         raise
 
+
 ###############################################################################
 def _raise_if_stopped(stop_check: Callable[[], bool] | None) -> None:
     if stop_check is not None and stop_check():
         raise TimelineGenerationCancelled("Timeline generation stopped.")
+
 
 ###############################################################################
 def _report_progress(
@@ -110,6 +115,7 @@ _TIMELINE_ERROR_CODES: frozenset[PatientTimelineGenerationErrorCode] = frozenset
         "unknown",
     }
 )
+
 
 ###############################################################################
 def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCode:
@@ -164,6 +170,7 @@ def _timeline_error_code(exc: BaseException) -> PatientTimelineGenerationErrorCo
         current = current.__cause__ or current.__context__
     return "provider_error" if provider_error_seen else "unknown"
 
+
 ###############################################################################
 def _timeline_fallback_note(
     *,
@@ -216,6 +223,7 @@ def _timeline_fallback_note(
     )
     return f"Local timeline extraction did not complete. {message} Retry when ready."
 
+
 ###############################################################################
 def _fallback_event_context(source_text: str) -> tuple[str, dict[str, Any]]:
     evidence_date = extract_single_explicit_timeline_date(source_text)
@@ -232,6 +240,7 @@ def _fallback_event_context(source_text: str) -> tuple[str, dict[str, Any]]:
         "date_certainty": "explicit",
         "extracted_timing_text": evidence_date.text,
     }
+
 
 ###############################################################################
 class InspectionTimelineMixin:

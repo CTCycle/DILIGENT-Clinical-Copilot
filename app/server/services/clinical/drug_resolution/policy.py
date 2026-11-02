@@ -21,6 +21,7 @@ LINK_PRIORITY = {
     "form_of_child": 4,
 }
 
+
 ###############################################################################
 class DrugResolutionPolicy:
     """Decide clinical knowledge eligibility from terminology identity.

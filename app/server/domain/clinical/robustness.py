@@ -27,6 +27,7 @@ AuditOutcome = Literal[
 ]
 GateSeverity = Literal["blocking", "non_blocking"]
 
+
 ###############################################################################
 class SourceSpan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -40,6 +41,7 @@ class SourceSpan(BaseModel):
     end_char: int = Field(..., ge=0)
     text: str = Field(default="", max_length=5000)
 
+
 ###############################################################################
 class SpanMapping(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -48,6 +50,7 @@ class SpanMapping(BaseModel):
     raw_end: int = Field(..., ge=0)
     clean_start: int = Field(..., ge=0)
     clean_end: int = Field(..., ge=0)
+
 
 ###############################################################################
 class NormalizedDocumentBlock(BaseModel):
@@ -59,6 +62,7 @@ class NormalizedDocumentBlock(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     source_spans: list[SourceSpan] = Field(default_factory=list)
 
+
 ###############################################################################
 class NormalizedDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -68,6 +72,7 @@ class NormalizedDocument(BaseModel):
     clean_text: str
     span_mappings: list[SpanMapping] = Field(default_factory=list)
     blocks: list[NormalizedDocumentBlock] = Field(default_factory=list)
+
 
 ###############################################################################
 class ExtractedSection(BaseModel):
@@ -80,6 +85,7 @@ class ExtractedSection(BaseModel):
     missing: bool = False
     issues: list[str] = Field(default_factory=list)
 
+
 ###############################################################################
 class ContaminationFlags(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -87,6 +93,7 @@ class ContaminationFlags(BaseModel):
     therapy_contaminated_by_bibliography_or_admin: bool = False
     assessment_contaminated_by_non_clinical_content: bool = False
     labs_embedded_without_dedicated_lab_section: bool = False
+
 
 ###############################################################################
 class TimedDrugMention(BaseModel):
@@ -98,6 +105,7 @@ class TimedDrugMention(BaseModel):
     status: str = "uncertain"
     source_span: SourceSpan | None = None
 
+
 ###############################################################################
 class ExtractionArtifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -108,6 +116,7 @@ class ExtractionArtifact(BaseModel):
     contamination_flags: ContaminationFlags = Field(default_factory=ContaminationFlags)
     timed_drugs: list[TimedDrugMention] = Field(default_factory=list)
     extraction_issues: list[dict[str, Any]] = Field(default_factory=list)
+
 
 ###############################################################################
 class FactGraphNode(BaseModel):
@@ -121,12 +130,14 @@ class FactGraphNode(BaseModel):
     origin: FactOrigin
     supports: list[str] = Field(default_factory=list)
 
+
 ###############################################################################
 class FactGraph(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = "1.0"
     nodes: list[FactGraphNode] = Field(default_factory=list)
+
 
 ###############################################################################
 class FactGraphValidation(BaseModel):
@@ -135,6 +146,7 @@ class FactGraphValidation(BaseModel):
     schema_version: str = "1.0"
     hard_issues: list[dict[str, Any]] = Field(default_factory=list)
     soft_issues: list[dict[str, Any]] = Field(default_factory=list)
+
 
 ###############################################################################
 class ReportMetadata(BaseModel):
@@ -145,6 +157,7 @@ class ReportMetadata(BaseModel):
     patient_name_source: Literal["ui_metadata"] = "ui_metadata"
     report_date_source: Literal["ui_metadata"] = "ui_metadata"
     claim_references: dict[str, list[str]] = Field(default_factory=dict)
+
 
 ###############################################################################
 class FaithfulnessAudit(BaseModel):
@@ -158,6 +171,7 @@ class FaithfulnessAudit(BaseModel):
     gate_decisions: list[dict[str, Any]] = Field(default_factory=list)
     discrepancy_report: str = ""
 
+
 ###############################################################################
 class RunBundleIndex(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -169,6 +183,7 @@ class RunBundleIndex(BaseModel):
         "database_session_result_payload"
     )
     artifacts: dict[str, str] = Field(default_factory=dict)
+
 
 ###############################################################################
 class ClinicalInputPreflightIssue(BaseModel):
@@ -184,6 +199,7 @@ class ClinicalInputPreflightIssue(BaseModel):
     consequence: str = ""
     continuation_allowed: bool = False
 
+
 ###############################################################################
 class RagReadiness(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -195,6 +211,7 @@ class RagReadiness(BaseModel):
     reason_code: str | None = None
     message: str | None = None
 
+
 ###############################################################################
 class EvidenceSourceStatus(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -204,6 +221,7 @@ class EvidenceSourceStatus(BaseModel):
     selected: bool
     available: bool
     message: str | None = None
+
 
 ###############################################################################
 class ClinicalInputPreflightResult(BaseModel):

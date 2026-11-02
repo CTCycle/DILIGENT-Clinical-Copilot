@@ -40,11 +40,13 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+
 ###############################################################################
 def build_repository_graph_for_test() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine), engine
+
 
 ###############################################################################
 def build_service(
@@ -63,6 +65,7 @@ def build_service(
         timeline_extractor=timeline_extractor,
         jobs=jobs,
     )
+
 
 ###############################################################################
 def save_session(
@@ -95,6 +98,7 @@ def save_session(
         }
     )
 
+
 ###############################################################################
 def test_clinical_services_receive_only_their_repository_capabilities() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -114,6 +118,7 @@ def test_clinical_services_receive_only_their_repository_capabilities() -> None:
     assert set(signature(ClinicalKnowledgePreparation).parameters) == {
         "knowledge_repository",
     }
+
 
 ###############################################################################
 def test_session_list_filters_and_search() -> None:
@@ -235,6 +240,7 @@ def test_session_list_filters_and_search() -> None:
         )
         assert total == expected_total
 
+
 ###############################################################################
 def test_session_report_and_text_use_result_payload_only() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -288,6 +294,7 @@ def test_session_report_and_text_use_result_payload_only() -> None:
     assert missing_text_detail["session_text"] == ""
     assert missing_text_detail["sections"]["anamnesis"] == "Section anamnesis"
 
+
 ###############################################################################
 def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -333,6 +340,7 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
         == detail["manual_edit_history"]
     )
 
+
 ###############################################################################
 def test_manual_report_edit_without_metadata_preserves_session_metadata() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -363,6 +371,7 @@ def test_manual_report_edit_without_metadata_preserves_session_metadata() -> Non
     assert result is not None
     assert result["session"]["metadata"] == {"reviewer": "Dr. Keep"}
 
+
 ###############################################################################
 def test_manual_report_edit_missing_session_returns_none() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -377,6 +386,7 @@ def test_manual_report_edit_missing_session_returns_none() -> None:
     )
 
     assert updated is None
+
 
 ###############################################################################
 def test_catalog_search_and_drug_delete_cleanup() -> None:
@@ -480,6 +490,7 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert len(mentions) == 1
         assert mentions[0].drug_id is None
 
+
 ###############################################################################
 def test_livertox_catalog_reports_missing_excerpt() -> None:
     repository_graph, engine = build_repository_graph_for_test()
@@ -518,6 +529,7 @@ def test_livertox_catalog_reports_missing_excerpt() -> None:
     by_name = {item["drug_name"]: item for item in items}
     assert by_name["Available Drug"]["has_excerpt"] is True
     assert by_name["Missing Excerpt Drug"]["has_excerpt"] is False
+
 
 ###############################################################################
 def test_update_job_lifecycle_with_cooperative_cancel(
@@ -593,6 +605,7 @@ def test_update_job_lifecycle_with_cooperative_cancel(
     assert final_livertox is not None
     assert final_livertox["status"] == "cancelled"
 
+
 ###############################################################################
 class FakeTimelineExtractor:
 
@@ -626,6 +639,7 @@ class FakeTimelineExtractor:
             ],
         )
 
+
 ###############################################################################
 class FailingTimelineExtractor:
 
@@ -651,6 +665,7 @@ class FailingTimelineExtractor:
             error_code=self.error_code,
         )
 
+
 ###############################################################################
 class EmptyTimelineExtractionClient:
 
@@ -658,6 +673,7 @@ class EmptyTimelineExtractionClient:
     async def llm_structured_call(self, **kwargs: Any) -> PatientTimelineExtraction:
         _ = kwargs
         return PatientTimelineExtraction()
+
 
 ###############################################################################
 def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
@@ -731,6 +747,7 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
     assert history[0]["timeline_id"] == regenerated.timeline_id
     assert history[1]["timeline_id"] == generated.timeline_id
 
+
 ###############################################################################
 def test_timeline_generation_marks_fallback_payload() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -790,6 +807,7 @@ def test_timeline_generation_marks_fallback_payload() -> None:
         for event in generated.events
     )
 
+
 ###############################################################################
 def test_empty_model_timeline_with_source_persists_deterministic_fallback() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -836,6 +854,7 @@ def test_empty_model_timeline_with_source_persists_deterministic_fallback() -> N
     assert persisted.generation_status == "fallback"
     assert persisted.generation_error_code == "invalid_response"
 
+
 ###############################################################################
 @pytest.mark.parametrize("error_code", ["timeout", "authentication", "rate_limited"])
 def test_timeline_generation_persists_classified_provider_fallback(
@@ -878,6 +897,7 @@ def test_timeline_generation_persists_classified_provider_fallback(
     assert history[0]["generation_status"] == "fallback"
     assert history[0]["generation_error_code"] == error_code
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("source_text", "expected_date", "expected_precision"),
@@ -904,6 +924,7 @@ def test_fallback_date_extraction_preserves_source_precision(
     assert evidence_date.interval.value == expected_date
     assert evidence_date.interval.precision == expected_precision
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "source_text",
@@ -919,6 +940,7 @@ def test_fallback_date_extraction_leaves_relative_invalid_or_ambiguous_sources_u
     source_text: str,
 ) -> None:
     assert extract_single_explicit_timeline_date(source_text) is None
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -943,6 +965,7 @@ def test_fallback_timeline_keeps_non_explicit_dates_undated_and_uncertain(
     assert event.timing_type == "uncertain"
     assert event.date_certainty == "uncertain"
     assert event.extracted_timing_text is None
+
 
 ###############################################################################
 def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> None:
@@ -988,6 +1011,7 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
         source_after["session_result_payload"]["runtime_settings"]
         == original_runtime_settings
     )
+
 
 ###############################################################################
 def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor() -> (
@@ -1035,6 +1059,7 @@ def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor(
     assert generated.source_kind == "cloud"
     assert generated.model_provider == "opencode_go"
 
+
 ###############################################################################
 def test_timeline_generation_records_effective_local_provider_provenance() -> None:
     repository_graph, _ = build_repository_graph_for_test()
@@ -1076,6 +1101,7 @@ def test_timeline_generation_records_effective_local_provider_provenance() -> No
     persisted = service.get_session_timeline(session_id)
     assert persisted is not None
     assert persisted.model_provider == "ollama"
+
 
 ###############################################################################
 def test_session_payload_timeline_is_not_read_as_history_record() -> None:
@@ -1120,6 +1146,7 @@ def test_session_payload_timeline_is_not_read_as_history_record() -> None:
         session_id
     )
     assert previews == []
+
 
 ###############################################################################
 def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
@@ -1168,6 +1195,7 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     assert status["status"] == "completed"
     assert source_reads == 1
 
+
 ###############################################################################
 def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None:
     engine = create_engine(
@@ -1192,6 +1220,7 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
         limit=10,
     )
     session_id = int(rows[0]["session_id"])
+
 
     ###############################################################################
     class BlockingTimelineExtractor:
@@ -1276,6 +1305,7 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
         ) == 1
     finally:
         jobs.shutdown(timeout=1.0)
+
 
 ###############################################################################
 def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() -> None:

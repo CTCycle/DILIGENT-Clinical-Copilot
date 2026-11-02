@@ -8,9 +8,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LAUNCHER_PATH = REPO_ROOT / "start_on_windows.ps1"
 
+
 ###############################################################################
 def _launcher_text() -> str:
     return LAUNCHER_PATH.read_text(encoding="utf-8")
+
 
 ###############################################################################
 def _function_body(source: str, name: str) -> str:
@@ -19,6 +21,7 @@ def _function_body(source: str, name: str) -> str:
     next_function = source.find("\nfunction ", start + len(marker))
     end = len(source) if next_function == -1 else next_function
     return source[start:end]
+
 
 ###############################################################################
 def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
@@ -44,6 +47,7 @@ def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
     assert "Get-LauncherPortStates" in explicit_cleanup
     assert "Assert-NoForeignPortListeners" in explicit_cleanup
 
+
 ###############################################################################
 def test_launch_resolves_only_api_port_and_starts_one_backend_process() -> None:
     source = _launcher_text()
@@ -64,6 +68,7 @@ def test_launch_resolves_only_api_port_and_starts_one_backend_process() -> None:
     assert "Test-LaunchRuntimeReady" in start_application
     assert "Get-FrontendBuildStatus" in start_application
 
+
 ###############################################################################
 def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> None:
     process_discovery = _function_body(_launcher_text(), "Get-ApplicationProcessRecords")
@@ -74,6 +79,7 @@ def test_explicit_cleanup_retains_repository_qualified_process_ownership() -> No
     assert "(?:run\\s+preview|vite)" in process_discovery
     assert "--port" in process_discovery
     assert "candidateIds.Contains($parentId)" in process_discovery
+
 
 ###############################################################################
 def test_launch_shutdown_is_graceful_then_limited_to_the_owned_process_tree() -> None:
@@ -90,6 +96,7 @@ def test_launch_shutdown_is_graceful_then_limited_to_the_owned_process_tree() ->
     assert "while (-not $process.HasExited)" in supervisor
     assert "Wait-OwnedApplication" in source[source.index("if ($Action)"):]
 
+
 ###############################################################################
 def test_launch_only_prepares_node_for_a_stale_frontend_build() -> None:
     source = _launcher_text()
@@ -103,6 +110,7 @@ def test_launch_only_prepares_node_for_a_stale_frontend_build() -> None:
         "Initialize-PortableNodeRuntime"
     )
 
+
 ###############################################################################
 def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundaries() -> None:
     source = _launcher_text()
@@ -115,6 +123,7 @@ def test_launch_conflict_messages_include_pid_port_and_safe_confirmation_boundar
     assert "LauncherInteractive" in resolution
     assert "No port holders were terminated" in resolution
     assert "All configured-port holders were left running" in resolution
+
 
 ###############################################################################
 def test_frontend_build_state_is_deterministic_and_published_after_stable_build() -> None:
@@ -150,6 +159,7 @@ def test_frontend_build_state_is_deterministic_and_published_after_stable_build(
     assert "[IO.File]::Replace" in source
     assert "changed while Angular was building" in build
 
+
 ###############################################################################
 def test_frontend_dependency_sync_requires_detected_input_change_or_missing_install() -> None:
     source = _launcher_text()
@@ -162,6 +172,7 @@ def test_frontend_dependency_sync_requires_detected_input_change_or_missing_inst
     assert "state.node_version" in status
     assert "Test-Path -LiteralPath $angularCli" in install_dependencies
     assert "Install-FrontendDependencies -ForceSync:$frontendBuildStatus.DependencyInputsChanged" in start_application
+
 
 ###############################################################################
 def test_warm_runtime_repair_does_not_force_frontend_dependency_or_build_work() -> None:

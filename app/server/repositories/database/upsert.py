@@ -18,6 +18,7 @@ from repositories.schemas.knowledge import (
     LiverToxMonograph,
 )
 
+
 ###############################################################################
 def upsert_application_configuration(
     db_session: Session,
@@ -44,6 +45,7 @@ def upsert_application_configuration(
         raise RuntimeError("Application configuration upsert did not return a row")
     return row
 
+
 ###############################################################################
 def insert_application_configuration_if_missing(
     db_session: Session,
@@ -61,6 +63,7 @@ def insert_application_configuration_if_missing(
     result = cast(CursorResult[Any], db_session.execute(statement))
     return bool(result.rowcount)
 
+
 ###############################################################################
 def dialect_insert(db_session: Session, model: Any) -> Any:
     dialect = db_session.get_bind().dialect.name
@@ -69,6 +72,7 @@ def dialect_insert(db_session: Session, model: Any) -> Any:
     elif dialect == "postgresql":
         return postgres_insert(model)
     raise ValueError(f"Unsupported upsert dialect: {dialect}")
+
 
 ###############################################################################
 def upsert_drug_alias(
@@ -103,6 +107,7 @@ def upsert_drug_alias(
     )
     db_session.execute(statement)
 
+
 ###############################################################################
 def upsert_drug_aliases(db_session: Session, values: list[dict[str, Any]]) -> None:
     """Atomically upsert a deduplicated batch of drug aliases."""
@@ -123,6 +128,7 @@ def upsert_drug_aliases(db_session: Session, values: list[dict[str, Any]]) -> No
     )
     db_session.execute(statement)
 
+
 ###############################################################################
 def upsert_drug_rxnorm_code(
     db_session: Session,
@@ -136,6 +142,7 @@ def upsert_drug_rxnorm_code(
     )
     statement = statement.on_conflict_do_nothing(index_elements=[DrugRxnormCode.rxcui])
     db_session.execute(statement)
+
 
 ###############################################################################
 def upsert_livertox_monographs(

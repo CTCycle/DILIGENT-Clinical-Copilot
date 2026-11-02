@@ -21,11 +21,13 @@ from services.updater.livertox_core import LiverToxUpdater
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
+
 ###############################################################################
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return build_repository_graph(engine=engine), engine
+
 
 ###############################################################################
 def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
@@ -36,6 +38,7 @@ def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
         aliases = len(db_session.execute(select(DrugAlias)).scalars().all())
         monographs = len(db_session.execute(select(LiverToxMonograph)).scalars().all())
     return drugs, rxcui_codes, aliases, monographs
+
 
 ###############################################################################
 def test_livertox_upsert_idempotent_twice() -> None:
@@ -69,6 +72,7 @@ def test_livertox_upsert_idempotent_twice() -> None:
     second_counts = fetch_counts(engine)
 
     assert first_counts == second_counts
+
 
 ###############################################################################
 def test_livertox_duplicate_nbk_is_nulled() -> None:
@@ -108,6 +112,7 @@ def test_livertox_duplicate_nbk_is_nulled() -> None:
     finalized = livertox_index.finalize_dataset(updater, frame)
 
     assert finalized["nbk_id"].isna().all()
+
 
 ###############################################################################
 def test_text_normalization_runtime_observation_writes_only_runtime_manifest() -> None:

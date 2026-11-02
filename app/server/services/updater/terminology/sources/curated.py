@@ -24,6 +24,7 @@ from services.updater.terminology.snapshot import (
 LICENSE = "Project-maintained curated list"
 CATALOG_DOMAIN = "drug_matching"
 
+
 ###############################################################################
 class CuratedAliasSource:
     key = "curated"

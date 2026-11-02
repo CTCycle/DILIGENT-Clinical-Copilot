@@ -211,8 +211,10 @@ def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None
 ###############################################################################
 def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
 
+
     ###############################################################################
     class FakeOllamaClient:
+
         # -------------------------------------------------------------------------
         async def __aenter__(self):
             return self
@@ -265,6 +267,7 @@ def test_request_logging_keeps_failures_and_debug_successes(caplog: Any) -> None
     )
 
 
+###############################################################################
 def test_httpx_request_filter_keeps_failed_responses_visible() -> None:
     import logging
 

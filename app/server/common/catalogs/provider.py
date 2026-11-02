@@ -8,6 +8,7 @@ from functools import lru_cache
 
 from domain.catalogs import ReferenceCatalogSnapshot
 
+
 ###############################################################################
 class _CatalogProvider:
 
@@ -42,6 +43,7 @@ class _CatalogProvider:
     def invalidate(self) -> None:
         if self._invalidate is not None:
             self._invalidate()
+
 
 ###############################################################################
 @lru_cache(maxsize=1)

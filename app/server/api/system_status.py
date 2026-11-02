@@ -13,10 +13,12 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 _service = SystemStatusService()
 
+
 ###############################################################################
 async def get_system_status(response: Response) -> SystemStatusResponse:
     response.headers["Cache-Control"] = "no-store"
     return await _service.get_status()
+
 
 ###############################################################################
 async def start_ollama(response: Response) -> SystemStatusResponse:
@@ -26,6 +28,7 @@ async def start_ollama(response: Response) -> SystemStatusResponse:
     except OllamaProcessError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return await _service.get_status()
+
 
 ###############################################################################
 async def stop_ollama(response: Response) -> SystemStatusResponse:
@@ -59,6 +62,7 @@ router.add_api_route(
     response_model=SystemStatusResponse,
     status_code=status.HTTP_200_OK,
 )
+
 
 ###############################################################################
 def rebind_database_services() -> None:

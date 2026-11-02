@@ -19,6 +19,7 @@ from domain.settings.runtime_ui import RuntimeSettingsUpdateRequest
 from pydantic import ValidationError
 from services.settings.runtime import RuntimeSettingsService
 
+
 ###############################################################################
 class MemoryApplicationConfigurationSerializer:
 
@@ -50,6 +51,7 @@ class MemoryApplicationConfigurationSerializer:
             return saved, self.updated_at
         return saved
 
+
 ###############################################################################
 def _service(monkeypatch) -> tuple[RuntimeSettingsService, MemoryApplicationConfigurationSerializer]:  # type: ignore[no-untyped-def]
     payload = build_default_application_configuration_payload(
@@ -61,6 +63,7 @@ def _service(monkeypatch) -> tuple[RuntimeSettingsService, MemoryApplicationConf
     monkeypatch.setattr(runtime_module, "get_server_settings", lambda: manager.server_settings)
     monkeypatch.setattr(runtime_module, "get_configuration_manager", lambda: manager)
     return RuntimeSettingsService(serializer=serializer), serializer
+
 
 ###############################################################################
 def test_runtime_settings_state_exposes_complete_database_settings(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -82,6 +85,7 @@ def test_runtime_settings_state_exposes_complete_database_settings(monkeypatch) 
         "matching",
         "advanced",
     }
+
 
 ###############################################################################
 def test_runtime_settings_partial_update_persists_all_mapped_blocks(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -115,6 +119,7 @@ def test_runtime_settings_partial_update_persists_all_mapped_blocks(monkeypatch)
     assert serializer.payload["clinical_language_detection"]["min_best_score"] == 3.0
     assert serializer.payload["runtime"]["livertox_archive"] == "custom-livertox.tar.gz"
     assert serializer.payload["drugs_matcher"]["fuzzy_short_name_length"] == 10
+
 
 ###############################################################################
 def test_runtime_settings_rapid_updates_preserve_sibling_fields(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -158,6 +163,7 @@ def test_runtime_settings_rapid_updates_preserve_sibling_fields(monkeypatch) -> 
     assert saved["rxnav_request_timeout"] == 13.0
     assert saved["drugcentral_enabled"] is False
 
+
 ###############################################################################
 def test_runtime_settings_persist_reload_and_reset_ncbi_contact(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     service, serializer = _service(monkeypatch)
@@ -181,6 +187,7 @@ def test_runtime_settings_persist_reload_and_reset_ncbi_contact(monkeypatch) -> 
     assert reset.values.integrations.ncbi_contact_email == ""
     assert serializer.payload["runtime"]["ncbi_contact_email"] == ""
 
+
 ###############################################################################
 def test_runtime_settings_missing_ncbi_contact_defaults_to_blank(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     service, serializer = _service(monkeypatch)
@@ -191,6 +198,7 @@ def test_runtime_settings_missing_ncbi_contact_defaults_to_blank(monkeypatch) ->
     state = RuntimeSettingsService(serializer=serializer).get_state()
 
     assert state.values.integrations.ncbi_contact_email == ""
+
 
 ###############################################################################
 def test_runtime_settings_reload_observes_persisted_update(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -207,6 +215,7 @@ def test_runtime_settings_reload_observes_persisted_update(monkeypatch) -> None:
 
     assert reloaded.values.data.drug_name_max_tokens == 11
 
+
 ###############################################################################
 def test_runtime_settings_reset_restores_typed_defaults(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     service, serializer = _service(monkeypatch)
@@ -222,6 +231,7 @@ def test_runtime_settings_reset_restores_typed_defaults(monkeypatch) -> None:  #
     assert serializer.payload["runtime"]["local_llm_timeout_cap"] == 45.0
     assert serializer.payload["runtime"]["livertox_archive"] == "custom-livertox.tar.gz"
 
+
 ###############################################################################
 def test_runtime_settings_reject_unknown_environment_fields() -> None:
     with pytest.raises(ValidationError):
@@ -233,6 +243,7 @@ def test_runtime_settings_reject_unknown_environment_fields() -> None:
                 }
             }
         )
+
 
 ###############################################################################
 def test_runtime_settings_reject_incompatible_timeout_caps(monkeypatch) -> None:  # type: ignore[no-untyped-def]

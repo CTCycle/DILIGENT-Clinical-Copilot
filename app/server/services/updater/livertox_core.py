@@ -19,6 +19,7 @@ from services.updater import (
 )
 from services.updater.sanitizer import LiverToxExcerptSanitizer
 
+
 ###############################################################################
 class LiverToxUpdater:
 

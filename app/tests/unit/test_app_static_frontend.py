@@ -12,6 +12,7 @@ from common.security.desktop import DesktopSessionSecurity
 from services.runtime.desktop import DesktopRuntimeService
 
 
+###############################################################################
 def test_backend_serves_static_spa_and_keeps_api_not_found_responses(
     monkeypatch, tmp_path
 ) -> None:  # type: ignore[no-untyped-def]

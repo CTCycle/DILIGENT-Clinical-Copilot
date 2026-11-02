@@ -31,12 +31,14 @@ from services.llm.transports.base import (
 from services.llm.transports.errors import TransportCancellation
 from services.llm.model_capabilities import catalog_capability_metadata
 
+
 ###############################################################################
 def gemini_model_requires_thinking(model: str) -> bool:
     normalized = (model or "").strip().lower()
     return normalized.startswith("gemini-3") or normalized.startswith(
         "gemini-2.5-pro"
     )
+
 
 ###############################################################################
 class GeminiTransport(StructuredTransportMixin):

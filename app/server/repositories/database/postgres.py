@@ -10,6 +10,7 @@ from domain.settings.configuration import DatabaseSettings
 from repositories.database.engine import build_postgres_engine
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
+
 ###############################################################################
 class PostgresRepository:
 

@@ -37,9 +37,11 @@ CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
     "finalization": "Step 15/15: Auditing artifacts and saving session results...",
 }
 
+
 ###############################################################################
 class ClinicalJobCancelled(Exception):
     pass
+
 
 ###############################################################################
 class ClinicalConsultationProgressCallback:
@@ -65,6 +67,7 @@ class ClinicalConsultationProgressCallback:
             self.progress_callback(
                 "report.generating", 94.0 + (bounded_fraction * 5.0), None
             )
+
 
 ###############################################################################
 class StageProgressFractionCallback:

@@ -37,6 +37,7 @@ from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
 
+
 ###############################################################################
 def _sanitize_optional_text(
     value: str | float | int | None,
@@ -92,10 +93,12 @@ HEPATIC_PATTERN_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
+
 
 ###############################################################################
 class ClinicalLabExtractor:

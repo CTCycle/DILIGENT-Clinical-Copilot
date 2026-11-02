@@ -28,6 +28,7 @@ from services.session.scheduler import (
 # keeps the combined snapshot version monotonic for one session.
 _ROW_VERSION_SCALE = 1_000_000
 
+
 ###############################################################################
 class ClinicalSessionLifecycleService:
     """Session-centred lifecycle: drafts, launch, status, and cancellation."""

@@ -45,6 +45,7 @@ OBSOLETE_MATCHER_SETTINGS = (
     "spelling_long_max_distance",
 )
 
+
 ###############################################################################
 def _migrate_existing_rows() -> None:
     # Legacy session aliases only duplicated exact canonical matches.
@@ -87,6 +88,7 @@ def _migrate_existing_rows() -> None:
             ).bindparams(sa.bindparam("payload", type_=sa.JSON())),
             {"payload": payload, "id": row_id},
         )
+
 
 ###############################################################################
 def upgrade() -> None:
@@ -247,6 +249,7 @@ def upgrade() -> None:
         batch_op.create_check_constraint(batch_op.f(KB_SOURCE_CHECK), KB_SOURCE_UPGRADED)
 
     _migrate_existing_rows()
+
 
 ###############################################################################
 def downgrade() -> None:
