@@ -213,14 +213,6 @@
                   (ngModelChange)="resolveInput.set($event)"
                   (keydown.enter)="resolveName()"
                 />
-                <label class="inspection-terminology-toggle">
-                  <input
-                    type="checkbox"
-                    [ngModel]="resolveAllowExternal()"
-                    (ngModelChange)="resolveAllowExternal.set($event)"
-                  />
-                  <span>RxNav fallback</span>
-                </label>
                 <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="resolveName()" [disabled]="resolveLoading() || !resolveInput().trim()">
                   {{ resolveLoading() ? 'Resolving...' : 'Resolve' }}
                 </button>
@@ -347,7 +339,7 @@
                         <td>{{ source.source }}@if (!source.enabled) { <span class="inspection-status-chip is-neutral">Disabled</span> }</td>
                         <td [title]="source.last_error || ''">
                           @if (source.last_status) {
-                            <span class="inspection-status-chip" [class.is-successful]="source.last_status === 'completed' || source.last_status === 'skipped'" [class.is-failed]="source.last_status === 'failed'" [class.is-neutral]="source.last_status !== 'completed' && source.last_status !== 'skipped' && source.last_status !== 'failed'">{{ source.last_status }}</span>
+                            <span class="inspection-status-chip" [ngClass]="terminologyRunStatusTone(source.last_status)">{{ source.last_status }}</span>
                           } @else {
                             —
                           }
@@ -404,7 +396,7 @@
                     @for (run of terminologyRuns(); track run.id) {
                       <tr [title]="run.error || ''">
                         <td>{{ run.source }} <small>({{ run.mode }})</small></td>
-                        <td>{{ run.status }}</td>
+                        <td><span class="inspection-status-chip" [ngClass]="terminologyRunStatusTone(run.status)">{{ run.status }}</span></td>
                         <td>{{ formatDateTime(run.finished_at) }}</td>
                         <td>{{ run.error || formatRunStats(run) }}</td>
                       </tr>

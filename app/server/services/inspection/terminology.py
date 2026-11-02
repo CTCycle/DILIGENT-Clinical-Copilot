@@ -79,10 +79,10 @@ class InspectionTerminologyMixin:
         return {"items": items, "total": total, "offset": offset, "limit": limit}
 
     # -------------------------------------------------------------------------
-    def resolve_terminology_name(self, name: str, *, allow_external: bool) -> dict[str, Any]:
+    def resolve_terminology_name(self, name: str) -> dict[str, Any]:
         lookup = TerminologyLookupRepository(self._terminology_context())
-        resolver = build_terminology_resolver(lookup, allow_external=allow_external)
-        return resolver.resolve(name, allow_external=allow_external).model_dump(mode="json")
+        resolver = build_terminology_resolver(lookup)
+        return resolver.resolve(name).model_dump(mode="json")
 
     # -------------------------------------------------------------------------
     def record_terminology_alias_decision(

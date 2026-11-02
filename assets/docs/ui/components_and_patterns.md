@@ -1,5 +1,5 @@
 # Components And Patterns
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Page Layout Patterns
 - Primary route pages render inside the shared `.page-container` frame under the root shell. Keep the 59px navigation header and shared content origin stable; route components should not add duplicate outer gutters or independent page-width limits.
@@ -10,6 +10,9 @@ Last updated: 2026-11-01
 - Clinical Sessions uses a list-detail workspace with AI preview, session editing, metadata summaries, revision actions, and timeline actions.
 - The editor keeps Save outside its horizontally scrollable formatting controls. At narrow supported widths, metadata attachment actions sit below their explanatory copy.
 - Knowledge uses tabbed sections with scroll-aware tables and lists for reference data and RAG datasets. The sidebar has no page heading; a divider separates the source tabs from the Update all action. Virtualized tables must keep CSS row height (`--inspection-row-height`) equal to `InspectionPagedResource`'s row height, otherwise spacer rows change `scrollHeight` mid-scroll and wheel scrolling stalls.
+- Report pages show lifecycle state with `app-report-activity`: a spinner only while the session is queued or running (label from the backend `progress_stage`/`progress_message`), a static dot with a reason for completed, failed, cancelled, interrupted (failed with error code `interrupted`) and draft. There is no progress bar on the report page.
+- Terminology status chips (`.inspection-status-chip`) use the shared status tokens: completed/updated green, skipped neutral, running/updating blue, partial/warning amber, failed red; each chip keeps its text label and a leading marker.
+- The status bar's Local popover reflects `ollama_control.state`: Start when stopped, a disabled Starting state while launching, Retry after an error, and Stop only when DILIGENT owns the process.
 - A global status bar (`app-status-bar`) is fixed below `.app-main` on every page and shows backend and Ollama connection LEDs, the count of operational cloud providers (active access key plus usable cached catalog), and system-wide CPU, RAM and GPU VRAM. It polls `GET /api/system/status` every 5 s through `SystemStatusStateService`, pauses while the tab is hidden, shows `N/A` for unavailable readings, and never renders an unknown state as healthy. Page heights subtract `--app-chrome-height` (header plus status bar).
 - Clinical Sessions keeps preview rendering and related view state in focused preview components; page-level orchestration should not reabsorb that logic.
 - Model Configurations and access-key dialogs use signal-backed local state, explicit loading/saving states, and provider-response sequencing.

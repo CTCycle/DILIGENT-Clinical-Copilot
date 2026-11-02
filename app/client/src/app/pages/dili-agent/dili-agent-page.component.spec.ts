@@ -84,7 +84,6 @@ describe('DiliAgentPageComponent', () => {
   it('is a plain creation page: no progress, stop, report link, or recovery banner', async () => {
     await create();
 
-    expect(root().querySelector('app-analysis-progress')).toBeNull();
     expect(text()).not.toMatch(/Stop analysis|View report|Saved draft available/);
     expect(root().querySelector<HTMLButtonElement>('#run-analysis-button')?.disabled).toBe(false);
     expect(root().querySelector('#save-draft-button')?.textContent).toContain('Save as draft');

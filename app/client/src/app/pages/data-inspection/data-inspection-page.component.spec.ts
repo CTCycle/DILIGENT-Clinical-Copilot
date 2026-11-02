@@ -297,7 +297,7 @@ describe('DataInspectionPageComponent folder selection', () => {
       }
       if (url.endsWith('/terminology/resolve')) {
         const body = JSON.parse(String(init?.body));
-        expect(body).toEqual({ name: 'hydroxazine', allow_external: false });
+        expect(body).toEqual({ name: 'hydroxazine' });
         return jsonResponse(ambiguous);
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -305,7 +305,6 @@ describe('DataInspectionPageComponent folder selection', () => {
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
 
     component.resolveInput.set(' hydroxazine ');
-    component.resolveAllowExternal.set(false);
     await component.resolveName();
     expect(component.resolveResult()?.status).toBe('ambiguous');
 

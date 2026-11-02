@@ -323,17 +323,19 @@
             <div class="clinical-session-metadata-actions" aria-label="Attach session metadata">
               <div class="clinical-session-metadata-column">
                 <section class="clinical-session-metadata-action-card is-images">
-                  <div class="clinical-session-metadata-card-icon" aria-hidden="true">
-                    <svg lucideImage size="24"></svg>
+                  <div class="clinical-session-metadata-card-header">
+                    <div class="clinical-session-metadata-card-icon" aria-hidden="true">
+                      <svg lucideImage size="24"></svg>
+                    </div>
+                    <div>
+                      <strong>Clinical image evidence</strong>
+                      <p>Load imaging, photos, and visual source files into this session metadata.</p>
+                    </div>
+                    <label class="btn btn-secondary">
+                      Load images
+                      <input type="file" accept="image/*" multiple (change)="onMetadataFilesSelected($event)" />
+                    </label>
                   </div>
-                  <div>
-                    <strong>Clinical image evidence</strong>
-                    <p>Load imaging, photos, and visual source files into this session metadata.</p>
-                  </div>
-                  <label class="btn btn-secondary">
-                    Load images
-                    <input type="file" accept="image/*" multiple (change)="onMetadataFilesSelected($event)" />
-                  </label>
                   <hr class="clinical-session-metadata-divider" />
                   <section class="clinical-session-metadata-summary-card">
                     <strong>Attached images</strong>
@@ -354,17 +356,19 @@
               </div>
               <div class="clinical-session-metadata-column">
                 <section class="clinical-session-metadata-action-card is-documents">
-                  <div class="clinical-session-metadata-card-icon" aria-hidden="true">
-                    <svg lucideFileText size="24"></svg>
+                  <div class="clinical-session-metadata-card-header">
+                    <div class="clinical-session-metadata-card-icon" aria-hidden="true">
+                      <svg lucideFileText size="24"></svg>
+                    </div>
+                    <div>
+                      <strong>Medical document evidence</strong>
+                      <p>Attach PDFs, notes, reports, and source documents used by the review.</p>
+                    </div>
+                    <label class="btn btn-secondary">
+                      Load documents
+                      <input type="file" multiple (change)="onMetadataFilesSelected($event)" />
+                    </label>
                   </div>
-                  <div>
-                    <strong>Medical document evidence</strong>
-                    <p>Attach PDFs, notes, reports, and source documents used by the review.</p>
-                  </div>
-                  <label class="btn btn-secondary">
-                    Load documents
-                    <input type="file" multiple (change)="onMetadataFilesSelected($event)" />
-                  </label>
                   <hr class="clinical-session-metadata-divider" />
                   <section class="clinical-session-metadata-summary-card">
                     <strong>Attached documents</strong>

@@ -1,0 +1,11 @@
+<div class="report-activity" [attr.data-tone]="tone()" [attr.data-active]="active()" data-testid="report-activity">
+  @if (active()) {
+    <span class="report-activity-spinner" data-testid="report-activity-spinner" aria-hidden="true"></span>
+  } @else {
+    <span class="report-activity-dot" aria-hidden="true"></span>
+  }
+  <span class="report-activity-label" role="status">{{ label() }}</span>
+  @if (detail(); as text) {
+    <span class="report-activity-detail">{{ text }}</span>
+  }
+</div>

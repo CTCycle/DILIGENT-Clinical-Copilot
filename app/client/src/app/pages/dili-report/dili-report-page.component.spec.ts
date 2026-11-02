@@ -98,7 +98,7 @@ describe('DiliReportPageComponent', () => {
 
     expect(text()).toContain('Waiting for capacity');
     expect(text()).toContain('position 2');
-    expect(root().querySelector('app-analysis-progress')).toBeNull();
+    expect(root().querySelector('[data-testid="report-activity-spinner"]')).not.toBeNull();
     expect(buttonByText('Cancel analysis')).toBeDefined();
   });
 
@@ -115,7 +115,7 @@ describe('DiliReportPageComponent', () => {
 
   it('confirms inline before cancelling and then shows the cooperative stop state', async () => {
     await create({ status: 'running', progress: 30, progress_stage: 'drugs.resolving' });
-    expect(root().querySelector('app-analysis-progress')).not.toBeNull();
+    expect(root().querySelector('[data-testid="report-activity-spinner"]')).not.toBeNull();
     expect(text()).toContain('Normalizing drug names');
 
     buttonByText('Cancel analysis')!.click();
@@ -158,6 +158,8 @@ describe('DiliReportPageComponent', () => {
     });
 
     expect(text()).toContain('Application restarted during analysis.');
+    expect(root().querySelector('[data-testid="session-status"]')?.textContent).toContain('Interrupted');
+    expect(root().querySelector('[data-testid="report-activity-spinner"]')).toBeNull();
     expect(text()).toContain('Partial report');
     expect(text()).toContain('Stored report');
   });
@@ -167,7 +169,7 @@ describe('DiliReportPageComponent', () => {
 
     const editLink = [...root().querySelectorAll('a')].find((anchor) => anchor.textContent?.includes('Edit draft'));
     expect(editLink?.getAttribute('href')).toBe('/?session=7');
-    expect(text()).toContain('This session is a draft');
+    expect(text()).toContain('Draft — not analysed yet');
     expect(root().querySelector('details')?.textContent).toContain('Original clinical text');
   });
 

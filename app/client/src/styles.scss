@@ -464,7 +464,7 @@ app-root {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  margin-top: var(--space-md);
+  margin-top: var(--space-xl);
 }
 
 .stitch-dili-clear {
@@ -3122,10 +3122,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-status-chip {
   display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 2px 8px;
   font-size: var(--font-xs);
   font-weight: 700;
+}
+
+.inspection-status-chip[class*="is-"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.inspection-status-chip.is-neutral::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
 }
 
 .inspection-nowrap {
@@ -3133,23 +3149,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .inspection-status-chip.is-successful {
-  color: #166534;
-  background: rgba(134, 239, 172, 0.35);
+  color: var(--color-status-success-text);
+  background: var(--color-status-success-bg);
+  border-color: var(--color-status-success-border);
 }
 
 .inspection-status-chip.is-failed {
-  color: #991b1b;
-  background: rgba(254, 202, 202, 0.6);
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+  border-color: var(--color-status-error-border);
 }
 
 .inspection-status-chip.is-warning {
   color: var(--color-status-warning-text);
   background: var(--color-status-warning-bg);
+  border-color: var(--color-status-warning-border);
+}
+
+.inspection-status-chip.is-info {
+  color: var(--color-status-info-text);
+  background: var(--color-status-info-bg);
+  border-color: var(--color-status-info-border);
 }
 
 .inspection-status-chip.is-neutral {
   color: var(--color-text-secondary);
   background: var(--color-surface-alt);
+  border-color: var(--color-border);
 }
 
 .clinical-session-drug-identity,
@@ -3415,7 +3441,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-inline-fields {
-  gap: var(--space-sm);
+  gap: var(--space-md);
 }
 
 .stitch-dili-inline-fields .field label {
@@ -3718,12 +3744,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-bottom-color: var(--color-divider);
 }
 
-:root[data-theme="dark"] .inspection-status-chip.is-successful {
-  color: #bbf7d0;
-  background: rgba(21, 128, 61, 0.35);
-}
-
-:root[data-theme="dark"] .inspection-status-chip.is-failed,
 :root[data-theme="dark"] .inspection-error-text {
   color: #fca5a5;
   background: transparent;
@@ -5758,13 +5778,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     grid-column: auto;
   }
 
-  .clinical-sessions-page .clinical-session-metadata-actions .clinical-session-metadata-action-card {
+  .clinical-sessions-page .clinical-session-metadata-actions .clinical-session-metadata-card-header {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
     gap: var(--space-md);
   }
 
-  .clinical-sessions-page .clinical-session-metadata-actions .clinical-session-metadata-action-card > .btn {
+  .clinical-sessions-page .clinical-session-metadata-actions .clinical-session-metadata-card-header > .btn {
     grid-column: 2;
     justify-self: start;
   }

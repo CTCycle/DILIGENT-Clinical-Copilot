@@ -1,8 +1,6 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { JobStatus } from '../../core/models/types';
-
 export const ANALYSIS_PHASES = [
   'Validating clinical information',
   'Extracting medications',
@@ -50,17 +48,4 @@ export function resolvePhaseIndex(stage: string | null): number | null {
   }
   const match = PHASE_KEYS.find(([key]) => stage.startsWith(key));
   return match ? match[1] : null;
-}
-
-export function formatElapsed(elapsedMs: number): string {
-  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-}
-
-export type AnalysisProgressTone = 'running' | 'completed' | 'failed' | 'cancelled';
-
-export function resolveProgressTone(status: JobStatus | null): AnalysisProgressTone {
-  return status === 'completed' || status === 'failed' || status === 'cancelled' ? status : 'running';
 }

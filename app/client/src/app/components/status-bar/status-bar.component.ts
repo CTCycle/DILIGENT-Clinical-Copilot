@@ -92,9 +92,11 @@ export class StatusBarComponent implements OnDestroy {
       : { led: 'unknown', label: 'Unknown' };
   });
 
+  readonly localStarting = computed(() => this.ollamaBusy() || this.localControl()?.state === 'starting');
+
   readonly localDetail = computed(() => {
     const control = this.localControl();
-    if (this.ollamaBusy()) return 'Starting Ollama…';
+    if (this.localStarting()) return 'Launching the local Ollama server…';
     if (!control) return 'Status unavailable while the backend is disconnected.';
     if (control.state === 'running') {
       return control.managed ? 'Running, started by DILIGENT.' : 'Running, managed outside DILIGENT.';

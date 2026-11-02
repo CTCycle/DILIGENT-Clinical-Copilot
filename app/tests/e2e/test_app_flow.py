@@ -578,7 +578,7 @@ def test_report_progress_is_restored_after_navigation_and_refresh(
         _fill_required_dili_fields(page)
         _start_analysis_from_wizard(page)
         expect(page).to_have_url(re.compile(r"/report/9$"))
-        expect(page.locator(".analysis-progress-detail").first).to_contain_text(
+        expect(page.locator(".report-activity-detail").first).to_contain_text(
             "Extracting therapy and medication data"
         )
 
@@ -586,7 +586,7 @@ def test_report_progress_is_restored_after_navigation_and_refresh(
         expect(page).to_have_url(re.compile(r"/settings/"))
         page.go_back()
         expect(page).to_have_url(re.compile(r"/report/9$"))
-        expect(page.locator(".analysis-progress-detail").first).to_contain_text(
+        expect(page.locator(".report-activity-detail").first).to_contain_text(
             "Gathering grounded evidence", timeout=15000
         )
 

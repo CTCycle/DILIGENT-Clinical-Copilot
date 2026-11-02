@@ -37,14 +37,11 @@ export async function fetchTerminologyConflicts(
   );
 }
 
-export async function resolveTerminologyName(
-  name: string,
-  allowExternal = true,
-): Promise<TerminologyResolution> {
+export async function resolveTerminologyName(name: string): Promise<TerminologyResolution> {
   return requestJson<TerminologyResolution>(`${API_BASE_URL}/inspection/terminology/resolve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, allow_external: allowExternal }),
+    body: JSON.stringify({ name }),
   });
 }
 

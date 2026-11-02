@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -83,14 +83,14 @@ analyses wait in a queue and start automatically, oldest first.
 
 ## Follow An Analysis On Its Report Page
 
-The report page is where an analysis is monitored and controlled. Its header
+The report page is where an analysis is monitored and controlled. Its compact header
 stays visible while the page scrolls and shows the patient, the session
 status, and the actions that apply:
 
 - **Queued**: the position in the queue. The analysis starts when a slot frees.
-- **Running**: the current pipeline stage (for example *Normalizing drug
-  names* or *Retrieving evidence*), the step, the backend message, and the
-  elapsed time.
+- **Running**: a spinner with the current pipeline stage (for example
+  *Normalizing drug names* or *Retrieving evidence*) and the backend message.
+  The spinner disappears as soon as the session stops running.
 - **Cancel analysis** (queued or running) asks for confirmation. A queued
   analysis is cancelled at once. A running one stops at its next safe step;
   a model call already in progress finishes first, and the page says so.

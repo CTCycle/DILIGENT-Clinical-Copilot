@@ -1,0 +1,74 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: block;
+}
+
+.report-activity {
+  --activity-color: var(--color-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  font-size: var(--font-sm);
+}
+
+.report-activity[data-tone='info'] {
+  --activity-color: var(--color-status-info-text);
+}
+
+.report-activity[data-tone='success'] {
+  --activity-color: var(--color-status-success-text);
+}
+
+.report-activity[data-tone='warning'] {
+  --activity-color: var(--color-status-warning-text);
+}
+
+.report-activity[data-tone='error'] {
+  --activity-color: var(--color-status-error-text);
+}
+
+.report-activity-spinner,
+.report-activity-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.report-activity-spinner {
+  border: 2px solid color-mix(in srgb, var(--activity-color) 25%, transparent);
+  border-top-color: var(--activity-color);
+  animation: report-activity-spin 0.8s linear infinite;
+}
+
+.report-activity-dot {
+  width: 8px;
+  height: 8px;
+  margin: 3px;
+  background: var(--activity-color);
+}
+
+.report-activity-label {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.report-activity-detail {
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+@keyframes report-activity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-activity-spinner {
+    animation-duration: 2.4s;
+  }
+}

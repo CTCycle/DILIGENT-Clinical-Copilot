@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
@@ -11,13 +13,21 @@ from api.inspection.terminology import InspectionTerminologyEndpoint
 from repository_fixtures import build_repository_graph
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
+from services.terminology import factory
+from services.terminology.factory import build_resolver_settings as real_resolver_settings
 from services.terminology.index import get_terminology_index_cache
 from terminology_fixtures import build_sqlite_engine, seed_reference_terminology
 
 
 ###############################################################################
 @pytest.fixture
-def client(tmp_path) -> TestClient:  # type: ignore[no-untyped-def]
+def client(tmp_path, monkeypatch) -> TestClient:  # type: ignore[no-untyped-def]
+    # Resolution reads the persisted Settings; keep the RxNav fallback off so tests stay offline.
+    monkeypatch.setattr(
+        factory,
+        "build_resolver_settings",
+        lambda: replace(real_resolver_settings(), external_fallback_enabled=False),
+    )
     graph = build_repository_graph(engine=build_sqlite_engine(tmp_path / "t.db"))
     seed_reference_terminology(graph.context)
     # The process-wide index is keyed by revision, which every test database reuses.
@@ -58,7 +68,7 @@ def test_summary_reports_sources_with_license_and_coverage(client: TestClient) -
 ###############################################################################
 def test_reviewer_confirmation_and_rejection_apply_to_later_resolutions(client: TestClient) -> None:
     ambiguous = client.post(
-        "/inspection/terminology/resolve", json={"name": "hydroxazine", "allow_external": False}
+        "/inspection/terminology/resolve", json={"name": "hydroxazine"}
     ).json()
     assert ambiguous["status"] == "ambiguous"
     hydroxyzine = next(item["drug_id"] for item in ambiguous["candidates"] if item["name"] == "hydroxyzine")
@@ -68,7 +78,7 @@ def test_reviewer_confirmation_and_rejection_apply_to_later_resolutions(client: 
     )
     assert confirmed.json() == {"alias": "Hydroxazine", "drug_id": hydroxyzine, "validation_status": "confirmed"}
     resolved = client.post(
-        "/inspection/terminology/resolve", json={"name": "hydroxazine 25 mg", "allow_external": False}
+        "/inspection/terminology/resolve", json={"name": "hydroxazine 25 mg"}
     ).json()
     assert (resolved["status"], resolved["method"], resolved["preferred_name"]) == (
         "verified",
@@ -76,9 +86,9 @@ def test_reviewer_confirmation_and_rejection_apply_to_later_resolutions(client: 
         "hydroxyzine",
     )
 
-    lipitor = client.post("/inspection/terminology/resolve", json={"name": "Lipitor", "allow_external": False}).json()
+    lipitor = client.post("/inspection/terminology/resolve", json={"name": "Lipitor"}).json()
     client.post("/inspection/terminology/aliases/reject", json={"alias": "Lipitor", "drug_id": lipitor["drug_id"]})
-    rejected = client.post("/inspection/terminology/resolve", json={"name": "Lipitor", "allow_external": False}).json()
+    rejected = client.post("/inspection/terminology/resolve", json={"name": "Lipitor"}).json()
     assert rejected["accepted"] is False
 
     missing = client.post("/inspection/terminology/aliases/confirm", json={"alias": "x", "drug_id": 999999})

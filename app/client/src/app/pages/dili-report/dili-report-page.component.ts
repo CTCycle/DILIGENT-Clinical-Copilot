@@ -7,8 +7,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideCheck, LucideCopy, LucideDownload } from '@lucide/angular';
 import { map } from 'rxjs';
 
-import { AnalysisProgressComponent } from '../../components/analysis-progress/analysis-progress.component';
 import { ClinicalReportViewerComponent } from '../../components/clinical-report-viewer/clinical-report-viewer.component';
+import { ReportActivityComponent } from '../../components/report-activity/report-activity.component';
 import { REPORT_EXPORT_FILENAME } from '../../core/constants';
 import { describeEvidenceSources } from '../../core/evidence-sources';
 import { ClinicalSessionDetail } from '../../core/models/inspection-types';
@@ -22,7 +22,7 @@ import { ClinicalSessionPoller } from '../../core/services/clinical-session-poll
 import { fetchClinicalSessionDetail } from '../../core/services/clinical-sessions-api';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { createDownloadUrl, formatUnknownError, isRecord } from '../../core/utils';
-import { isActiveSessionStatus, sessionStatusLabel, sessionStatusTone } from '../../core/utils/session-status';
+import { isActiveSessionStatus, isInterruptedSession, sessionStatusLabel, sessionStatusTone } from '../../core/utils/session-status';
 import { previewReport } from '../clinical-sessions/clinical-session-preview';
 
 type CancelStep = 'idle' | 'confirming' | 'requesting';
@@ -37,7 +37,7 @@ function parseSessionId(value: string | null): number | null {
 
 @Component({
   selector: 'app-dili-report-page',
-  imports: [RouterLink, LucideCheck, LucideCopy, LucideDownload, AnalysisProgressComponent, ClinicalReportViewerComponent],
+  imports: [RouterLink, LucideCheck, LucideCopy, LucideDownload, ClinicalReportViewerComponent, ReportActivityComponent],
   templateUrl: './dili-report-page.component.html',
   styleUrl: './dili-report-page.component.scss',
 })
@@ -64,13 +64,19 @@ export class DiliReportPageComponent {
   private copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly status = computed(() => this.state()?.status ?? null);
+  private readonly interrupted = computed(() => {
+    const state = this.state();
+    return state !== null && isInterruptedSession(state.status, state.error);
+  });
   readonly statusLabel = computed(() => {
     const status = this.status();
-    return status ? sessionStatusLabel(status) : '';
+    if (!status) return '';
+    return this.interrupted() ? 'Interrupted' : sessionStatusLabel(status);
   });
   readonly statusTone = computed(() => {
     const status = this.status();
-    return status ? sessionStatusTone(status) : 'neutral';
+    if (!status) return 'neutral';
+    return this.interrupted() ? 'warning' : sessionStatusTone(status);
   });
   readonly isActive = computed(() => {
     const status = this.status();
@@ -85,14 +91,6 @@ export class DiliReportPageComponent {
   readonly reportMarkdown = computed(() => {
     const detail = this.detail();
     return detail && this.state()?.has_report ? previewReport(detail) : '';
-  });
-  readonly progressStartedAtMs = computed(() => {
-    const started = this.state()?.started_at;
-    return started ? Date.parse(started) : null;
-  });
-  readonly progressUpdatedAtMs = computed(() => {
-    const updated = this.state()?.updated_at;
-    return updated ? Date.parse(updated) : null;
   });
   readonly evidenceSources = computed(() => {
     const sources = this.detail()?.metadata['evidence_sources'];

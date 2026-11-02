@@ -5,25 +5,22 @@
     <header class="dili-report-header">
       <div class="dili-report-heading">
         <a class="dili-report-back" routerLink="/clinical-sessions" [queryParams]="{ session: session.session_id }">← Clinical Sessions</a>
-        <div class="dili-report-title-row">
-          <h1>{{ title() }}</h1>
-          <span class="session-status-chip" [attr.data-tone]="statusTone()" data-testid="session-status">{{ statusLabel() }}</span>
-        </div>
-        <dl class="dili-report-meta">
-          <div><dt>Session</dt><dd>#{{ session.session_id }}</dd></div>
+        <h1>{{ title() }}</h1>
+        <span class="session-status-chip" [attr.data-tone]="statusTone()" data-testid="session-status">{{ statusLabel() }}</span>
+        <ul class="dili-report-meta">
+          <li><span>Session</span> #{{ session.session_id }}</li>
           @if (visitDate(); as date) {
-            <div><dt>Visit date</dt><dd>{{ date }}</dd></div>
+            <li><span>Visit</span> {{ date }}</li>
           }
           @if (evidenceSources(); as sources) {
-            <div><dt>Evidence sources</dt><dd>{{ sources }}</dd></div>
+            <li><span>Evidence</span> {{ sources }}</li>
           }
           @for (model of models(); track model.role) {
-            <div>
-              <dt>{{ model.role }} model</dt>
-              <dd>{{ model.name }}@if (model.overridden) { <span class="dili-report-tag">Override</span> }</dd>
-            </div>
+            <li>
+              <span>{{ model.role }} model</span> {{ model.name }}@if (model.overridden) { <span class="dili-report-tag">Override</span> }
+            </li>
           }
-        </dl>
+        </ul>
       </div>
       <div class="dili-report-actions" role="toolbar" aria-label="Session actions">
         @if (isActive()) {
@@ -74,58 +71,27 @@
       <p class="dili-report-note is-error" role="alert">{{ error }}</p>
     }
 
-    @switch (session.status) {
-      @case ('draft') {
-        <div class="dili-report-status">
-          <p class="dili-report-note">This session is a draft. It has not been analysed yet.</p>
-        </div>
+    <app-report-activity
+      [status]="session.status"
+      [error]="session.error"
+      [stage]="session.progress_stage"
+      [message]="session.progress_message"
+      [queuePosition]="session.queue_position"
+      [stopRequested]="stopRequested()"
+    ></app-report-activity>
+
+    @if (session.status === 'completed' && !reportMarkdown()) {
+      @if (detailError(); as error) {
+        <p class="dili-report-note is-error" role="alert">{{ error }}</p>
+      } @else {
+        <p class="dili-report-note" role="status">Loading report…</p>
       }
-      @case ('queued') {
-        <div class="dili-report-status">
-          <p class="dili-report-note" role="status">
-            Waiting for capacity@if (session.queue_position !== null) { (position {{ session.queue_position }}) }.
-            The analysis starts automatically; you can leave this page.
-          </p>
-        </div>
+    }
+    @if (reportMarkdown()) {
+      @if (session.status !== 'completed') {
+        <h2 class="dili-report-section-title">Partial report</h2>
       }
-      @case ('running') {
-        <div class="dili-report-status">
-          <app-analysis-progress
-            jobStatus="running"
-            [jobProgress]="session.progress ?? 0"
-            [stage]="session.progress_stage"
-            [stageMessage]="session.progress_message"
-            [startedAtMs]="progressStartedAtMs()"
-            [lastProgressAtMs]="progressUpdatedAtMs()"
-          ></app-analysis-progress>
-          <p class="dili-report-note">The report appears here when the analysis completes.</p>
-        </div>
-      }
-      @case ('completed') {
-        @if (reportMarkdown()) {
-          <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
-        } @else if (detailError(); as error) {
-          <p class="dili-report-note is-error" role="alert">{{ error }}</p>
-        } @else {
-          <p class="dili-report-note" role="status">Loading report…</p>
-        }
-      }
-      @default {
-        <div class="dili-report-status" data-testid="session-interrupted">
-          <app-analysis-progress
-            [jobStatus]="session.status === 'failed' ? 'failed' : 'cancelled'"
-            [jobProgress]="session.progress ?? 0"
-            [errorMessage]="session.error?.message ?? null"
-          ></app-analysis-progress>
-          @if (session.status === 'cancelled') {
-            <p class="dili-report-note">The analysis was cancelled before it finished.</p>
-          }
-        </div>
-        @if (reportMarkdown()) {
-          <h2 class="dili-report-section-title">Partial report</h2>
-          <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
-        }
-      }
+      <app-clinical-report-viewer [markdown]="reportMarkdown()"></app-clinical-report-viewer>
     }
 
     @if (input(); as source) {

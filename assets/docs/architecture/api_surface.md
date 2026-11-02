@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 `/api/model-config` manages provider, model, reasoning, and RAG selection; it
 does not expose sampling temperature. `GET` returns the rich catalog and
@@ -200,7 +200,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 ## Notes
 - DILIrank inspection is read-only at record level. `GET /api/inspection/dilirank` exposes the complete persisted FDA snapshot, including rows that are intentionally unlinked to the local canonical drug catalog. The update routes use the same centralized inspection job manager as RxNav, LiverTox, terminology, the combined structured-source workflow, and RAG. `redownload=true` forces a fresh FDA workbook; otherwise conditional HTTP metadata is used when a validated cache exists.
 - `POST /api/inspection/structured-sources/jobs` starts the dependency-aware `RxNav -> LiverTox -> Terminology -> DILIrank` sequence and returns child source state in the job result. The optional `include_terminology` flag (default true) omits the terminology step; the skipped source is reported with status `skipped`. RAG is intentionally excluded and remains independently controllable.
-- Terminology routes: `summary` reports per-source versions, last runs, counts, license and attribution, open conflicts and fuzzy-index statistics; `resolve` is the try-it resolver (`allow_external` controls the RxNav fallback); `aliases/confirm` and `aliases/reject` store reviewer decisions as `reviewer` aliases (`404` for an unknown concept). `POST /api/inspection/rxnav/jobs` accepts only `force_full`; `POST /api/inspection/terminology/jobs` accepts `force_full`, `drugcentral_enabled`, `chembl_enabled` and `swissmedic_enabled`. See [drug_terminology.md](drug_terminology.md).
+- Terminology routes: `summary` reports per-source versions, last runs, counts, license and attribution, open conflicts and fuzzy-index statistics; `resolve` is the try-it resolver (takes only `name`; the RxNav fallback follows Settings → Drug Matching); `aliases/confirm` and `aliases/reject` store reviewer decisions as `reviewer` aliases (`404` for an unknown concept). `POST /api/inspection/rxnav/jobs` accepts only `force_full`; `POST /api/inspection/terminology/jobs` accepts `force_full`, `drugcentral_enabled`, `chembl_enabled` and `swissmedic_enabled`. See [drug_terminology.md](drug_terminology.md).
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
   persisted `timeline_model` role at start; provider/model controls are managed

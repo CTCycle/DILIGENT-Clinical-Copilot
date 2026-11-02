@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { ClinicalSessionStatus } from '../models/types';
+import { ClinicalSessionError, ClinicalSessionStatus } from '../models/types';
 
 export type SessionStatusTone = 'neutral' | 'info' | 'warning' | 'success' | 'error';
 
@@ -42,4 +42,9 @@ export function sessionStatusTone(status: ClinicalSessionStatus): SessionStatusT
 
 export function isActiveSessionStatus(status: ClinicalSessionStatus): boolean {
   return status === 'queued' || status === 'running';
+}
+
+/** Interruption is a failed session whose reason code is `interrupted`; it is not a separate status. */
+export function isInterruptedSession(status: ClinicalSessionStatus, error: ClinicalSessionError | null | undefined): boolean {
+  return status === 'failed' && error?.code === 'interrupted';
 }

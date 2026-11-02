@@ -3,7 +3,7 @@
 
 import { TerminologyResolutionStatus } from '../models/inspection-types';
 
-export type TerminologyStatusTone = 'is-successful' | 'is-warning' | 'is-failed' | 'is-neutral';
+export type TerminologyStatusTone = 'is-successful' | 'is-warning' | 'is-failed' | 'is-info' | 'is-neutral';
 
 const STATUS_LABELS: Record<TerminologyResolutionStatus, string> = {
   verified: 'Verified',
@@ -29,4 +29,19 @@ export function terminologyStatusLabel(status: unknown): string {
 
 export function terminologyStatusTone(status: unknown): TerminologyStatusTone {
   return isTerminologyStatus(status) ? STATUS_TONES[status] : 'is-neutral';
+}
+
+const RUN_STATUS_TONES: Record<string, TerminologyStatusTone> = {
+  completed: 'is-successful',
+  updated: 'is-successful',
+  skipped: 'is-neutral',
+  running: 'is-info',
+  updating: 'is-info',
+  partial: 'is-warning',
+  warning: 'is-warning',
+  failed: 'is-failed',
+};
+
+export function terminologyRunStatusTone(status: unknown): TerminologyStatusTone {
+  return typeof status === 'string' ? (RUN_STATUS_TONES[status] ?? 'is-neutral') : 'is-neutral';
 }

@@ -73,7 +73,7 @@ import {
   TerminologyResolution,
   TerminologySummaryResponse,
 } from '../../core/models/inspection-types';
-import { terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
+import { terminologyRunStatusTone, terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
 import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
 import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from '../../core/state/inspection-update-job-resource';
@@ -386,13 +386,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly terminologyLoading = signal(false);
   readonly terminologyError = signal<string | null>(null);
   readonly resolveInput = signal('');
-  readonly resolveAllowExternal = signal(true);
   readonly resolveLoading = signal(false);
   readonly resolveError = signal<string | null>(null);
   readonly resolveResult = signal<TerminologyResolution | null>(null);
   readonly aliasDecisionMessage = signal<string | null>(null);
   readonly terminologyStatusLabel = terminologyStatusLabel;
   readonly terminologyStatusTone = terminologyStatusTone;
+  readonly terminologyRunStatusTone = terminologyRunStatusTone;
   readonly dilirankUpdateRunning = computed(() => this.updateTargetState().dilirank.running);
   readonly dilirankUpdateProgress = computed(() => this.updateTargetState().dilirank.progress);
   readonly dilirankUpdateMessage = computed(() => this.updateTargetState().dilirank.message);
@@ -462,7 +462,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.resolveError.set(null);
     this.aliasDecisionMessage.set(null);
     try {
-      this.resolveResult.set(await resolveTerminologyName(name, this.resolveAllowExternal()));
+      this.resolveResult.set(await resolveTerminologyName(name));
     } catch (error) {
       this.resolveResult.set(null);
       this.resolveError.set(error instanceof Error ? error.message : 'Failed to resolve the name.');

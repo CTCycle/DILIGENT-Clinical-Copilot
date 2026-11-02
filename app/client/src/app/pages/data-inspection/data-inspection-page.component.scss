@@ -248,15 +248,6 @@
   min-width: 12rem;
 }
 
-.inspection-terminology-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: var(--font-sm);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
 .inspection-terminology-body {
   max-height: min(68vh, 720px);
   padding: var(--space-md);

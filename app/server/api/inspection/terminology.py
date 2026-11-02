@@ -65,7 +65,7 @@ class InspectionTerminologyEndpoint(InspectionJobEndpointMixin):
     # -------------------------------------------------------------------------
     def resolve_name(self, request: TerminologyResolveRequest) -> TerminologyResolution:
         return TerminologyResolution(
-            **self.service.resolve_terminology_name(request.name, allow_external=request.allow_external)
+            **self.service.resolve_terminology_name(request.name)
         )
 
     # -------------------------------------------------------------------------
