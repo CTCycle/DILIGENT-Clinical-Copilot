@@ -145,6 +145,7 @@ class JobManager:
         kwargs: dict[str, Any] | None = None,
         scope_key: str | None = None,
         job_id: str | None = None,
+        on_cancelled_before_start: Callable[[], None] | None = None,
     ) -> str:
         job_id = str(job_id or uuid.uuid4()).strip()[:8]
         if not job_id:
@@ -162,7 +163,7 @@ class JobManager:
 
         thread = threading.Thread(
             target=self.run_job,
-            args=(job_id, runner, args, runner_kwargs),
+            args=(job_id, runner, args, runner_kwargs, on_cancelled_before_start),
             daemon=True,
         )
 
@@ -322,6 +323,7 @@ class JobManager:
         runner: Callable[..., dict[str, Any]],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
+        on_cancelled_before_start: Callable[[], None] | None = None,
     ) -> None:
         try:
             with self.lock:
@@ -334,6 +336,7 @@ class JobManager:
                     status="cancelled",
                     completed_at=monotonic(),
                 )
+                self._notify_cancelled_before_start(job_id, on_cancelled_before_start)
                 return
             try:
                 result = runner(*args, **kwargs)
@@ -382,6 +385,19 @@ class JobManager:
             with self.lock:
                 self.threads.pop(job_id, None)
                 self._prune_terminal_jobs_locked()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _notify_cancelled_before_start(
+        job_id: str, callback: Callable[[], None] | None
+    ) -> None:
+        """Let the owner finalize work whose runner will never execute."""
+        if callback is None:
+            return
+        try:
+            callback()
+        except Exception:  # noqa: BLE001
+            logger.exception("Pre-start cancellation callback failed for job %s", job_id)
 
     # -------------------------------------------------------------------------
     def _finish_terminal_state(self, state: JobState, **updates: Any) -> None:

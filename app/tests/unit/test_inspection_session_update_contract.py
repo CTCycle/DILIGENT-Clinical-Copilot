@@ -29,6 +29,7 @@ class FakeSerializer:
         self,
         session_id: int,
         *,
+        expected_version: int,
         report_text: str,
         edited_fields: list[str] | None,
         reviewer_note: str | None,
@@ -37,6 +38,7 @@ class FakeSerializer:
     ) -> dict[str, object]:
         call = {
             "session_id": session_id,
+            "expected_version": expected_version,
             "report_text": report_text,
             "edited_fields": edited_fields,
             "reviewer_note": reviewer_note,
@@ -85,12 +87,14 @@ class FakeEndpointService:
         edited_fields: list[str] | None = None,
         reviewer_note: str | None = None,
         edited_by: str | None = None,
+        expected_version: int | None = None,
         metadata: dict[str, object] | None,
     ) -> dict[str, object]:
         self.calls.append(
             {
                 "session_id": session_id,
                 "report_text": report_text,
+                "expected_version": expected_version,
                 "edited_fields": edited_fields,
                 "reviewer_note": reviewer_note,
                 "edited_by": edited_by,
@@ -117,6 +121,7 @@ class FakeRequest:
     ) -> None:
         self.session_text = session_text
         self.report_text = report_text
+        self.expected_version = None
         self.edited_fields = None
         self.reviewer_note = None
         self.edited_by = None
@@ -166,6 +171,7 @@ def test_update_session_with_report_text_updates_report_only() -> None:
     payload = service.update_session(
         9,
         report_text="new report",
+        expected_version=3,
         metadata={"source": "manual"},
     )
 
@@ -177,6 +183,7 @@ def test_update_session_with_report_text_updates_report_only() -> None:
     assert serializer.report_calls == [
         {
             "session_id": 9,
+            "expected_version": 3,
             "report_text": "new report",
             "edited_fields": None,
             "reviewer_note": None,
@@ -206,6 +213,7 @@ def test_session_endpoint_does_not_treat_session_text_as_report_text() -> None:
         {
             "session_id": 11,
             "report_text": None,
+            "expected_version": None,
             "edited_fields": None,
             "reviewer_note": None,
             "edited_by": None,

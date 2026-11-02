@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchWithTimeout } from './http-api';
+import { ApiHttpError, fetchWithTimeout } from './http-api';
+import { fetchSessionAttachmentBlob } from './clinical-sessions-api';
 import { loadStoredDesktopSession, setDesktopSessionToken, storeDesktopSession } from './desktop-session';
 import { TestBed } from '@angular/core/testing';
 import { DesktopDialogService } from './desktop-dialog.service';
@@ -193,5 +194,36 @@ describe('session timeline API', () => {
       `${API_BASE_URL}/inspection/sessions/42/timeline-jobs/job%2F1`,
     );
     expect(init?.method).toBe('DELETE');
+  });
+});
+
+describe('session attachment download API', () => {
+  afterEach(() => {
+    setDesktopSessionToken('');
+    vi.restoreAllMocks();
+  });
+
+  it('fetches the attachment blob with the desktop session header', async () => {
+    setDesktopSessionToken('private-session-token');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('pdf-bytes'));
+
+    const blob = await fetchSessionAttachmentBlob(42, 7);
+
+    expect(await blob.text()).toBe('pdf-bytes');
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toBe(`${API_BASE_URL}/inspection/sessions/42/attachments/7`);
+    expect(new Headers(init?.headers).get('X-DILIGENT-Desktop-Session')).toBe('private-session-token');
+  });
+
+  it('raises ApiHttpError with the server detail on failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({ detail: 'Attachment not found.' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    const failure = fetchSessionAttachmentBlob(42, 7);
+
+    await expect(failure).rejects.toBeInstanceOf(ApiHttpError);
+    await expect(failure).rejects.toMatchObject({ statusCode: 404 });
   });
 });

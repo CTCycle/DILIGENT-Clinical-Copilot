@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Section Extraction Contract
 A launched DILI session (`POST /api/clinical/sessions/{session_id}/launch`) uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -196,7 +196,16 @@ Pre-existing or chronic liver disease is retained as baseline context and a pote
 
 Hy's Law evaluation is same-episode aware and records baseline multiples,
 initial cholestasis, alternative-cause exclusion, exposure compatibility, and
-individual-patient versus trial-signal context. Rechallenge remains a safety
+individual-patient versus trial-signal context. Same episode means a dated
+bilirubin value >2x reference on the same day as, or up to
+`BILIRUBIN_LAG_WINDOW_DAYS` (30) days after, a dated ALT/AST value >=3x
+reference; peaks from unrelated periods do not pair. The reference is the ULN,
+or the latest abnormal pre-exposure value when one is dated. A missing or
+unparseable date leaves the episode indeterminate rather than qualifying. The
+evaluated pair and its lag are recorded in the rationale. The 30-day window and
+baseline rule follow FDA 2009 / EASL 2019 guidance and await clinician sign-off.
+Trial context requires word-bounded trial terms ("clinical trial", "study
+drug", "investigational", ...), so "atrial fibrillation" does not match. Rechallenge remains a safety
 signal only; the workflow never recommends rechallenge.
 
 Initial cholestasis uses the ALP contemporaneous with the first ALT/AST ≥3× ULN

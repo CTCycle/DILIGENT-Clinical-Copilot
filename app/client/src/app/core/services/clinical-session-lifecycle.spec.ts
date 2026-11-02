@@ -151,4 +151,45 @@ describe('ClinicalSessionPoller', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/sessions/9/'))).toHaveLength(1);
   });
+
+  it('backs off after failures, recovers on success, and disconnects once retries are exhausted', async () => {
+    vi.useFakeTimers();
+    try {
+      let failing = false;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        if (failing) throw new TypeError('network down');
+        return jsonResponse(sessionState({ status: 'running', version: 1, poll_interval: 0.25 }));
+      });
+      const connection: string[] = [];
+      const onError = vi.fn();
+      const stop = TestBed.inject(ClinicalSessionPoller).watch(5, () => undefined, onError, (next) => connection.push(next));
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      failing = true;
+      await vi.advanceTimersByTimeAsync(250);
+      expect(connection).toEqual(['retrying']);
+      // Delays double from the base interval: 500, 1000, 2000.
+      await vi.advanceTimersByTimeAsync(499);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+      failing = false;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(connection).toEqual(['retrying', 'retrying', 'live']);
+
+      failing = true;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(connection.slice(3)).toEqual(['retrying', 'retrying', 'retrying', 'retrying', 'disconnected']);
+      expect(onError).toHaveBeenCalledTimes(1);
+      const callsAtStop = fetchSpy.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetchSpy).toHaveBeenCalledTimes(callsAtStop);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

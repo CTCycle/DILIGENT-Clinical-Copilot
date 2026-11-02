@@ -7,7 +7,7 @@ import asyncio
 import threading
 import uuid
 from collections.abc import Callable
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import Any
 
 from common.utils.logger import logger
@@ -76,6 +76,9 @@ class ClinicalSessionScheduler:
                         kwargs={"session_id": session_id},
                         scope_key=f"clinical:{session_id}",
                         job_id=job_id,
+                        on_cancelled_before_start=partial(
+                            self.release_unstarted_session, session_id, job_id
+                        ),
                     )
                 except RuntimeError:
                     # Shutdown began between the claim and the start: the
@@ -100,6 +103,15 @@ class ClinicalSessionScheduler:
         else:
             self._persist_unfinished(repository, session_id, job_id, None)
             return result
+        finally:
+            self.dispatch()
+
+    # -------------------------------------------------------------------------
+    def release_unstarted_session(self, session_id: int, job_id: str) -> None:
+        """Finalize a claimed session whose job was cancelled before its runner."""
+        repository = self.repository_factory()
+        try:
+            self._persist_unfinished(repository, session_id, job_id, None)
         finally:
             self.dispatch()
 

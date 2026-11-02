@@ -7,11 +7,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from repositories import values as repository_values
 from repositories.context import RepositoryContext
+from repositories.database.session import unit_of_work
 from repositories.schemas.clinical import (
     ClinicalSession,
     ClinicalSessionResult,
@@ -40,6 +41,16 @@ from repositories.serialization.session_result_data import (
     parse_session_result_payload,
     serialize_json_payload,
 )
+
+
+###############################################################################
+class SessionLineageConflictError(RuntimeError):
+    """A session lineage operation was rejected by the current lineage state."""
+
+
+###############################################################################
+class StaleReportVersionError(RuntimeError):
+    """A manual edit was based on a report version that is no longer current."""
 
 
 ###############################################################################
@@ -155,67 +166,98 @@ class SessionRevisionRepository:
             return self._next_session_version(db_session, root_session_id)
 
     # -------------------------------------------------------------------------
-    def delete_session_revisions(self, session_id: int) -> bool:
+    def delete_session_revisions(self, db_session: Session, session_id: int) -> bool:
+        """Delete the lineage records owned by one session in the caller's transaction.
+
+        Owned records are the session's own versions, the unfinalized drafts of
+        its lineage (no session yet), and the revision runs it launched.
+        Surviving descendants make the deletion a conflict instead.
+        """
         safe_session_id = int(session_id)
-        with self.session_factory() as db_session:
-            root_session_id = db_session.execute(
-                select(ClinicalSessionVersion.root_session_id)
-                .where(ClinicalSessionVersion.session_id == safe_session_id)
-                .order_by(ClinicalSessionVersion.version_number.desc())
+        owned_version = or_(
+            ClinicalSessionVersion.session_id == safe_session_id,
+            and_(
+                ClinicalSessionVersion.session_id.is_(None),
+                ClinicalSessionVersion.root_session_id == safe_session_id,
+            ),
+        )
+        version_ids = list(
+            db_session.execute(
+                select(ClinicalSessionVersion.id).where(owned_version)
+            ).scalars()
+        )
+        run_ids = list(
+            db_session.execute(
+                select(ClinicalSessionRevisionRun.id).where(
+                    ClinicalSessionRevisionRun.session_id == safe_session_id
+                )
+            ).scalars()
+        )
+        descendant = db_session.execute(
+            select(ClinicalSessionVersion.id)
+            .where(
+                ~owned_version,
+                or_(
+                    ClinicalSessionVersion.root_session_id == safe_session_id,
+                    ClinicalSessionVersion.source_version_id.in_(version_ids),
+                ),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if descendant is None and version_ids:
+            descendant = db_session.execute(
+                select(ClinicalSessionRevisionRun.id)
+                .where(
+                    ClinicalSessionRevisionRun.session_id != safe_session_id,
+                    or_(
+                        ClinicalSessionRevisionRun.source_version_id.in_(version_ids),
+                        ClinicalSessionRevisionRun.target_revision_version_id.in_(
+                            version_ids
+                        ),
+                    ),
+                )
                 .limit(1)
             ).scalar_one_or_none()
-            is_root_session = int(root_session_id or safe_session_id) == safe_session_id
-            version_scope = (
-                ClinicalSessionVersion.root_session_id == safe_session_id
-                if is_root_session
-                else ClinicalSessionVersion.session_id == safe_session_id
+        if descendant is not None:
+            raise SessionLineageConflictError(
+                "This session has revised child sessions. Delete them first."
             )
-            version_ids = list(
-                db_session.execute(
-                    select(ClinicalSessionVersion.id).where(version_scope)
-                ).scalars()
+        if version_ids:
+            db_session.execute(
+                delete(ClinicalSessionRevisionReview).where(
+                    ClinicalSessionRevisionReview.revision_version_id.in_(version_ids)
+                )
             )
-            run_scope = (
-                ClinicalSessionRevisionRun.root_session_id == safe_session_id
-                if is_root_session
-                else ClinicalSessionRevisionRun.session_id == safe_session_id
-            )
-            run_ids = list(
-                db_session.execute(
-                    select(ClinicalSessionRevisionRun.id).where(run_scope)
-                ).scalars()
-            )
-            if version_ids:
-                db_session.execute(
-                    delete(ClinicalSessionRevisionReview).where(
-                        ClinicalSessionRevisionReview.revision_version_id.in_(
-                            version_ids
-                        )
+            db_session.execute(
+                delete(ClinicalSessionRevisionArtifact).where(
+                    ClinicalSessionRevisionArtifact.revision_version_id.in_(
+                        version_ids
                     )
                 )
-                db_session.execute(
-                    delete(ClinicalSessionRevisionArtifact).where(
-                        ClinicalSessionRevisionArtifact.revision_version_id.in_(
-                            version_ids
-                        )
-                    )
+            )
+        if run_ids:
+            db_session.execute(
+                delete(ClinicalSessionRevisionStep).where(
+                    ClinicalSessionRevisionStep.revision_run_id.in_(run_ids)
                 )
-            if run_ids:
-                db_session.execute(
-                    delete(ClinicalSessionRevisionStep).where(
-                        ClinicalSessionRevisionStep.revision_run_id.in_(run_ids)
-                    )
+            )
+            db_session.execute(
+                delete(ClinicalSessionRevisionArtifact).where(
+                    ClinicalSessionRevisionArtifact.revision_run_id.in_(run_ids)
                 )
-                db_session.execute(
-                    delete(ClinicalSessionRevisionArtifact).where(
-                        ClinicalSessionRevisionArtifact.revision_run_id.in_(run_ids)
-                    )
+            )
+            db_session.execute(
+                delete(ClinicalSessionRevisionRun).where(
+                    ClinicalSessionRevisionRun.id.in_(run_ids)
                 )
-            db_session.execute(delete(ClinicalSessionRevisionRun).where(run_scope))
-            if version_ids:
-                db_session.execute(delete(ClinicalSessionVersion).where(version_scope))
-            db_session.commit()
-            return bool(version_ids or run_ids)
+            )
+        if version_ids:
+            db_session.execute(
+                delete(ClinicalSessionVersion).where(
+                    ClinicalSessionVersion.id.in_(version_ids)
+                )
+            )
+        return bool(version_ids or run_ids)
 
     # -------------------------------------------------------------------------
     def list_manual_report_edits(self, session_id: int) -> list[dict[str, Any]]:
@@ -242,6 +284,7 @@ class SessionRevisionRepository:
         self,
         session_id: int,
         *,
+        expected_version: int,
         report_text: str,
         edited_fields: list[str] | None,
         reviewer_note: str | None,
@@ -252,7 +295,9 @@ class SessionRevisionRepository:
         if not normalized_report:
             raise ValueError("Report text cannot be empty.")
         safe_session_id = int(session_id)
-        with self.session_factory() as db_session:
+        with unit_of_work(
+            session_factory=self.session_factory, immediate=True
+        ) as db_session:
             current = db_session.execute(
                 select(ClinicalSessionVersion)
                 .where(ClinicalSessionVersion.session_id == safe_session_id)
@@ -264,6 +309,11 @@ class SessionRevisionRepository:
                 return None
             if current is None:
                 raise RuntimeError("No persisted version exists for manual report edit")
+            if int(current.version_number) != int(expected_version):
+                raise StaleReportVersionError(
+                    "The report changed since you opened it. Reload the latest "
+                    "version before saving your edit."
+                )
             if metadata is not None:
                 existing_session.metadata_json = serialize_json_payload(metadata or {})
             result_row = db_session.execute(
@@ -332,7 +382,6 @@ class SessionRevisionRepository:
                     completed_at=timestamp,
                 )
             )
-            db_session.commit()
         audits = self.list_manual_report_edits(safe_session_id)
         return {"audit": audits[0]}
 

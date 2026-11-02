@@ -29,6 +29,10 @@ from domain.inspection import (
     SessionVersionListResponse,
     SessionVersionSummary,
 )
+from services.inspection.attachment_policy import (
+    AttachmentPolicyError,
+    build_download_response_parts,
+)
 from services.inspection.service import DataInspectionService
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -105,6 +109,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             edited_fields=request.edited_fields,
             reviewer_note=request.reviewer_note,
             edited_by=request.edited_by,
+            expected_version=request.expected_version,
             metadata=request.metadata,
         )
         if detail is None:
@@ -155,6 +160,7 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
             edited_fields=request.edited_fields,
             reviewer_note=request.reviewer_note,
             edited_by=request.edited_by,
+            expected_version=request.expected_version,
             metadata=request.metadata,
         )
         if response is None:
@@ -196,12 +202,14 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Attachment must be between 1 byte and 10 MB.",
             )
-        stored = self.service.add_session_attachment(
-            session_id,
-            file_name=request.file_name,
-            media_type=request.media_type,
-            content=content,
-        )
+        try:
+            stored = self.service.add_session_attachment(
+                session_id, file_name=request.file_name, content=content
+            )
+        except AttachmentPolicyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
         if stored is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -218,14 +226,10 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
                 detail="Attachment not found.",
             )
         summary, content = found
-        return Response(
-            content=content,
-            media_type=summary["media_type"],
-            headers={
-                "Content-Disposition": "inline",
-                "X-Content-Type-Options": "nosniff",
-            },
+        media_type, headers = build_download_response_parts(
+            summary["file_name"], content
         )
+        return Response(content=content, media_type=media_type, headers=headers)
 
     # -------------------------------------------------------------------------
     def delete_session_attachment(

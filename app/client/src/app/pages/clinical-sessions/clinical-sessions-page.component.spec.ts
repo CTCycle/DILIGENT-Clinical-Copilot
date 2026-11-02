@@ -320,6 +320,52 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(component.revisionDraftReport()).toBe('');
     expect(fetchSpy.mock.calls.some(([input]) => String(input).endsWith('/sessions/19/versions'))).toBe(true);
   });
+
+  it('offers reload on a stale manual edit and keeps the unsaved draft', async () => {
+    component.selected.set(sessionDetail(19));
+    component.editorText.set('My unsaved draft');
+    let reportBody: { expected_version?: number } = {};
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/19/report')) {
+        reportBody = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ detail: 'The report changed since you opened it.' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/sessions/19')) {
+        return jsonResponse({ ...sessionDetail(19), version: 2 });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await component.saveManualReportEdit();
+
+    expect(reportBody.expected_version).toBe(1);
+    expect(component.staleEditDetected()).toBe(true);
+    expect(component.saveStatus()).toContain('changed since you opened it');
+
+    await component.reloadLatestSession();
+
+    expect(component.selected()?.version).toBe(2);
+    expect(component.editorText()).toBe('My unsaved draft');
+    expect(component.staleEditDetected()).toBe(false);
+  });
+
+  it('explains a refused delete when the session has revised child sessions', async () => {
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ detail: 'This session has revised child sessions. Delete them first.' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await component.deleteSession(sessionItem(19), new Event('click'));
+
+    expect(component.listError()).toContain('Delete the child sessions first');
+  });
 });
 
 describe('ClinicalSessionsPageComponent lifecycle list', () => {

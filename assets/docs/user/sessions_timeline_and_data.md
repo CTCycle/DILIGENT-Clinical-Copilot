@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -27,7 +27,8 @@ keep your place.
   report.
 - **Edit draft** reopens a draft in the DILI Agent; launch it from there.
 - Cancelled and failed sessions keep their input and any partial report.
-- Queued or running sessions cannot be deleted; cancel them first.
+- Queued or running sessions cannot be deleted; cancel them first. A session
+  with revised child sessions cannot be deleted until its children are.
 - Revisions and manual report edits are available once a report exists.
 
 Recommended workflow:
@@ -46,7 +47,8 @@ If a session is missing, confirm that the assessment completed successfully and 
 
 Important distinctions:
 - Manual report edits do not create a new official version.
-- Current known behavior: saving a manual report edit replaces saved session metadata with an empty object. Re-enter and save needed attachment or session metadata after editing. This is a v3.4.0 follow-up recorded in the [project status ledger](../project_status_ledger.md).
+- If the report changed after you opened the editor, Save is refused; use **Reload latest** to load the current report while keeping your draft text.
+- Metadata attachments are downloaded through the app. HTML, SVG, script, and executable files are not accepted.
 - LLM-assisted revision creates a new versioned draft and keeps the previous version unchanged.
 - Human clinical review status is separate from LLM QA status.
 - Backend-provided matched drugs, structured case fields, revision entities, RxNav identifiers, LiverTox matches, and linked FDA DILIrank identifiers are authoritative persisted evidence only within their documented source semantics.

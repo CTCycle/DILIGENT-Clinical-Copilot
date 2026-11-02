@@ -18,7 +18,7 @@ import {
   fetchClinicalSessionInput,
   fetchClinicalSessionStatus,
 } from '../../core/services/clinical-session-lifecycle-api';
-import { ClinicalSessionPoller } from '../../core/services/clinical-session-poller';
+import { ClinicalSessionPoller, PollConnection } from '../../core/services/clinical-session-poller';
 import { fetchClinicalSessionDetail } from '../../core/services/clinical-sessions-api';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { createDownloadUrl, formatUnknownError, isRecord } from '../../core/utils';
@@ -58,6 +58,7 @@ export class DiliReportPageComponent {
   readonly input = signal<ClinicalSessionInput | null>(null);
   readonly loadError = signal<string | null>(null);
   readonly detailError = signal<string | null>(null);
+  readonly connection = signal<PollConnection>('live');
   readonly cancelStep = signal<CancelStep>('idle');
   readonly cancelError = signal<string | null>(null);
   readonly copied = signal(false);
@@ -182,10 +183,19 @@ export class DiliReportPageComponent {
     URL.revokeObjectURL(url);
   }
 
+  /** Restarts status polling after it paused, keeping the last snapshot on screen. */
+  reconnect(): void {
+    const sessionId = this.sessionId();
+    if (sessionId === null) return;
+    this.stopPolling?.();
+    this.startPolling(sessionId, this.loadGeneration);
+  }
+
   private open(sessionId: number | null): void {
     const generation = ++this.loadGeneration;
     this.stopPolling?.();
     this.stopPolling = null;
+    this.connection.set('live');
     this.state.set(null);
     this.detail.set(null);
     this.input.set(null);
@@ -197,6 +207,12 @@ export class DiliReportPageComponent {
       this.loadError.set('Invalid session id.');
       return;
     }
+    this.startPolling(sessionId, generation);
+    void this.loadInput(sessionId, generation);
+  }
+
+  private startPolling(sessionId: number, generation: number): void {
+    this.connection.set('live');
     this.stopPolling = this.poller.watch(
       sessionId,
       (next) => this.applyState(next, generation),
@@ -205,8 +221,10 @@ export class DiliReportPageComponent {
           this.loadError.set(formatUnknownError(error, 'Failed to load the session.'));
         }
       },
+      (connection) => {
+        if (generation === this.loadGeneration) this.connection.set(connection);
+      },
     );
-    void this.loadInput(sessionId, generation);
   }
 
   private applyState(next: ClinicalSessionState, generation: number): void {

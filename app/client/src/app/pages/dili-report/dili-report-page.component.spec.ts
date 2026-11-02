@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ClinicalSessionState } from '../../core/models/types';
 import { FetchCall, jsonResponse, sessionState } from '../../core/testing/clinical-session-fixtures';
+import { ClinicalSessionPoller, PollConnection } from '../../core/services/clinical-session-poller';
 import { DiliReportPageComponent } from './dili-report-page.component';
 
 const DETAIL = {
@@ -185,5 +186,46 @@ describe('DiliReportPageComponent', () => {
     await settle();
 
     expect(text()).toContain('Session unavailable');
+  });
+});
+
+describe('DiliReportPageComponent connection banner', () => {
+  it('keeps the last snapshot visible, flags paused updates, and restarts polling on reconnect', async () => {
+    const connectionHandlers: Array<(connection: PollConnection) => void> = [];
+    const watch = vi.fn((_id: number, onState: (state: ClinicalSessionState) => void, _onError: unknown, onConnection: (c: PollConnection) => void) => {
+      connectionHandlers.push(onConnection);
+      onState(sessionState({ session_id: 7, patient_name: 'Stored Patient', status: 'running' }));
+      return () => undefined;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(INPUT));
+    await TestBed.configureTestingModule({
+      imports: [DiliReportPageComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ClinicalSessionPoller, useValue: { watch } },
+        { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({ sessionId: '7' })), snapshot: { paramMap: convertToParamMap({ sessionId: '7' }) } } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(DiliReportPageComponent);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const banner = () => root.querySelector('[data-testid="connection-banner"]');
+    expect(banner()).toBeNull();
+
+    connectionHandlers[0]('retrying');
+    fixture.detectChanges();
+    expect(banner()?.textContent).toContain('Connection lost, retrying');
+    expect(root.textContent).toContain('Stored Patient');
+
+    connectionHandlers[0]('disconnected');
+    fixture.detectChanges();
+    expect(banner()?.textContent).toContain('Updates paused');
+    [...root.querySelectorAll('button')].find((button) => button.textContent?.includes('Reconnect'))!.click();
+    fixture.detectChanges();
+
+    expect(watch).toHaveBeenCalledTimes(2);
+    expect(banner()).toBeNull();
+    fixture.destroy();
+    vi.restoreAllMocks();
   });
 });

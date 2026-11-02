@@ -119,7 +119,9 @@ class ApplicationConfigurationSerializer:
     ) -> dict[str, Any] | tuple[dict[str, Any], Any]:
         """Atomically merge a settings update into the latest singleton payload."""
         with self._write_lock:
-            with unit_of_work(session_factory=self.session_factory) as db_session:
+            with unit_of_work(
+                session_factory=self.session_factory, immediate=True
+            ) as db_session:
                 row = db_session.get(
                     ApplicationConfiguration,
                     1,

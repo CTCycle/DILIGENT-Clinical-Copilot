@@ -22,7 +22,9 @@ const OLDER_QUERY_DEBOUNCE_MS = 250;
 
 /**
  * Client-side session cache. Sessions created in the last 90 days are loaded once and filtered
- * locally; older sessions are queried server-side only when explicitly requested.
+ * locally; older sessions are queried server-side only when explicitly requested. Free-text search
+ * always goes through the server (which also matches report content) for both ranges, so results do
+ * not depend on session age; only the matching session ids are kept for the recent set.
  */
 @Injectable()
 export class ClinicalSessionsStore {
@@ -38,9 +40,12 @@ export class ClinicalSessionsStore {
   private readonly recent = signal<InspectionSessionItem[]>([]);
   private readonly older = signal<InspectionSessionItem[]>([]);
   private readonly now = signal(new Date());
+  private readonly recentSearch = signal<{ query: string; ids: ReadonlySet<number> } | null>(null);
   private recentGeneration = 0;
   private olderGeneration = 0;
+  private searchGeneration = 0;
   private olderTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  private searchTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
   readonly recentCount = computed(() => this.recent().length);
   readonly olderCount = computed(() => this.older().length);
@@ -54,7 +59,15 @@ export class ClinicalSessionsStore {
   ));
   readonly visible = computed(() => {
     const filters = this.filters();
-    const recent = filterSessions(this.recent(), filters, this.now());
+    const query = filters.query.trim();
+    const search = this.recentSearch();
+    // Until the server answers the current query, fall back to the local metadata match.
+    const serverMatches = query && search?.query === query ? search.ids : null;
+    const recent = filterSessions(
+      this.recent(),
+      serverMatches ? { ...filters, query: '' } : filters,
+      this.now(),
+    ).filter((item) => !serverMatches || serverMatches.has(item.session_id));
     if (!this.includeOlder()) return recent;
     // Older items were already matched server-side (including report content search).
     const merged = new Map(recent.map((item) => [item.session_id, item]));
@@ -65,18 +78,22 @@ export class ClinicalSessionsStore {
   destroy(): void {
     this.recentGeneration++;
     this.olderGeneration++;
+    this.searchGeneration++;
     this.clearOlderTimer();
+    this.clearSearchTimer();
   }
 
   setFilters(patch: Partial<SessionFilterState>): void {
     this.filters.update((current) => ({ ...current, ...patch }));
     if (rangeReachesHistory(this.filters(), this.now())) this.includeOlder.set(true);
     this.scheduleOlderReload();
+    this.scheduleRecentSearch();
   }
 
   resetFilters(): void {
     this.filters.set(DEFAULT_SESSION_FILTERS);
     this.scheduleOlderReload();
+    this.scheduleRecentSearch();
   }
 
   setIncludeOlder(value: boolean): void {
@@ -113,6 +130,7 @@ export class ClinicalSessionsStore {
     } finally {
       if (generation === this.recentGeneration) this.loading.set(false);
     }
+    if (this.filters().query.trim()) void this.searchRecent();
     if (this.includeOlder()) void this.loadOlder();
   }
 
@@ -170,6 +188,29 @@ export class ClinicalSessionsStore {
     }
   }
 
+  /** Resolves the current free-text query server-side within the cached window. */
+  private async searchRecent(): Promise<void> {
+    this.clearSearchTimer();
+    const query = this.filters().query.trim();
+    const generation = ++this.searchGeneration;
+    if (!query) {
+      this.recentSearch.set(null);
+      return;
+    }
+    try {
+      const items = await this.fetchAll({
+        date_field: 'created',
+        date_from: cacheCutoff(this.now()).toISOString(),
+        sort: 'created_desc',
+        search: query,
+      });
+      if (generation !== this.searchGeneration) return;
+      this.recentSearch.set({ query, ids: new Set(items.map((item) => item.session_id)) });
+    } catch {
+      // Keep the local metadata match until the next query change or reload.
+    }
+  }
+
   remove(sessionId: number): void {
     this.recent.update((items) => items.filter((item) => item.session_id !== sessionId));
     this.older.update((items) => items.filter((item) => item.session_id !== sessionId));
@@ -184,7 +225,12 @@ export class ClinicalSessionsStore {
   }
 
   private async fetchAll(
-    query: { date_field: 'created' | 'updated'; date_from: string; sort: 'created_desc' | 'updated_desc' },
+    query: {
+      date_field: 'created' | 'updated';
+      date_from: string;
+      sort: 'created_desc' | 'updated_desc';
+      search?: string;
+    },
   ): Promise<InspectionSessionItem[]> {
     const collected = new Map<number, InspectionSessionItem>();
     let offset = 0;
@@ -213,6 +259,27 @@ export class ClinicalSessionsStore {
       this.olderTimer = null;
       void this.loadOlder();
     }, OLDER_QUERY_DEBOUNCE_MS);
+  }
+
+  private scheduleRecentSearch(): void {
+    this.clearSearchTimer();
+    if (!this.filters().query.trim()) {
+      this.searchGeneration++;
+      this.recentSearch.set(null);
+      return;
+    }
+    if (this.recentSearch()?.query === this.filters().query.trim()) return;
+    this.searchTimer = globalThis.setTimeout(() => {
+      this.searchTimer = null;
+      void this.searchRecent();
+    }, OLDER_QUERY_DEBOUNCE_MS);
+  }
+
+  private clearSearchTimer(): void {
+    if (this.searchTimer !== null) {
+      globalThis.clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
   }
 
   private clearOlderTimer(): void {

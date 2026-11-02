@@ -124,6 +124,7 @@ class SessionUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_text: str | None = Field(default=None, max_length=100000)
     report_text: str | None = Field(default=None, max_length=200000)
+    expected_version: int | None = Field(default=None, ge=1)
     edited_fields: list[str] = Field(default_factory=lambda: ["report_text"])
     reviewer_note: str | None = Field(default=None, max_length=2000)
     edited_by: str | None = Field(default=None, max_length=200)
@@ -151,6 +152,7 @@ class SessionRevisionRequest(BaseModel):
 class ManualReportEditRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     report_text: str = Field(..., min_length=1, max_length=200000)
+    expected_version: int = Field(..., ge=1)
     edited_fields: list[str] = Field(default_factory=lambda: ["report_text"])
     reviewer_note: str | None = Field(default=None, max_length=2000)
     edited_by: str | None = Field(default=None, max_length=200)

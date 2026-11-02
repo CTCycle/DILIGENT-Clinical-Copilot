@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Relational Database
 
@@ -269,6 +269,7 @@ erDiagram
 - Evidence-locked DILI artifacts in the database-backed session result payload are `normalized_document`, `extraction_artifact`, `fact_graph`, `faithfulness_audit`, generated report metadata, discrepancy report, and `dili_evidence_bundle_index`.
 - Successful clinical workflows require persistence. Repository failures, missing persisted IDs, and failed upserts are service dependency failures rather than silent in-memory success.
 - SQLite enables foreign keys, a 30-second busy timeout, and WAL journaling.
+- Transactions that read before they write (session deletion, manual report edits, application-configuration saves) open with `unit_of_work(immediate=True)`, which issues `BEGIN IMMEDIATE` on SQLite so they wait on the busy timeout instead of failing with "database is locked" when another writer commits in between. Plain reads stay deferred; PostgreSQL is unchanged.
 - Alembic is the authoritative schema-evolution mechanism. The shared
   `repositories.schemas.Base.metadata` is the autogenerate source of truth;
   application startup and explicit initialization never use `create_all()`.
@@ -286,7 +287,7 @@ erDiagram
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
 - Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`. One observation (marker, date, value, unit) is stored once even when several sections restate it; differing sources are kept as `source: merged` in the lab timeline. Migration `202611010001` collapsed previously duplicated rows.
-- Metadata-tab images, JSON and documents are stored as bytes in `clinical_session_attachments`, scoped to a session and its version (unique on session, version and SHA-256, so repeated uploads are idempotent) and removed with the session or version by cascade.
+- Metadata-tab images, JSON and documents are stored as bytes in `clinical_session_attachments`, scoped to a session and its version (unique on session, version and SHA-256, so repeated uploads are idempotent) and removed with the session or version by cascade. The stored media type and kind are derived server-side from the file extension and verified image signature (`services/inspection/attachment_policy.py`), never from the client declaration; active formats (HTML, SVG, XML, scripts, executables) are rejected.
 - Access-key ciphertext remains in the database; versioned Fernet key material is stored in the protected `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
 - FDA DILIrank 2.0 rows are stored in `dilirank_records` as a source-complete snapshot. `ltkb_id` is unique. `drug_id` is nullable so unmatched or ambiguous FDA rows remain inspectable without inventing a canonical drug mapping. A linked row also receives a `drug_identifiers` entry using identifier system `dilirank_ltkb`.
@@ -317,7 +318,7 @@ storage remains.
   drug-identity resolution, runtime vocabulary observations, and knowledge
   match-cache updates. `ClinicalSessionRepository` persists resolved drug
   mentions and does not learn catalog aliases while saving a session.
-- `DataInspectionService` coordinates cross-repository inspection responses and owns the canonical update-job dispatch for RxNav, LiverTox, terminology, DILIrank, and RAG; it combines clinical session detail with revision records rather than making either repository depend on the other. Session deletion follows the same ownership boundary: it asks `SessionRevisionRepository` to remove revision-owned rows before `ClinicalSessionRepository` removes the session.
+- `DataInspectionService` coordinates cross-repository inspection responses and owns the canonical update-job dispatch for RxNav, LiverTox, terminology, DILIrank, and RAG; it combines clinical session detail with revision records rather than making either repository depend on the other. Session deletion follows the same ownership boundary inside one transaction: `SessionRevisionRepository` removes only the revision rows the session owns and `ClinicalSessionRepository` removes the session, so any failure rolls both back. A session with surviving child sessions is refused (409) to preserve their lineage; delete the children first.
 - The combined structured-source job is the backend orchestration boundary for `RxNav -> LiverTox -> Terminology -> DILIrank`; RAG remains independent. Its child progress is exposed through the same inspection job status contract.
 - Feature-specific file serialization remains separate from SQLAlchemy persistence. `RepositoryContext` supplies the shared engine/session factory, and application services receive only the focused repositories they need. Transactions remain explicit at the repository boundary, including atomic session persistence and batch ingestion.
 - `repositories/serialization` is a mixed historical package: pure row and

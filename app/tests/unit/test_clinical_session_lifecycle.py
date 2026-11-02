@@ -300,6 +300,40 @@ def test_cancelling_one_session_leaves_others_running(client, analyses, monkeypa
 
 
 ###############################################################################
+def test_cancel_before_worker_start_releases_slot_and_admits_next(
+    client, analyses, monkeypatch
+) -> None:
+    monkeypatch.setattr(get_clinical_scheduler(), "limit_provider", lambda: 1)
+    manager = get_job_manager()
+    original_run_job = manager.run_job
+    entered, release = threading.Event(), threading.Event()
+    calls: list[str] = []
+
+    def paused_run_job(job_id, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        calls.append(job_id)
+        if len(calls) == 1:
+            entered.set()
+            assert release.wait(timeout=5)
+        original_run_job(job_id, *args, **kwargs)
+
+    monkeypatch.setattr(manager, "run_job", paused_run_job)
+    first = launch(client, "P1")
+    second = launch(client, "P2")
+    assert entered.wait(timeout=5)
+
+    requested = client.post(f"/api/clinical/sessions/{first}/cancel").json()
+    assert requested["status"] == "running"
+    release.set()
+
+    assert wait_for_status(client, first, TERMINAL)["status"] == "cancelled"
+    wait_for_status(client, second, {"running"})
+    wait_until(lambda: analyses.started == ["P2"])
+    assert len(calls) == 2
+    repository = ClinicalSessionRepository(RepositoryContext.create())
+    assert repository.count_sessions_with_status("running") == 1
+
+
+###############################################################################
 def test_concurrent_runs_keep_their_own_results(client, analyses) -> None:
     left, right = launch(client, "L"), launch(client, "R")
     wait_for_status(client, left, {"running"})

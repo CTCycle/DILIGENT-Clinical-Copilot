@@ -21,12 +21,13 @@ import {
   deleteInspectionSession,
   deleteSessionAttachment,
   fetchClinicalSessionDetail,
+  fetchSessionAttachmentBlob,
   fetchSessionAttachments,
   manualEditClinicalSessionReport,
-  sessionAttachmentContentUrl,
   updateClinicalSession,
   uploadSessionAttachment,
 } from '../../core/services/clinical-sessions-api';
+import { ApiHttpError } from '../../core/services/http-api';
 import {
   fetchInspectionLiverToxCatalog,
   fetchInspectionRxNavCatalog,
@@ -193,6 +194,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly documentAttachments = computed(() => this.attachments().filter((item) => item.kind !== 'image'));
   readonly activeSection = signal<ClinicalSessionSection>('preview');
   readonly saveStatus = signal('');
+  readonly staleEditDetected = signal(false);
   readonly deletingSessionId = signal<number | null>(null);
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
   readonly terminologyDecisionPending = signal(false);
@@ -337,6 +339,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.editorRedoStack = [];
       this.editorViewMode.set('source');
       this.manualEditReviewerNote.set('');
+      this.staleEditDetected.set(false);
       this.manualEditEditedBy.set(this.defaultReviewerLabel(detail));
       this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(detail.metadata || {}), null, 2));
       this.activeSection.set(section);
@@ -372,7 +375,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         await this.ensureSelectedSessionVisible();
       }
     } catch (error) {
-      this.listError.set(formatUnknownError(error, 'Failed to delete clinical session.'));
+      this.listError.set(
+        error instanceof ApiHttpError && error.statusCode === 409
+          ? '[ERROR] This session cannot be deleted while it is running or has revised child sessions. Delete the child sessions first.'
+          : formatUnknownError(error, 'Failed to delete clinical session.'),
+      );
     } finally {
       this.deletingSessionId.set(null);
     }
@@ -831,6 +838,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const response = await manualEditClinicalSessionReport(detail.session_id, {
         report_text: persistedEditorValue,
+        expected_version: detail.version,
         edited_fields: ['report_text'],
         reviewer_note: this.manualEditReviewerNote().trim() || null,
         edited_by: this.manualEditEditedBy().trim() || null,
@@ -851,9 +859,32 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionArtifacts.set([]);
       this.revisionDraftReport.set('');
       void this.loadPersistedRevision(response.session.session_id, revisionLoadGeneration);
+      this.staleEditDetected.set(false);
       this.saveStatus.set('Manual report edit saved.');
     } catch (error) {
+      if (error instanceof ApiHttpError && error.statusCode === 409) {
+        this.staleEditDetected.set(true);
+        this.saveStatus.set(
+          '[ERROR] The report changed since you opened it. Reload the latest version; your draft is kept.',
+        );
+        return;
+      }
       this.saveStatus.set(formatUnknownError(error, 'Failed to save manual report edit.'));
+    }
+  }
+
+  /** Refetch the latest session without discarding the unsaved editor draft. */
+  async reloadLatestSession(): Promise<void> {
+    const detail = this.selected();
+    if (!detail) return;
+    try {
+      const latest = await fetchClinicalSessionDetail(detail.session_id);
+      this.selected.set(latest);
+      this.store.patch(latest.session_id, { version: latest.version });
+      this.staleEditDetected.set(false);
+      this.saveStatus.set('Latest report loaded. Your draft was kept; review it before saving.');
+    } catch (error) {
+      this.saveStatus.set(formatUnknownError(error, 'Failed to reload the latest report.'));
     }
   }
 
@@ -1014,8 +1045,18 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
 
-  attachmentUrl(item: ClinicalSessionAttachment): string {
-    return sessionAttachmentContentUrl(item.session_id, item.attachment_id);
+  async downloadAttachment(item: ClinicalSessionAttachment): Promise<void> {
+    try {
+      const blob = await fetchSessionAttachmentBlob(item.session_id, item.attachment_id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = item.file_name;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      this.metadataSaveStatus.set(formatUnknownError(error, 'Failed to download attachment.'));
+    }
   }
 
   private async loadAttachments(sessionId: number, generation: number): Promise<void> {

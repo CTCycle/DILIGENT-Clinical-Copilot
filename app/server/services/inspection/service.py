@@ -20,14 +20,23 @@ from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.inspection import InspectionJobPhase
-from repositories.clinical_session_repository import ClinicalSessionRepository
+from repositories.clinical_session_repository import (
+    ClinicalSessionRepository,
+    SessionStateConflictError,
+)
+from repositories.database.session import unit_of_work
 from repositories.context import RepositoryContext
 from repositories.values import ACTIVE_SESSION_STATUSES
 from repositories.dilirank_repository import DiliRankRepository
 from repositories.terminology_repository import TerminologyRepository
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
-from repositories.session_revision_repository import SessionRevisionRepository
+from repositories.session_revision_repository import (
+    SessionLineageConflictError,
+    SessionRevisionRepository,
+    StaleReportVersionError,
+)
+from services.inspection.attachment_policy import validate_upload
 from repositories.session_timeline_repository import SessionTimelineRepository
 from repositories.serialization.document_serializer import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
@@ -241,12 +250,18 @@ class DataInspectionService(
         edited_fields: list[str] | None = None,
         reviewer_note: str | None = None,
         edited_by: str | None = None,
+        expected_version: int | None = None,
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
         resolved_report_text = str(report_text or "").strip() or None
         if resolved_report_text is not None:
-            updated = self.session_revision_repository.update_current_report_text_with_manual_audit(
+            if expected_version is None:
+                raise ServiceConflictError(
+                    "The report version is required to edit a report."
+                )
+            updated = self._save_manual_report_edit(
                 session_id,
+                expected_version=expected_version,
                 report_text=resolved_report_text,
                 edited_fields=edited_fields,
                 reviewer_note=reviewer_note,
@@ -265,10 +280,22 @@ class DataInspectionService(
         return self._session_detail_with_manual_edit_history(session_id)
 
     # -------------------------------------------------------------------------
+    def _save_manual_report_edit(
+        self, session_id: int, **edit: Any
+    ) -> dict[str, Any] | None:
+        try:
+            return self.session_revision_repository.update_current_report_text_with_manual_audit(
+                session_id, **edit
+            )
+        except StaleReportVersionError as exc:
+            raise ServiceConflictError(str(exc)) from exc
+
+    # -------------------------------------------------------------------------
     def manual_edit_report(
         self,
         session_id: int,
         *,
+        expected_version: int,
         report_text: str,
         edited_fields: list[str] | None,
         reviewer_note: str | None,
@@ -278,8 +305,9 @@ class DataInspectionService(
         state = self.clinical_session_repository.get_session_state(session_id)
         if state is not None and not state["has_report"]:
             raise ServiceConflictError("Only a session with a report can be edited.")
-        updated = self.session_revision_repository.update_current_report_text_with_manual_audit(
+        updated = self._save_manual_report_edit(
             session_id,
+            expected_version=expected_version,
             report_text=report_text,
             edited_fields=edited_fields,
             reviewer_note=reviewer_note,
@@ -303,7 +331,6 @@ class DataInspectionService(
         session_id: int,
         *,
         file_name: str,
-        media_type: str,
         content: bytes,
     ) -> dict[str, Any] | None:
         version = self.session_revision_repository.get_version_record_for_session(
@@ -311,19 +338,13 @@ class DataInspectionService(
         )
         if version is None:
             return None
-        lowered_name = file_name.lower()
-        if media_type.startswith("image/"):
-            kind = "image"
-        elif media_type == "application/json" or lowered_name.endswith(".json"):
-            kind = "json"
-        else:
-            kind = "document"
+        policy = validate_upload(file_name, content)
         return self.clinical_session_repository.add_attachment(
             session_id,
             version_id=int(version["version_id"]),
-            kind=kind,
-            file_name=file_name,
-            media_type=media_type,
+            kind=policy.kind,
+            file_name=policy.file_name,
+            media_type=policy.media_type,
             content=content,
         )
 
@@ -348,8 +369,19 @@ class DataInspectionService(
             raise ServiceConflictError(
                 "Cancel this analysis before deleting its session."
             )
-        self.session_revision_repository.delete_session_revisions(session_id)
-        return self.clinical_session_repository.delete_session(session_id)
+        try:
+            with unit_of_work(
+                session_factory=self.clinical_session_repository.session_factory,
+                immediate=True,
+            ) as db_session:
+                self.session_revision_repository.delete_session_revisions(
+                    db_session, session_id
+                )
+                return self.clinical_session_repository.delete_session(
+                    session_id, db_session=db_session
+                )
+        except (SessionLineageConflictError, SessionStateConflictError) as exc:
+            raise ServiceConflictError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
     def list_rxnav_catalog(

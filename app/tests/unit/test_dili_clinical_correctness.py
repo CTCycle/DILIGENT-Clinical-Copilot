@@ -539,6 +539,135 @@ def test_hys_law_uses_alp_at_aminotransferase_rise() -> None:
 
 
 ###############################################################################
+def _hys_assessment(labs: list[ClinicalLabEntry], source_text: str = ""):
+    drugs = [DrugEntry(name="Drug A", therapy_start_date="2024-01-05")]
+    patient_labs = PatientLabTimeline(entries=labs)
+    return HysLawDetector().assess(
+        labs=patient_labs,
+        differential=DiliDifferentialAssessment(all_major_causes_excluded=True),
+        timeline=DiliTimelineEngine().build(drugs, patient_labs),
+        drugs=drugs,
+        source_text=source_text,
+    )
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("bilirubin_date", "status", "same_episode"),
+    [
+        ("2024-03-01", "meets_criteria", True),  # concurrent rise
+        ("2024-03-08", "meets_criteria", True),  # +7 days
+        ("2024-03-22", "meets_criteria", True),  # +21 days, rejected by the old 14-day cutoff
+        ("2024-03-29", "meets_criteria", True),  # +28 days
+        ("2024-03-31", "meets_criteria", True),  # +30 days, inclusive boundary
+        ("2024-04-01", "not_met", False),  # +31 days
+        ("2024-02-25", "not_met", False),  # bilirubin precedes the ALT rise
+        ("2024-07-01", "not_met", False),  # unrelated elevation months later
+    ],
+)
+def test_hys_law_pairs_bilirubin_within_lag_window_after_aminotransferase(
+    bilirubin_date: str, status: str, same_episode: bool
+) -> None:
+    # EASL 2019 / FDA 2009: bilirubin may rise weeks after ALT; window is 0-30 days.
+    result = _hys_assessment(
+        [
+            _lab("ALT", 600, 40, "2024-03-01"),
+            _lab("ALP", 140, 120, "2024-03-01"),
+            _lab("TBIL", 4.0, 1.2, bilirubin_date, "mg/dL"),
+        ]
+    )
+
+    assert (result.status, result.same_episode) == (status, same_episode)
+
+
+###############################################################################
+def test_hys_law_ignores_unrelated_episodes_when_pairing() -> None:
+    # Early ALT rise with late unrelated bilirubin must not pair; the later
+    # ALT rise with its own bilirubin does.
+    result = _hys_assessment(
+        [
+            _lab("ALT", 300, 40, "2024-02-01"),
+            _lab("ALT", 30, 40, "2024-03-01"),
+            _lab("ALT", 500, 40, "2024-06-01"),
+            _lab("TBIL", 4.0, 1.2, "2024-06-10", "mg/dL"),
+            _lab("ALP", 140, 120, "2024-06-01"),
+        ]
+    )
+
+    assert result.status == "meets_criteria"
+    assert any("2024-06-01" in item and "2024-06-10" in item for item in result.rationale)
+
+
+###############################################################################
+@pytest.mark.parametrize("missing_date", [None, "not a date"])
+@pytest.mark.parametrize("undated", ["ALT", "TBIL"])
+def test_hys_law_missing_or_unparseable_dates_are_indeterminate(
+    undated: str, missing_date: str | None
+) -> None:
+    labs = [
+        _lab("ALT", 600, 40, "2024-03-01"),
+        _lab("TBIL", 4.0, 1.2, "2024-03-02", "mg/dL"),
+    ]
+    # A dated pair would qualify; the extra undated elevation must not be hidden,
+    # and an undated-only member must never produce meets_criteria.
+    only_undated = [
+        lab.model_copy(update={"sample_date": missing_date})
+        if lab.marker_name == undated
+        else lab
+        for lab in labs
+    ]
+
+    result = _hys_assessment(only_undated)
+
+    assert result.status == "not_assessable"
+    assert result.same_episode is None
+    assert any("indeterminate" in item for item in result.rationale)
+
+
+###############################################################################
+def test_hys_law_abnormal_baseline_is_judged_relative_to_baseline() -> None:
+    # Pre-exposure ALT 3x ULN and TBIL 1.5x ULN: later ALT 6x / TBIL 2.5x are
+    # below 3x / 2x their baselines, so no Hy's Law signal.
+    chronic = [
+        _lab("ALT", 120, 40, "2023-12-01"),
+        _lab("TBIL", 1.8, 1.2, "2023-12-01", "mg/dL"),
+        _lab("ALT", 240, 40, "2024-03-01"),
+        _lab("TBIL", 3.0, 1.2, "2024-03-02", "mg/dL"),
+        _lab("ALP", 100, 120, "2024-03-01"),
+    ]
+    above_baseline = [
+        _lab("ALT", 120, 40, "2023-12-01"),
+        _lab("TBIL", 1.8, 1.2, "2023-12-01", "mg/dL"),
+        _lab("ALT", 400, 40, "2024-03-01"),
+        _lab("TBIL", 4.0, 1.2, "2024-03-02", "mg/dL"),
+        _lab("ALP", 100, 120, "2024-03-01"),
+    ]
+
+    assert _hys_assessment(chronic).status == "not_met"
+    assert _hys_assessment(above_baseline).status == "meets_criteria"
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("text", "signal"),
+    [
+        ("Patient enrolled in a clinical trial of drug X.", "clinical_trial_signal"),
+        ("Trial medication was started in March.", "clinical_trial_signal"),
+        ("Randomized to the study arm B.", "clinical_trial_signal"),
+        ("Received an investigational agent.", "clinical_trial_signal"),
+        ("History of atrial fibrillation.", "individual_patient_risk_flag"),
+        ("Paroxysmal atrial flutter on apixaban.", "individual_patient_risk_flag"),
+        ("A trial of diet modification failed.", "individual_patient_risk_flag"),
+        ("Atrial septal defect repaired in childhood.", "individual_patient_risk_flag"),
+    ],
+)
+def test_hys_law_trial_context_uses_word_bounded_terms(text: str, signal: str) -> None:
+    labs = [_lab("ALT", 600, 40, "2024-03-01"), _lab("TBIL", 4.0, 1.2, "2024-03-02", "mg/dL")]
+
+    assert _hys_assessment(labs, text).signal_context == signal
+
+
+###############################################################################
 @pytest.mark.parametrize(
     ("text", "labs", "grade"),
     [

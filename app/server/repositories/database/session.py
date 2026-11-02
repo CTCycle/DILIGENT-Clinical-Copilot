@@ -6,9 +6,10 @@ from __future__ import annotations
 from contextlib import contextmanager
 from collections.abc import Iterator
 from functools import lru_cache
+from typing import Any
 
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from configurations.startup import get_server_settings
 from repositories.database.postgres import PostgresRepository
@@ -49,13 +50,40 @@ def resolve_session_factory(
 
 
 ###############################################################################
+def begin_immediate_write(db_session: Session) -> None:
+    """Take SQLite's write lock before the transaction's first read.
+
+    Deferred transactions that read and then write fail at once with "database
+    is locked" when another writer commits in between. BEGIN IMMEDIATE waits on
+    the busy timeout instead. Must run before any other statement in the
+    session; PostgreSQL is left unchanged.
+    """
+    connection = db_session.connection()
+    if connection.dialect.name != "sqlite":
+        return
+    driver_connection: Any = connection.connection.driver_connection
+    previous_autocommit = getattr(driver_connection, "autocommit", None)
+    if previous_autocommit is not None:
+        driver_connection.autocommit = True
+    try:
+        driver_connection.execute("BEGIN IMMEDIATE")
+    finally:
+        if previous_autocommit is not None:
+            driver_connection.autocommit = previous_autocommit
+
+
+###############################################################################
 @contextmanager
 def unit_of_work(
     *,
     engine: Engine | None = None,
     session_factory: sessionmaker | None = None,
+    immediate: bool = False,
 ) -> Iterator:
-    """Own one transaction and never commit behind the caller's back."""
+    """Own one transaction and never commit behind the caller's back.
+
+    Set ``immediate`` for transactions that read before they write.
+    """
     factory = resolve_session_factory(
         engine=engine,
         session_factory=session_factory,
@@ -63,6 +91,8 @@ def unit_of_work(
     )
     db_session = factory()
     try:
+        if immediate:
+            begin_immediate_write(db_session)
         yield db_session
         db_session.commit()
     except Exception:

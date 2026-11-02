@@ -1047,6 +1047,9 @@ def test_revision_uses_latest_manual_edit_version(tmp_path: Path) -> None:
 
     serializer.session_revision_repository.update_current_report_text_with_manual_audit(
         session_id,
+        expected_version=serializer.clinical_session_repository.get_session_detail(
+            session_id
+        )["version"],
         report_text="Manually corrected DILI report.",
         edited_fields=["report_text"],
         reviewer_note="Corrected wording.",
@@ -1114,6 +1117,9 @@ def test_manual_edit_skips_orphaned_revision_version_numbers(tmp_path: Path) -> 
 
     serializer.session_revision_repository.update_current_report_text_with_manual_audit(
         session_id,
+        expected_version=serializer.clinical_session_repository.get_session_detail(
+            session_id
+        )["version"],
         report_text="Manually corrected after failed revisions.",
         edited_fields=["report_text"],
         reviewer_note="Corrected wording.",
@@ -1921,6 +1927,9 @@ def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:
     assert original is not None
     serializer.session_revision_repository.update_current_report_text_with_manual_audit(
         session_id,
+        expected_version=serializer.clinical_session_repository.get_session_detail(
+            session_id
+        )["version"],
         report_text="Manually corrected DILI report.",
         edited_fields=["report_text"],
         reviewer_note="Create a newer source version.",

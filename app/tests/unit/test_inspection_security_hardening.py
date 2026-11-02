@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -23,6 +24,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from repositories.drug_catalog_repository import _build_search_pattern
 from services.inspection import DataInspectionService
+from services.inspection.attachment_policy import validate_upload
 
 
 ###############################################################################
@@ -524,3 +526,173 @@ def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
         "DELETE",
         "/inspection/reference-catalogs/runtime-observations/{category}/{term}",
     ) in routes
+
+
+###############################################################################
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+
+
+###############################################################################
+class AttachmentServiceStub:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.rows: dict[int, tuple[dict[str, Any], bytes]] = {}
+
+    # -------------------------------------------------------------------------
+    def add_session_attachment(
+        self, session_id: int, *, file_name: str, content: bytes
+    ) -> dict[str, Any]:
+        policy = validate_upload(file_name, content)
+        attachment_id = len(self.rows) + 1
+        summary = {
+            "attachment_id": attachment_id,
+            "session_id": session_id,
+            "version_id": 1,
+            "kind": policy.kind,
+            "file_name": policy.file_name,
+            "media_type": policy.media_type,
+            "size_bytes": len(content),
+            "sha256": "0" * 64,
+            "created_at": None,
+        }
+        self.rows[attachment_id] = (summary, content)
+        return summary
+
+    # -------------------------------------------------------------------------
+    def get_session_attachment_content(
+        self, session_id: int, attachment_id: int
+    ) -> tuple[dict[str, Any], bytes] | None:
+        return self.rows.get(attachment_id)
+
+
+###############################################################################
+@pytest.fixture
+def attachment_client() -> Any:
+    stub = AttachmentServiceStub()
+    endpoint = get_route_owner(data_inspection.router, "/sessions/{session_id}/attachments")
+    original_service = endpoint.service
+    endpoint.service = stub
+    app = FastAPI()
+    app.include_router(data_inspection.router)
+    try:
+        yield TestClient(app), stub
+    finally:
+        endpoint.service = original_service
+
+
+# -----------------------------------------------------------------------------
+def upload_attachment(client: TestClient, file_name: str, content: bytes) -> Any:
+    return client.post(
+        "/inspection/sessions/1/attachments",
+        json={
+            "file_name": file_name,
+            "media_type": "text/html",
+            "content_base64": base64.b64encode(content).decode(),
+        },
+    )
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    "file_name", ["page.html", "logo.SVG", "feed.xml", "run.js", "x.hta", "a.xhtml"]
+)
+def test_attachment_upload_rejects_active_formats(
+    attachment_client: Any, file_name: str
+) -> None:
+    client, stub = attachment_client
+
+    response = upload_attachment(client, file_name, b"<script>alert(1)</script>")
+
+    assert response.status_code == 422
+    assert "not allowed" in response.json()["detail"]
+    assert not stub.rows
+
+
+# -----------------------------------------------------------------------------
+def test_attachment_upload_rejects_spoofed_image(attachment_client: Any) -> None:
+    client, stub = attachment_client
+
+    response = upload_attachment(client, "photo.png", b"<html><script>1</script>")
+
+    assert response.status_code == 422
+    assert "image format" in response.json()["detail"]
+    assert not stub.rows
+
+
+# -----------------------------------------------------------------------------
+def test_attachment_png_is_served_inline_with_verified_type(
+    attachment_client: Any,
+) -> None:
+    client, _ = attachment_client
+    stored = upload_attachment(client, "scan.png", PNG_BYTES).json()
+
+    response = client.get(f"/inspection/sessions/1/attachments/{stored['attachment_id']}")
+
+    assert stored["kind"] == "image"
+    assert stored["media_type"] == "image/png"
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["content-disposition"].startswith("inline;")
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["content-security-policy"] == "default-src 'none'; sandbox"
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("file_name", "kind", "media_type"),
+    [
+        ("report.pdf", "document", "application/pdf"),
+        ("data.json", "json", "application/json"),
+        ("blob.bin", "document", "application/octet-stream"),
+    ],
+)
+def test_attachment_documents_are_downloaded_not_inlined(
+    attachment_client: Any, file_name: str, kind: str, media_type: str
+) -> None:
+    client, _ = attachment_client
+    stored = upload_attachment(client, file_name, b"%PDF-1.4").json()
+
+    response = client.get(f"/inspection/sessions/1/attachments/{stored['attachment_id']}")
+
+    assert stored["kind"] == kind
+    assert response.headers["content-type"] == media_type
+    assert response.headers["content-disposition"].startswith("attachment;")
+    assert response.headers["content-security-policy"] == "default-src 'none'; sandbox"
+
+
+# -----------------------------------------------------------------------------
+def test_legacy_html_attachment_is_served_as_inert_download(
+    attachment_client: Any,
+) -> None:
+    client, stub = attachment_client
+    summary = {
+        "attachment_id": 7,
+        "file_name": "legacy.html",
+        "media_type": "text/html",
+        "kind": "document",
+    }
+    stub.rows[7] = (summary, b"<script>alert(1)</script>")
+
+    response = client.get("/inspection/sessions/1/attachments/7")
+
+    assert response.headers["content-type"] == "application/octet-stream"
+    assert response.headers["content-disposition"].startswith("attachment;")
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+# -----------------------------------------------------------------------------
+def test_attachment_file_name_cannot_inject_headers(attachment_client: Any) -> None:
+    client, _ = attachment_client
+    hostile_name = '..\\evil/rep\r\nX-Injected: 1"ört.pdf'
+    stored = upload_attachment(client, hostile_name, b"%PDF-1.4").json()
+
+    response = client.get(f"/inspection/sessions/1/attachments/{stored['attachment_id']}")
+
+    disposition = response.headers["content-disposition"]
+    assert stored["file_name"] == 'repX-Injected: 1"ört.pdf'
+    assert "x-injected" not in response.headers
+    assert '/' not in stored["file_name"] and "\r" not in stored["file_name"]
+    ascii_part, _, encoded_part = disposition.partition("; filename*=UTF-8''")
+    assert ascii_part == 'attachment; filename="repX-Injected: 1__rt.pdf"'
+    assert encoded_part == "repX-Injected%3A%201%22%C3%B6rt.pdf"

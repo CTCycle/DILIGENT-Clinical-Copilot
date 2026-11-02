@@ -936,6 +936,16 @@
   gap: var(--space-md);
 }
 
+.clinical-session-attachment-download {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .clinical-session-attachment-remove {
   border: 0;
   background: transparent;

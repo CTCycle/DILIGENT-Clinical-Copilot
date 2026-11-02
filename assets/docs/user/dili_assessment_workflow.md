@@ -102,6 +102,9 @@ status, and the actions that apply:
 A collapsible **Clinical input** section shows exactly what was submitted.
 You can leave the page, refresh, or close the browser: reopening the report
 (or the session in Clinical Sessions) reconnects to the live progress.
+If the connection to the backend drops, the page keeps the last loaded state
+and shows **Connection lost, retrying…**; after repeated failures it shows
+**Updates paused** with a **Reconnect** button.
 
 ## Save And Reopen A Draft
 

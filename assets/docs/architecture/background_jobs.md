@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -173,7 +173,10 @@ stateDiagram-v2
 - **Cancellation** is cooperative. A queued session is cancelled immediately.
   A running one keeps `running` with `stop_requested` until the worker reaches
   a checkpoint; an in-flight provider call is not aborted. Its capacity slot
-  stays occupied until then.
+  stays occupied until then. A job cancelled after the claim but before its
+  worker enters the runner calls the job's `on_cancelled_before_start`
+  callback, which persists the session through the guarded transition and
+  dispatches the next queued session, so no `running` row is left unowned.
 - **Failure.** Failed runs persist the sanitized `error` (`clinical_job_failed`
   or `validation_failed`) and the existing failure payload. The session keeps
   its clinician-entered input; intermediate extraction artifacts are not

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
 from common.utils.text_utils import normalize_drug_name
+from repositories.database.session import unit_of_work
 from repositories import values as repository_values
 from repositories.context import RepositoryContext
 from repositories.schemas.clinical import (
@@ -45,6 +46,18 @@ def _build_search_pattern(value: str | None) -> str | None:
 ###############################################################################
 class SessionStateConflictError(RuntimeError):
     """A lifecycle guard rejected a write because the session state changed."""
+
+
+###############################################################################
+def _report_exists(session_id: Any) -> Any:
+    """A session has a report when any of its versions has non-empty report text."""
+    return exists(
+        select(1).where(
+            ClinicalSessionVersion.session_id == session_id,
+            ClinicalSessionVersion.report_text.isnot(None),
+            ClinicalSessionVersion.report_text != "",
+        )
+    )
 
 
 ###############################################################################
@@ -533,17 +546,7 @@ class ClinicalSessionRepository:
             if row is None:
                 return None
             has_report = bool(
-                db_session.execute(
-                    select(
-                        exists(
-                            select(1).where(
-                                ClinicalSessionVersion.session_id == row.id,
-                                ClinicalSessionVersion.report_text.isnot(None),
-                                ClinicalSessionVersion.report_text != "",
-                            )
-                        )
-                    )
-                ).scalar()
+                db_session.execute(select(_report_exists(row.id))).scalar()
             )
             queue_position = None
             if row.session_status == "queued":
@@ -681,12 +684,7 @@ class ClinicalSessionRepository:
         }.get(sort or "", (ClinicalSession.updated_at.desc(), ClinicalSession.id.desc()))
         db_session = self.session_factory()
         try:
-            report_exists = exists(
-                select(1).where(
-                    ClinicalSessionVersion.session_id == ClinicalSession.id,
-                    ClinicalSessionVersion.report_text.isnot(None),
-                )
-            )
+            report_exists = _report_exists(ClinicalSession.id)
             timeline_exists = exists(
                 select(1).where(
                     ClinicalSessionTimeline.session_id == ClinicalSession.id
@@ -994,19 +992,25 @@ class ClinicalSessionRepository:
             return True
 
     # -------------------------------------------------------------------------
-    def delete_session(self, session_id: int) -> bool:
-        safe_session_id = int(session_id)
-        with self.session_factory() as db_session:
-            existing = db_session.get(ClinicalSession, safe_session_id)
-            if existing is None:
-                return False
-            if existing.session_status in repository_values.ACTIVE_SESSION_STATUSES:
-                raise SessionStateConflictError(
-                    "An active clinical session cannot be deleted."
-                )
-            db_session.delete(existing)
-            db_session.commit()
-            return True
+    def delete_session(
+        self, session_id: int, *, db_session: Session | None = None
+    ) -> bool:
+        """Delete one session, inside the caller's transaction when given."""
+        if db_session is None:
+            with unit_of_work(
+                session_factory=self.session_factory, immediate=True
+            ) as owned_session:
+                return self.delete_session(session_id, db_session=owned_session)
+        existing = db_session.get(ClinicalSession, int(session_id))
+        if existing is None:
+            return False
+        if existing.session_status in repository_values.ACTIVE_SESSION_STATUSES:
+            raise SessionStateConflictError(
+                "An active clinical session cannot be deleted."
+            )
+        db_session.delete(existing)
+        db_session.flush()
+        return True
 
     # -------------------------------------------------------------------------
     def persist_session_sections(

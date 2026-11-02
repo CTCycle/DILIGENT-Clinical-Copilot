@@ -343,7 +343,7 @@
                       <ul>
                         @for (item of imageAttachments(); track item.attachment_id) {
                           <li>
-                            <a [href]="attachmentUrl(item)" target="_blank" rel="noopener">{{ item.file_name }}</a>
+                            <button type="button" class="clinical-session-attachment-download" [attr.aria-label]="'Download ' + item.file_name" [title]="'Download ' + item.file_name" (click)="downloadAttachment(item)">{{ item.file_name }}</button>
                             <button type="button" class="clinical-session-attachment-remove" [attr.aria-label]="'Remove ' + item.file_name" [title]="'Remove ' + item.file_name" (click)="removeAttachment(item)">Remove</button>
                           </li>
                         }
@@ -376,7 +376,7 @@
                       <ul>
                         @for (item of documentAttachments(); track item.attachment_id) {
                           <li>
-                            <a [href]="attachmentUrl(item)" target="_blank" rel="noopener">{{ item.file_name }}</a>
+                            <button type="button" class="clinical-session-attachment-download" [attr.aria-label]="'Download ' + item.file_name" [title]="'Download ' + item.file_name" (click)="downloadAttachment(item)">{{ item.file_name }}</button>
                             <button type="button" class="clinical-session-attachment-remove" [attr.aria-label]="'Remove ' + item.file_name" [title]="'Remove ' + item.file_name" (click)="removeAttachment(item)">Remove</button>
                           </li>
                         }
@@ -491,6 +491,9 @@
 
         @if (saveStatus()) {
           <p class="clinical-sessions-status">{{ saveStatus() }}</p>
+        }
+        @if (staleEditDetected()) {
+          <button type="button" (click)="reloadLatestSession()">Reload latest</button>
         }
       } @else {
         <p class="clinical-sessions-empty">Select a session to begin.</p>

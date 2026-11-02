@@ -132,9 +132,9 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - `GET /api/inspection/sessions/{session_id}/versions`
 - `GET /api/inspection/sessions/{session_id}/versions/{version_id}`
 - `PUT /api/inspection/sessions/{session_id}`
-- `PUT /api/inspection/sessions/{session_id}/report`
+- `PUT /api/inspection/sessions/{session_id}/report` (requires `expected_version`; a stale version returns 409)
 - `GET /api/inspection/sessions/{session_id}/manual-edits`
-- `GET|POST /api/inspection/sessions/{session_id}/attachments` and `GET|DELETE .../attachments/{attachment_id}` (base64 JSON upload, 10 MB limit, idempotent by content hash)
+- `GET|POST /api/inspection/sessions/{session_id}/attachments` and `GET|DELETE .../attachments/{attachment_id}` (base64 JSON upload, 10 MB limit, idempotent by content hash; active formats return 422; verified raster images are served inline and everything else as a download, with `Cache-Control: no-store`, `nosniff`, and a sandboxing CSP; clients fetch content through the authenticated HTTP helper, never by bare link)
 - `POST /api/inspection/sessions/{session_id}/revision/jobs`
 - `GET /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}`
 - `POST /api/inspection/sessions/revision/pipeline-runs/{pipeline_run_id}/retry`

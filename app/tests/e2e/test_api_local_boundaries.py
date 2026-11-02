@@ -475,12 +475,14 @@ def test_session_inspection_mutations_and_timeline_errors(
     assert api_context.delete(attachment_path).status == 200
     assert api_context.get(attachment_path).status == 404
 
+    session_path = f"/api/inspection/sessions/{session_id}"
     edited_report = f"{original_report}\n\nAPI boundary validation marker."
     try:
         report_update = api_context.put(
-            f"/api/inspection/sessions/{session_id}/report",
+            f"{session_path}/report",
             data={
                 "report_text": edited_report,
+                "expected_version": api_context.get(session_path).json()["version"],
                 "edited_fields": ["report_text"],
                 "reviewer_note": "Disposable API contract check.",
                 "edited_by": "validation",
@@ -508,6 +510,7 @@ def test_session_inspection_mutations_and_timeline_errors(
             f"/api/inspection/sessions/{session_id}/report",
             data={
                 "report_text": original_report,
+                "expected_version": api_context.get(session_path).json()["version"],
                 "edited_fields": ["report_text"],
                 "edited_by": "validation-cleanup",
             },
@@ -524,7 +527,7 @@ def test_session_inspection_mutations_and_timeline_errors(
         ),
         api_context.put(
             "/api/inspection/sessions/999999/report",
-            data={"report_text": "missing session"},
+            data={"report_text": "missing session", "expected_version": 1},
         ),
         api_context.delete("/api/inspection/sessions/999999"),
         api_context.get(

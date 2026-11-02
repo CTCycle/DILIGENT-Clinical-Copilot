@@ -71,6 +71,15 @@
       <p class="dili-report-note is-error" role="alert">{{ error }}</p>
     }
 
+    @if (connection() !== 'live') {
+      <div class="dili-report-connection" role="status" data-testid="connection-banner" [attr.data-state]="connection()">
+        <span>{{ connection() === 'retrying' ? 'Connection lost, retrying… Showing the last known state.' : 'Updates paused. Showing the last known state.' }}</span>
+        @if (connection() === 'disconnected') {
+          <button type="button" class="btn btn-secondary dili-report-button" (click)="reconnect()">Reconnect</button>
+        }
+      </div>
+    }
+
     <app-report-activity
       [status]="session.status"
       [error]="session.error"

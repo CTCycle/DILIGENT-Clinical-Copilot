@@ -12,7 +12,14 @@ import {
   ManualReportEditRequest,
   ManualReportEditResponse,
 } from "../models/inspection-types";
-import { buildQueryString, requestJson } from "./http-api";
+import {
+  ApiHttpError,
+  GENERIC_REQUEST_ERROR,
+  buildQueryString,
+  fetchWithTimeout,
+  parseApiResponse,
+  requestJson,
+} from "./http-api";
 
 export async function fetchInspectionSessions(
   query: InspectionSessionQuery,
@@ -88,11 +95,19 @@ function sessionAttachmentsUrl(sessionId: number): string {
   return `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/attachments`;
 }
 
-export function sessionAttachmentContentUrl(
+export async function fetchSessionAttachmentBlob(
   sessionId: number,
   attachmentId: number,
-): string {
-  return `${sessionAttachmentsUrl(sessionId)}/${encodeURIComponent(String(attachmentId))}`;
+): Promise<Blob> {
+  const response = await fetchWithTimeout(
+    `${sessionAttachmentsUrl(sessionId)}/${encodeURIComponent(String(attachmentId))}`,
+    { method: "GET" },
+  );
+  if (!response.ok) {
+    const result = await parseApiResponse(response);
+    throw new ApiHttpError(result.message || GENERIC_REQUEST_ERROR, response.status);
+  }
+  return response.blob();
 }
 
 export async function fetchSessionAttachments(

@@ -314,6 +314,7 @@ def test_inspection_detail_exposes_persisted_manual_edit_history() -> None:
     session_id = int(session_id)
     updated = repository_graph.session_revision_repository.update_current_report_text_with_manual_audit(
         session_id,
+        expected_version=1,
         report_text="Corrected report",
         edited_fields=["report_text"],
         reviewer_note="Corrected chronology.",
@@ -362,6 +363,7 @@ def test_manual_report_edit_without_metadata_preserves_session_metadata() -> Non
     service = build_service(repository_graph, jobs=JobManager())
     result = service.manual_edit_report(
         int(session_id),
+        expected_version=1,
         report_text="Corrected report",
         edited_fields=["report_text"],
         reviewer_note=None,
@@ -379,6 +381,7 @@ def test_manual_report_edit_missing_session_returns_none() -> None:
 
     updated = repository_graph.session_revision_repository.update_current_report_text_with_manual_audit(
         999999,
+        expected_version=1,
         report_text="Missing session report",
         edited_fields=["report_text"],
         reviewer_note=None,

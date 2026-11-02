@@ -130,6 +130,7 @@ export type ManualReportEditAudit = {
 
 export type ManualReportEditRequest = {
   report_text: string;
+  expected_version: number;
   edited_fields?: string[];
   reviewer_note?: string | null;
   edited_by?: string | null;

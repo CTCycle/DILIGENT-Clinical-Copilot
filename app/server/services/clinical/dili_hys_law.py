@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from domain.clinical.dili import (
@@ -18,6 +19,30 @@ from services.clinical.dili_timeline import DiliTimelineEngine
 # sample within this many days (FDA 2009: no initial cholestasis).
 ONSET_ALP_WINDOW_DAYS = 7
 
+# A qualifying bilirubin value pairs with an aminotransferase elevation when it
+# is dated on the same day or up to this many days after the aminotransferase
+# onset. Follows EASL 2019 / FDA 2009 guidance (bilirubin may rise weeks after
+# the aminotransferase rise); the exact window still needs clinician review.
+BILIRUBIN_LAG_WINDOW_DAYS = 30
+
+AMINOTRANSFERASE_MARKERS = {"ALT", "AST"}
+BILIRUBIN_MARKERS = {"BILIRUBIN", "TBIL"}
+AMINOTRANSFERASE_MULTIPLE = 3.0
+BILIRUBIN_MULTIPLE = 2.0
+
+# Word-bounded, contextual terms: "atrial fibrillation" or "trial of diet"
+# must not mark a patient as a clinical-trial case.
+CLINICAL_TRIAL_PATTERN = re.compile(
+    r"\b(clinical\s+trials?|trial\s+(drug|medication|participants?|participation)"
+    r"|(enrolled|participat\w+)\s+in\s+(a|an|the)\s+(\w+\s+){0,2}trial"
+    r"|study\s+(arm|drug)|investigational|randomi[sz]ed)\b",
+    re.IGNORECASE,
+)
+
+# (sample date or None when missing/unparseable, multiple of the reference)
+LabPoint = tuple[date | None, float]
+EpisodePair = tuple[tuple[date, float], tuple[date, float]]
+
 
 ###############################################################################
 class HysLawDetector:
@@ -32,16 +57,24 @@ class HysLawDetector:
         drugs: list[DrugEntry],
         source_text: str,
     ) -> DiliHysLawAssessment:
-        baseline_alt = self._first_multiple(labs, {"ALT", "AST"})
-        baseline_bili = self._first_multiple(labs, {"BILIRUBIN", "TBIL"})
-        peak_alt = self._peak_multiple(labs, {"ALT", "AST"})
-        peak_bili = self._peak_multiple(labs, {"BILIRUBIN", "TBIL"})
-        onset_date = self._first_qualifying_aminotransferase_date(labs)
+        baseline_alt = self._first_multiple(labs, AMINOTRANSFERASE_MARKERS)
+        baseline_bili = self._first_multiple(labs, BILIRUBIN_MARKERS)
+        peak_alt = self._peak_multiple(labs, AMINOTRANSFERASE_MARKERS)
+        peak_bili = self._peak_multiple(labs, BILIRUBIN_MARKERS)
+        exposure_start = self._exposure_start(drugs)
+        amino_points = self._qualifying_points(
+            labs, AMINOTRANSFERASE_MARKERS, AMINOTRANSFERASE_MULTIPLE, exposure_start
+        )
+        bili_points = self._qualifying_points(
+            labs, BILIRUBIN_MARKERS, BILIRUBIN_MULTIPLE, exposure_start, strict=True
+        )
+        pair = self._episode_pair(amino_points, bili_points)
+        onset_date = pair[0][0] if pair else self._first_date(amino_points)
         initial_alp = self._onset_alp_multiple(labs, onset_date)
 
-        amino_met = peak_alt >= 3 if peak_alt is not None else None
-        bilirubin_met = peak_bili > 2 if peak_bili is not None else None
-        same_episode = self._same_episode(onset_date, timeline)
+        amino_met = bool(amino_points) if peak_alt is not None else None
+        bilirubin_met = bool(bili_points) if peak_bili is not None else None
+        same_episode = self._same_episode(pair, amino_points, bili_points)
         initial_cholestasis = initial_alp >= 2 if initial_alp is not None else None
         cholestasis_excluded = (
             (initial_cholestasis is False) if initial_cholestasis is not None else None
@@ -60,10 +93,7 @@ class HysLawDetector:
         exposure_timing_compatible = bool(compatible_exposures) if drugs else None
         signal_context = (
             "clinical_trial_signal"
-            if any(
-                token in source_text.lower()
-                for token in ("trial", "study arm", "randomized")
-            )
+            if CLINICAL_TRIAL_PATTERN.search(source_text)
             else "individual_patient_risk_flag"
         )
 
@@ -97,6 +127,7 @@ class HysLawDetector:
                 f"Peak ALT/AST multiple: {peak_alt if peak_alt is not None else 'unavailable'}",
                 f"Peak bilirubin multiple: {peak_bili if peak_bili is not None else 'unavailable'}",
                 f"ALP multiple at the qualifying ALT/AST rise: {initial_alp if initial_alp is not None else 'unavailable'}",
+                self._pair_rationale(pair, same_episode, exposure_start),
                 "Hy's Law is a risk signal, not a standalone DILI diagnosis.",
             ],
         )
@@ -138,18 +169,129 @@ class HysLawDetector:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _first_qualifying_aminotransferase_date(labs: PatientLabTimeline) -> date | None:
-        qualifying = [
+    def _exposure_start(drugs: list[DrugEntry]) -> date | None:
+        starts = [
             parsed
-            for lab in labs.entries
-            if lab.marker_name.upper() in {"ALT", "AST"}
-            and lab.value is not None
-            and lab.upper_limit_normal
-            and float(lab.value) / float(lab.upper_limit_normal) >= 3
-            for parsed in [DiliTimelineEngine.parse_date(lab.sample_date)]
+            for drug in drugs
+            for parsed in [DiliTimelineEngine.parse_date(drug.therapy_start_date)]
             if parsed is not None
         ]
-        return min(qualifying) if qualifying else None
+        return min(starts) if starts else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _qualifying_points(
+        labs: PatientLabTimeline,
+        markers: set[str],
+        multiple: float,
+        exposure_start: date | None,
+        strict: bool = False,
+    ) -> list[LabPoint]:
+        """Post-exposure (or undated) values above `multiple` x reference.
+
+        The reference is the ULN, or the latest pre-exposure multiple when that
+        baseline is abnormal (FDA 2009 DILI guidance, EASL 2019). It is resolved
+        per marker; without a dated pre-exposure value the ULN applies.
+        """
+        series: dict[str, list[LabPoint]] = {}
+        for lab in labs.entries:
+            if (
+                lab.marker_name.upper() not in markers
+                or lab.value is None
+                or not lab.upper_limit_normal
+                or float(lab.upper_limit_normal) <= 0
+            ):
+                continue
+            series.setdefault(lab.marker_name.upper(), []).append(
+                (
+                    DiliTimelineEngine.parse_date(lab.sample_date),
+                    float(lab.value) / float(lab.upper_limit_normal),
+                )
+            )
+        qualifying: list[LabPoint] = []
+        for points in series.values():
+            pre_exposure = [
+                (point_date, value)
+                for point_date, value in points
+                if point_date is not None
+                and exposure_start is not None
+                and point_date < exposure_start
+            ]
+            reference = max(1.0, max(pre_exposure)[1]) if pre_exposure else 1.0
+            threshold = multiple * reference
+            qualifying.extend(
+                (point_date, value)
+                for point_date, value in points
+                if (point_date, value) not in pre_exposure
+                and (value > threshold if strict else value >= threshold)
+            )
+        return qualifying
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _first_date(points: list[LabPoint]) -> date | None:
+        return min((item[0] for item in points if item[0] is not None), default=None)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _episode_pair(
+        amino_points: list[LabPoint], bili_points: list[LabPoint]
+    ) -> EpisodePair | None:
+        """Earliest bilirubin dated 0..BILIRUBIN_LAG_WINDOW_DAYS after an ALT/AST rise."""
+        candidates = [
+            ((amino_date, amino_value), (bili_date, bili_value))
+            for amino_date, amino_value in amino_points
+            if amino_date is not None
+            for bili_date, bili_value in bili_points
+            if bili_date is not None
+            and 0 <= (bili_date - amino_date).days <= BILIRUBIN_LAG_WINDOW_DAYS
+        ]
+        return min(candidates, key=lambda item: (item[0][0], item[1][0])) if candidates else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _same_episode(
+        pair: EpisodePair | None,
+        amino_points: list[LabPoint],
+        bili_points: list[LabPoint],
+    ) -> bool | None:
+        """True when paired; None when a missing date leaves the timing unresolved."""
+        if pair is not None:
+            return True
+        if amino_points and bili_points:
+            undated = any(item[0] is None for item in (*amino_points, *bili_points))
+            return None if undated else False
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _pair_rationale(
+        pair: EpisodePair | None, same_episode: bool | None, exposure_start: date | None
+    ) -> str:
+        reference = (
+            "ULN, or the abnormal pre-exposure baseline when one is dated"
+            if exposure_start is not None
+            else "ULN (no exposure start date to define a baseline)"
+        )
+        if pair is not None:
+            (amino_date, amino_value), (bili_date, bili_value) = pair
+            return (
+                f"Evaluated pair: ALT/AST {amino_value:.2f}x on {amino_date.isoformat()}, "
+                f"bilirubin {bili_value:.2f}x on {bili_date.isoformat()} "
+                f"({(bili_date - amino_date).days} days later; accepted window 0-"
+                f"{BILIRUBIN_LAG_WINDOW_DAYS} days, pending clinician review). "
+                f"Reference: {reference}."
+            )
+        if same_episode is None:
+            return (
+                "Episode timing is indeterminate: a qualifying ALT/AST or bilirubin "
+                f"date is missing or unparseable. Reference: {reference}."
+            )
+        return (
+            "No qualifying bilirubin dated 0-"
+            f"{BILIRUBIN_LAG_WINDOW_DAYS} days after a qualifying ALT/AST elevation. "
+            f"Reference: {reference}."
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -169,14 +311,6 @@ class HysLawDetector:
             and abs((parsed - onset_date).days) <= ONSET_ALP_WINDOW_DAYS
         ]
         return min(candidates, key=lambda item: item[0])[1] if candidates else None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _same_episode(onset_date: date | None, timeline: DiliTimeline) -> bool | None:
-        parsed_bili = DiliTimelineEngine.parse_date(timeline.jaundice_or_bilirubin_rise_date)
-        if onset_date is None or parsed_bili is None:
-            return None
-        return abs((parsed_bili - onset_date).days) <= 14
 
     # -------------------------------------------------------------------------
     @staticmethod

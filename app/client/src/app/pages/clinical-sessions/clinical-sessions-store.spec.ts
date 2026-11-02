@@ -71,8 +71,31 @@ describe('ClinicalSessionsStore', () => {
     expect(store.recentCount()).toBe(3);
 
     store.setFilters({ statuses: ['failed'] });
-    store.setFilters({ query: 'patient 2' });
     expect(urls).toHaveLength(2);
+  });
+
+  it('resolves free-text search server-side so recent and older sessions match identically', async () => {
+    mockFetch((url) => {
+      if (url.searchParams.get('search') === 'hepatic') {
+        // Matches report content only: neither patient name contains the term.
+        return url.searchParams.has('created_before')
+          ? page([item(200)], 1)
+          : page([item(2)], 1);
+      }
+      return page([item(1), item(2)], 2);
+    });
+    await store.loadRecent();
+    store.setIncludeOlder(true);
+    await vi.waitFor(() => expect(store.olderTotal()).not.toBeNull());
+
+    vi.useFakeTimers();
+    store.setFilters({ query: 'hepatic' });
+    await vi.advanceTimersByTimeAsync(300);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(store.visible().map((entry) => entry.session_id)).toEqual([2, 200]));
+
+    const searched = urls.filter((url) => url.searchParams.get('search') === 'hepatic');
+    expect(searched.map((url) => url.searchParams.has('created_before'))).toEqual(expect.arrayContaining([true, false]));
   });
 
   it('merges only changed sessions on sync and reflects removals', async () => {
