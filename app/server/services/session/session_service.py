@@ -17,6 +17,7 @@ from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
+    EvidenceSource,
     PatientData,
     PatientRucamAssessmentBundle,
     PipelineIssue,
@@ -292,7 +293,7 @@ class ClinicalSessionService(
         self,
         *,
         session_detail: dict[str, Any],
-        evidence_sources: list[str],
+        evidence_sources: list[EvidenceSource],
     ) -> tuple[
         ClinicalSessionRequest,
         ClinicalSectionExtractionResult | None,

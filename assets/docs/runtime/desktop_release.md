@@ -1,5 +1,5 @@
 # Windows Desktop Release
-Last updated: 2026-10-22
+Last updated: 2026-11-02
 
 ## Published release: v3.5.0
 
@@ -47,6 +47,8 @@ At launch, the shell shows the bundled startup splash, verifies and extracts the
 
 It starts the backend on a random localhost port, waits for the ready file and health response, then loads the bundled Angular interface from Tauri's local origin. The shell passes the API origin and one-time session token to the frontend; API requests include `X-DILIGENT-Desktop-Session`. The backend accepts CORS only from `http://tauri.localhost` and keeps the API bound to loopback. The backend is attached to a Windows Job Object and is asked to shut down cooperatively when the shell exits, with a bounded process termination fallback recorded in the backend log.
 
+The shell hands the one-time bootstrap URL to the SPA once. The SPA then keeps the loopback API origin and session token in the window's `sessionStorage`, so a full page reload (for example F5 on `/clinical-sessions`) continues to call the loopback API instead of the Tauri origin. The packaged CSP disables Tauri's nonce rewriting for `style-src` only (`dangerousDisableAssetCspModification`), because Angular injects component styles at runtime, and the production Angular build does not inline critical CSS because its `onload` handler is blocked by the CSP; without both, the packaged UI renders unstyled. The backend's packaged CORS allow-list covers every request header the client sends, including `Cache-Control` and `Pragma` on no-cache reads.
+
 Mutable settings, the SQLite database, logs, embedding cache, source catalogs, and application state live beneath:
 
 ~~~text
@@ -75,7 +77,7 @@ The portable EXE, MSI, and SHA-256 manifest are written under `release/`. Launch
 
 ### Local packaged smoke
 
-For a local portable startup check, verify the EXE against its SHA-256 manifest, open it, and confirm the DILIGENT interface appears. Reload a client-side route such as `/clinical-sessions`, confirm the bundled CSS/JavaScript load, and check `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` plus `/api/health` on its recorded port. Confirm the frontend can access a protected API after bootstrap, then close the window and verify the backend PID exits and its port closes. The backend log is `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`. This smoke does not replace the hosted MSI lifecycle, provider E2E, native operator acceptance, or publication readback.
+For a local portable startup check, verify the EXE against its SHA-256 manifest, open it, and confirm the DILIGENT interface appears. Reload a client-side route such as `/clinical-sessions`, confirm the bundled CSS/JavaScript load, and check `%LOCALAPPDATA%\DILIGENT\data\state\desktop-backend-ready.json` plus `/api/health` on its recorded port. Confirm the frontend can access a protected API after bootstrap, then close the window and verify the backend PID exits and its port closes. The backend log is `%LOCALAPPDATA%\DILIGENT\data\cache\logs\desktop-backend.log`. `app/desktop/build/smoke_release.ps1` automates launch, extraction, backend health, the unauthenticated 401 boundary, exact-origin CORS, and close/port release against an isolated `LOCALAPPDATA`, but it does not render the UI. For UI-level evidence, launch the executable with an isolated `LOCALAPPDATA` and `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>`, attach Playwright over CDP, and check computed styles, an in-app draft save, a settings change that survives a full reload, and `Network` preflight statuses. Release builds require `rustc 1.95.0`; install it side by side with `rustup toolchain install 1.95.0 --profile minimal` and set `RUSTUP_TOOLCHAIN=1.95.0` for the build process. Each desktop build runs `uv sync --locked` without test extras, so run `uv sync --locked --all-extras` again before Playwright or pytest. This smoke does not replace the hosted MSI lifecycle, provider E2E, native operator acceptance, or publication readback.
 
 ## Prepare and publish
 

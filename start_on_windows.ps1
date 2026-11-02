@@ -1,6 +1,8 @@
 # Copyright © 2023–2025 Thomas Virdis
 # Licensed under the GNU General Public License, version 3 or later.
 
+#Requires -Version 7.0
+
 # ============================================================
 # Launcher parameters and repository paths
 # ============================================================
@@ -55,6 +57,11 @@ $script:PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
 $script:RuffCacheDir = Join-Path $RuntimeCacheDir 'ruff'
 $script:UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
 $script:EnvFile = Join-Path $RepoRoot 'settings/.env'
+# Variables supplied by the caller win over settings/.env, as in the backend and Angular tooling.
+$script:CallerEnvironmentNames = [Collections.Generic.HashSet[string]]::new(
+    [string[]]@([Environment]::GetEnvironmentVariables('Process').Keys),
+    [StringComparer]::OrdinalIgnoreCase
+)
 $script:EnvExample = Join-Path $RepoRoot 'settings/.env.example'
 $script:PythonVersion = '3.14.7'
 $script:NodeVersion = '22.13.0'
@@ -453,6 +460,9 @@ function Import-DotEnv {
             continue
         }
         $key = $line.Substring(0, $separator).Trim()
+        if ($script:CallerEnvironmentNames.Contains($key)) {
+            continue
+        }
         $value = $line.Substring($separator + 1).Trim()
         if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
             ($value.StartsWith("'") -and $value.EndsWith("'"))) {

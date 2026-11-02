@@ -1,6 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { API_BASE_URL, configureDesktopApiOrigin } from './constants';
 import { buildRuntimeSettingsFromConfig, resolveCloudChoices, resolveCloudModel, resolveProvider } from './model-config';
@@ -16,6 +17,17 @@ import {
 } from '../../../scripts/runtime-config.mjs';
 
 describe('runtime network configuration', () => {
+  it('imports every node:fs function the development server launcher calls', () => {
+    const source = readFileSync('scripts/ng-serve.mjs', 'utf8');
+    const imported = /import \{([^}]*)\} from 'node:fs'/.exec(source)?.[1] ?? '';
+    const called = [...source.matchAll(/(\w+Sync)\(/g)].map((match) => match[1]);
+
+    expect(called.length).toBeGreaterThan(0);
+    for (const name of new Set(called)) {
+      expect(imported).toContain(name);
+    }
+  });
+
   it('keeps default development API routing same-origin', () => {
     const settings = resolveRuntimeNetworkSettings({}, {});
 

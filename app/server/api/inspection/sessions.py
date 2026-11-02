@@ -176,8 +176,8 @@ class InspectionSessionEndpoint(InspectionJobEndpointMixin):
 
     # -------------------------------------------------------------------------
     def list_session_attachments(self, session_id: int) -> SessionAttachmentListResponse:
-        return SessionAttachmentListResponse(
-            items=self.service.list_session_attachments(session_id)
+        return SessionAttachmentListResponse.model_validate(
+            {"items": self.service.list_session_attachments(session_id)}
         )
 
     # -------------------------------------------------------------------------

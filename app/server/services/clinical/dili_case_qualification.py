@@ -253,7 +253,11 @@ class DiliCaseQualificationEngine:
         value = DiliSeverityGrader.bilirubin_mg_dl(entry)
         baseline = self._latest_marker(baseline_entries, BILIRUBIN_MARKERS)
         baseline_multiple = self._multiple(baseline)
-        if baseline_multiple is not None and baseline_multiple > 1.0:
+        if (
+            baseline is not None
+            and baseline_multiple is not None
+            and baseline_multiple > 1.0
+        ):
             reference = DiliSeverityGrader.bilirubin_mg_dl(baseline)
         else:
             reference = DiliSeverityGrader.bilirubin_mg_dl(

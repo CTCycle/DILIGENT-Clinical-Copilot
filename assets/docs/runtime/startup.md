@@ -1,14 +1,15 @@
 # Startup
-Last updated: 2026-10-31
+Last updated: 2026-11-02
 
 ## Recommended Local Startup
-On Windows, use:
+On Windows, use PowerShell 7 (`pwsh`); the launcher declares `#Requires -Version 7.0` because it uses .NET path APIs that Windows PowerShell 5.1 lacks:
 
 ```powershell
 .\start_on_windows.ps1
 ```
 
 The launcher:
+- gives variables already present in the calling environment (for example `DILIGENT_DATA_PATH` for an isolated data root) precedence over `settings/.env`, matching the backend and Angular tooling
 - creates `settings/.env` from `settings/.env.example` on first application start when the local environment file is missing
 - ensures the backend Python runtime for a warm launch; `uv` is prepared when backend/runtime repair or an explicit install requires it
 - runs `uv sync --locked` against the tracked `app/server/uv.lock` during backend/runtime repair and explicit installation

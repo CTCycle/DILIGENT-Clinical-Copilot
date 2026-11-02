@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
@@ -225,7 +226,7 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     @contextmanager
-    def override_for_run(cls, overrides: dict[str, object] | None):
+    def override_for_run(cls, overrides: Mapping[str, object] | None):
         normalized = {str(key): value for key, value in (overrides or {}).items()}
         token: Token[dict[str, object] | None] | None = None
         if normalized:

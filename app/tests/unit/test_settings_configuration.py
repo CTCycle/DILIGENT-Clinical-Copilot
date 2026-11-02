@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 import app as server_app_module
 from typing import Any
 from api import ollama as ollama_routes
-from api import session as session_routes
 from configurations.startup import get_server_settings
 from services.clinical import job_progress as clinical_job_progress
 from services.session import session_shared
@@ -206,7 +205,9 @@ def test_packaged_desktop_ignores_source_mode_cors_configuration(monkeypatch) ->
     assert len(cors) == 1
     assert cors[0].kwargs["allow_origins"] == ["http://tauri.localhost"]
     assert cors[0].kwargs["allow_headers"] == [
+        "Cache-Control",
         "Content-Type",
+        "Pragma",
         "X-DILIGENT-Desktop-Session",
     ]
 
@@ -235,6 +236,17 @@ def test_packaged_desktop_cors_preflight_is_exactly_tauri_origin(monkeypatch) ->
     assert allowed.status_code == 200
     assert allowed.headers["access-control-allow-origin"] == "http://tauri.localhost"
     assert "x-diligent-desktop-session" in allowed.headers["access-control-allow-headers"].casefold()
+
+    # The client sends no-cache headers on settings, model-config and job reads.
+    no_cache = client.options(
+        "/api/settings",
+        headers={
+            "Origin": "http://tauri.localhost",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "cache-control,pragma,x-diligent-desktop-session",
+        },
+    )
+    assert no_cache.status_code == 200
 
     rejected = client.options(
         "/api/model-config",

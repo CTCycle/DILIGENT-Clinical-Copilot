@@ -9,7 +9,7 @@ import time
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import APIRequestContext, Page, Route, expect
+from playwright.sync_api import APIRequestContext, Page, expect
 
 LIFECYCLE_FILTERS = ["Draft", "Queued", "Running", "Completed", "Cancelled", "Failed"]
 

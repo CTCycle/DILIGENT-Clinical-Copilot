@@ -24,6 +24,24 @@ def _function_body(source: str, name: str) -> str:
 
 
 ###############################################################################
+def test_launcher_requires_powershell_7_for_dotnet_path_apis() -> None:
+    source = _launcher_text()
+
+    # Path.GetRelativePath does not exist in Windows PowerShell 5.1.
+    assert "GetRelativePath" in source
+    assert "#Requires -Version 7.0" in source
+
+
+###############################################################################
+def test_dotenv_import_keeps_variables_supplied_by_the_caller() -> None:
+    source = _launcher_text()
+    dotenv_import = _function_body(source, "Import-DotEnv")
+
+    assert "$script:CallerEnvironmentNames = " in source
+    assert "$script:CallerEnvironmentNames.Contains($key)" in dotenv_import
+
+
+###############################################################################
 def test_launch_port_cleanup_uses_general_deduplicated_holders() -> None:
     source = _launcher_text()
     process_discovery = _function_body(source, "Get-ApplicationProcessRecords")

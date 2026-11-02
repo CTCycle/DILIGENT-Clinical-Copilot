@@ -3,13 +3,38 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchWithTimeout } from './http-api';
-import { setDesktopSessionToken } from './desktop-session';
+import { loadStoredDesktopSession, setDesktopSessionToken, storeDesktopSession } from './desktop-session';
 import { TestBed } from '@angular/core/testing';
 import { DesktopDialogService } from './desktop-dialog.service';
 import { MarkdownRendererService } from './markdown-renderer.service';
 import { NotificationService } from './notification.service';
 import { API_BASE_URL } from '../constants';
 import { cancelInspectionSessionTimelineJob } from './session-timeline-api';
+
+describe('desktop session reload persistence', () => {
+  afterEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  it('restores the loopback API origin and token after the bootstrap URL is gone', () => {
+    storeDesktopSession({ apiOrigin: 'http://127.0.0.1:51884', token: 'private-session-token' });
+
+    expect(loadStoredDesktopSession()).toEqual({
+      apiOrigin: 'http://127.0.0.1:51884',
+      token: 'private-session-token',
+    });
+  });
+
+  it('ignores missing or malformed stored sessions', () => {
+    expect(loadStoredDesktopSession()).toBeNull();
+
+    window.sessionStorage.setItem('diligent.desktop-session', '{"apiOrigin":"http://127.0.0.1:1"}');
+    expect(loadStoredDesktopSession()).toBeNull();
+
+    window.sessionStorage.setItem('diligent.desktop-session', 'not json');
+    expect(loadStoredDesktopSession()).toBeNull();
+  });
+});
 
 describe('HTTP API desktop session header', () => {
   afterEach(() => {

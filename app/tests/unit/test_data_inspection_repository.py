@@ -33,6 +33,7 @@ from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection import DataInspectionService
+from services.inspection import timeline as inspection_timeline
 from services.inspection.timeline import InspectionTimelineMixin
 from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
@@ -1014,9 +1015,18 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
 
 
 ###############################################################################
-def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor() -> (
-    None
-):
+def test_timeline_generation_follows_current_configuration_not_session_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = inspection_timeline.LLMRuntimeConfig
+    monkeypatch.setattr(
+        config, "resolve_provider_and_model", lambda purpose: ("ollama", "qwen3.5:9b")
+    )
+    monkeypatch.setattr(config, "is_cloud_enabled", lambda: False)
+    monkeypatch.setattr(config, "get_llm_provider", lambda: "ollama")
+    monkeypatch.setattr(config, "get_cloud_model", lambda: "")
+    monkeypatch.setattr(config, "get_text_extraction_model", lambda: "qwen3.5:9b")
+    monkeypatch.setattr(config, "get_clinical_model", lambda: "qwen3.5:9b")
     repository_graph, _ = build_repository_graph_for_test()
     persisted_runtime_settings = {
         "use_cloud_services": True,
@@ -1053,11 +1063,11 @@ def test_timeline_generation_passes_persisted_opencode_go_settings_to_extractor(
 
     assert generated is not None
     assert extractor.last_runtime_settings is not None
-    assert extractor.last_runtime_settings["use_cloud_services"] is True
-    assert extractor.last_runtime_settings["llm_provider"] == "opencode_go"
-    assert extractor.last_runtime_settings["cloud_model"] == "deepseek-v4-flash"
-    assert generated.source_kind == "cloud"
-    assert generated.model_provider == "opencode_go"
+    assert extractor.last_runtime_settings["use_cloud_services"] is False
+    assert extractor.last_runtime_settings["llm_provider"] == "ollama"
+    assert extractor.last_runtime_settings["timeline_model"] == "qwen3.5:9b"
+    assert generated.source_kind == "local"
+    assert generated.model_provider == "ollama"
 
 
 ###############################################################################

@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from sqlalchemy import String, and_, exists, func, or_, select, update
 from sqlalchemy import cast as sql_cast
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -44,6 +45,11 @@ def _build_search_pattern(value: str | None) -> str | None:
 ###############################################################################
 class SessionStateConflictError(RuntimeError):
     """A lifecycle guard rejected a write because the session state changed."""
+
+
+###############################################################################
+def _rowcount(result: Any) -> int:
+    return cast(CursorResult[Any], result).rowcount
 
 
 ###############################################################################
@@ -219,7 +225,7 @@ class ClinicalSessionRepository:
                 )
                 .values(state_version=ClinicalSession.state_version + 1)
             )
-            if guarded.rowcount != 1:
+            if _rowcount(guarded) != 1:
                 raise SessionStateConflictError(
                     "Only a running clinical session can be completed."
                 )
@@ -322,7 +328,7 @@ class ClinicalSessionRepository:
                     state_version=ClinicalSession.state_version + 1,
                 )
             )
-            if result.rowcount != 1:
+            if _rowcount(result) != 1:
                 db_session.rollback()
                 raise stale
             db_session.commit()
@@ -371,7 +377,7 @@ class ClinicalSessionRepository:
                 )
             )
             db_session.commit()
-            return result.rowcount == 1
+            return _rowcount(result) == 1
 
     # -------------------------------------------------------------------------
     def claim_next_queued(self, job_id: str) -> int | None:
@@ -494,7 +500,7 @@ class ClinicalSessionRepository:
                 .values(**values)
             )
             db_session.commit()
-            return result.rowcount == 1
+            return _rowcount(result) == 1
 
     # -------------------------------------------------------------------------
     def fail_interrupted_sessions(
@@ -828,7 +834,7 @@ class ClinicalSessionRepository:
                 .where(ClinicalSessionResult.session_id == int(session_id))
                 .values(payload_json=serialized_payload)
             )
-            if updated.rowcount == 0:
+            if _rowcount(updated) == 0:
                 db_session.add(
                     ClinicalSessionResult(
                         session_id=int(session_id), payload_json=serialized_payload

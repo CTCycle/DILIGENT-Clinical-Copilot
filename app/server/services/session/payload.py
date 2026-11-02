@@ -6,6 +6,7 @@ from __future__ import annotations
 import html
 import re
 import unicodedata
+from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
@@ -174,7 +175,7 @@ class PayloadSanitizationService:
         anamnesis: str | None,
         drugs: str | None,
         laboratory_analysis: str | None,
-        evidence_sources: list[str],
+        evidence_sources: Sequence[str],
     ) -> dict[str, Any]:
         normalized_visit_date = normalize_visit_date(visit_date)
         return {

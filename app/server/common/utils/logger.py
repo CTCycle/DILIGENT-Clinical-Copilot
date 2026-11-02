@@ -20,8 +20,13 @@ class HttpxRequestFilter(logging.Filter):
 
     # -------------------------------------------------------------------------
     def filter(self, record: logging.LogRecord) -> bool:
-        if record.msg == 'HTTP Request: %s %s "%s %d %s"' and len(record.args) == 5:
-            status = record.args[3]
+        args = record.args
+        if (
+            record.msg == 'HTTP Request: %s %s "%s %d %s"'
+            and isinstance(args, tuple)
+            and len(args) == 5
+        ):
+            status = args[3]
             level = (
                 logging.WARNING
                 if isinstance(status, int) and status >= 400

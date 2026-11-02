@@ -44,3 +44,24 @@ def test_tauri_release_bundles_frontend_and_uses_a_local_session_api() -> None:
     assert "X-DILIGENT-Desktop-Session" in backend
     assert "http://tauri.localhost" in backend
     assert "http://127.0.0.1:*" in configuration["app"]["security"]["csp"]
+
+
+###############################################################################
+def test_packaged_csp_keeps_runtime_component_styles_and_avoids_inline_handlers() -> None:
+    # Tauri's nonce injection would make WebView2 ignore 'unsafe-inline' and block
+    # Angular's runtime <style> tags; critical-CSS inlining adds an inline onload
+    # handler that the packaged CSP also blocks, leaving the UI unstyled.
+    configuration = json.loads(
+        (ROOT / "app/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8")
+    )
+    angular = json.loads(
+        (ROOT / "app/client/angular.json").read_text(encoding="utf-8")
+    )
+    production = angular["projects"]["diligent-client"]["architect"]["build"][
+        "configurations"
+    ]["production"]
+
+    assert configuration["app"]["security"]["dangerousDisableAssetCspModification"] == [
+        "style-src"
+    ]
+    assert production["optimization"]["styles"]["inlineCritical"] is False

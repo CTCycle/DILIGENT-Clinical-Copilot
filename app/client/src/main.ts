@@ -5,7 +5,11 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
 import { API_BASE_URL, configureDesktopApiOrigin } from './app/core/constants';
-import { setDesktopSessionToken } from './app/core/services/desktop-session';
+import {
+  loadStoredDesktopSession,
+  setDesktopSessionToken,
+  storeDesktopSession,
+} from './app/core/services/desktop-session';
 
 const DESKTOP_BOOTSTRAP_PREFIX = '#desktop-bootstrap=';
 
@@ -16,6 +20,11 @@ function showStartupError(): void {
 
 async function bootstrapDesktopSession(): Promise<void> {
   if (!window.location.hash.startsWith(DESKTOP_BOOTSTRAP_PREFIX)) {
+    const stored = loadStoredDesktopSession();
+    if (stored) {
+      configureDesktopApiOrigin(stored.apiOrigin);
+      setDesktopSessionToken(stored.token);
+    }
     return;
   }
 
@@ -42,6 +51,7 @@ async function bootstrapDesktopSession(): Promise<void> {
     throw new Error('Desktop session bootstrap failed');
   }
   setDesktopSessionToken(token);
+  storeDesktopSession({ apiOrigin, token });
 }
 
 async function startApplication(): Promise<void> {

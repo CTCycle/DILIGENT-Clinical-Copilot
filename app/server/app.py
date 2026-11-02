@@ -202,7 +202,12 @@ def create_app() -> FastAPI:
             allow_origins=list(cors_allow_origins),
             allow_credentials=False,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            allow_headers=["Content-Type", "X-DILIGENT-Desktop-Session"],
+            allow_headers=[
+                "Cache-Control",
+                "Content-Type",
+                "Pragma",
+                "X-DILIGENT-Desktop-Session",
+            ],
         )
     for router in (
         session_router,
