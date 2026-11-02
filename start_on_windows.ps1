@@ -72,7 +72,7 @@ $script:NodeArchiveSha256 = 'b0feb09ebf41328628e7383f7a092fb7342ce1e05c867a90cf8
 $script:UvArchiveSha256 = 'be8d78c992312212e5cc05e9f9de3fa996db73b7c86a186dfb9231eb9f91d33e'
 $script:DesktopDir = Join-Path $RepoRoot 'app/desktop'
 $script:DesktopTauriDir = Join-Path $DesktopDir 'src-tauri'
-$script:DesktopBuildDir = Join-Path $RepoRoot 'assets/QA/desktop-release-staging'
+$script:DesktopBuildDir = Join-Path $RepoRoot 'assets/QA/desktop/staging'
 $script:DesktopGeneratedDir = Join-Path $DesktopTauriDir 'generated'
 $script:DesktopArtifactsDir = Join-Path $RepoRoot 'release'
 $script:DesktopStageRoot = Join-Path $DesktopBuildDir 'staging'
@@ -2359,7 +2359,7 @@ function Test-FrozenBackend {
     $backend = Join-Path $backendRoot 'DILIGENTBackend.exe'
     $dataRoot = Join-Path $StageRoot 'frozen-data'
     $readyFile = Join-Path $dataRoot 'state/ready.json'
-    $qaRoot = Join-Path $RepoRoot 'assets/QA/release-audit-20260826'
+    $qaRoot = Join-Path $RepoRoot 'assets/QA/desktop/launcher-logs'
     $stdoutPath = Join-Path $qaRoot 'launcher-frozen-backend.stdout.log'
     $stderrPath = Join-Path $qaRoot 'launcher-frozen-backend.stderr.log'
     New-Item -ItemType Directory -Path $qaRoot -Force | Out-Null

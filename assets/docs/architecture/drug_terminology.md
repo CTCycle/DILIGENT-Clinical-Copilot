@@ -1,5 +1,5 @@
 # Drug Terminology Resolution
-Last updated: 2026-10-29
+Last updated: 2026-11-02
 
 ## Purpose
 
@@ -189,7 +189,7 @@ US and Swiss brands, INN/USAN pairs, language variants, typos, abbreviations,
 salts, stereoisomers, look-alike pairs, strengths, unknowns) and the harness.
 The labels are author-curated from standard nomenclature and are not a
 clinical validation. Latest results:
-[`assets/QA/drug-terminology-20261029/report.md`](../../QA/drug-terminology-20261029/report.md).
+[`assets/QA/terminology/drug-terminology-20261029.md`](../../QA/terminology/drug-terminology-20261029.md).
 
 ## Known Limitations
 

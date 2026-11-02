@@ -40,6 +40,6 @@ Representative captures:
 
 ## Known issue and waiver
 
-A manual report edit sends metadata as an empty object from the client. The repository replaces saved session metadata with that object. Re-entering metadata restores it. This issue was present in the released version and remains in the current source; see the [project status ledger](../../docs/project_status_ledger.md) and [session guide](../../docs/user/sessions_timeline_and_data.md).
+A manual report edit sends metadata as an empty object from the client. The repository replaces saved session metadata with that object. Re-entering metadata restores it. This issue was present in the released version and remains in the current source; see the [project status ledger](../../../docs/project_status_ledger.md) and [session guide](../../../docs/user/sessions_timeline_and_data.md).
 
 **Waived on 2026-10-18:** clean-host WebView2 installation was not tested because only one Windows machine was available. The recorded WebView2 version is evidence about that machine only, not clean-host compatibility.

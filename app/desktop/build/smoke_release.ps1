@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).Path
 $artifactRoot = Join-Path $repoRoot 'release'
 $qaRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'assets/QA'))
-if (-not $ReportDirectory) { $ReportDirectory = Join-Path $qaRoot "desktop-smoke-$Version-$([guid]::NewGuid())" }
+if (-not $ReportDirectory) { $ReportDirectory = Join-Path $qaRoot "desktop/smoke/$Version-$([guid]::NewGuid())" }
 $ReportDirectory = [IO.Path]::GetFullPath($ReportDirectory)
 if (-not $ReportDirectory.StartsWith($qaRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Desktop smoke reports must be stored under assets/QA.'

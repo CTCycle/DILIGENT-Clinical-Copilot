@@ -165,7 +165,7 @@ switch ($Action) {
                 & gh release upload $tag (Join-Path $ArtifactDirectory $file) --repo $repo
                 if ($LASTEXITCODE -ne 0) { throw "Draft asset upload failed: $file" }
             }
-            $download = Join-Path 'assets/QA' "published-verification-$env:GITHUB_RUN_ID"
+            $download = Join-Path 'assets/QA/release-gates' "published-verification-$env:GITHUB_RUN_ID"
             New-Item -ItemType Directory -Path $download -Force | Out-Null
             & gh release download $tag --repo $repo --dir $download
             if ($LASTEXITCODE -ne 0) { throw 'Draft asset readback failed.' }
@@ -177,11 +177,11 @@ switch ($Action) {
             $releaseRoot = Join-Path (Resolve-Path '.').Path 'release'
             if ((Resolve-Path -LiteralPath $ArtifactDirectory).Path -ne $releaseRoot) { throw 'Publication expects the release artifact directory.' }
             foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $download $file) -Destination (Join-Path $releaseRoot $file) -Force }
-            & "$PSScriptRoot/smoke_release.ps1" -Version $Version -DesktopTarget Portable -RequireUnsigned -ReportDirectory (Join-Path (Resolve-Path 'assets/QA').Path "published-smoke-$env:GITHUB_RUN_ID") | Out-Null
+            & "$PSScriptRoot/smoke_release.ps1" -Version $Version -DesktopTarget Portable -RequireUnsigned -ReportDirectory (Join-Path (Resolve-Path 'assets/QA').Path "release-gates/published-smoke-$env:GITHUB_RUN_ID") | Out-Null
             Assert-SynchronizedSource
             & gh release edit $tag --repo $repo --draft=false --latest
             if ($LASTEXITCODE -ne 0) { throw 'Publishing the verified draft release failed.' }
-            $publicDownload = Join-Path 'assets/QA' "public-readback-$env:GITHUB_RUN_ID"
+            $publicDownload = Join-Path 'assets/QA/release-gates' "public-readback-$env:GITHUB_RUN_ID"
             New-Item -ItemType Directory -Path $publicDownload -Force | Out-Null
             & gh release download $tag --repo $repo --dir $publicDownload
             if ($LASTEXITCODE -ne 0) { throw 'Public release download failed.' }

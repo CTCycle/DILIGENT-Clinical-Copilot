@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-10-29
+Last updated: 2026-11-02
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -13,7 +13,7 @@ branch-status record.
 
 - Backend, frontend, and desktop source manifests report synchronized version `3.6.0`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
-- The latest published desktop release is `v3.5.1` (2026-10-22); the prior `v3.5.0` (2026-10-20) is also documented. Their unsigned portable EXE and MSI digests, hosted gates, native validation, and publication readback are recorded in the [release-gate report](../QA/release-gates-20261020/report.md) and [desktop release procedure](runtime/desktop_release.md), separately from product validation components.
+- The latest published desktop release is `v3.5.1` (2026-10-22); the prior `v3.5.0` (2026-10-20) is also documented. Their unsigned portable EXE and MSI digests, hosted gates, native validation, and publication readback are recorded in the [release-gate report](../QA/release-gates/20261020/report.md) and [desktop release procedure](runtime/desktop_release.md), separately from product validation components.
 - Model configuration reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - Runtime-managed application settings are persisted in the active database's
   `application_configuration` singleton. The selected backend and its
@@ -53,6 +53,8 @@ branch-status record.
 ### Root
 - `project_index.md`
   - Entry point and master index for the full documentation tree.
+- `../QA/README.md`
+  - Ontology of the validation-evidence tree under `assets/QA/`.
 - `project_status_ledger.md`
   - Canonical current operational status catalog for stable project components, active issues, validation debt, and resolved findings.
 
@@ -140,7 +142,7 @@ branch-status record.
 - Keep all affected documents updated whenever behavior, architecture, runtime, or UX changes.
 - Treat `project_status_ledger.md` as the canonical current operational status. Before substantial implementation or validation work, inspect it; after a meaningful change or test, update the affected component or issue and its concept links.
 - Put durable behavior, guarantees, and known limits in the existing architecture, runtime, coding, or user document for that concept. Use `runtime/validation_ledger.md` only for cross-cutting validation boundaries that do not belong to one leaf document.
-- `assets/QA/` is git-ignored scratch space for local runs. Track only compact evidence needed to substantiate a current external release or acceptance claim; avoid committing duplicate run narratives, screenshots, logs, and checklists when the durable result belongs in the documentation ontology.
+- `assets/QA/` is git-ignored evidence space organized by the ontology in [`../QA/README.md`](../QA/README.md) (`audits`, `release-gates`, `desktop`, `ui-validation`, `e2e`, `terminology`, `pytest`). Track only compact reports needed to substantiate a current release or acceptance claim; do not create new top-level QA folders or scatter run narratives, screenshots, and logs outside it.
 - Always include a `Last updated: YYYY-MM-DD` line when modifying a document.
 - Pre-select files to read by folder structure and task intent before opening them.
 

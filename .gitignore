@@ -11,6 +11,7 @@ runtimes/**
 runtimes/cache/**
 !runtimes/cache/.gitkeep
 assets/QA/**
+!assets/QA/README.md
 .playwright-mcp/
 
 # Python

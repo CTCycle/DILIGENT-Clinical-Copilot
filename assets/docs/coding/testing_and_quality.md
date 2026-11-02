@@ -1,5 +1,5 @@
 # Testing and Quality
-Last updated: 2026-10-22
+Last updated: 2026-11-02
 
 ## Testing standards
 
@@ -47,7 +47,7 @@ It runs the live-provider flow and requires DILIGENT_LIVE_PROVIDER_E2E=1 plus OP
 To exercise a completed assessment on an installed local Ollama model (default `qwen3.5:2b`, override with `DILIGENT_LOCAL_OLLAMA_MODEL`), start Ollama and run the LocalOllama lane:
 
 ~~~powershell
-.pp	ests\ciun_browser_e2e.ps1 -Suite LocalOllama
+.\app\tests\ci\run_browser_e2e.ps1 -Suite LocalOllama
 ~~~
 
 It seeds the isolated database with the one-drug amoxicillin knowledge-base fixture, drives the analysis wizard, waits for the clinical job to complete, and checks the rendered report and persisted session. Synthetic text stays on the machine. Heavyweight embedding behavior runs with `DILIGENT_RUN_EMBEDDING_INTEGRATION=1` against `app/tests/e2e/test_multilingual_embedding_runtime.py`. A deterministic fixture or a successful API response is not a substitute for those lanes.

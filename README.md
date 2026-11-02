@@ -32,38 +32,50 @@
 
 ## What it does
 
-DILIGENT brings a structured DILI assessment workflow, saved clinical sessions, and local knowledge resources into one desktop application. It helps clinicians organize medication exposure and liver-test timelines, review a model-generated draft, and keep the source material available for follow-up.
+DILIGENT brings a structured DILI assessment workflow, saved clinical sessions, and local knowledge resources into one desktop application. It helps clinicians organize medication exposure and liver-test timelines, review a model-generated report, and keep the source material available for follow-up.
 
-The app runs as a single-user desktop application on Windows. It is designed for a wide desktop window (about 1100 px or more), not a phone-sized screen.
+- **DILI Agent** – enter or paste the anamnesis, therapy, and dated laboratory results; choose evidence sources and optional per-run model overrides; review preflight checks, then run the assessment. Unfinished input can be saved as a draft.
+- **Clinical Sessions** – every analysis is a session with a visible lifecycle (queued, running, completed, failed, cancelled). Search and filter sessions, open the report, review metadata and attachments, and revise the report with version tracking.
+- **Patient Timeline** – a date-grounded chronology of medication, clinical, and laboratory events with source evidence, available as a list or a horizontal timeline.
+- **Knowledge** – local drug and liver-injury references (RxNav, LiverTox, FDA DILIrank 2.0), a drug terminology mapper (RxNorm, DrugCentral, ChEMBL, Swissmedic) with reviewer decisions, and optional RAG over your own documents.
+- **Settings** – local Ollama or hosted model providers per role, runtime and network options, drug matching, and a SQLite or PostgreSQL database.
+
+The app runs as a single-user application on Windows, either as the packaged desktop app or from source in a browser. It is designed for a wide desktop window (about 1100 px or more), not a phone-sized screen.
 
 ## Screenshots
 
-The first image shows a saved fictional draft. It is an interface example only; no clinical analysis has been run.
+All screenshots show the running application with fictional patients. Reports were produced by the assessment pipeline from synthetic cases; no real patient data is shown.
 
-![DILI Agent showing a saved fictional assessment draft](assets/figures/01-dili-agent.jpg)
+![DILI Agent with a fictional case ready to run](assets/figures/01-dili-agent.jpg)
 
-### Assessment and sessions
+![Clinical Sessions with the saved report preview](assets/figures/02-clinical-sessions.jpg)
 
-- Enter the clinical context, liver tests, and suspected medication exposures in the DILI Agent.
-- Review preflight checks and warnings before running an assessment.
-- Optionally include the configured retrieval-augmented generation (RAG) sources for an assessment.
-- Save and resume an unfinished draft. Completed reports and revisions are available in Clinical Sessions, with a contextual Timeline.
+![Completed DILI report with adjudication summary](assets/figures/03-report.jpg)
 
-### Models and knowledge
+![Patient Timeline in horizontal view](assets/figures/04-patient-timeline.jpg)
+
+### Models and retrieval
 
 Model providers and roles are configured in Settings. Local Ollama models and supported hosted providers can be selected; provider availability depends on the configured endpoint and credentials.
 
-![Settings showing runtime sources and a filtered local model catalog](assets/figures/02-model-settings.jpg)
+![Settings showing the runtime source and local model catalog](assets/figures/05-model-settings.jpg)
 
-The Knowledge area presents configured drug and liver-injury references, including RxNav, LiverTox, and FDA DILIrank 2.0. DILIrank is a drug-level hepatotoxicity reference, not a patient-specific causality result. RAG settings control candidate counts, hybrid search, and reranking when retrieval is enabled.
+RAG settings control candidate counts, hybrid search, and reranking when retrieval is enabled. DILIrank is a drug-level hepatotoxicity reference, not a patient-specific causality result.
 
-![RAG settings for retrieval, hybrid search, and reranking](assets/figures/03-rag-settings.jpg)
+![RAG settings for retrieval, hybrid search, and reranking](assets/figures/06-rag-settings.jpg)
 
 ## Run on Windows
 
 ### Packaged release
 
-Download the portable executable or MSI installer from [Releases](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases). The desktop app uses the Windows WebView2 runtime.
+Download one of the Windows x64 builds from [Releases](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) and verify it against the published `.sha256` file:
+
+| Download | Use it when |
+| --- | --- |
+| `DILIGENT-vX.Y.Z-windows-x64.msi` | You want a standard installation with an uninstall entry. Installing a newer MSI upgrades in place and keeps your data. |
+| `DILIGENT-vX.Y.Z-windows-x64-portable.exe` | You want a single executable with no installation. It extracts its runtime under `%LOCALAPPDATA%\DILIGENT\rt` on first launch. |
+
+Both builds are unsigned, so Windows SmartScreen may show an unknown-publisher prompt. Both use the Windows WebView2 runtime and keep settings and data in `%LOCALAPPDATA%\DILIGENT\data`; uninstalling the MSI or deleting the portable EXE does not remove that data.
 
 ### Run from source
 
@@ -80,8 +92,8 @@ The launcher prepares and starts the local app. Keep its window open while using
 1. In **Settings → Models**, choose Local or Cloud and assign a model to each role. Add provider credentials if you use a hosted provider.
 2. In **DILI Agent**, enter the clinical context, dated laboratory results, and suspected medication exposures.
 3. Resolve or acknowledge the preflight warnings, then run the assessment.
-4. Review the generated report against the source data; revise it as needed.
-5. Save the report and continue follow-up from **Clinical Sessions** and its **Timeline**.
+4. Follow progress from the session page; queued or running analyses can be cancelled.
+5. Review the generated report against the source data; revise it as needed and continue follow-up from **Clinical Sessions** and its **Timeline**.
 
 Reports are drafts for clinician review. A model’s output can be incomplete or incorrect.
 
@@ -108,6 +120,7 @@ Local storage does not mean every operation stays local: a hosted model provider
 - [Clinical sessions, timeline, and data](assets/docs/user/sessions_timeline_and_data.md)
 - [Runtime modes](assets/docs/runtime/modes.md)
 - [Configuration](assets/docs/runtime/configuration.md)
+- [Changelog](CHANGELOG.md)
 - [Project documentation index](assets/docs/project_index.md)
 
 ## Contributing
@@ -120,4 +133,4 @@ DILIGENT is distributed under the [GNU General Public License v3.0 or later](LIC
 
 ---
 
-_Last updated: 2026-10-28_
+_Last updated: 2026-11-02_
