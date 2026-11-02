@@ -5547,6 +5547,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #7fcefb;
 }
 
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-role-action.is-active {
+  background: #12362e;
+  border-color: #58e0ad;
+  color: #73e8b8;
+}
+
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-save-btn {
   background: linear-gradient(90deg, #1e66b2, #2799d1);
 }

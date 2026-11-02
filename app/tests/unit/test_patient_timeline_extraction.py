@@ -13,6 +13,7 @@ from domain.timeline_dates import normalize_timeline_interval
 from repositories.serialization.session_timelines import build_timeline_preview_payload
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
+from services.inspection import timeline as inspection_timeline
 from services.inspection.timeline import _timeline_error_code, _timeline_fallback_note
 from services.llm.cloud import LLMError
 
@@ -636,6 +637,32 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
             "timeline_model": "deepseek-v4-flash",
         }
     ) == ("opencode_go", "deepseek-v4-flash")
+
+
+###############################################################################
+def test_timeline_runtime_settings_follow_persisted_model_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = inspection_timeline.LLMRuntimeConfig
+    monkeypatch.setattr(
+        config, "resolve_provider_and_model", lambda purpose: ("opencode_go", "beam-free")
+    )
+    monkeypatch.setattr(config, "is_cloud_enabled", lambda: True)
+    monkeypatch.setattr(config, "get_llm_provider", lambda: "opencode_go")
+    monkeypatch.setattr(config, "get_cloud_model", lambda: "beam-free")
+    monkeypatch.setattr(config, "get_text_extraction_model", lambda: "beam-free")
+    monkeypatch.setattr(config, "get_clinical_model", lambda: "beam-free")
+    monkeypatch.setattr(config, "get_ollama_seed", lambda: None)
+
+    settings = (
+        inspection_timeline.InspectionTimelineMixin()._build_timeline_runtime_settings()
+    )
+
+    assert settings["use_cloud_services"] is True
+    assert settings["timeline_model"] == "beam-free"
+    assert PatientTimelineExtractor._resolve_provider_model_from_runtime_settings(
+        settings
+    ) == ("opencode_go", "beam-free")
 
 
 ###############################################################################

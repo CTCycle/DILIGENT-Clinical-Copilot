@@ -301,38 +301,21 @@ class InspectionTimelineMixin:
         )
 
     # -------------------------------------------------------------------------
-    def _build_timeline_runtime_settings(
-        self,
-        *,
-        source: dict[str, Any],
-    ) -> dict[str, Any]:
-        session_payload = source.get("session_result_payload")
-        persisted = (
-            session_payload.get("runtime_settings")
-            if isinstance(session_payload, dict)
-            else None
-        )
-        settings = dict(persisted) if isinstance(persisted, dict) else {}
-        provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
-        settings.setdefault("use_cloud_services", LLMRuntimeConfig.is_cloud_enabled())
-        settings.setdefault("llm_provider", LLMRuntimeConfig.get_llm_provider())
-        settings.setdefault("cloud_model", LLMRuntimeConfig.get_cloud_model())
-        settings.setdefault(
-            "text_extraction_model",
-            LLMRuntimeConfig.get_text_extraction_model()
-            or coerce_optional_str(source.get("text_extraction_model")),
-        )
-        settings.setdefault(
-            "clinical_model",
-            LLMRuntimeConfig.get_clinical_model()
-            or coerce_optional_str(source.get("clinical_model")),
-        )
-        settings.setdefault("timeline_model", model)
-        settings.setdefault(
-            "reasoning_level", LLMRuntimeConfig.get_reasoning_level().value
-        )
-        settings.setdefault("ollama_seed", LLMRuntimeConfig.get_ollama_seed())
-        return settings
+    def _build_timeline_runtime_settings(self) -> dict[str, Any]:
+        # Timeline generation follows the latest persisted model configuration
+        # (what the status-bar models popover shows), never the settings frozen
+        # into the session's analysis result or the session record.
+        _, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
+        return {
+            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
+            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
+            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
+            "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
+            "clinical_model": LLMRuntimeConfig.get_clinical_model(),
+            "timeline_model": model,
+            "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
+            "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
+        }
 
     # -------------------------------------------------------------------------
     def build_fallback_timeline(
@@ -478,9 +461,7 @@ class InspectionTimelineMixin:
             timeline_timeout_s = max(
                 20.0, min(330.0, attempt_timeout_s * max(1, attempts) + 15.0)
             )
-            requested_runtime_settings = self._build_timeline_runtime_settings(
-                source=source
-            )
+            requested_runtime_settings = self._build_timeline_runtime_settings()
             _report_progress(progress_callback, 15, "Configuring timeline model")
             source_model = (
                 requested_runtime_settings["timeline_model"]

@@ -322,7 +322,7 @@
                 }
                 } @else {
                 @for (modelName of visibleCloudModels(); track modelName) {
-                  <tr [class.is-selected]="draftCloudModel() === modelName">
+                  <tr [class.is-selected]="draftCloudModel() === modelName || draftConfig().clinicalModel === modelName || draftConfig().textExtractionModel === modelName || draftConfig().revisionModel === modelName || draftConfig().timelineModel === modelName">
                     <td>
                       <div class="model-config-model-cell">
                         <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">

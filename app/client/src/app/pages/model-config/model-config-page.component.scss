@@ -671,7 +671,17 @@
 
 :host ::ng-deep .model-config-role-action.is-active {
   background: var(--mc-brand);
+  border-color: var(--mc-brand);
   color: var(--color-text-on-brand);
+  opacity: 1;
+}
+
+.model-config-table tbody tr.is-selected td {
+  background: color-mix(in srgb, var(--mc-brand) 14%, transparent);
+}
+
+.model-config-table tbody tr.is-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--mc-brand);
 }
 
 .model-config-table-footer {
