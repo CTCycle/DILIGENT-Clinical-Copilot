@@ -572,7 +572,12 @@ function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Cap
     }
     $arguments = @((Join-Path $PSScriptRoot 'check_upgrade_fixture.py'), $database, (Join-Path $ReportDirectory 'upgrade-data.json'))
     if ($Capture) { $arguments += '--capture' }
-    if ($CheckHead) { $arguments += @('--expected-head', '202609170001') }
+    if ($CheckHead) {
+        $migrations = Get-Content -LiteralPath (Join-Path $repoRoot 'app/server/repositories/database/migrations.py') -Raw
+        $headRevision = [regex]::Match($migrations, 'HEAD_REVISION\s*=\s*"([^"]+)"').Groups[1].Value
+        if (-not $headRevision) { throw 'Unable to read HEAD_REVISION from the migration module.' }
+        $arguments += @('--expected-head', $headRevision)
+    }
     $previousPythonHome = $env:PYTHONHOME
     try {
         $env:PYTHONHOME = Join-Path $repoRoot 'runtimes/python'
