@@ -29,7 +29,7 @@ LIVE_PROVIDER_ENABLED = os.getenv("DILIGENT_LIVE_PROVIDER_E2E", "").strip().lowe
 }
 PROVIDER = "opencode_go"
 ACCESS_KEY_PROVIDER = "opencode"
-MODEL = "deepseek-v4-flash"
+MODEL = "deepseek-v4.1-flash"
 REVISION_INSTRUCTION = (
     "Read the session context once, then append exactly this sentence to the "
     "revised report: Synthetic release-gate revision: human review is required. "
