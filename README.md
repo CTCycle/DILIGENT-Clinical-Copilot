@@ -64,6 +64,12 @@ RAG settings control candidate counts, hybrid search, and reranking when retriev
 
 ![RAG settings for retrieval, hybrid search, and reranking](assets/figures/06-rag-settings.jpg)
 
+### Knowledge and drug terminology
+
+Knowledge → Terminology resolves a drug name, brand, or abbreviation against the locally imported terminology. Ambiguous matches can be confirmed or rejected by a reviewer. The capture below uses a small test fixture, not a full import.
+
+![Knowledge terminology resolving a drug name to a verified concept](assets/figures/07-knowledge-terminology.jpg)
+
 ## Run on Windows
 
 ### Packaged release

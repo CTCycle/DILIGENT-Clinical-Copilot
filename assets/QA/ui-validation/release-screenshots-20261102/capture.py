@@ -53,6 +53,8 @@ with sync_playwright() as p:
     # 05 model settings
     page.goto(BASE + "/settings/models")
     settle(page, 2500)
+    page.get_by_role("button", name="Refresh model catalog").click()
+    settle(page, 3000)
     page.get_by_role("button", name="Up to 8B").click()
     settle(page, 800)
     page.screenshot(path=OUT / "05-model-settings.jpg", type="jpeg", quality=90)
@@ -61,4 +63,14 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Configure").first.click()
     settle(page, 1200)
     page.screenshot(path=OUT / "06-rag-settings.jpg", type="jpeg", quality=90)
+
+    # 07 Knowledge terminology resolution
+    page.goto(BASE + "/data")
+    settle(page, 2500)
+    page.get_by_text("Terminology", exact=True).click()
+    settle(page, 1500)
+    page.get_by_placeholder("Resolve a drug name, brand, or abbreviation...").fill("amoxicillin")
+    page.get_by_role("button", name="Resolve", exact=True).click()
+    settle(page, 2500)
+    page.screenshot(path=OUT / "07-knowledge-terminology.jpg", type="jpeg", quality=90)
     browser.close()
