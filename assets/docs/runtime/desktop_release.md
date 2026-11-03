@@ -31,9 +31,17 @@ The public [v3.5.1 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot
 
 Binaries are unsigned. Before preparation, local checks passed (892 backend unit tests, 112 frontend tests, 57-test Windows Full browser suite). Local inspection of the first candidate build found the packaged window showing `asset not found`: the staged Tauri config set `frontendDist` to an absolute drive-letter path, which Tauri does not embed. The build now writes a path relative to `src-tauri`, and the smoke script no longer applies the current API-boundary assertions to the v3.5.0 upgrade baseline. The exact published portable EXE was launched natively (WebView2 inspection showed the bundled DILI Agent UI, `/api/health` ok, clean close, no orphan processes). The existing smoke checks only window title and health, so UI rendering is not automated; the owner-approved waivers were populated native analysis, clean-host WebView2, and local MSI install (needs elevation; hosted MSI lifecycle and v3.5.0 upgrade gates passed). The [v3.5.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.0) remains documented below.
 
-## Release candidate: v3.6.0 (not published)
+## Published release: v3.6.0 (minor)
 
-Source version 3.6.0 is prepared on `develop`; no tag, merge, or publication has occurred. The local validation build used `RUSTUP_TOOLCHAIN=1.95.0-x86_64-pc-windows-msvc` because the launcher requires rustc 1.95.0 exactly and the default toolchain on the build host is newer. It passed the portable smoke with the deep-path replay and MSI metadata checks (same UpgradeCode as v3.5.1, so installing the MSI upgrades in place). The MSI lifecycle and the populated upgrade from the published v3.5.1 package need an administrator-capable disposable host and run in the hosted prepare workflow. See the [release evidence](../../QA/release-gates/20261102/report.md) and the [changelog](../../../CHANGELOG.md).
+The public [v3.6.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.6.0) is the latest release. Tag v3.6.0 resolves to source commit `b487b98465a799f9ae1a7772fc28cb08355451f9` (`main` and `develop`). Prepare run [41637519430](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/41637519430) and the approved publish run [41684111486](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/41684111486) succeeded. An earlier prepare run failed only at the LiveProvider gate because the test used the retired `deepseek-v4-flash` id (HTTP 400); the test now uses `deepseek-v4.1-flash`. Published assets were downloaded and their digests match the candidate receipt.
+
+| Published artifact | SHA-256 |
+|---|---|
+| DILIGENT-v3.6.0-windows-x64-portable.exe | c8732936bb5bf2fd8fd7b17ed56ea91f6d92656d4f17154c2d8437cf0bdaa9a1 |
+| DILIGENT-v3.6.0-windows-x64.msi | 1583e9b081592b8f4d720cfc96aa1f16d0d3b6d7bbab0035b2ec4f8e5e169c7e |
+| DILIGENT-v3.6.0-windows-x64.sha256 | b566bb2f3bf1efa95ae60d1a625d1d477806d834eb57245280d63e2bfac24ffc |
+
+Binaries are unsigned. Local validation of the exact candidate on Windows 11: portable smoke with deep path, a 13-check UI run against an isolated `LOCALAPPDATA` (styled UI, route reload, draft persistence across reload and restart, clean close), and an elevated MSI lifecycle with in-place upgrade from the published v3.5.1 MSI (sessions, versions and settings preserved, migration head verified), uninstall and reinstall. The owner waived a clean-host WebView2 test and a populated native analysis. See the [2026-11-03 report](../../QA/release-gates/20261103/report.md).
 
 ## Packaging architecture
 

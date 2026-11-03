@@ -13,3 +13,8 @@ Scope: `develop` at `7287bbb9` (screenshots and README retaken on top of the 202
 
 ## Findings
 - The Full browser harness leaves its Angular preview server (`scripts/preview-server.mjs`, port 9847) listening after a passing run. It was stopped manually; not release-blocking.
+
+## Publication
+- Prepare run 41637519430 (source `b487b984`) passed all gates after the LiveProvider test model id was corrected to `deepseek-v4.1-flash` (first run 41635859941 failed with provider HTTP 400 for `deepseek-v4-flash`). Publish run 41684111486 succeeded; tag `v3.6.0` resolves to `b487b984`; the downloaded assets match the candidate hashes.
+- Local candidate checks: portable smoke (`desktop/smoke/3.6.0-candidate-41637519430`), a 13-check packaged UI run (`desktop/portable-3.6.0-ui`), and an elevated MSI lifecycle with upgrade from the published v3.5.1 MSI (`desktop/smoke/3.6.0-candidate-msi`) all passed.
+- Waived: clean-host WebView2 test, populated native analysis. Binaries are unsigned.
