@@ -1,9 +1,11 @@
 # Windows Desktop Release
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
-## Published release: v3.5.0
+The latest published release is [v3.6.0](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.6.0), published on 2026-11-03 from tag commit `b487b98465a799f9ae1a7772fc28cb08355451f9`. This document is the durable record of release identity, artifact hashes, hosted gates, local acceptance, unsigned status, and waivers.
 
-The public [v3.5.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.0) is the latest release. Tag v3.5.0 resolves to source commit `7a1b23e6f27b3d1987f1106eb2fb5f9aa40b2820`. Prepare run [39382912130](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39382912130) and protected, approved publish run [39419567722](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39419567722) succeeded.
+## Published release: v3.5.0 (historical)
+
+The public [v3.5.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.0) was published on 2026-10-20. Tag v3.5.0 resolves to source commit `7a1b23e6f27b3d1987f1106eb2fb5f9aa40b2820`. Prepare run [39382912130](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39382912130) and protected, approved publish run [39419567722](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39419567722) succeeded.
 
 | Published artifact | SHA-256 |
 |---|---|
@@ -15,13 +17,13 @@ The publication workflow promoted the immutable prepare candidate without rebuil
 
 The binaries are unsigned. The public release notes disclose the missing publisher signature and warn of a possible unknown-publisher or SmartScreen prompt.
 
-The release owner explicitly waived a candidate-specific populated native analysis and clean-host Windows 11/WebView2 run, relying on the existing [project validation ledger](../project_status_ledger.md) for tested feature coverage. The v3.5.0 local smoke verifies package launch and health only; it is not a populated analysis or clean-host compatibility result. The approval comment records these waivers. Detailed release evidence is in the [v3.5.0 report](../../QA/release-gates/20261020/report.md). The previous [v3.4.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0) and its evidence remain documented in the [v3.4.0 report](../../QA/release-gates/20261018/report.md).
+The release owner explicitly waived a candidate-specific populated native analysis and clean-host Windows 11/WebView2 run, relying on the tested feature coverage in the [project status ledger](../project_status_ledger.md). The v3.5.0 local smoke verifies package launch and health only; it is not a populated analysis or clean-host compatibility result. The approval comment recorded these waivers. The earlier v3.4.0 release is summarized below.
 
 Release acceptance recorded a manual-edit metadata issue that remains in the current source. Its current behavior and user workaround are in the [status ledger](../project_status_ledger.md) and [session guide](../user/sessions_timeline_and_data.md); it was not changed in v3.4.0.
 
-## Published release: v3.5.1 (patch)
+## Published release: v3.5.1 (patch, historical)
 
-The public [v3.5.1 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.1) is the latest release. Tag v3.5.1 resolves to source commit `49f3a7f4a14b808586288ffd59befc680f8d88bd` (`main` and `develop`). Prepare run [39827941660](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39827941660) and the approved publish run [39832496262](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39832496262) succeeded; published asset digests match the candidate receipt.
+The public [v3.5.1 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.1) was published on 2026-10-22. Tag v3.5.1 resolves to source commit `49f3a7f4a14b808586288ffd59befc680f8d88bd` (`main` and `develop`). Prepare run [39827941660](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39827941660) and the approved publish run [39832496262](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39832496262) succeeded; published asset digests match the candidate receipt.
 
 | Published artifact | SHA-256 |
 |---|---|
@@ -31,7 +33,7 @@ The public [v3.5.1 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot
 
 Binaries are unsigned. Before preparation, local checks passed (892 backend unit tests, 112 frontend tests, 57-test Windows Full browser suite). Local inspection of the first candidate build found the packaged window showing `asset not found`: the staged Tauri config set `frontendDist` to an absolute drive-letter path, which Tauri does not embed. The build now writes a path relative to `src-tauri`, and the smoke script no longer applies the current API-boundary assertions to the v3.5.0 upgrade baseline. The exact published portable EXE was launched natively (WebView2 inspection showed the bundled DILI Agent UI, `/api/health` ok, clean close, no orphan processes). The existing smoke checks only window title and health, so UI rendering is not automated; the owner-approved waivers were populated native analysis, clean-host WebView2, and local MSI install (needs elevation; hosted MSI lifecycle and v3.5.0 upgrade gates passed). The [v3.5.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.5.0) remains documented below.
 
-## Published release: v3.6.0 (minor)
+## Published release: v3.6.0 (minor, latest)
 
 The public [v3.6.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.6.0) is the latest release. Tag v3.6.0 resolves to source commit `b487b98465a799f9ae1a7772fc28cb08355451f9` (`main` and `develop`). Prepare run [41637519430](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/41637519430) and the approved publish run [41684111486](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/41684111486) succeeded. An earlier prepare run failed only at the LiveProvider gate because the test used the retired `deepseek-v4-flash` id (HTTP 400); the test now uses `deepseek-v4.1-flash`. Published assets were downloaded and their digests match the candidate receipt.
 
@@ -41,7 +43,13 @@ The public [v3.6.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot
 | DILIGENT-v3.6.0-windows-x64.msi | 1583e9b081592b8f4d720cfc96aa1f16d0d3b6d7bbab0035b2ec4f8e5e169c7e |
 | DILIGENT-v3.6.0-windows-x64.sha256 | b566bb2f3bf1efa95ae60d1a625d1d477806d834eb57245280d63e2bfac24ffc |
 
-Binaries are unsigned. Local validation of the exact candidate on Windows 11: portable smoke with deep path, a 13-check UI run against an isolated `LOCALAPPDATA` (styled UI, route reload, draft persistence across reload and restart, clean close), and an elevated MSI lifecycle with in-place upgrade from the published v3.5.1 MSI (sessions, versions and settings preserved, migration head verified), uninstall and reinstall. The owner waived a clean-host WebView2 test and a populated native analysis. See the [2026-11-03 report](../../QA/release-gates/20261103/report.md).
+Binaries are unsigned. Local validation of the exact candidate on Windows 11 included portable smoke with a deep path, a 13-check UI run against an isolated `LOCALAPPDATA` (styled UI, route reload, draft persistence across reload and restart, clean close), and an elevated MSI lifecycle with in-place upgrade from the published v3.5.1 MSI (sessions, versions and settings preserved, migration head verified), uninstall, and reinstall. The local release validation also recorded 1034 backend unit and persistence tests passed with 26 PostgreSQL parameterizations skipped, 194 frontend tests passed, the Angular production build passed, and 63 Windows Full browser tests passed. Seven README screenshots were captured from a running build with fictional data; the Knowledge screenshot used a small fixture rather than a full terminology import. Markdown links were checked in 42 tracked files with no broken links. The owner waived a clean-host WebView2 test and a populated native analysis.
+
+## Published release: v3.4.0 (historical)
+
+The public [v3.4.0 release](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.4.0) was published on 2026-10-18 from tag commit `d4efa5e0bccfa552c80a5edeff2168bfaa718639`. Hosted prepare run [39109627873](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39109627873) and approved publish run [39125173765](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/runs/39125173765) passed. The published portable EXE digest was `702f8df1ff1520fe3a43aafc8cfbc589c10a9502cdf2eb2d0264d78a049acd26`; the MSI digest was `3587f93c019e9983e11a5b54955d88e747d0dfbc08b3d369e0447d12e502243d`. Downloaded bytes matched the published assets.
+
+The hosted prepare gates passed 864 backend tests, 53 browser tests, Angular/Vitest and production build, PostgreSQL persistence, LiveProvider E2E, dependency/security checks, portable/deep-path smoke, and MSI install, launch, upgrade, uninstall, and reinstall. On one Windows 11 host, an isolated synthetic DILI assessment persisted and exported a review-required report; a missing visit date blocked session/job creation; settings, sessions, versions, and timelines survived restart; and RAG cited two indexed documents while skipping a byte-identical duplicate. The local qwen3.5:9b timeline request timed out twice and saved a deterministic, source-backed fallback. The binaries were unsigned, and clean-host WebView2 compatibility was waived because only one Windows machine was available. This release evidence does not establish clinical validity or clean-host compatibility.
 
 ## Packaging architecture
 
@@ -85,7 +93,7 @@ Build on Windows x64 with Rust/Cargo, the Windows C++ build tools, network acces
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` to build one artifact. `-OfflineWebView2` applies only to MSI builds. Release builds require a clean worktree unless `-AllowDirtyTree` is supplied intentionally and recorded.
 
-The portable EXE, MSI, and SHA-256 manifest are written under `release/`. Launcher option 8 builds artifacts; option 9 removes selected release artifacts. Intermediate build output and local validation captures are disposable and remain ignored. Only the current release evidence report and its representative screenshots are tracked under `assets/QA/`.
+The portable EXE, MSI, and SHA-256 manifest are written under `release/`. Launcher option 8 builds artifacts; option 9 removes selected release artifacts. Intermediate build output and local validation captures are temporary and are removed after their durable conclusions are recorded here.
 
 ### Local packaged smoke
 
@@ -95,7 +103,7 @@ For a local portable startup check, verify the EXE against its SHA-256 manifest,
 
 The release workflow is .github/workflows/release.yml. It is manually dispatched with mode=prepare or mode=publish; pushing a tag alone does not publish a release.
 
-Preparation runs the required backend quality and migration checks, SQLite/PostgreSQL persistence, frontend tests/build, the Windows Full browser harness, the LiveProvider lane, dependency audits, artifact checks, portable/deep-path smoke, the MSI install/launch/uninstall/reinstall lifecycle, and a populated MSI upgrade from the published v3.5.0 package. The upgrade fixture verifies session, configuration, timeline, and source-catalog data remain intact at the current migration head. It produces checksums and an immutable candidate receipt. Candidate workflow artifacts expire after 30 days; an expired candidate must be prepared and accepted again. Populated databases without a revision and databases with unknown or divergent revisions remain unsupported and are rejected without stamping.
+Preparation runs the required backend quality and migration checks, SQLite/PostgreSQL persistence, frontend tests/build, the Windows Full browser harness, the LiveProvider lane, dependency audits, artifact checks, portable/deep-path smoke, the MSI install/launch/uninstall/reinstall lifecycle, and a populated MSI upgrade from the previously published package (v3.5.1 for v3.6.0). The upgrade fixture verifies session, configuration, timeline, and source-catalog data remain intact at the current migration head. It produces checksums and an immutable candidate receipt. Candidate workflow artifacts expire after 30 days; an expired candidate must be prepared and accepted again. Populated databases without a revision and databases with unknown or divergent revisions remain unsupported and are rejected without stamping.
 
 Keep OPENCODE_GO_API_KEY in the GitHub secret store for LiveProvider E2E. Never put it in local evidence or logs.
 
@@ -105,7 +113,7 @@ Signing state must be explicit for every release. The v3.4.0 release was intenti
 
 ## Release evidence
 
-The retained report records exact source and artifact hashes, hosted run IDs, operator acceptance, native workflows, download readback, the single-machine WebView2 waiver, and the known metadata issue. Keep detailed run output in hosted workflow artifacts or ignored local scratch space; add tracked QA material only when a future external acceptance claim requires it.
+The release record above retains exact source and artifact hashes, hosted run IDs, native acceptance, download readback, waivers, and known release issues. Hosted workflow artifacts provide run-level logs and expire after 30 days. Local logs, screenshots, databases, and build output are temporary and are removed after any durable release conclusion is added here.
 
 ## Cleanup
 

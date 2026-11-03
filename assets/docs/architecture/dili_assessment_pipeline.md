@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## Section Extraction Contract
 A launched DILI session (`POST /api/clinical/sessions/{session_id}/launch`) uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -417,3 +417,22 @@ not reuse the patient visit date as an invented exact event date.
 Regression fixtures under `app/tests/fixtures/dili_pipeline_audit` cover clean, noisy, incomplete, and adversarial clinical documents, including duplicate headings, ambiguous headings, structured and unstructured therapy, structured and noisy laboratories, hepatic-pattern conflicts, family-history disease mentions, allergy-only drug mentions, negated diagnoses, combination therapy, brand/generic variants, and missing LiverTox matches.
 
 Focused clinical correctness unit coverage additionally checks presentation-versus-peak phenotype behavior, laboratory-specific ULN handling, missing-ULN and AST-substitution safeguards, patient-only RUCAM provenance, polypharmacy attribution, baseline-aware case qualification, drug-specific dechallenge, weak LiverTox prior handling, competing-cause semantics, onset-ALP Hy's Law, DILIN severity with negation-aware events, patient-record RUCAM parsing, baseline-aware episode anchoring, EASL single-panel and bilirubin-combined qualification, recurrence-based rechallenge, range stop-date recovery, recently stopped anamnesis drugs, therapy/anamnesis date conflicts, LiverTox likelihood validation, terminology identity warnings, explicit LiverTox link types, reference-range lab parsing, structured narrative claim checks, deterministic safety auditing of revised reports, DILIrank trusted-linking semantics, source-provenance attribution, and failed/cancelled DILIrank cache refresh behavior.
+
+## Clinical Validation Boundary
+
+A synthetic accuracy audit on 2026-10-28 used 57 deterministic probes and 16
+synthetic cases, each run three times through the API. The first results
+exposed systematic defects in competing-cause assessment, dechallenge,
+clinical dates, Hy's Law, severity, RUCAM parsing, episode anchoring, lab
+parsing, qualification, rechallenge, and narrative checks. Three remediation
+passes raised the deterministic probe result from 16/57 to 56/57; ambiguous
+numeric date order is surfaced for
+human review. Repeated outputs were reproducible, which did not make the
+initial incorrect results accurate.
+
+The case expectations were author-derived rather than adjudicated ground
+truth, five cases required expert adjudication, and no real-patient cases or
+independent clinician adjudication were part of that audit. Current fixtures
+and regression checks support software behavior only. They do not establish
+clinical validity; generated structured results remain decision support and
+require qualified clinical review.

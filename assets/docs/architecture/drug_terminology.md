@@ -1,5 +1,5 @@
 # Drug Terminology Resolution
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## Purpose
 
@@ -187,9 +187,24 @@ status, cancel). See [api_surface.md](api_surface.md).
 `app/tests/benchmarks/drug_terminology/` contains 407 labeled cases (generics,
 US and Swiss brands, INN/USAN pairs, language variants, typos, abbreviations,
 salts, stereoisomers, look-alike pairs, strengths, unknowns) and the harness.
-The labels are author-curated from standard nomenclature and are not a
-clinical validation. Latest results:
-[`assets/QA/terminology/drug-terminology-20261029.md`](../../QA/terminology/drug-terminology-20261029.md).
+The 250-case calibration split and 157-case held-out split are deterministic.
+Labels are author-curated from standard nomenclature and are not a clinical
+validation. On the full set, the legacy resolver achieved 62.7% Top-1 accuracy
+with 58 wrong automatic matches; the local terminology resolver achieved
+97.6% with 2 wrong automatic matches, and the resolver with RxNav fallback
+achieved 98.2% with the same 2. On the held-out split, both new configurations
+achieved 97.3% Top-1 accuracy with no wrong automatic matches and 100%
+abstention recall. The two remaining automatic matches were the class terms
+"insulin" and "vitamin D" resolving to their corresponding LiverTox class
+concepts. Local median resolution was 2.0 ms; RxNav fallback raised p95 to
+about 747 ms because it makes network calls for names absent from local
+sources.
+
+The benchmark supports resolver behavior on this curated label set. It does
+not establish clinical identity safety across all products, countries, or
+source versions. Fuzzy calibration did not reduce wrong automatic matches;
+the conservative spelling gate was retained to send look-alike candidates to
+review.
 
 ## Known Limitations
 
