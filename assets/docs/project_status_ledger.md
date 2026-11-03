@@ -5,7 +5,7 @@ Last updated: 2026-11-02
 
 This ledger is the canonical current status of project components. Product behavior is defined in the concept documents linked in each row. The [validation ledger](runtime/validation_ledger.md) preserves cross-cutting evidence boundaries; it does not duplicate component statuses or maintain a dated run diary.
 
-The latest published release is v3.6.0. Its tag, artifact hashes, hosted release gates, unsigned status, owner-approved waivers, and local portable smoke are recorded in the [desktop release document](runtime/desktop_release.md) and the [release evidence report](../QA/release-gates/20261020/report.md).
+The latest published release is v3.6.0. Its tag, artifact hashes, hosted release gates, unsigned status, owner-approved waivers, and local portable smoke are recorded in the [desktop release document](runtime/desktop_release.md) and the [release evidence report](../QA/release-gates/20261103/report.md).
 
 Update a component status only when evidence supports the stated scope. Keep limitations with the affected concept, link to the narrowest relevant documentation, and remove stale status entries when they no longer affect current work.
 
