@@ -66,6 +66,8 @@ try {
         (Join-Path $repoRoot 'app\client\package-lock.json')
     )
     foreach ($path in $persistentFiles) { Write-FixtureFile -Path $path }
+    $dependencySentinel = Join-Path $repoRoot 'app\client\node_modules\undici\lib\llhttp\.gitkeep'
+    Write-FixtureFile -Path $dependencySentinel
 
     $cacheTargets = @(Get-DiligentCacheTargets -RepoRoot $repoRoot -LocalAppData $localAppData -DataRoots @($dataRoot))
     $cachePlan = New-DiligentCleanupPlan -Targets $cacheTargets -AllowedRoots @($repoRoot, $appRoot, $dataRoot)
@@ -82,6 +84,7 @@ try {
     }
     foreach ($path in $persistentFiles) { Assert-True (Test-Path -LiteralPath $path) "Cache cleanup removed persistent data: $path" }
     Assert-True (Test-Path -LiteralPath (Join-Path $repoRoot 'runtimes\cache\.gitkeep')) 'Cache cleanup removed the sentinel.'
+    Assert-True (Test-Path -LiteralPath $dependencySentinel) 'Cache cleanup removed dependency package content.'
 
     $repeat = Invoke-DiligentCleanupPlan -Plan (New-DiligentCleanupPlan -Targets $cacheTargets -AllowedRoots @($repoRoot, $appRoot, $dataRoot))
     Assert-True ($repeat.Failed.Count -eq 0) 'Repeated cleanup failed on missing paths.'
@@ -100,6 +103,7 @@ try {
         (Join-Path $repoRoot 'app\client\dist'),
         (Join-Path $appRoot 'runtime')
     )) { Assert-True (-not (Test-Path -LiteralPath $path)) "Standard uninstall left generated path: $path" }
+    Assert-True (-not (Test-Path -LiteralPath $dependencySentinel)) 'Standard uninstall preserved a dependency package sentinel.'
 
     $outsideMarker = Join-Path $outsideRoot 'keep.txt'
     Write-FixtureFile -Path $outsideMarker

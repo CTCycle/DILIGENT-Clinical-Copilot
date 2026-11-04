@@ -380,7 +380,10 @@ function Get-DiligentUninstallTargets {
         (Join-Path $RepoRoot 'app\desktop\src-tauri\gen'),
         (Join-Path $RepoRoot 'app\desktop\src-tauri\generated'),
         (Join-Path $RepoRoot 'assets\QA\desktop-release-staging')
-    )) { [void]$targets.Add([pscustomobject]@{ Path = $path; Label = 'Repository dependency or generated build output'; PreserveNames = @('.gitkeep') }) }
+    )) {
+        $preserveNames = if ([IO.Path]::GetFileName([string]$path) -ieq 'node_modules') { @() } else { @('.gitkeep') }
+        [void]$targets.Add([pscustomobject]@{ Path = $path; Label = 'Repository dependency or generated build output'; PreserveNames = $preserveNames })
+    }
 
     foreach ($cacheTarget in @(Get-DiligentCacheTargets -RepoRoot $RepoRoot -LocalAppData $LocalAppData -DataRoots $DataRoots -IncludeLogs)) {
         [void]$targets.Add($cacheTarget)
