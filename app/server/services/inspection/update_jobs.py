@@ -54,6 +54,43 @@ def _override_bool(values: Mapping[str, object], key: str) -> bool | None:
 
 
 ###############################################################################
+def _structured_child_overrides(
+    override_values: Mapping[str, object], target: str
+) -> dict[str, object]:
+    payload = override_values.get(target)
+    return dict(payload) if isinstance(payload, Mapping) else {}
+
+
+###############################################################################
+def _mark_pending_cancelled(
+    targets: tuple[str, ...],
+    source_state: dict[str, dict[str, Any]],
+    start_index: int,
+) -> None:
+    for target in targets[start_index:]:
+        if source_state[target]["status"] == "pending":
+            source_state[target].update(
+                status="cancelled",
+                message="Cancellation requested.",
+            )
+
+
+###############################################################################
+def _report_structured_child_progress(
+    patch_job: Callable[[float, str], None],
+    source_state: dict[str, dict[str, Any]],
+    target_count: int,
+    index: int,
+    target: str,
+    progress: float,
+    message: str,
+) -> None:
+    bounded = min(100.0, max(0.0, float(progress)))
+    source_state[target].update(progress=bounded, message=message)
+    patch_job(((index + bounded / 100.0) / target_count) * 100.0, message)
+
+
+###############################################################################
 class DataInspectionProgressReporter:
 
     # -------------------------------------------------------------------------
@@ -296,6 +333,27 @@ class DataInspectionUpdateJobRunner:
         return {"summary": result}
 
     # -------------------------------------------------------------------------
+    def _patch_structured_job(
+        self,
+        job_id: str,
+        source_state: dict[str, dict[str, Any]],
+        summaries: dict[str, Any],
+        progress: float,
+        message: str,
+    ) -> None:
+        self.jobs.update_progress(job_id, progress)
+        self.jobs.update_result(
+            job_id,
+            {
+                "sources": {
+                    target: dict(payload) for target, payload in source_state.items()
+                },
+                "summaries": dict(summaries),
+                "progress_message": message,
+            },
+        )
+
+    # -------------------------------------------------------------------------
     def run_structured_sources_update_job(
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
@@ -326,31 +384,11 @@ class DataInspectionUpdateJobRunner:
             }
         summaries: dict[str, Any] = {}
 
-        def patch_job(progress: float, message: str) -> None:
-            self.jobs.update_progress(job_id, progress)
-            self.jobs.update_result(
-                job_id,
-                {
-                    "sources": {
-                        target: dict(payload)
-                        for target, payload in source_state.items()
-                    },
-                    "summaries": dict(summaries),
-                    "progress_message": message,
-                },
-            )
-
-        def child_overrides(target: str) -> dict[str, object]:
-            payload = override_values.get(target)
-            return dict(payload) if isinstance(payload, Mapping) else {}
-
-        def mark_cancelled(start_index: int) -> None:
-            for target in targets[start_index:]:
-                if source_state[target]["status"] == "pending":
-                    source_state[target].update(
-                        status="cancelled",
-                        message="Cancellation requested.",
-                    )
+        patch_job = partial(
+            self._patch_structured_job, job_id, source_state, summaries
+        )
+        child_overrides = partial(_structured_child_overrides, override_values)
+        mark_cancelled = partial(_mark_pending_cancelled, targets, source_state)
 
         patch_job(0.0, "Structured source updates queued.")
         for index, target in enumerate(targets):
@@ -371,13 +409,14 @@ class DataInspectionUpdateJobRunner:
                 f"Running {target.capitalize()} update.",
             )
 
-            def report_child_progress(progress: float, message: str) -> None:
-                bounded = min(100.0, max(0.0, float(progress)))
-                source_state[target].update(
-                    progress=bounded,
-                    message=message,
-                )
-                patch_job(((index + bounded / 100.0) / len(targets)) * 100.0, message)
+            report_child_progress = partial(
+                _report_structured_child_progress,
+                patch_job,
+                source_state,
+                len(targets),
+                index,
+                target,
+            )
 
             try:
                 if target == "rxnav":

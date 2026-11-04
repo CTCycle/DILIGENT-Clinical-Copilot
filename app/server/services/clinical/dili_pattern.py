@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Literal
 
 from domain.clinical.dili import ClinicalEvidenceQuote, DiliInjuryPattern
@@ -30,43 +31,7 @@ class DiliPatternEngine:
 
         calculated: list[DiliInjuryPattern] = []
 
-        def add_bucket(
-            sample_date: str | None, entries: list[ClinicalLabEntry]
-        ) -> None:
-            pair = analyzer.build_anchor_from_bucket(entries)
-            if pair is None:
-                return
-            score = analyzer.calculator.calculate(
-                alt_value=pair["alt_value"],
-                alt_uln=pair["alt_uln"],
-                alp_value=pair["alp_value"],
-                alp_uln=pair["alp_uln"],
-            )
-            alt = analyzer.pick_best_entry(entries, {"ALT"})
-            alp = analyzer.pick_best_entry(entries, {"ALP"})
-            calculated.append(
-                DiliInjuryPattern(
-                    assessment_point="first_qualifying",
-                    alt=pair["alt_value"],
-                    alt_uln=pair["alt_uln"],
-                    alp=pair["alp_value"],
-                    alp_uln=pair["alp_uln"],
-                    r_ratio=score.r_score,
-                    pattern=self.classify(score.r_score),
-                    pattern_source="calculated",
-                    sample_date=sample_date,
-                    evidence=[
-                        ClinicalEvidenceQuote(
-                            claim="R-ratio input",
-                            quote=(alt.evidence if alt is not None else None)
-                            or (alp.evidence if alp is not None else None),
-                            source_section="laboratory_analysis",
-                            event_date=sample_date,
-                            source_kind="calculated",
-                        )
-                    ],
-                )
-            )
+        add_bucket = partial(self._append_bucket_pattern, analyzer, calculated)
 
         for sample_date in sorted(buckets, key=analyzer._date_sort_key):
             add_bucket(sample_date, buckets[sample_date])
@@ -121,6 +86,49 @@ class DiliPatternEngine:
         peak_payload = peak.model_copy(deep=True)
         peak_payload.assessment_point = "peak"
         return [first_payload, peak_payload]
+
+    # -------------------------------------------------------------------------
+    def _append_bucket_pattern(
+        self,
+        analyzer: HepatotoxicityPatternAnalyzer,
+        calculated: list[DiliInjuryPattern],
+        sample_date: str | None,
+        entries: list[ClinicalLabEntry],
+    ) -> None:
+        pair = analyzer.build_anchor_from_bucket(entries)
+        if pair is None:
+            return
+        score = analyzer.calculator.calculate(
+            alt_value=pair["alt_value"],
+            alt_uln=pair["alt_uln"],
+            alp_value=pair["alp_value"],
+            alp_uln=pair["alp_uln"],
+        )
+        alt = analyzer.pick_best_entry(entries, {"ALT"})
+        alp = analyzer.pick_best_entry(entries, {"ALP"})
+        calculated.append(
+            DiliInjuryPattern(
+                assessment_point="first_qualifying",
+                alt=pair["alt_value"],
+                alt_uln=pair["alt_uln"],
+                alp=pair["alp_value"],
+                alp_uln=pair["alp_uln"],
+                r_ratio=score.r_score,
+                pattern=self.classify(score.r_score),
+                pattern_source="calculated",
+                sample_date=sample_date,
+                evidence=[
+                    ClinicalEvidenceQuote(
+                        claim="R-ratio input",
+                        quote=(alt.evidence if alt is not None else None)
+                        or (alp.evidence if alp is not None else None),
+                        source_section="laboratory_analysis",
+                        event_date=sample_date,
+                        source_kind="calculated",
+                    )
+                ],
+            )
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

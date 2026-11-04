@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime
+from functools import partial
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -174,26 +175,33 @@ class ModelConfigSerializer:
         }
         updates = {key: value for key, value in updates.items() if value is not UNSET}
 
-        def merge_latest_configuration(payload: dict[str, object]) -> None:
-            payload.pop("database", None)
-            current = asdict(self.snapshot_from_payload(payload, updated_at=None))
-            current.pop("updated_at", None)
-            current.update(updates)
-            self._require_required_roles(current)
-            current["reasoning_level"] = self.reasoning_level_from_payload(current)
-            current["ollama_seed"] = self.normalize_optional_seed(
-                current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
-            )
-            current["rag_settings"] = self.normalize_rag_settings(
-                current.get("rag_settings")
-            )
-            payload.update(current)
+        merge_latest_configuration = partial(
+            self._merge_latest_configuration, updates
+        )
 
         saved_payload, updated_at = self.application_configuration.update_payload(
             merge_latest_configuration,
             return_metadata=True,
         )
         return self.snapshot_from_payload(saved_payload, updated_at=updated_at)
+
+    # -------------------------------------------------------------------------
+    def _merge_latest_configuration(
+        self, updates: dict[str, object], payload: dict[str, object]
+    ) -> None:
+        payload.pop("database", None)
+        current = asdict(self.snapshot_from_payload(payload, updated_at=None))
+        current.pop("updated_at", None)
+        current.update(updates)
+        self._require_required_roles(current)
+        current["reasoning_level"] = self.reasoning_level_from_payload(current)
+        current["ollama_seed"] = self.normalize_optional_seed(
+            current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
+        )
+        current["rag_settings"] = self.normalize_rag_settings(
+            current.get("rag_settings")
+        )
+        payload.update(current)
 
     # -------------------------------------------------------------------------
     @classmethod

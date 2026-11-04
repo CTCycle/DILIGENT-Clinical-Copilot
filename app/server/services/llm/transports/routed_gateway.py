@@ -7,6 +7,7 @@ import hashlib
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from functools import partial
 
 import httpx
 
@@ -25,6 +26,7 @@ from services.llm.transports.base import (
     CloudTransport,
     StructuredTransportMixin,
     call_with_retries,
+    checked_http_call,
 )
 from services.llm.transports.openai_chat import OpenAIChatTransport
 from services.llm.transports.openai_responses import OpenAIResponsesTransport
@@ -152,10 +154,7 @@ class RoutedGatewayTransport(StructuredTransportMixin):
                 headers={"Authorization": f"Bearer {self.api_key}"},
             ) as client:
 
-                async def get_checked() -> httpx.Response:
-                    response = await client.get(self.models_path)
-                    response.raise_for_status()
-                    return response
+                get_checked = partial(checked_http_call, client.get, self.models_path)
 
                 response = await call_with_retries(
                     get_checked,

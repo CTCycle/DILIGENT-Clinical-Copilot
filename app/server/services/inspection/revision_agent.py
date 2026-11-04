@@ -200,6 +200,31 @@ def _requested_append_sentence(instruction: str | None) -> str | None:
 
 
 ###############################################################################
+async def _structured_call_and_close(
+    client: Any,
+    *,
+    model: str,
+    user_prompt: str,
+    schema: type[Any],
+    purpose: GenerationPurpose,
+) -> Any:
+    try:
+        return await client.llm_structured_call(
+            model=model,
+            system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            schema=schema,
+            purpose=purpose,
+            use_json_mode=True,
+            max_repair_attempts=3,
+        )
+    finally:
+        close = getattr(client, "close", None)
+        if close is not None:
+            await close()
+
+
+###############################################################################
 def _revision_provider_timeout(provider: str) -> float:
     runtime = get_server_settings().runtime
     cap = (
@@ -1148,53 +1173,74 @@ class RevisionAgentRunner:
         max_tool_calls: int,
         stop_check: StopCheck | None,
     ) -> ToolLoopResult:
-        async def run() -> ToolLoopResult:
-            client = select_llm_provider(
-                provider=runtime.provider,
-                default_model=runtime.model,
-                timeout_s=_revision_provider_timeout(runtime.provider),
-                max_retries=REVISION_PROVIDER_MAX_RETRIES,
+        return asyncio.run(
+            self._run_native_tool_loop(
+                runtime=runtime,
+                task=task,
+                manifest=manifest,
+                tools=tools,
+                registry=registry,
+                max_tool_calls=max_tool_calls,
+                stop_check=stop_check,
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    async def _run_native_tool_loop(
+        *,
+        runtime: RevisionAgentRuntime,
+        task: Any,
+        manifest: list[str],
+        tools: list[Any],
+        registry: RevisionToolRegistry,
+        max_tool_calls: int,
+        stop_check: StopCheck | None,
+    ) -> ToolLoopResult:
+        client = select_llm_provider(
+            provider=runtime.provider,
+            default_model=runtime.model,
+            timeout_s=_revision_provider_timeout(runtime.provider),
+            max_retries=REVISION_PROVIDER_MAX_RETRIES,
+        )
+        try:
+            executor = ToolLoopExecutor(
+                chat=client.chat_result,  # type: ignore[attr-defined]
+                execute=lambda name, arguments: registry.execute(
+                    name, arguments, manifest
+                ),
+                max_iterations=max(1, max_tool_calls),
+                max_tool_calls=max(1, max_tool_calls),
+                stop_check=stop_check,
             )
             try:
-                executor = ToolLoopExecutor(
-                    chat=client.chat_result,  # type: ignore[attr-defined]
-                    execute=lambda name, arguments: registry.execute(
-                        name, arguments, manifest
-                    ),
-                    max_iterations=max(1, max_tool_calls),
-                    max_tool_calls=max(1, max_tool_calls),
-                    stop_check=stop_check,
+                return await executor.run(
+                    model=runtime.model,
+                    messages=[
+                        ChatMessage(
+                            role="system",
+                            content=REVISION_AGENT_SYSTEM_PROMPT,
+                        ),
+                        ChatMessage(
+                            role="user",
+                            content=tool_prompt(
+                                task.model_dump(mode="json"), [], manifest
+                            ),
+                        ),
+                    ],
+                    tools=tools,
+                    purpose=GenerationPurpose.REVISION_TOOL_SELECTION,
                 )
-                try:
-                    return await executor.run(
-                        model=runtime.model,
-                        messages=[
-                            ChatMessage(
-                                role="system",
-                                content=REVISION_AGENT_SYSTEM_PROMPT,
-                            ),
-                            ChatMessage(
-                                role="user",
-                                content=tool_prompt(
-                                    task.model_dump(mode="json"), [], manifest
-                                ),
-                            ),
-                        ],
-                        tools=tools,
-                        purpose=GenerationPurpose.REVISION_TOOL_SELECTION,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    if getattr(exc, "error_code", None) == "cancelled" or (
-                        stop_check is not None and stop_check()
-                    ):
-                        raise RevisionAgentCancelled("Revision job cancelled.") from exc
-                    raise
-            finally:
-                close = getattr(client, "close", None)
-                if close is not None:
-                    await close()
-
-        return asyncio.run(run())
+            except Exception as exc:  # noqa: BLE001
+                if getattr(exc, "error_code", None) == "cancelled" or (
+                    stop_check is not None and stop_check()
+                ):
+                    raise RevisionAgentCancelled("Revision job cancelled.") from exc
+                raise
+        finally:
+            close = getattr(client, "close", None)
+            if close is not None:
+                await close()
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1227,23 +1273,15 @@ class RevisionAgentRunner:
             timeout_s=_revision_provider_timeout(runtime.provider),
             max_retries=REVISION_PROVIDER_MAX_RETRIES,
         )
-        async def call() -> Any:
-            try:
-                return await client.llm_structured_call(
-                    model=runtime.model,
-                    system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                    schema=schema,
-                    purpose=purpose,
-                    use_json_mode=True,
-                    max_repair_attempts=3,
-                )
-            finally:
-                close = getattr(client, "close", None)
-                if close is not None:
-                    await close()
-
-        return asyncio.run(call())
+        return asyncio.run(
+            _structured_call_and_close(
+                client,
+                model=runtime.model,
+                user_prompt=user_prompt,
+                schema=schema,
+                purpose=purpose,
+            )
+        )
 
     # -------------------------------------------------------------------------
     def _run_structured_scan(
@@ -1270,20 +1308,12 @@ class RevisionAgentRunner:
             timeout_s=_revision_provider_timeout(runtime.provider),
             max_retries=REVISION_PROVIDER_MAX_RETRIES,
         )
-        async def call() -> RevisionIssueScanResult:
-            try:
-                return await client.llm_structured_call(
-                    model=runtime.model,
-                    system_prompt=REVISION_AGENT_SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                    schema=RevisionIssueScanResult,
-                    purpose=GenerationPurpose.REVISION_SCAN,
-                    use_json_mode=True,
-                    max_repair_attempts=3,
-                )
-            finally:
-                close = getattr(client, "close", None)
-                if close is not None:
-                    await close()
-
-        return asyncio.run(call())
+        return asyncio.run(
+            _structured_call_and_close(
+                client,
+                model=runtime.model,
+                user_prompt=user_prompt,
+                schema=RevisionIssueScanResult,
+                purpose=GenerationPurpose.REVISION_SCAN,
+            )
+        )

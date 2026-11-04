@@ -34,6 +34,11 @@ T = TypeVar("T")
 
 
 ###############################################################################
+async def _run_awaitable(awaitable: Awaitable[T]) -> T:
+    return await awaitable
+
+
+###############################################################################
 async def _await_with_stop_check(
     awaitable: Awaitable[T],
     *,
@@ -43,10 +48,7 @@ async def _await_with_stop_check(
     if stop_check is None:
         return await awaitable
 
-    async def run_awaitable() -> T:
-        return await awaitable
-
-    task = asyncio.create_task(run_awaitable())
+    task = asyncio.create_task(_run_awaitable(awaitable))
     try:
         while not task.done():
             stop_check()

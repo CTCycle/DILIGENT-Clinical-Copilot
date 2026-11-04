@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import time
+from functools import partial
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -40,6 +41,17 @@ class TerminologyIngestor:
         self.on_change = on_change
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _report_source_progress(
+        progress: ProgressFn,
+        total: int,
+        base: float,
+        value: float,
+        message: str,
+    ) -> None:
+        progress(base + max(0.0, min(100.0, value)) / total, message)
+
+    # -------------------------------------------------------------------------
     def run(
         self,
         *,
@@ -55,8 +67,7 @@ class TerminologyIngestor:
                 continue
             base = 100.0 * index / total
 
-            def report(value: float, message: str, *, _base: float = base) -> None:
-                progress(_base + max(0.0, min(100.0, value)) / total, message)
+            report = partial(self._report_source_progress, progress, total, base)
 
             report(0.0, f"Refreshing {source.key}")
             results[source.key] = self._run_source(source, force_full, report, should_stop)

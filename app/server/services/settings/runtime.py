@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from threading import RLock
 from typing import Any
 
@@ -113,66 +114,10 @@ class RuntimeSettingsService:
     ) -> None:
         serializer = self._serializer_or_create()
         try:
-            def update_payload(payload: dict[str, Any]) -> None:
-                if not payload:
-                    payload.update(
-                        build_default_application_configuration_payload(
-                            environment_snapshot_from_os_env()
-                        )
-                    )
-                if "general" in updates:
-                    jobs = payload.get("jobs")
-                    jobs = dict(jobs) if isinstance(jobs, dict) else {}
-                    jobs.update(updates["general"])
-                    payload["jobs"] = jobs
-                if "data" in updates:
-                    data_blocks = {
-                        "ingestion": {
-                            "drug_name_min_length",
-                            "drug_name_max_length",
-                            "drug_name_max_tokens",
-                        },
-                        "session_pipeline": {
-                            "text_extraction_batch_size",
-                            "text_extraction_max_concurrency",
-                            "retrieval_batch_size",
-                            "retrieval_max_concurrency",
-                            "clinical_assessment_batch_size",
-                            "clinical_assessment_max_concurrency",
-                        },
-                        "clinical_language_detection": {
-                            "min_best_score",
-                            "high_confidence_min_score",
-                            "high_confidence_min_margin",
-                            "moderate_confidence_min_score",
-                            "moderate_confidence_min_margin",
-                        },
-                    }
-                    for block_name, block_fields in data_blocks.items():
-                        block = payload.get(block_name)
-                        block = dict(block) if isinstance(block, dict) else {}
-                        block.update(
-                            {
-                                key: value
-                                for key, value in updates["data"].items()
-                                if key in block_fields
-                            }
-                        )
-                        payload[block_name] = block
-                if "integrations" in updates or "advanced" in updates:
-                    runtime = payload.get("runtime")
-                    runtime = dict(runtime) if isinstance(runtime, dict) else {}
-                    runtime.update(updates.get("integrations", {}))
-                    runtime.update(updates.get("advanced", {}))
-                    payload["runtime"] = runtime
-                if "matching" in updates:
-                    matching = payload.get("drugs_matcher")
-                    matching = dict(matching) if isinstance(matching, dict) else {}
-                    matching.update(updates["matching"])
-                    payload["drugs_matcher"] = matching
-
             with _RUNTIME_SETTINGS_WRITE_LOCK:
-                saved_payload = serializer.update_payload(update_payload)
+                saved_payload = serializer.update_payload(
+                    partial(_apply_runtime_updates, updates)
+                )
                 get_configuration_manager().reload(saved_payload)
         except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
             raise ServiceError(
@@ -250,4 +195,66 @@ class RuntimeSettingsService:
             _, timestamp = self._serializer_or_create().load_with_metadata()
             return timestamp
         except (OSError, RuntimeError, SQLAlchemyError):
-            return None
+            return None###############################################################################
+def _apply_runtime_updates(
+    updates: dict[str, dict[str, Any]], payload: dict[str, Any]
+) -> None:
+    if not payload:
+        payload.update(
+            build_default_application_configuration_payload(
+                environment_snapshot_from_os_env()
+            )
+        )
+    if "general" in updates:
+        jobs = payload.get("jobs")
+        jobs = dict(jobs) if isinstance(jobs, dict) else {}
+        jobs.update(updates["general"])
+        payload["jobs"] = jobs
+    if "data" in updates:
+        data_blocks = {
+            "ingestion": {
+                "drug_name_min_length",
+                "drug_name_max_length",
+                "drug_name_max_tokens",
+            },
+            "session_pipeline": {
+                "text_extraction_batch_size",
+                "text_extraction_max_concurrency",
+                "retrieval_batch_size",
+                "retrieval_max_concurrency",
+                "clinical_assessment_batch_size",
+                "clinical_assessment_max_concurrency",
+            },
+            "clinical_language_detection": {
+                "min_best_score",
+                "high_confidence_min_score",
+                "high_confidence_min_margin",
+                "moderate_confidence_min_score",
+                "moderate_confidence_min_margin",
+            },
+        }
+        for block_name, block_fields in data_blocks.items():
+            block = payload.get(block_name)
+            block = dict(block) if isinstance(block, dict) else {}
+            block.update(
+                {
+                    key: value
+                    for key, value in updates["data"].items()
+                    if key in block_fields
+                }
+            )
+            payload[block_name] = block
+    if "integrations" in updates or "advanced" in updates:
+        runtime = payload.get("runtime")
+        runtime = dict(runtime) if isinstance(runtime, dict) else {}
+        runtime.update(updates.get("integrations", {}))
+        runtime.update(updates.get("advanced", {}))
+        payload["runtime"] = runtime
+    if "matching" in updates:
+        matching = payload.get("drugs_matcher")
+        matching = dict(matching) if isinstance(matching, dict) else {}
+        matching.update(updates["matching"])
+        payload["drugs_matcher"] = matching
+
+
+

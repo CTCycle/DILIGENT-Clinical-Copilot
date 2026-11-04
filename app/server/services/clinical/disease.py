@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import re
 import unicodedata
+from functools import partial
 from collections.abc import Callable
 from typing import Any
 
@@ -38,6 +39,17 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     r"please\s+try\s+again\s+in\s+(\d+(?:\.\d+)?)s",
     re.IGNORECASE,
 )
+
+
+###############################################################################
+def _stop_requested(stop_check: Callable[[], None] | None) -> bool:
+    if stop_check is None:
+        return False
+    try:
+        stop_check()
+    except ClinicalJobCancelled:
+        return True
+    return False
 
 
 ###############################################################################
@@ -354,14 +366,7 @@ class DiseaseExtractor:
         if stop_check is not None:
             stop_check()
 
-        def cancel_check() -> bool:
-            if stop_check is None:
-                return False
-            try:
-                stop_check()
-            except ClinicalJobCancelled:
-                return True
-            return False
+        cancel_check = partial(_stop_requested, stop_check)
 
         self.emit_progress(progress_callback, 0.0)
         deterministic = extract_deterministic_diseases(cleaned)

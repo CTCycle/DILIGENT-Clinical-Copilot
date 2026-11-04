@@ -8,6 +8,7 @@ import json
 import re
 import time
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from typing import cast
@@ -239,6 +240,32 @@ def _normalize_drug_dates(drugs: PatientDrugs, date_order: DateOrder) -> Patient
 
 
 ###############################################################################
+async def _extract_drug_group(
+    group: str,
+    *,
+    service: Any,
+    cleaned_anamnesis_text: str,
+    cleaned_therapy_text: str,
+    issues: list[Any],
+    progress_callback: Any,
+    stop_check: Any,
+) -> PatientDrugs:
+    if group == "anamnesis":
+        return await service.extract_anamnesis_drugs(
+            anamnesis_text=cleaned_anamnesis_text,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+    return await service.extract_therapy_drugs(
+        cleaned_therapy_text=cleaned_therapy_text,
+        issues=issues,
+        progress_callback=progress_callback,
+        stop_check=stop_check,
+    )
+
+
+###############################################################################
 async def process_single_patient_workflow(
     service: Any,
     payload: PatientData,
@@ -319,20 +346,15 @@ async def process_single_patient_workflow(
     parser_task_count = min(2, extraction_batch_size, extraction_max_concurrency)
     preflight = await check_parser_batch_capacity(task_count=parser_task_count)
     if preflight.concurrency_allowed:
-        async def extract_drug_group(group: str) -> PatientDrugs:
-            if group == "anamnesis":
-                return await service.extract_anamnesis_drugs(
-                    anamnesis_text=cleaned_anamnesis_text,
-                    issues=issues,
-                    progress_callback=progress_callback,
-                    stop_check=stop_check,
-                )
-            return await service.extract_therapy_drugs(
-                cleaned_therapy_text=cleaned_therapy_text,
-                issues=issues,
-                progress_callback=progress_callback,
-                stop_check=stop_check,
-            )
+        extract_drug_group = partial(
+            _extract_drug_group,
+            service=service,
+            cleaned_anamnesis_text=cleaned_anamnesis_text,
+            cleaned_therapy_text=cleaned_therapy_text,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
 
         anamnesis_drugs, therapy_drugs = await run_batched_in_order(
             ["anamnesis", "therapy"],

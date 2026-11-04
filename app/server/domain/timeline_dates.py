@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from functools import partial
 import re
 
 from common.utils.clinical_dates import (
@@ -159,6 +160,21 @@ def _named_date_interval(match: re.Match[str]) -> TimelineDateInterval | None:
 
 
 ###############################################################################
+def _claim_match(
+    found: list[tuple[int, EvidenceDate]],
+    taken: list[tuple[int, int]],
+    match: re.Match[str],
+    interval: TimelineDateInterval | None,
+) -> None:
+    if interval is None:
+        return
+    if any(start < match.end() and match.start() < end for start, end in taken):
+        return
+    taken.append((match.start(), match.end()))
+    found.append((match.start(), EvidenceDate(match.group(0), interval)))
+
+
+###############################################################################
 def find_evidence_dates(
     text: str | None,
     order: DateOrder = "day_first",
@@ -175,13 +191,7 @@ def find_evidence_dates(
     found: list[tuple[int, EvidenceDate]] = []
     taken: list[tuple[int, int]] = []
 
-    def claim(match: re.Match[str], interval: TimelineDateInterval | None) -> None:
-        if interval is None:
-            return
-        if any(start < match.end() and match.start() < end for start, end in taken):
-            return
-        taken.append((match.start(), match.end()))
-        found.append((match.start(), EvidenceDate(match.group(0), interval)))
+    claim = partial(_claim_match, found, taken)
 
     for match in _ISO_TOKEN_RE.finditer(text):
         claim(match, normalize_timeline_interval(match.group(0)))

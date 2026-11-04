@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 import sys
+from functools import partial
 from typing import Any, Protocol
 
 import httpx
@@ -164,6 +165,36 @@ def provider_exception_is_retryable(exc: BaseException) -> bool:
 
 
 ###############################################################################
+async def _enter_context(
+    context_factory: Callable[[], Any],
+    validate: Callable[[Any], None] | None,
+) -> tuple[Any, Any]:
+    context = context_factory()
+    try:
+        value = await context.__aenter__()
+        if validate is not None:
+            validate(value)
+        return context, value
+    except Exception:
+        exit_error = sys.exc_info()
+        try:
+            await context.__aexit__(*exit_error)
+        except Exception:
+            pass
+        raise
+
+
+###############################################################################
+async def checked_http_call(
+    method: Callable[..., Awaitable[httpx.Response]], *args: Any, **kwargs: Any
+) -> httpx.Response:
+    """Issue one HTTP request and raise on an error status."""
+    response = await method(*args, **kwargs)
+    response.raise_for_status()
+    return response
+
+
+###############################################################################
 async def call_with_retries(
     operation: Callable[[], Awaitable[Any]],
     *,
@@ -199,23 +230,8 @@ async def enter_async_context_with_retries(
 ) -> tuple[Any, Any]:
     """Enter an SDK/HTTP streaming context with the same retry policy as chat."""
 
-    async def enter() -> tuple[Any, Any]:
-        context = context_factory()
-        try:
-            value = await context.__aenter__()
-            if validate is not None:
-                validate(value)
-            return context, value
-        except Exception:
-            exit_error = sys.exc_info()
-            try:
-                await context.__aexit__(*exit_error)
-            except Exception:
-                pass
-            raise
-
     return await call_with_retries(
-        enter,
+        partial(_enter_context, context_factory, validate),
         max_retries=max_retries,
         cancel_check=cancel_check,
     )

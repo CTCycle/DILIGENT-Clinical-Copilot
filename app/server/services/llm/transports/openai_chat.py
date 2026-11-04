@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator, Mapping
+from functools import partial
 from typing import Any
 
 import httpx
@@ -23,6 +24,7 @@ from domain.llm.transports import (
 from services.llm.transports.base import (
     StructuredTransportMixin,
     call_with_retries,
+    checked_http_call,
     enter_async_context_with_retries,
     request_output_token_limit,
     normalize_finish_reason,
@@ -321,10 +323,9 @@ class OpenAIChatTransport(StructuredTransportMixin):
         self._check_active(request)
         payload = self._request_payload(request, stream=False)
 
-        async def post_checked() -> httpx.Response:
-            response = await self.client.post("chat/completions", json=payload)
-            response.raise_for_status()
-            return response
+        post_checked = partial(
+            checked_http_call, self.client.post, "chat/completions", json=payload
+        )
 
         operation = asyncio.create_task(
             call_with_retries(
@@ -493,10 +494,7 @@ class OpenAIChatTransport(StructuredTransportMixin):
     ) -> list[CloudModelDescriptor]:
         del force_refresh
 
-        async def get_checked() -> httpx.Response:
-            response = await self.client.get("models")
-            response.raise_for_status()
-            return response
+        get_checked = partial(checked_http_call, self.client.get, "models")
 
         response = await call_with_retries(
             get_checked,

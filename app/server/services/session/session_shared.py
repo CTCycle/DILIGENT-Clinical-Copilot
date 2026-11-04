@@ -422,6 +422,35 @@ def _failure_error(code: str, message: str) -> dict[str, str]:
 
 
 ###############################################################################
+async def _persist_clinical_failure(
+    issues: list[dict[str, Any]],
+    error_message: str,
+    error: dict[str, str],
+    *,
+    service: Any,
+    payload: PatientData,
+    patient_image_base64: str | None,
+    session_id: int,
+    section_extraction: ClinicalSectionExtractionResult | None,
+    job_started_at: float,
+) -> None:
+    failed = build_failed_session_payload(
+        payload=payload,
+        patient_image_base64=patient_image_base64,
+        issues=issues,
+        error_message=error_message,
+        elapsed_seconds=(time.perf_counter() - job_started_at),
+        section_extraction=section_extraction,
+    )
+    failed["lifecycle_error"] = error
+    await asyncio.to_thread(
+        service.session_repository.complete_clinical_session,
+        session_id,
+        failed,
+    )
+
+
+###############################################################################
 async def execute_clinical_job(
     service: Any,
     payload: PatientData,
@@ -454,24 +483,15 @@ async def execute_clinical_job(
         detail="preflight.validated",
     )
     job_started_at = time.perf_counter()
-
-    async def persist_failure(
-        issues: list[dict[str, Any]], error_message: str, error: dict[str, str]
-    ) -> None:
-        failed = build_failed_session_payload(
-            payload=payload,
-            patient_image_base64=patient_image_base64,
-            issues=issues,
-            error_message=error_message,
-            elapsed_seconds=(time.perf_counter() - job_started_at),
-            section_extraction=section_extraction,
-        )
-        failed["lifecycle_error"] = error
-        await asyncio.to_thread(
-            service.session_repository.complete_clinical_session,
-            session_id,
-            failed,
-        )
+    persist_failure = partial(
+        _persist_clinical_failure,
+        service=service,
+        payload=payload,
+        patient_image_base64=patient_image_base64,
+        session_id=session_id,
+        section_extraction=section_extraction,
+        job_started_at=job_started_at,
+    )
 
     try:
         result = await service.process_single_patient(

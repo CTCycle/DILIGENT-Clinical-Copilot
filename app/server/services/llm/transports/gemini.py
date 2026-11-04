@@ -267,6 +267,26 @@ class GeminiTransport(StructuredTransportMixin):
         return self._result(response)
 
     # -------------------------------------------------------------------------
+    def _produce_stream_events(
+        self,
+        request: ChatRequest,
+        contents: Any,
+        events: queue.Queue[object],
+        sentinel: object,
+    ) -> None:
+        try:
+            for item in self.client.models.generate_content_stream(
+                model=request.model,
+                contents=contents,
+                config=self._config(request),
+            ):
+                events.put(item)
+        except Exception as exc:  # noqa: BLE001
+            events.put(exc)
+        finally:
+            events.put(sentinel)
+
+    # -------------------------------------------------------------------------
     async def stream(self, request: ChatRequest) -> AsyncIterator[ChatStreamEvent]:
         self._check_active(request)
         validate_request_capabilities(request.model_copy(update={"stream": True}))
@@ -274,20 +294,11 @@ class GeminiTransport(StructuredTransportMixin):
         events: queue.Queue[object] = queue.Queue()
         sentinel = object()
 
-        def produce() -> None:
-            try:
-                for item in self.client.models.generate_content_stream(
-                    model=request.model,
-                    contents=contents,
-                    config=self._config(request),
-                ):
-                    events.put(item)
-            except Exception as exc:  # noqa: BLE001
-                events.put(exc)
-            finally:
-                events.put(sentinel)
-
-        task = asyncio.create_task(asyncio.to_thread(produce))
+        task = asyncio.create_task(
+            asyncio.to_thread(
+                self._produce_stream_events, request, contents, events, sentinel
+            )
+        )
         text_parts: list[str] = []
         reasoning_parts: list[str] = []
         calls: dict[int, ToolCall] = {}

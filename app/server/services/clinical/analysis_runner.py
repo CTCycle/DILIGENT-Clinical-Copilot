@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import date
+from functools import partial
 from typing import Any, TypeAlias
 
 from common.utils.logger import logger
@@ -144,6 +145,25 @@ def normalize_match_reason(
     if len(primary_reason) > MATCH_REASON_MAX_LENGTH:
         primary_reason = primary_reason[:MATCH_REASON_MAX_LENGTH].rstrip()
     return primary_reason or None, normalized_notes
+
+
+###############################################################################
+async def _prepare_indexed_item(
+    item: tuple[int, Any],
+    *,
+    prepare_fn: Callable[..., Any],
+    **context: Any,
+) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
+    idx, drug_entry = item
+    return await prepare_fn(idx=idx, drug_entry=drug_entry, **context)
+
+
+###############################################################################
+async def _execute_indexed_item(
+    execute: Callable[[int, Any], Any], item: tuple[int, Any]
+) -> tuple[int, Any]:
+    idx, task = item
+    return await execute(idx, task)
 
 
 ###############################################################################
@@ -380,21 +400,17 @@ class AnalysisRunner:
                 if normalized_key:
                     rucam_by_key[normalized_key] = item
 
-        async def prepare_item(
-            item: tuple[int, Any],
-        ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-            idx, drug_entry = item
-            return await prepare_fn(
-                idx=idx,
-                drug_entry=drug_entry,
-                resolved_drugs=resolved_drugs,
-                visit_date=visit_date,
-                report_language=report_language,
-                normalized_context=normalized_context,
-                pattern_summary=pattern_summary,
-                rag_query=rag_query,
-                rucam_by_key=rucam_by_key,
-            )
+        prepare_item = partial(
+            _prepare_indexed_item,
+            prepare_fn=prepare_fn,
+            resolved_drugs=resolved_drugs,
+            visit_date=visit_date,
+            report_language=report_language,
+            normalized_context=normalized_context,
+            pattern_summary=pattern_summary,
+            rag_query=rag_query,
+            rucam_by_key=rucam_by_key,
+        )
 
         prepared_items = await run_batched_in_order(
             list(enumerate(self.drugs.entries)),
@@ -409,11 +425,9 @@ class AnalysisRunner:
 
         self.emit_progress(progress_callback, stage="llm_analysis", fraction=0.0)
         if llm_jobs:
-            async def run_assessment_job(
-                item: tuple[int, Any],
-            ) -> tuple[int, Any]:
-                idx, task = item
-                return await self.execute_indexed_job(idx, task)
+            run_assessment_job = partial(
+                _execute_indexed_item, self.execute_indexed_job
+            )
 
             completed_results = await run_batched_in_order(
                 llm_jobs,
