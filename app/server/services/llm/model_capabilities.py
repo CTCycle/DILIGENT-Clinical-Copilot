@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from functools import partial
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Literal
@@ -209,6 +210,37 @@ def _coerce_reasoning_parameter(value: object) -> ReasoningParameter:
 
 
 ###############################################################################
+def _metadata_value(metadata: ModelCapabilityMetadata | None, name: str) -> object:
+    if metadata is None:
+        return None
+    return getattr(metadata, name)
+
+
+###############################################################################
+def _rule_value(
+    rule: Mapping[str, object],
+    fallback: Mapping[str, object],
+    name: str,
+    fallback_name: str | None = None,
+) -> object:
+    if name in rule:
+        return rule[name]
+    return fallback.get(fallback_name or name)
+
+
+###############################################################################
+def _pick_capability(
+    item: Mapping[str, object], capabilities: Mapping[str, object], *names: str
+) -> object:
+    for name in names:
+        if name in item and item[name] is not None:
+            return item[name]
+        if name in capabilities and capabilities[name] is not None:
+            return capabilities[name]
+    return None
+
+
+###############################################################################
 def resolve_model_capabilities(
     *,
     provider: str,
@@ -237,15 +269,8 @@ def resolve_model_capabilities(
         or (descriptor is not None and descriptor.capabilities is not None)
     )
 
-    def metadata_value(name: str) -> object:
-        if metadata is None:
-            return None
-        return getattr(metadata, name)
-
-    def rule_value(name: str, fallback_name: str | None = None) -> object:
-        if name in rule:
-            return rule[name]
-        return fallback.get(fallback_name or name)
+    metadata_value = partial(_metadata_value, metadata)
+    rule_value = partial(_rule_value, rule, fallback)
 
     input_token_limit = _coerce_optional_positive_int(
         metadata_value("context_window_tokens")
@@ -512,17 +537,7 @@ def catalog_capability_metadata(
     nested = item.get("capabilities")
     capabilities = dict(nested) if isinstance(nested, Mapping) else {}
 
-    def pick(*names: str) -> object:
-        for name in names:
-            if name in item and item[name] is not None:
-                return item[name]
-            if name in capabilities and capabilities[name] is not None:
-                return capabilities[name]
-        return None
-
-    def optional_bool(*names: str) -> bool | None:
-        value = pick(*names)
-        return _optional_bool(value)
+    pick = partial(_pick_capability, item, capabilities)
 
     values: dict[str, object] = {}
     string_fields = {
@@ -614,7 +629,7 @@ def catalog_capability_metadata(
         ),
     }
     for target, names in bool_fields.items():
-        parsed = optional_bool(*names)
+        parsed = _optional_bool(pick(*names))
         if parsed is not None:
             values[target] = parsed
 

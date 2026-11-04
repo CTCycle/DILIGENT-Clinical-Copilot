@@ -40,6 +40,11 @@ FALLBACK_STATUSES = frozenset({"missing_livertox", "ambiguous_requires_review", 
 
 
 ###############################################################################
+def _audit_issue(code: str, message: str) -> PipelineIssue:
+    return PipelineIssue(severity="warning", code=code, field="matched_drugs", message=message)
+
+
+###############################################################################
 class ClinicalKnowledgePreparation:
 
     # -------------------------------------------------------------------------
@@ -461,35 +466,32 @@ class ClinicalKnowledgePreparation:
         status = str(payload.get("decision_status") or "")
         resolved = terminology.get("preferred_name") or payload.get("drug_name") or "another name"
 
-        def issue(code: str, message: str) -> PipelineIssue:
-            return PipelineIssue(severity="warning", code=code, field="matched_drugs", message=message)
-
         if status == "unresolved":
             if terminology.get("method") == "product_unverified":
                 return [
-                    issue(
+                    _audit_issue(
                         "drug_composition_unverified",
                         f"{raw_label} matches a product whose composition could not be verified.",
                     )
                 ]
-            return [issue("drug_identity_unresolved", f"No terminology identity was verified for {raw_label}.")]
+            return [_audit_issue("drug_identity_unresolved", f"No terminology identity was verified for {raw_label}.")]
         if status == "ambiguous_requires_review":
             candidates = ", ".join(
                 str(item.get("name")) for item in terminology.get("candidates") or [] if item.get("name")
             )
             suffix = f" Candidates: {candidates}." if candidates else ""
-            return [issue("drug_identity_ambiguous", f"Drug identity is ambiguous for {raw_label}.{suffix}")]
+            return [_audit_issue("drug_identity_ambiguous", f"Drug identity is ambiguous for {raw_label}.{suffix}")]
         issues: list[PipelineIssue] = []
         if terminology.get("status") == "probable":
             issues.append(
-                issue(
+                _audit_issue(
                     "drug_identity_probable",
                     f"{raw_label} was matched to {resolved} by spelling correction; confirm the drug identity.",
                 )
             )
         if status == "missing_livertox":
             issues.append(
-                issue("livertox_link_missing", f"No LiverTox record is linked to {resolved} ({raw_label}).")
+                _audit_issue("livertox_link_missing", f"No LiverTox record is linked to {resolved} ({raw_label}).")
             )
         return issues
 

@@ -71,12 +71,15 @@ def _utc_now() -> datetime:
 
 
 ###############################################################################
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+###############################################################################
 def _same_instant(stored: datetime | None, expected: datetime) -> bool:
     if stored is None:
         return False
-    def as_utc(value: datetime) -> datetime:
-        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
-    return as_utc(stored) == as_utc(expected)
+    return _as_utc(stored) == _as_utc(expected)
 
 
 ###############################################################################

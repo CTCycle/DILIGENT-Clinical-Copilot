@@ -254,8 +254,8 @@ async def process_single_patient_workflow(
 ) -> dict[str, Any]:
     service.run_stop_check(stop_check)
     logger.info(
-        "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
-        payload.name,
+        "Starting Drug-Induced Liver Injury (DILI) analysis session_id=%s",
+        session_id,
     )
 
     global_start_time = time.perf_counter()

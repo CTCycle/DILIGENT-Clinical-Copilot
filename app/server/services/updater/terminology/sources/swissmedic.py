@@ -12,6 +12,7 @@ matching. The source creates no ingredient concepts of its own.
 from __future__ import annotations
 
 import re
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,12 @@ HEADER_PREFIXES = {
 _STAND_RE = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
 _BRAND_NOISE_RE = re.compile(r"\([^)]*\)|\b\d+(?:[.,']\d+)*\s*(?:mg|g|µg|μg|mcg|ml|%|i\.e\.|u\.i\.)?(?=\s|$)", re.IGNORECASE)
 _STRENGTH_TEMPLATE = r"\s+(\d+(?:[.,]\d+)?)\s*(mg|g|µg|μg|mcg|ml|u\.i\.|%)(?![a-z])"
+
+
+###############################################################################
+def _cell_text(row: tuple[Any, ...], columns: dict[str, int], name: str) -> str:
+    index = columns[name]
+    return str(row[index]).strip() if index < len(row) and row[index] is not None else ""
 
 
 ###############################################################################
@@ -143,9 +150,7 @@ class SwissmedicSource:
 
     # -------------------------------------------------------------------------
     def _parse_row(self, row: tuple[Any, ...], columns: dict[str, int]) -> StagedProduct | None:
-        def cell(name: str) -> str:
-            index = columns[name]
-            return str(row[index]).strip() if index < len(row) and row[index] is not None else ""
+        cell = partial(_cell_text, row, columns)
 
         authorisation, dosage, name = cell("authorisation"), cell("dosage"), cell("name")
         actives = cell("ingredients")

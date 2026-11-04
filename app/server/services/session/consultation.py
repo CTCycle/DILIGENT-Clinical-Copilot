@@ -221,10 +221,9 @@ class ClinicalSessionConsultationMixin:
                 ),
             )
             logger.warning(
-                "Clinical LLM timeout for patient '%s' after %.1fs: %s",
-                payload.name or "unknown",
+                "Clinical LLM timeout after %.1fs: %s",
                 consultation_timeout_s,
-                exc,
+                type(exc).__name__,
             )
         except LLMError as exc:
             self.append_warning_issue(
@@ -236,9 +235,8 @@ class ClinicalSessionConsultationMixin:
                 ),
             )
             logger.warning(
-                "Clinical LLM unavailable for patient '%s': %s",
-                payload.name or "unknown",
-                exc,
+                "Clinical LLM unavailable: %s",
+                type(exc).__name__,
             )
         used_fallback_report = not bool(str(final_report or "").strip())
         if used_fallback_report:
@@ -339,10 +337,9 @@ class ClinicalSessionConsultationMixin:
                 ),
             )
             logger.warning(
-                "Clinical LLM timeout for patient '%s' after %.1fs: %s",
-                payload.name or "unknown",
+                "Clinical LLM timeout after %.1fs: %s",
                 consultation_timeout_s,
-                exc,
+                type(exc).__name__,
             )
         except LLMError as exc:
             self.append_warning_issue(
@@ -354,9 +351,8 @@ class ClinicalSessionConsultationMixin:
                 ),
             )
             logger.warning(
-                "Clinical LLM unavailable for patient '%s': %s",
-                payload.name or "unknown",
-                exc,
+                "Clinical LLM unavailable: %s",
+                type(exc).__name__,
             )
         used_fallback_report = not bool(str(final_report or "").strip())
         if used_fallback_report:

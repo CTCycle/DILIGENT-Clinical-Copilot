@@ -178,6 +178,13 @@ class _ReconciliationState:
 
 
 ###############################################################################
+def _concept_rank(concept: StagedConcept) -> int:
+    if concept.concept_type == "multi_ingredient":
+        return 2
+    return 1 if concept.parent_key else 0
+
+
+###############################################################################
 class TerminologyRepository:
 
     # -------------------------------------------------------------------------
@@ -326,12 +333,7 @@ class TerminologyRepository:
     # -------------------------------------------------------------------------
     @staticmethod
     def _concept_order(snapshot: TerminologySnapshot) -> list[StagedConcept]:
-        def rank(concept: StagedConcept) -> int:
-            if concept.concept_type == "multi_ingredient":
-                return 2
-            return 1 if concept.parent_key else 0
-
-        return sorted(snapshot.concepts.values(), key=rank)
+        return sorted(snapshot.concepts.values(), key=_concept_rank)
 
     # -------------------------------------------------------------------------
     def _reconcile_concepts(

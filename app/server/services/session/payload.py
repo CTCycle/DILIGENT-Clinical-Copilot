@@ -109,61 +109,6 @@ def sanitize_laboratory_text(value: str | None) -> str | None:
 
 
 ###############################################################################
-def normalize_visit_date(
-    value: datetime | date | dict[str, Any] | str | None,
-) -> date | None:
-    if value is None:
-        return None
-
-    if isinstance(value, dict):
-        day_raw = value.get("day")
-        month_raw = value.get("month")
-        year_raw = value.get("year")
-
-        if not isinstance(day_raw, (str, int)):
-            return None
-        if not isinstance(month_raw, (str, int)):
-            return None
-        if not isinstance(year_raw, (str, int)):
-            return None
-
-        try:
-            day = int(day_raw)
-            month = int(month_raw)
-            year = int(year_raw)
-            normalized = date(year, month, day)
-        except TypeError, ValueError:
-            return None
-
-    elif isinstance(value, datetime):
-        normalized = value.date()
-
-    elif isinstance(value, date):
-        normalized = value
-
-    elif isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return None
-        try:
-            parsed_datetime = datetime.fromisoformat(stripped)
-        except ValueError:
-            try:
-                normalized = date.fromisoformat(stripped)
-            except ValueError:
-                return None
-        else:
-            normalized = parsed_datetime.date()
-    else:
-        return None
-
-    today = date.today()
-    if normalized > today:
-        return today
-    return normalized
-
-
-###############################################################################
 class PayloadSanitizationService:
 
     # -------------------------------------------------------------------------
@@ -177,18 +122,10 @@ class PayloadSanitizationService:
         laboratory_analysis: str | None,
         evidence_sources: Sequence[str],
     ) -> dict[str, Any]:
-        normalized_visit_date = normalize_visit_date(visit_date)
         return {
             "name": sanitize_field(patient_name),
-            "visit_date": (
-                {
-                    "day": normalized_visit_date.day,
-                    "month": normalized_visit_date.month,
-                    "year": normalized_visit_date.year,
-                }
-                if normalized_visit_date
-                else None
-            ),
+            # PatientData is the single authority for visit-date validation.
+            "visit_date": visit_date,
             "anamnesis": sanitize_anamnesis_text(anamnesis),
             "drugs": sanitize_drugs_text(drugs),
             "laboratory_analysis": sanitize_laboratory_text(laboratory_analysis),

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 import httpx
@@ -63,6 +64,22 @@ def make_json_safe(value: object) -> object:
 
 
 ###############################################################################
+def build_safe_validation_detail(
+    errors: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    # Pydantic errors carry the rejected input and context (which may hold secrets
+    # or clinical text); expose only location, category and message.
+    return [
+        {
+            "loc": make_json_safe(error.get("loc", ())),
+            "type": str(error.get("type", "")),
+            "msg": str(error.get("msg", "")),
+        }
+        for error in errors
+    ]
+
+
+###############################################################################
 class RequestIdMiddleware(BaseHTTPMiddleware):
 
     # -------------------------------------------------------------------------
@@ -114,7 +131,7 @@ def request_validation_error_handler(
         detail=(
             "Invalid clinical session request."
             if is_clinical_session_input
-            else make_json_safe(exc.errors())
+            else build_safe_validation_detail(exc.errors())
         ),
         request_id=request_id,
         retryable=False,
@@ -124,8 +141,7 @@ def request_validation_error_handler(
         content=payload,
     )
     response.headers.setdefault(REQUEST_ID_HEADER, request_id)
-    if is_clinical_session_input:
-        response.headers["Cache-Control"] = "no-store"
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 

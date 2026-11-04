@@ -131,16 +131,21 @@ def test_validation_error_keeps_detail_and_request_id() -> None:
 
 
 ###############################################################################
-def test_validation_error_with_value_error_context_is_json_safe() -> None:
+def test_validation_error_never_reflects_submitted_values() -> None:
+    secret = "synthetic-secret-value"
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
             "/api/access-keys",
-            json={"provider": "openai", "access_key": "short"},
+            json={"provider": "openai", "access_key": "short", "extra": secret},
         )
 
     assert response.status_code == 422
-    payload = response.json()
-    assert payload["detail"][0]["ctx"]["error"] == "access_key is too short"
+    assert response.headers["Cache-Control"] == "no-store"
+    detail = response.json()["detail"]
+    assert all(set(error) == {"loc", "type", "msg"} for error in detail)
+    assert "short" not in {error.get("input") for error in detail}
+    assert secret not in response.text
+    assert "access_key is too short" in response.text
 
 
 ###############################################################################

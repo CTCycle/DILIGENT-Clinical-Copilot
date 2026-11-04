@@ -33,17 +33,15 @@ class ClinicalSessionFormattingMixin:
     def serialize_validation_errors(
         errors: Sequence[ErrorDetails],
     ) -> list[dict[str, Any]]:
-        serialized: list[dict[str, Any]] = []
-        for error in errors:
-            error_dict: dict[str, Any] = dict(error)
-            ctx = error_dict.get("ctx")
-            if isinstance(ctx, dict) and "error" in ctx:
-                serialized.append(
-                    {**error_dict, "ctx": {**ctx, "error": str(ctx["error"])}}
-                )
-                continue
-            serialized.append(error_dict)
-        return serialized
+        # Never echo the rejected input or context: both may hold clinical text.
+        return [
+            {
+                "loc": list(error.get("loc", ())),
+                "type": error.get("type", ""),
+                "msg": error.get("msg", ""),
+            }
+            for error in errors
+        ]
 
     # -------------------------------------------------------------------------
     @staticmethod

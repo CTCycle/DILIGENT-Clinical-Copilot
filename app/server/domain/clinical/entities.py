@@ -190,29 +190,27 @@ class PatientData(BaseModel):
     def coerce_visit_date(cls, value: Any) -> date | None:
         if value is None:
             return None
-        if isinstance(value, date):
-            return value
         if isinstance(value, datetime):
             return value.date()
+        if isinstance(value, date):
+            return value
         if isinstance(value, Mapping):
             return cls._parse_date_mapping(value)
         if isinstance(value, str):
             return cls._parse_date_string(value)
-        return None
+        raise ValueError("visit_date is not a valid date")
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _parse_date_mapping(value: Mapping[Any, Any]) -> date | None:
-        try:
-            day = int(str(value.get("day", "")).strip())
-            month = int(str(value.get("month", "")).strip())
-            year = int(str(value.get("year", "")).strip())
-        except TypeError, ValueError:
+        parts = [str(value.get(key, "")).strip() for key in ("day", "month", "year")]
+        if not any(parts):
             return None
         try:
+            day, month, year = (int(part) for part in parts)
             return date(year, month, day)
         except ValueError:
-            return None
+            raise ValueError("visit_date is not a valid date") from None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -221,24 +219,20 @@ class PatientData(BaseModel):
         if not stripped:
             return None
         try:
-            parsed_datetime = datetime.fromisoformat(stripped)
+            return datetime.fromisoformat(stripped).date()
         except ValueError:
-            try:
-                return date.fromisoformat(stripped)
-            except ValueError:
-                return None
-        else:
-            return parsed_datetime.date()
+            pass
+        try:
+            return date.fromisoformat(stripped)
+        except ValueError:
+            raise ValueError("visit_date is not a valid date") from None
 
     # -------------------------------------------------------------------------
     @field_validator("visit_date")
     @classmethod
     def validate_visit_date(cls, value: date | None) -> date | None:
-        if value is None:
-            return None
-        today = date.today()
-        if value > today:
-            return today
+        if value is not None and value > date.today():
+            raise ValueError("visit_date must not be in the future")
         return value
 
     # -------------------------------------------------------------------------
