@@ -10,7 +10,7 @@ Last updated: 2026-10-27
 5. Confirm the ready-file port returns `200` from `/api/health`.
 
 ## Recommended End-to-end Journey
-1. Start DILIGENT with the packaged desktop app, or run `start_on_windows.ps1` for source/development mode.
+1. Start DILIGENT with the packaged desktop app, or run `setup_and_maintenance.ps1` for source/development mode.
 2. Confirm the UI opens.
 3. In source mode, confirm backend health at `http://127.0.0.1:7690/api/health`; in packaged mode, use the port recorded in `desktop-backend-ready.json`.
 4. Open **Settings → Models**.

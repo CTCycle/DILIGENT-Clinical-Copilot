@@ -25,7 +25,7 @@ def test_desktop_runtime_archive_excludes_frontend_assets() -> None:
 
 ###############################################################################
 def test_tauri_release_bundles_frontend_and_uses_a_local_session_api() -> None:
-    launcher = (ROOT / "start_on_windows.ps1").read_text(encoding="utf-8")
+    launcher = (ROOT / "setup_and_maintenance.ps1").read_text(encoding="utf-8")
     tauri_main = (ROOT / "app/desktop/src-tauri/src/main.rs").read_text(
         encoding="utf-8"
     )

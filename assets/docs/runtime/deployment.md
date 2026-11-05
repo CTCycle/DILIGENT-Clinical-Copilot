@@ -3,7 +3,7 @@ Last updated: 2026-10-22
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
-- On Windows, `start_on_windows.ps1` prepares only the warm-launch runtime prerequisites on a normal launch; backend/runtime repair and explicit installation use the tracked `app/server/uv.lock`. The frontend build is normally produced by install option 2, can be rebuilt independently with option 3 or `-Action RebuildFrontend`, and is rebuilt by option 1 only when its deterministic build state is missing, unreadable, stale, or its output is missing. Option 6 checks `origin/main` without changing the checkout, while option 7 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes.
+- On Windows, `setup_and_maintenance.ps1` prepares only the warm-launch runtime prerequisites on a normal launch; backend/runtime repair and explicit installation use the tracked `app/server/uv.lock`. The frontend build is normally produced by Install dependencies menu option, can be rebuilt independently with Rebuild frontend menu option or `-Action RebuildFrontend`, and is rebuilt by direct launch only when its deterministic build state is missing, unreadable, stale, or its output is missing. Option 5 checks origin/main without changing the checkout, while option 6 updates source only from a non-detached, clean `main` checkout with `git pull --ff-only origin main`; it does not switch branches or modify local changes.
 - The release frontend runtime is Node.js 22.13.0, matching the launcher and CI.
 - Desktop release builds use Rust 1.95.0 with the `x86_64-pc-windows-msvc` target, Python 3.14.7, uv 0.11.30, and PyInstaller 6.21.0.
 - RAG requires `numpy`, `onnxruntime`, and `tokenizers`; the canonical artifact is a pinned AVX2 `uint8` ONNX model. PyTorch and Sentence Transformers are not required.
@@ -37,8 +37,8 @@ Automatic source-mode behavior is:
 - valid current marker and output: reuse exactly as-is; no Angular build or npm dependency synchronization
 - missing output, missing marker, corrupt marker, or fingerprint/contract mismatch: rebuild
 - dependency-manifest or pinned-Node change, or an unknown prior marker: run `npm ci` from the tracked lockfile before rebuilding
-- option 2 / `-Action Install`: synchronize backend and frontend dependencies and rebuild
-- option 3 / `-Action RebuildFrontend`: rebuild unconditionally
+- Install dependencies / -Action Install: synchronize backend and frontend dependencies and rebuild
+- Rebuild frontend menu option / `-Action RebuildFrontend`: rebuild unconditionally
 - update/check-for-update actions: do not build the frontend
 
 The launcher calculates the source fingerprint before and after `npm run build`
@@ -77,7 +77,7 @@ existing output contract and does not require this source-mode marker.
 The latest published desktop release is `v3.5.0`. It contains a Tauri portable EXE and MSI built from synchronized source. Current release status, exact artifact hashes, hosted and native validation, unsigned disclosure, and the WebView2 waiver are recorded in the [desktop release document](desktop_release.md).
 
 ```powershell
-.\start_on_windows.ps1 -Action BuildDesktopRelease -Version 3.6.0 -DesktopTarget All
+.\setup_and_maintenance.ps1 -Action BuildDesktopRelease -Version 3.6.0 -DesktopTarget All
 ```
 
 For a later release, use the synchronized version from the source manifests. The build produces a portable EXE, MSI, and matching `.sha256` file under `release/`. Use `-DesktopTarget Portable` or `-DesktopTarget Msi` for one artifact. Add `-OfflineWebView2` only for an MSI that must carry an offline WebView2 installer. Release builds reject dirty worktrees unless `-AllowDirtyTree` is supplied intentionally.

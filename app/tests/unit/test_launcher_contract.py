@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-LAUNCHER_PATH = REPO_ROOT / "start_on_windows.ps1"
+LAUNCHER_PATH = REPO_ROOT / "setup_and_maintenance.ps1"
 
 
 ###############################################################################
@@ -203,3 +203,18 @@ def test_warm_runtime_repair_does_not_force_frontend_dependency_or_build_work() 
     assert "-ForceFrontendDependencySync" in explicit_install
     assert "Install-FrontendDependencies -ForceSync:$frontendBuildStatus.DependencyInputsChanged" in start_application
     assert "BuildFrontend requires InstallFrontendDependencies" in install
+
+###############################################################################
+def test_batch_entrypoint_uses_non_menu_launch_and_maintenance_menu_hides_launch() -> None:
+    source = _launcher_text()
+    wrapper = (REPO_ROOT / "start_on_windows.bat").read_text(encoding="utf-8")
+    menu = _function_body(source, "Get-MainMenuEntries")
+
+    assert "[switch]$Launch" in source
+    assert "if ($Launch)" in source
+    assert "Start-Application" in source
+    assert "Wait-OwnedApplication" in source
+    assert "pwsh.exe" in wrapper
+    assert "setup_and_maintenance.ps1" in wrapper
+    assert "-Launch" in wrapper
+    assert "Key = 'Launch'" not in menu

@@ -6,7 +6,7 @@ Last updated: 2026-10-21
 - Backend: FastAPI in `app/server/app.py`
 - Production frontend: built Angular SPA served by FastAPI from `app/client/dist/browser`; `/api/*` and the SPA share one origin
 - Development frontend: Angular dev server from `npm run dev`, with `/api` proxied to FastAPI
-- Windows launcher and maintenance menu: `start_on_windows.ps1`
+- Windows application launch wrapper: start_on_windows.bat; setup and maintenance menu: setup_and_maintenance.ps1
 - Source production uses `FASTAPI_HOST` and `FASTAPI_PORT` (template defaults `127.0.0.1:7690`). The browser opens the backend origin.
 - Development uses `UI_HOST` and `UI_PORT` (template defaults `127.0.0.1:9847`) for the Angular dev server. `UI_PORT` does not start a production process.
 

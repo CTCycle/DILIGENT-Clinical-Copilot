@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $launcher = Get-Command .\start_on_windows.ps1 -CommandType ExternalScript
+          $launcher = Get-Command .\setup_and_maintenance.ps1 -CommandType ExternalScript
           foreach ($parameter in @("Action", "Version", "DesktopTarget")) {
             if (-not $launcher.Parameters.ContainsKey($parameter)) {
               throw "Launcher is missing required release parameter: -$parameter"
@@ -372,7 +372,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - name: Build the explicitly unsigned candidate once
         shell: pwsh
-        run: .\start_on_windows.ps1 -Action BuildDesktopRelease -Version $env:RELEASE_VERSION -DesktopTarget All
+        run: .\setup_and_maintenance.ps1 -Action BuildDesktopRelease -Version $env:RELEASE_VERSION -DesktopTarget All
       - name: Install locked validation extras in the existing environment
         shell: pwsh
         working-directory: app/server

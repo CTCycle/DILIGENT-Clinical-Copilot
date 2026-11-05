@@ -86,7 +86,7 @@ Open the portable EXE, or launch the application installed by the MSI. The Tauri
 On Windows, open PowerShell in the repository root and run:
 
 ```powershell
-.\start_on_windows.ps1
+.\setup_and_maintenance.ps1
 ```
 
 Expected source-mode result:

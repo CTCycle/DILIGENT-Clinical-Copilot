@@ -88,10 +88,10 @@ Both builds are unsigned, so Windows SmartScreen may show an unknown-publisher p
 The repository includes a PowerShell launcher. From the repository root, run:
 
 ```powershell
-.\start_on_windows.ps1 -Action Launch
+.\start_on_windows.bat
 ```
 
-The launcher prepares and starts the local app. Keep its window open while using DILIGENT. By default, the source app is available at `http://127.0.0.1:7690`. See [Getting started](assets/docs/user/getting_started.md) for setup details and [runtime modes](assets/docs/runtime/modes.md) for development options.
+The batch launcher prepares and starts the local app. Keep its window open while using DILIGENT. Run pwsh .\setup_and_maintenance.ps1 to open the setup and maintenance menu. By default, the source app is available at `http://127.0.0.1:7690`. See [Getting started](assets/docs/user/getting_started.md) for setup details and [runtime modes](assets/docs/runtime/modes.md) for development options.
 
 ## Typical workflow
 

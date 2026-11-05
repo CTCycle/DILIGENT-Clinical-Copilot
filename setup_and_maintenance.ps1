@@ -10,6 +10,7 @@
 param(
     [ValidateSet('Launch', 'Install', 'RebuildFrontend', 'InitializeDatabase', 'Test', 'ClearCache', 'Uninstall', 'Update', 'CheckForUpdates', 'RemoveAllData', 'KillApplicationProcesses', 'BuildDesktopRelease', 'RemoveDesktopRelease')]
     [string]$Action,
+    [switch]$Launch,
     [ValidateSet('Standard', 'Development')]
     [string]$InstallationType,
     [ValidatePattern('^\d+\.\d+\.\d+$')]
@@ -1131,7 +1132,7 @@ function New-PortConflictMessage {
     }) -join '; '
 
     if ($OwnedProcessesStillRunning) {
-        return "DILIGENT process tree(s) still occupy $details after the stop request. Run .\start_on_windows.ps1 -Action KillApplicationProcesses interactively, or change FASTAPI_PORT/UI_PORT in settings/.env, then retry."
+        return "DILIGENT process tree(s) still occupy $details after the stop request. Run .\setup_and_maintenance.ps1 -Action KillApplicationProcesses interactively, or change FASTAPI_PORT/UI_PORT in settings/.env, then retry."
     }
 
     return "Configured port conflict: $details. Stop the owning service or change FASTAPI_PORT/UI_PORT in settings/.env, then retry."
@@ -2751,7 +2752,7 @@ function Write-MenuLine {
 
 function Get-MainMenuEntries {
     return @(
-        [pscustomobject]@{ Section = 'APPLICATION'; Label = 'Launch application'; Description = 'Start local services'; Key = 'Launch'; Destructive = $false }
+
         [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Install dependencies'; Description = 'Sync runtimes + packages'; Key = 'Install'; Destructive = $false }
         [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Rebuild frontend'; Description = 'Recreate Angular production output'; Key = 'Rebuild'; Destructive = $false }
         [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Initialize database'; Description = 'Prepare local data store'; Key = 'Database'; Destructive = $false }
@@ -2908,7 +2909,14 @@ function Invoke-RemoveDesktopReleaseMenu {
 }
 
 try {
-    if ($Action) {
+    if ($Launch -and $Action) { throw 'Use either -Launch or -Action, not both.' }
+    if ($Launch) {
+        Invoke-TrackedLauncherAction -Name 'Launch application' -Operation {
+            Start-Application
+            Wait-OwnedApplication
+        }
+    }
+    elseif ($Action) {
         Invoke-TrackedLauncherAction -Name "action $Action" -Operation {
             switch ($Action) {
                 'Launch' {
@@ -2949,10 +2957,7 @@ try {
             try {
                 Invoke-TrackedLauncherAction -Name $entry.Label -Operation {
                     switch ($entry.Key) {
-                        'Launch' {
-                            Start-Application
-                            Wait-OwnedApplication
-                        }
+
                         'Install' { Install-OrUpdateApplication }
                         'Rebuild' { Rebuild-Frontend }
                         'Database' { Initialize-Database }

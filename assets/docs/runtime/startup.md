@@ -2,10 +2,10 @@
 Last updated: 2026-11-02
 
 ## Recommended Local Startup
-On Windows, use PowerShell 7 (`pwsh`); the launcher declares `#Requires -Version 7.0` because it uses .NET path APIs that Windows PowerShell 5.1 lacks:
+On Windows, start_on_windows.bat starts the app through PowerShell 7 (pwsh). Run pwsh .\setup_and_maintenance.ps1 to open the setup and maintenance menu.
 
 ```powershell
-.\start_on_windows.ps1
+.\start_on_windows.bat
 ```
 
 The launcher:
@@ -14,14 +14,14 @@ The launcher:
 - ensures the backend Python runtime for a warm launch; `uv` is prepared when backend/runtime repair or an explicit install requires it
 - runs `uv sync --locked` against the tracked `app/server/uv.lock` during backend/runtime repair and explicit installation
 - prepares Node and installs frontend dependencies only when an explicit frontend install/rebuild or a stale/missing frontend build requires them
-- rebuilds the frontend when the main-menu install option 2 or frontend rebuild option 3 is executed, or when option 1 detects missing or stale source-mode build output
+- rebuilds the frontend when the Install dependencies or Rebuild frontend menu option is executed, or during direct launch when source-mode build output is missing or stale
 - validates the deterministic frontend build-state marker before reusing an existing production build
 - starts one FastAPI process with the synchronized virtual-environment Python; FastAPI serves the built Angular SPA and `/api/*` from the same origin
 - waits for `/api/health`, the SPA entry page, and a built JavaScript asset before opening the backend origin in the browser
 - reports each major launch phase and total time to application readiness in milliseconds
 - runs the backend in the launcher console, which stays attached and streams backend output; the launcher owns the process
-- keeps the interactive menu open while the app runs; `EXIT` and Ctrl+C request authenticated graceful shutdown, wait, then stop only the launcher-owned process tree if needed
-- makes `-Action Launch` supervise the server until it stops or Ctrl+C is pressed; Ctrl+C unwinds into a single, re-entrant stop sequence that defers further Ctrl+C presses (so the backend's lifespan cleanup is not force-exited), requests graceful shutdown, waits up to 15 s, then runs `taskkill /T /F` on the launcher-owned PID only and verifies the port is released. The backend PID is recorded immediately after `Start-Process`. Ctrl+C during a dependency step (`uv sync`, `npm`) is reported as an interruption and never triggers virtual-environment recreation. A clean backend exit leaves the launcher with exit code 0
+- provides setup, testing, source control, release, and maintenance actions in an interactive menu; app startup uses the separate non-menu route
+- makes the non-menu -Launch path supervise the server until it stops or Ctrl+C is pressed; Ctrl+C unwinds into a single, re-entrant stop sequence that defers further Ctrl+C presses (so the backend's lifespan cleanup is not force-exited), requests graceful shutdown, waits up to 15 s, then runs `taskkill /T /F` on the launcher-owned PID only and verifies the port is released. The backend PID is recorded immediately after `Start-Process`. Ctrl+C during a dependency step (`uv sync`, `npm`) is reported as an interruption and never triggers virtual-environment recreation. A clean backend exit leaves the launcher with exit code 0
 - recreates a stale backend virtual environment when the repository has moved
 - provides grouped `APPLICATION`, `SETUP & VALIDATION`, `SOURCE CONTROL`, `BUILD & DISTRIBUTION`, and `DATA & MAINTENANCE` options, followed by a final sequential `EXIT` option; the desktop-release submenu uses the same aligned numeric rows
 - checks the configured API port immediately before starting the production process; `UI_PORT` is reserved for frontend development
@@ -43,9 +43,9 @@ anchored to the launcher's repository path, so they work from any current
 directory. Use `-DryRun` to inspect a cleanup without changing files:
 
 ```powershell
-.\start_on_windows.ps1 -Action ClearCache -DryRun
-.\start_on_windows.ps1 -Action Uninstall -DryRun
-.\start_on_windows.ps1 -Action RemoveAllData -DryRun
+.\setup_and_maintenance.ps1 -Action ClearCache -DryRun
+.\setup_and_maintenance.ps1 -Action Uninstall -DryRun
+.\setup_and_maintenance.ps1 -Action RemoveAllData -DryRun
 ```
 
 `ClearCache` removes recognized Python, Angular/Vite, Cargo/Tauri, test, and
@@ -87,14 +87,14 @@ Database startup behavior is migration-driven:
 - The explicit `InitializeDatabase` action remains the repeatable operator path
   for either backend. It applies pending migrations and seeds idempotently;
   `--drop-existing` is the explicit destructive reset path.
-- Install option 2 runs the same database synchronization after backend
+- The Install dependencies menu option runs the same database synchronization after backend
   and frontend dependencies are ready. Launch performs the check again so
   startup remains safe when installation was skipped.
 
-For a deterministic disposable-state reset, run `.\start_on_windows.ps1 -Action ClearCache`; it requires the same interactive `[y/N]` confirmation, preserves only `runtimes/cache/.gitkeep`, and reports locked entries without aborting the cleanup.
+For a deterministic disposable-state reset, run `.\setup_and_maintenance.ps1 -Action ClearCache`; it requires the same interactive `[y/N]` confirmation, preserves only `runtimes/cache/.gitkeep`, and reports locked entries without aborting the cleanup.
 
 If a previous launch left backend, frontend development, or launcher wrapper processes running,
-run `.\start_on_windows.ps1 -Action KillApplicationProcesses` and confirm the
+run `.\setup_and_maintenance.ps1 -Action KillApplicationProcesses` and confirm the
 cleanup when prompted.
 
 ## Source-mode frontend build freshness
@@ -163,10 +163,8 @@ The development UI uses `UI_HOST` and `UI_PORT` (default `127.0.0.1:9847`). Its 
 
 ## Quick Startup Checklist
 ### Source production mode
-1. Run `.\start_on_windows.ps1` from an interactive PowerShell console.
-2. Select **Launch application**. The launcher checks `FASTAPI_PORT` (default `7690`), starts FastAPI, and opens `http://127.0.0.1:7690` after health and built-asset checks pass.
-3. Press Ctrl+C in the launcher to stop the app. Both the menu's Launch option and `.\start_on_windows.ps1 -Action Launch` keep the launcher supervising the backend until Ctrl+C.
-
+1. Run .\start_on_windows.bat to launch the app. It checks FASTAPI_PORT (default 7690), starts FastAPI, and opens the app after health and built-asset checks pass.
+2. Press Ctrl+C in the launcher to stop the app. You can also run pwsh .\setup_and_maintenance.ps1 -Launch; this route supervises the backend until Ctrl+C.
 ### Source development mode
 1. Start the backend and Angular development server in separate terminals as described above.
 2. Open `http://127.0.0.1:9847`; the Angular dev server proxies API requests to FastAPI.

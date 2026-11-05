@@ -21,7 +21,7 @@ http://127.0.0.1:7690
 - If not, restart with:
 
 ```text
-start_on_windows.ps1
+setup_and_maintenance.ps1
 ```
 
 ## Backend Health Check Fails
@@ -33,7 +33,7 @@ http://127.0.0.1:7690/api/health
 
 - If unreachable, restart the application and inspect the backend output in the launcher console.
 - If an earlier launch left stale application processes,
-  run `start_on_windows.ps1 -Action KillApplicationProcesses`, confirm the
+  run `setup_and_maintenance.ps1 -Action KillApplicationProcesses`, confirm the
   cleanup, and launch again.
 
 ## Model Call Fails

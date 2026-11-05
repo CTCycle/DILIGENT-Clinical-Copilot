@@ -147,4 +147,4 @@ branch-status record.
 ## Environment Rules
 - Windows is the default operating environment for this repository.
 - Support both PowerShell and CMD guidance where commands differ.
-- Keep runtime guidance aligned with `start_on_windows.ps1` and `app/tests/*.ps1` or `.bat`.
+- Keep runtime guidance aligned with `setup_and_maintenance.ps1` and `app/tests/*.ps1` or `.bat`.

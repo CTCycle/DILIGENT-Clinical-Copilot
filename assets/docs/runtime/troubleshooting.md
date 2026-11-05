@@ -51,7 +51,7 @@ For stale repository-owned DILIGENT process trees, the explicit cleanup action
 remains available from an interactive PowerShell console:
 
 ```powershell
-.\start_on_windows.ps1 -Action KillApplicationProcesses
+.\setup_and_maintenance.ps1 -Action KillApplicationProcesses
 ```
 
 If launch is redirected or noninteractive, it cannot confirm stopping owned
@@ -80,7 +80,7 @@ from `app/client/dist/browser`. Check the source backend logs under
 `runtimes/cache/logs/`, then confirm the build is current:
 
 ```powershell
-.\start_on_windows.ps1 -Action RebuildFrontend
+.\setup_and_maintenance.ps1 -Action RebuildFrontend
 ```
 
 The launcher rebuilds automatically when its build-state marker is missing or
@@ -114,12 +114,12 @@ Get-Process -Id <PID>
 ```
 
 3. If you want the launcher to request termination, start
-   `start_on_windows.ps1 -Action Launch` from an interactive PowerShell console
+   `setup_and_maintenance.ps1 -Launch` from an interactive PowerShell console
    and review the listed PID/port mapping. A `No` answer leaves the process
    untouched. For a stale DILIGENT process tree, the explicit cleanup action is:
 
 ```powershell
-.\start_on_windows.ps1 -Action KillApplicationProcesses
+.\setup_and_maintenance.ps1 -Action KillApplicationProcesses
 ```
 
 4. If the health endpoint returns `200` and the service is the one you want to use, decline the launcher stop prompt and open its configured backend origin directly. The launcher does not attach to an existing process:

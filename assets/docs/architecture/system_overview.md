@@ -5,7 +5,7 @@ Last updated: 2026-10-21
 DILIGENT is a local-first clinical application with:
 - FastAPI backend in `app/server`
 - Angular standalone frontend in `app/client`
-- PowerShell launcher and maintenance menu in `start_on_windows.ps1`
+- PowerShell launcher and maintenance menu in `setup_and_maintenance.ps1`
 - Isolated Windows desktop release project under `app/desktop`
 
 Primary flow:
@@ -77,7 +77,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 
 ```text
 .
-|-- start_on_windows.ps1
+|-- setup_and_maintenance.ps1
 |-- settings/
 |   |-- .env
 |   |-- .env.example
@@ -123,11 +123,11 @@ Maintained source-level structure, with build and cache artifacts omitted:
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
 - Current routes: `/`, `/clinical-sessions`, `/data`, `/settings` (General, Models, Data Processing, Integrations, Drug Matching, Advanced), `/sessions/:sessionId/timetable`, and `/sessions/:sessionId/timetable/:timelineId`. Model configuration is part of Settings; there is no `/model-config` UI route alias. The backend `/api/model-config` API remains active.
-- Windows launcher and maintenance entry point: `start_on_windows.ps1`.
+- Windows launch wrapper: start_on_windows.bat; setup and maintenance entry point: setup_and_maintenance.ps1.
 
 ### Runtime entry points
 
-- Source production: `start_on_windows.ps1` owns one FastAPI process started through `app/server/source_entry.py`. FastAPI serves the built Angular SPA and API on `FASTAPI_PORT`; the launcher waits for health and a built asset, opens that origin, and requests authenticated shutdown on Exit or Ctrl+C. Backend logs go to `runtimes/cache/logs/`.
+- Source production: `setup_and_maintenance.ps1` owns one FastAPI process started through `app/server/source_entry.py`. FastAPI serves the built Angular SPA and API on `FASTAPI_PORT`; the launcher waits for health and a built asset, opens that origin, and requests authenticated shutdown on Exit or Ctrl+C. Backend logs go to `runtimes/cache/logs/`.
 - Development: run FastAPI with Uvicorn reload and the Angular development server with `npm run dev`. The development server uses `UI_PORT` and proxies `/api` to FastAPI. The preview server is not the production server.
 - Packaged desktop: the Tauri shell in `app/desktop/src-tauri` embeds the Angular build and startup splash as Tauri assets, extracts the API-only `DILIGENTBackend.exe` runtime, and starts it on a random localhost port. The shell passes the API origin and one-time session token to the bundled SPA, authorizes only the exact Tauri origin for CORS, and owns the backend shutdown and process-tree fallback. Node.js is not part of the packaged runtime.
 

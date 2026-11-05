@@ -145,7 +145,7 @@ Do not edit local database files manually while the application is running.
 Some data sources or embeddings may require initialization or refresh through the Knowledge update controls or through:
 
 ```text
-start_on_windows.ps1
+setup_and_maintenance.ps1
 ```
 
 The Knowledge sidebar groups Drug Catalog, LiverTox and DILIrank under *Knowledge sources*, Terminology under *Mapping*, and RAG under *Retrieval*; the **?** button beside *Sources* opens a Knowledge help dialog covering sources, updates, terminology mapping, dependencies and update status. In Clinical Sessions the refresh icon beside Search reloads the persisted sessions while keeping the query, filters and selection.
