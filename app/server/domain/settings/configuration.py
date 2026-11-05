@@ -213,7 +213,7 @@ DEFAULT_RAG_SETTINGS = {
     "vector_collection_name": "documents",
     "chunk_size": 512,
     "chunk_overlap": 64,
-    "embedding_batch_size": 64,
+    "embedding_batch_size": 8,
     "use_hybrid_search": True,
     "use_reranking": True,
     "retrieval_candidate_count": 40,

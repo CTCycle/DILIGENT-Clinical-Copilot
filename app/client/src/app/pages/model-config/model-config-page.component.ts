@@ -81,7 +81,7 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   vector_collection_name: 'documents',
   chunk_size: 512,
   chunk_overlap: 64,
-  embedding_batch_size: 64,
+  embedding_batch_size: 8,
   use_hybrid_search: true,
   use_reranking: true,
   retrieval_candidate_count: 40,

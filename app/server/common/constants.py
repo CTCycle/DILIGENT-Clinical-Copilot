@@ -111,7 +111,7 @@ LIVERTOX_MASTER_LIST_ACCESSION = "NBK571102"
 DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx"}
 TEXT_FILE_FALLBACK_ENCODINGS = ("utf-8", "utf-16", "latin-1", "iso-8859-1")
 DRUG_NAME_ALLOWED_PATTERN = r"[A-Za-z0-9\s\-/(),'+\.]+"
-DEFAULT_EMBEDDING_BATCH_SIZE = 64
+DEFAULT_EMBEDDING_BATCH_SIZE = 8
 
 # [DILI DEFAULTS]
 ###############################################################################
