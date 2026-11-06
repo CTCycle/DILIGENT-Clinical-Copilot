@@ -2,8 +2,22 @@
   "venvPath": ".",
   "venv": ".venv",
   "pythonVersion": "3.14",
+  "typeCheckingMode": "strict",
+  "reportMissingTypeStubs": "none",
+  "include": [
+    "app.py",
+    "api",
+    "common",
+    "configurations",
+    "domain",
+    "migrations",
+    "repositories",
+    "services"
+  ],
   "exclude": [
     ".venv",
-    "__pycache__"
+    "**/__pycache__",
+    "../../data",
+    "pytest-cache-files"
   ]
 }

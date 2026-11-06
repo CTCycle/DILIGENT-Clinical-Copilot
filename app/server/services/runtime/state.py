@@ -77,3 +77,11 @@ class JobState:
                 version=self.version,
                 stop_requested=self.stop_requested,
             )
+
+    # -------------------------------------------------------------------------
+    def update_progress(self, progress: float, *, last_activity_at: float) -> None:
+        """Apply a monotonic progress update atomically."""
+        with self.lock:
+            self.progress = max(self.progress, min(100.0, max(0.0, progress)))
+            self.last_activity_at = last_activity_at
+            self.version += 1

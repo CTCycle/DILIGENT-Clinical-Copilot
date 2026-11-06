@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Iterator, Literal, cast
+from typing import TYPE_CHECKING, Any, Iterator, Literal, cast
 
-import lancedb
 import pyarrow as pa
-from lancedb.db import DBConnection
-from lancedb.table import Table
+
+if TYPE_CHECKING:
+    from lancedb.db import DBConnection
+    from lancedb.table import Table
 
 from common.utils.logger import logger
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
@@ -88,6 +89,11 @@ class LanceVectorDatabase:
     # -------------------------------------------------------------------------
     def connect(self) -> DBConnection:
         if self.connection is None:
+            # LanceDB starts a background asyncio loop during import. Defer it
+            # until vector storage is actually accessed so API import and
+            # process startup do not trigger socket setup as a side effect.
+            import lancedb
+
             database_path = Path(self.database_path)
             base_directory = (
                 database_path.parent if database_path.suffix else database_path

@@ -145,6 +145,30 @@ def test_job_result_merge_is_single_source_of_truth() -> None:
 
 
 ###############################################################################
+def test_concurrent_progress_updates_never_move_backwards() -> None:
+    state = JobState(job_id="progress", job_type="runtime_test", status="running")
+    start = threading.Barrier(4)
+
+    def update_progress(progress: float) -> None:
+        start.wait(timeout=1)
+        for _ in range(500):
+            state.update_progress(progress, last_activity_at=time.monotonic())
+
+    workers = [
+        threading.Thread(target=update_progress, args=(progress,))
+        for progress in (20.0, 30.0, 80.0)
+    ]
+    for worker in workers:
+        worker.start()
+    start.wait(timeout=1)
+    for worker in workers:
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+
+    assert state.snapshot()["progress"] == 80.0
+
+
+###############################################################################
 def test_job_running_checks_can_be_scoped() -> None:
     manager = JobManager()
     started = threading.Event()

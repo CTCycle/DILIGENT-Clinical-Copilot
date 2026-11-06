@@ -301,9 +301,7 @@ class JobManager:
         with self.lock:
             state = self.jobs.get(job_id)
         if state:
-            clamped = min(100.0, max(0.0, progress))
-            non_decreasing = max(state.progress, clamped)
-            state.update(progress=non_decreasing, last_activity_at=monotonic())
+            state.update_progress(progress, last_activity_at=monotonic())
 
     # -------------------------------------------------------------------------
     def update_result(

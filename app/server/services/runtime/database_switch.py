@@ -158,6 +158,16 @@ class DatabaseRuntimeManager:
                         "Active requests did not finish in time. No database change was applied."
                     )
 
+                # Recheck after draining requests so a launch admitted before
+                # the gate closed cannot enqueue work between the first check
+                # and database activation.
+                if ClinicalSessionRepository(RepositoryContext.create()).count_sessions_with_status(
+                    "queued", "running"
+                ):
+                    raise DatabaseSwitchBusyError(
+                        "DILI analyses are queued or running. Wait for them to finish or cancel them and retry."
+                    )
+
                 # Initialization runs against the candidate only. It creates a
                 # missing PostgreSQL database when permitted, applies migrations,
                 # and seeds defaults without copying current application data.
@@ -185,6 +195,8 @@ class DatabaseRuntimeManager:
                         "Database switched. Application settings were loaded from the selected database."
                     ),
                 )
+            except DatabaseSwitchBusyError:
+                raise
             except Exception as exc:
                 try:
                     if candidate_repository is None:

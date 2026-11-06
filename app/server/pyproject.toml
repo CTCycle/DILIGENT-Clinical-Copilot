@@ -72,27 +72,3 @@ exclude = [
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
 
-[tool.pyright]
-include = [
-    "app.py",
-    "api",
-    "common",
-    "configurations",
-    "domain",
-    "migrations",
-    "repositories",
-    "services",
-]
-exclude = [
-    ".venv",
-    "**/__pycache__",
-    "../../data",
-    "pytest-cache-files",
-]
-pythonVersion = "3.14"
-typeCheckingMode = "strict"
-reportMissingTypeStubs = "none"
-
-
-
-

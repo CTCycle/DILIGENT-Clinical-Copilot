@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Iterable
 from dataclasses import replace
 from datetime import datetime
 from typing import Any, Protocol, cast
+
+from pydantic import TypeAdapter, ValidationError
 
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.exceptions import ServiceValidationError
@@ -54,6 +55,17 @@ from services.retrieval.settings import (
     normalize_rag_settings_patch,
     rag_settings_payload,
 )
+
+_JSON_OBJECT_ADAPTER = TypeAdapter(dict[str, object])
+
+
+def _manifest_count(payload: dict[str, object], key: str) -> int:
+    value = payload.get(key)
+    if value is None:
+        return 0
+    if isinstance(value, (str, int, float)):
+        return int(value)
+    return 0
 
 
 ###############################################################################
@@ -106,7 +118,7 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     async def get_state(self) -> ModelConfigStateResponse:
-        snapshot = self.load_current_snapshot()
+        snapshot = await asyncio.to_thread(self.load_current_snapshot)
         local_models = await self.list_local_model_cards(
             selected_models=(
                 snapshot.clinical_model,
@@ -115,7 +127,9 @@ class ModelConfigService:
                 snapshot.timeline_model,
             ),
         )
-        local_catalog = model_catalog.local_catalog_metadata(self.catalog_cache)
+        local_catalog = await asyncio.to_thread(
+            model_catalog.local_catalog_metadata, self.catalog_cache
+        )
         return self.build_response(
             snapshot=snapshot,
             local_models=local_models,
@@ -127,7 +141,7 @@ class ModelConfigService:
     async def update_state(
         self, payload: ModelConfigUpdateRequest
     ) -> ModelConfigPersistResponse:
-        snapshot = self.load_current_snapshot()
+        snapshot = await asyncio.to_thread(self.load_current_snapshot)
         fields_set = payload.model_fields_set
         local_roles_updated = self._local_roles_updated(fields_set)
         target_use_cloud_models = (
@@ -139,11 +153,9 @@ class ModelConfigService:
             local_roles_updated
             or ("use_cloud_services" in fields_set and not target_use_cloud_models)
         )
-        available_local_model_names = (
-            await self.list_available_ollama_models()
-            if requires_local_model_availability
-            else set()
-        )
+        available_local_model_names: set[str] = set()
+        if requires_local_model_availability:
+            available_local_model_names = await self.list_available_ollama_models()
         local_model_names = await self._build_local_model_names(
             snapshot=snapshot,
             refresh_from_ollama=not target_use_cloud_models and local_roles_updated,
@@ -157,18 +169,24 @@ class ModelConfigService:
         )
 
         if updates:
-            self.validate_current_snapshot(replace(snapshot, **updates))
-            snapshot = self.serializer.save_snapshot(
-                **updates,
+            await asyncio.to_thread(
+                self.validate_current_snapshot, replace(snapshot, **updates)
+            )
+            snapshot = await asyncio.to_thread(
+                self.serializer.save_snapshot, **updates
             )
 
         return self.build_persist_response(snapshot)
 
     # -------------------------------------------------------------------------
     async def get_embedding_status(self) -> EmbeddingStatusResponse:
+        runtime, index = await asyncio.gather(
+            asyncio.to_thread(self.build_embedding_runtime_status),
+            asyncio.to_thread(self.build_embedding_index_status),
+        )
         return EmbeddingStatusResponse(
-            embedding_runtime=self.build_embedding_runtime_status(),
-            embedding_index=self.build_embedding_index_status(),
+            embedding_runtime=runtime,
+            embedding_index=index,
         )
 
     # -------------------------------------------------------------------------
@@ -240,7 +258,7 @@ class ModelConfigService:
         snapshot: ModelConfigSnapshot,
         refresh_from_ollama: bool,
     ) -> set[str]:
-        local_model_names = self.known_local_model_names()
+        local_model_names = await asyncio.to_thread(self.known_local_model_names)
         for model_name in (
             snapshot.clinical_model,
             snapshot.text_extraction_model,
@@ -553,7 +571,7 @@ class ModelConfigService:
                 )
 
         if snapshot.use_cloud_models:
-            if provider is None or cloud_model is None:
+            if cloud_model is None:
                 raise ServiceValidationError(
                     "Cloud mode requires both a provider and a model."
                 )
@@ -639,7 +657,9 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     async def list_available_ollama_models(self) -> set[str]:
-        record = model_catalog.load_catalog_record(self.catalog_cache, "ollama")
+        record = await asyncio.to_thread(
+            model_catalog.load_catalog_record, self.catalog_cache, "ollama"
+        )
         return {
             str(item.get("id"))
             for item in (record.models if record else [])
@@ -777,13 +797,15 @@ class ModelConfigService:
         if not manifest_path.is_file():
             return EmbeddingIndexStatus(status="reindex_required")
         try:
-            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
-            return EmbeddingIndexStatus(status="corrupt")
-        if not isinstance(payload, dict):
+            payload = _JSON_OBJECT_ADAPTER.validate_json(manifest_path.read_bytes())
+        except (OSError, ValidationError):
             return EmbeddingIndexStatus(status="corrupt")
         source = payload.get("source")
-        source_data = source if isinstance(source, dict) else {}
+        source_data = (
+            _JSON_OBJECT_ADAPTER.validate_python(source)
+            if isinstance(source, dict)
+            else {}
+        )
         is_ready = (
             payload.get("manifest_version") == 2
             and payload.get("status") == "ready"
@@ -791,9 +813,7 @@ class ModelConfigService:
         )
         built_at_value = payload.get("built_at")
         built_at = None
-        if isinstance(built_at_value, datetime):
-            built_at = built_at_value
-        elif isinstance(built_at_value, str):
+        if isinstance(built_at_value, str):
             try:
                 built_at = datetime.fromisoformat(built_at_value)
             except ValueError:
@@ -805,8 +825,8 @@ class ModelConfigService:
                 if payload.get("embedding_fingerprint")
                 else None
             ),
-            document_count=int(source_data.get("document_count", 0) or 0),
-            chunk_count=int(source_data.get("chunk_count", 0) or 0),
+            document_count=_manifest_count(source_data, "document_count"),
+            chunk_count=_manifest_count(source_data, "chunk_count"),
             built_at=built_at,
         )
 
@@ -849,8 +869,10 @@ class ModelConfigService:
                 catalog_updated_at = None
                 message = None
             else:
-                record = model_catalog.load_catalog_record(
-                    self.catalog_cache, item.provider_id
+                record = await asyncio.to_thread(
+                    model_catalog.load_catalog_record,
+                    self.catalog_cache,
+                    item.provider_id,
                 )
                 models = [
                     enrich_model_descriptor(
@@ -907,11 +929,14 @@ class ModelConfigService:
     ) -> ModelCatalogOperationResponse:
         if provider != "ollama":
             provider_registry.get(provider)
-        if (
-            not force_refresh
-            and model_catalog.load_catalog_record(self.catalog_cache, provider)
-            is not None
-        ):
+        cached_record = (
+            await asyncio.to_thread(
+                model_catalog.load_catalog_record, self.catalog_cache, provider
+            )
+            if not force_refresh
+            else None
+        )
+        if not force_refresh and cached_record is not None:
             return ModelCatalogOperationResponse(
                 catalog_provider=provider,
                 outcome="cached",
@@ -931,7 +956,9 @@ class ModelConfigService:
     async def _fetch_catalog(
         self, provider: CatalogProviderId
     ) -> ModelCatalogOperationResponse:
-        fingerprint = model_catalog.catalog_configuration_fingerprint(provider)
+        fingerprint = await asyncio.to_thread(
+            model_catalog.catalog_configuration_fingerprint, provider
+        )
         try:
             if provider == "ollama":
                 async with OllamaClient() as client:
@@ -939,7 +966,7 @@ class ModelConfigService:
                 models = [
                     {"id": name.strip(), "display_name": name.strip()}
                     for name in names
-                    if isinstance(name, str) and name.strip()
+                    if name.strip()
                 ]
             else:
                 async with CloudLLMClient(
@@ -953,7 +980,8 @@ class ModelConfigService:
                         "Provider returned no models available for clinical text generation."
                     )
                 models = [item.model_dump(mode="json") for item in descriptors]
-            self.catalog_cache.save_success(
+            await asyncio.to_thread(
+                self.catalog_cache.save_success,
                 provider_id=provider,
                 configuration_fingerprint=fingerprint,
                 models=models,
@@ -970,7 +998,8 @@ class ModelConfigService:
                 if "access key" in message.lower()
                 else "unavailable"
             )
-            self.catalog_cache.save_failure(
+            await asyncio.to_thread(
+                self.catalog_cache.save_failure,
                 provider_id=provider,
                 configuration_fingerprint=fingerprint,
                 status=status,
@@ -987,7 +1016,8 @@ class ModelConfigService:
                 "Unexpected error while refreshing %s model catalog", provider
             )
             message = "The provider model catalog could not be refreshed."
-            self.catalog_cache.save_failure(
+            await asyncio.to_thread(
+                self.catalog_cache.save_failure,
                 provider_id=provider,
                 configuration_fingerprint=fingerprint,
                 status="unavailable",

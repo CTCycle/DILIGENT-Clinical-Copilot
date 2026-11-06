@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -130,7 +130,11 @@ def redirect_root_to_docs() -> RedirectResponse:
 
 ###############################################################################
 async def _release_application_resources() -> None:
-    jobs_finished = await asyncio.to_thread(get_job_manager().shutdown, 5.0)
+    try:
+        jobs_finished = await asyncio.to_thread(get_job_manager().shutdown, 5.0)
+    except Exception:
+        jobs_finished = False
+        logger.exception("Could not stop background jobs during shutdown")
     if not jobs_finished:
         logger.warning("Background jobs did not stop before shutdown; failing interrupted runs")
         try:
@@ -141,8 +145,14 @@ async def _release_application_resources() -> None:
             await asyncio.to_thread(get_clinical_scheduler().reconcile_interrupted)
         except Exception:
             logger.exception("Could not mark interrupted clinical sessions during shutdown")
-    close_embedding_runtime()
-    await asyncio.to_thread(ollama_process_manager.stop)
+    try:
+        close_embedding_runtime()
+    except Exception:
+        logger.exception("Could not close the embedding runtime during shutdown")
+    try:
+        await asyncio.to_thread(ollama_process_manager.stop)
+    except Exception:
+        logger.exception("Could not stop Ollama during shutdown")
     try:
         RepositoryContext.create().engine.dispose()
     except Exception:
@@ -151,21 +161,21 @@ async def _release_application_resources() -> None:
 
 ###############################################################################
 @asynccontextmanager
-async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
-    bootstrap_settings = get_server_settings()
-    ensure_database_ready(bootstrap_settings.database)
-    settings = reload_persisted_settings()
-    job_manager = get_job_manager()
-    job_manager.begin_startup()
-    reconcile_interrupted_revision_jobs(job_manager)
-    clinical_scheduler = get_clinical_scheduler()
-    clinical_scheduler.reconcile_interrupted()
-    initialize_reference_catalog_provider()
-    run_startup_validations(settings)
-    # Queued sessions never started executing, so they resume from the queue.
-    clinical_scheduler.dispatch()
-    application.state.server_settings = settings
+async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     try:
+        bootstrap_settings = get_server_settings()
+        ensure_database_ready(bootstrap_settings.database)
+        settings = reload_persisted_settings()
+        job_manager = get_job_manager()
+        job_manager.begin_startup()
+        reconcile_interrupted_revision_jobs(job_manager)
+        clinical_scheduler = get_clinical_scheduler()
+        clinical_scheduler.reconcile_interrupted()
+        initialize_reference_catalog_provider()
+        run_startup_validations(settings)
+        # Queued sessions never started executing, so they resume from the queue.
+        clinical_scheduler.dispatch()
+        application.state.server_settings = settings
         yield
     finally:
         await _release_application_resources()

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from common.constants import FASTAPI_API_PREFIX
 from services.runtime.database_switch import get_database_runtime_manager
@@ -13,18 +14,18 @@ from services.runtime.database_switch import get_database_runtime_manager
 class DatabaseSwitchMiddleware:
 
     # -------------------------------------------------------------------------
-    def __init__(self, app) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         self.app = app
         self._gate = get_database_runtime_manager().request_gate
         self._api_prefix = FASTAPI_API_PREFIX.rstrip("/") + "/"
         self._database_prefix = self._api_prefix + "database/"
 
     # -------------------------------------------------------------------------
-    async def __call__(self, scope, receive, send) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        path = scope.get("path", "")
+        path = str(scope.get("path", ""))
         if not path.startswith(self._api_prefix) or path.startswith(self._database_prefix):
             await self.app(scope, receive, send)
             return
