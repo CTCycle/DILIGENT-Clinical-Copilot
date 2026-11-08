@@ -551,18 +551,7 @@ function Install-ApplicationDependencies {
     if ($InstallationType -eq 'Development') {
         $syncArguments += '--all-extras'
     }
-    try {
-        Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
-    }
-    catch {
-        # An interrupted sync must never trigger the destructive environment recreation.
-        if ($_.Exception -is [OperationCanceledException]) { throw }
-        Write-Info 'Recreating a virtual environment that may reference an older repository location'
-        if (Test-Path -LiteralPath $VenvDir) {
-            [void](Remove-LauncherPath -Path $VenvDir -Activity 'DILIGENT: recreate Python environment' -Strict)
-        }
-        Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
-    }
+    Invoke-Checked -FilePath $UvExe -ArgumentList $syncArguments -WorkingDirectory $ServerDir
 
     $venvPythonVersion = 'unknown'
     if (Test-Path -LiteralPath $VenvPython) {
@@ -2342,11 +2331,25 @@ function Build-DesktopBackend {
     $distPath = Join-Path $StageRoot 'backend'
     $workPath = Join-Path $DesktopBuildDir 'pyinstaller-work'
     New-Item -ItemType Directory -Path $distPath, $workPath -Force | Out-Null
-    Invoke-Checked -FilePath $VenvPython -WorkingDirectory $RepoRoot -ArgumentList @(
-        (Join-Path $DesktopDir 'build/run_pyinstaller.py'), '--noconfirm', '--clean', '--distpath', $distPath,
-        '--workpath', $workPath,
-        (Join-Path $DesktopDir 'build/diligent_backend.spec')
-    )
+    $sourceEpoch = (& git -C $RepoRoot log -1 --format=%ct).Trim()
+    if ($LASTEXITCODE -ne 0 -or $sourceEpoch -notmatch '^\d+$') {
+        throw 'Unable to resolve the source commit timestamp for the frozen backend.'
+    }
+    $previousHashSeed = $env:PYTHONHASHSEED
+    $previousSourceEpoch = $env:SOURCE_DATE_EPOCH
+    try {
+        $env:PYTHONHASHSEED = '0'
+        $env:SOURCE_DATE_EPOCH = $sourceEpoch
+        Invoke-Checked -FilePath $VenvPython -WorkingDirectory $RepoRoot -ArgumentList @(
+            (Join-Path $DesktopDir 'build/run_pyinstaller.py'), '--noconfirm', '--clean', '--distpath', $distPath,
+            '--workpath', $workPath,
+            (Join-Path $DesktopDir 'build/diligent_backend.spec')
+        )
+    }
+    finally {
+        $env:PYTHONHASHSEED = $previousHashSeed
+        $env:SOURCE_DATE_EPOCH = $previousSourceEpoch
+    }
     $backendRoot = Join-Path $distPath 'DILIGENTBackend'
     $backendExecutable = Join-Path $backendRoot 'DILIGENTBackend.exe'
     if (-not (Test-Path -LiteralPath $backendExecutable)) { throw "Frozen backend was not created: $backendExecutable" }
@@ -2490,6 +2493,8 @@ function New-TauriFrontendAssets {
     }
     New-Item -ItemType Directory -Path $frontendRoot -Force | Out-Null
     Copy-Item -Path (Join-Path $frontendOutputRoot '*') -Destination $frontendRoot -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $script:DesktopFrontendOutputDir '3rdpartylicenses.txt') -Destination $frontendRoot -ErrorAction Stop
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'LICENSE') -Destination $frontendRoot -ErrorAction Stop
     Copy-Item -LiteralPath (Join-Path $DesktopDir 'splash/index.html') -Destination (Join-Path $frontendRoot 'splash.html') -Force
     if (-not (Test-Path -LiteralPath (Join-Path $frontendRoot 'splash.html') -PathType Leaf)) {
         throw 'Tauri startup splash was not staged with the Angular assets.'

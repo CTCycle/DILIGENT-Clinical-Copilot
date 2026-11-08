@@ -2,6 +2,12 @@
 
 Release notes for DILIGENT Clinical Copilot. Earlier releases (v3.5.1 and before) are described on the [GitHub Releases](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) page.
 
+## 3.6.1 (unreleased)
+
+- Recover desktop startup after an interrupted runtime extraction and verify the cached runtime before executing it.
+- Block Windows MSI downgrades and include the project license notice and frontend dependency notices in desktop packages.
+- Use stable inputs for freezing the backend and preserve the development environment when dependency downloads fail.
+
 ## 3.6.0 (2026-11-03)
 
 Compared with v3.5.1 (2026-10-22). Minor release: the stack, packaging, and data locations are unchanged, and existing data is upgraded automatically.

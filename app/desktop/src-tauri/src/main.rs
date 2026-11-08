@@ -69,7 +69,6 @@ fn main() {
             std::thread::spawn(move || {
                 let session_secret = Uuid::new_v4().to_string();
                 let startup_result = runtime::prepare_runtime(&version).and_then(|paths| {
-                    runtime::prune_runtime_cache(&version);
                     let process = backend::BackendProcess::start(&paths, &version, &session_secret)?;
                     Ok((paths, process))
                 });

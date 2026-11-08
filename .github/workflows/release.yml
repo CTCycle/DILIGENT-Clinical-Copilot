@@ -13,7 +13,7 @@ on:
       version:
         description: Exact major.minor.patch release version
         type: string
-        default: '3.6.0'
+        default: '3.6.1'
         required: true
       candidate_run_id:
         description: Successful prepare run ID (publish only)
@@ -358,7 +358,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     env:
-      RELEASE_BASELINE_VERSION: '3.5.0'
+      RELEASE_BASELINE_VERSION: '3.6.0'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -381,7 +381,7 @@ jobs:
         run: |
           & ../../runtimes/uv/uv.exe sync --locked --all-extras --group desktop-build
           if ($LASTEXITCODE -ne 0) { throw 'Validation dependency installation failed.' }
-      - name: Download the published v3.5.0 upgrade baseline
+      - name: Download the published upgrade baseline
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

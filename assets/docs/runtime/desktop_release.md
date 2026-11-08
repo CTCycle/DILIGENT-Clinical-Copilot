@@ -1,5 +1,5 @@
 # Windows Desktop Release
-Last updated: 2026-11-03
+Last updated: 2026-11-07
 
 The latest published release is [v3.6.0](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases/tag/v3.6.0), published on 2026-11-03 from tag commit `b487b98465a799f9ae1a7772fc28cb08355451f9`. This document is the durable record of release identity, artifact hashes, hosted gates, local acceptance, unsigned status, and waivers.
 
@@ -69,6 +69,10 @@ It starts the backend on a random localhost port, waits for the ready file and h
 
 The shell hands the one-time bootstrap URL to the SPA once. The SPA then keeps the loopback API origin and session token in the window's `sessionStorage`, so a full page reload (for example F5 on `/clinical-sessions`) continues to call the loopback API instead of the Tauri origin. The packaged CSP disables Tauri's nonce rewriting for `style-src` only (`dangerousDisableAssetCspModification`), because Angular injects component styles at runtime, and the production Angular build does not inline critical CSS because its `onload` handler is blocked by the CSP; without both, the packaged UI renders unstyled. The backend's packaged CORS allow-list covers every request header the client sends, including `Cache-Control` and `Pragma` on no-cache reads.
 
+Starting with the 3.6.1 candidate, Windows releases the extraction lock when the process exits. Each launch hashes every extracted file against the manifest embedded in the executable (a startup cost proportional to the runtime size) and rebuilds the runtime cache if validation fails. The 3.6.1 MSI blocks downgrades to protect data migrated by newer versions.
+
+Local candidate validation on 2026-11-07 confirmed recovery after closing the window during extraction, repair of a same-length cache change, and removal of an unlisted DLL. The portable passed the normal and deep-path smoke. Two independent frozen runtime builds produced the same SHA-256. The MSI downgrade guard was verified in its launch table. Elevated installation and upgrade testing remain part of release acceptance.
+
 Mutable settings, the SQLite database, logs, embedding cache, source catalogs, and application state live beneath:
 
 ~~~text
@@ -88,12 +92,14 @@ Clinical-session attachments and patient profile images use normal HTML file inp
 Build on Windows x64 with Rust/Cargo, the Windows C++ build tools, network access for dependencies and the WebView2 bootstrapper, and the repository launcher for pinned runtimes. Set the version to the synchronized source manifest version:
 
 ~~~powershell
-.\setup_and_maintenance.ps1 -Action BuildDesktopRelease -Version 3.6.0 -DesktopTarget All
+.\setup_and_maintenance.ps1 -Action BuildDesktopRelease -Version 3.6.1 -DesktopTarget All
 ~~~
 
 Use `-DesktopTarget Portable` or `-DesktopTarget Msi` to build one artifact. `-OfflineWebView2` applies only to MSI builds. Release builds require a clean worktree unless `-AllowDirtyTree` is supplied intentionally and recorded.
 
 The portable EXE, MSI, and SHA-256 manifest are written under `release/`. Launcher option 8 builds artifacts; option 9 removes selected release artifacts. Intermediate build output and local validation captures are temporary and are removed after their durable conclusions are recorded here.
+
+The desktop bundle includes the project license notice and the Angular dependency notices. The frozen backend uses the source commit timestamp and a fixed Python hash seed. Publication promotes the exact prepared artifacts by checksum. WiX generates installer identities when bundling, so each MSI build has its own checksum.
 
 ### Local packaged smoke
 
@@ -103,7 +109,7 @@ For a local portable startup check, verify the EXE against its SHA-256 manifest,
 
 The release workflow is .github/workflows/release.yml. It is manually dispatched with mode=prepare or mode=publish; pushing a tag alone does not publish a release.
 
-Preparation runs the required backend quality and migration checks, SQLite/PostgreSQL persistence, frontend tests/build, the Windows Full browser harness, the LiveProvider lane, dependency audits, artifact checks, portable/deep-path smoke, the MSI install/launch/uninstall/reinstall lifecycle, and a populated MSI upgrade from the previously published package (v3.5.1 for v3.6.0). The upgrade fixture verifies session, configuration, timeline, and source-catalog data remain intact at the current migration head. It produces checksums and an immutable candidate receipt. Candidate workflow artifacts expire after 30 days; an expired candidate must be prepared and accepted again. Populated databases without a revision and databases with unknown or divergent revisions remain unsupported and are rejected without stamping.
+Preparation runs the required backend quality and migration checks, SQLite/PostgreSQL persistence, frontend tests/build, the Windows Full browser harness, the LiveProvider lane, dependency audits, artifact checks, portable/deep-path smoke, the MSI install/launch/uninstall/reinstall lifecycle, and a populated MSI upgrade from the pinned published package. The hosted v3.6.0 workflow used v3.5.0. The v3.6.1 candidate workflow uses v3.6.0. The upgrade fixture verifies sessions, versions, and settings at the current migration head. Preparation produces checksums and an immutable candidate receipt. Candidate workflow artifacts expire after 30 days; an expired candidate must be prepared and accepted again. Populated databases without a revision and databases with unknown or divergent revisions remain unsupported and are rejected without stamping.
 
 Keep OPENCODE_GO_API_KEY in the GitHub secret store for LiveProvider E2E. Never put it in local evidence or logs.
 

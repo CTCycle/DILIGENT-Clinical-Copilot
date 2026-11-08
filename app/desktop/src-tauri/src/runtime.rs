@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 use std::{
-    fs::{self, OpenOptions},
+    collections::HashSet,
+    fs::{self, File, OpenOptions, TryLockError},
     io::Read,
     path::{Path, PathBuf},
     thread,
@@ -52,14 +53,6 @@ struct ExtractionMarker {
     total_size: u64,
 }
 
-struct RuntimeLock(PathBuf);
-
-impl Drop for RuntimeLock {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.0);
-    }
-}
-
 fn archive_digest() -> String {
     format!("{:x}", Sha256::digest(EMBEDDED_ARCHIVE))
 }
@@ -80,15 +73,11 @@ fn safe_member_path(name: &str) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file = fs::File::open(path).map_err(|error| error.to_string())?;
+fn sha256_file(path: &Path, buffer: &mut [u8]) -> Result<String, String> {
+    let mut file = File::open(path).map_err(|error| error.to_string())?;
     let mut digest = Sha256::new();
-    // Keep the hashing buffer on the heap. The Windows GUI subsystem uses a
-    // relatively small default thread stack, so a 1 MiB stack array can
-    // overflow before the desktop window is created.
-    let mut buffer = vec![0_u8; 1024 * 1024];
     loop {
-        let count = file.read(&mut buffer).map_err(|error| error.to_string())?;
+        let count = file.read(buffer).map_err(|error| error.to_string())?;
         if count == 0 {
             break;
         }
@@ -97,9 +86,15 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-fn load_manifest(root: &Path, expected_version: &str) -> Result<(RuntimeManifest, String), String> {
-    let manifest_bytes =
-        fs::read(root.join("runtime-manifest.json")).map_err(|error| error.to_string())?;
+fn load_embedded_manifest(
+    archive: &mut ZipArchive<std::io::Cursor<&[u8]>>,
+    expected_version: &str,
+) -> Result<(RuntimeManifest, String), String> {
+    let mut manifest_bytes = Vec::new();
+    archive
+        .by_name("runtime-manifest.json")
+        .and_then(|mut member| member.read_to_end(&mut manifest_bytes).map_err(Into::into))
+        .map_err(|error| error.to_string())?;
     let manifest: RuntimeManifest =
         serde_json::from_slice(&manifest_bytes).map_err(|error| error.to_string())?;
     if manifest.release_version != expected_version {
@@ -108,20 +103,75 @@ fn load_manifest(root: &Path, expected_version: &str) -> Result<(RuntimeManifest
     Ok((manifest, format!("{:x}", Sha256::digest(manifest_bytes))))
 }
 
+fn is_runtime_link(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_REPARSE_POINT includes junctions and other redirects.
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    {
+        metadata.is_symlink()
+    }
+}
+
+fn validate_runtime_tree(
+    root: &Path,
+    directory: &Path,
+    expected: &HashSet<PathBuf>,
+) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(directory).map_err(|error| error.to_string())?;
+    if !metadata.is_dir() || is_runtime_link(&metadata) {
+        return Err(format!(
+            "invalid runtime directory: {}",
+            directory.display()
+        ));
+    }
+    for entry in fs::read_dir(directory).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        let metadata = entry.metadata().map_err(|error| error.to_string())?;
+        let relative = path.strip_prefix(root).map_err(|error| error.to_string())?;
+        if !expected.contains(relative) || is_runtime_link(&metadata) {
+            return Err(format!("unexpected runtime entry: {}", path.display()));
+        }
+        if metadata.is_dir() {
+            validate_runtime_tree(root, &path, expected)?;
+        } else if !metadata.is_file() {
+            return Err(format!("unexpected runtime file: {}", path.display()));
+        }
+    }
+    Ok(())
+}
+
 fn validate_manifest_entries(
     root: &Path,
     manifest: &RuntimeManifest,
-    hash_files: bool,
 ) -> Result<(usize, u64), String> {
+    let mut expected = HashSet::from([
+        PathBuf::from("runtime-manifest.json"),
+        PathBuf::from("extraction.complete"),
+    ]);
+    for file in &manifest.files {
+        let path = safe_member_path(&file.path)?;
+        if !expected.insert(path.clone()) {
+            return Err(format!("duplicate runtime manifest entry: {}", file.path));
+        }
+        expected.extend(path.ancestors().skip(1).map(Path::to_path_buf));
+    }
+    validate_runtime_tree(root, root, &expected)?;
+
+    // Keep the buffer off the Windows GUI thread's small stack.
+    let mut buffer = vec![0_u8; 1024 * 1024];
     let mut total_size = 0_u64;
     for file in &manifest.files {
-        let relative = safe_member_path(&file.path)?;
-        let path = root.join(relative);
+        let path = root.join(&file.path);
         let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
         if !metadata.is_file() || metadata.len() != file.size {
             return Err(format!("runtime manifest size mismatch: {}", file.path));
         }
-        if hash_files && sha256_file(&path)? != file.sha256 {
+        if sha256_file(&path, &mut buffer)? != file.sha256 {
             return Err(format!("runtime manifest hash mismatch: {}", file.path));
         }
         total_size = total_size
@@ -143,41 +193,52 @@ fn read_marker(path: &Path) -> Result<ExtractionMarker, String> {
         .map_err(|error| error.to_string())
 }
 
-fn fast_validate_extracted_runtime(
+fn validate_extracted_runtime(
     root: &Path,
-    expected_version: &str,
+    manifest: &RuntimeManifest,
+    manifest_sha256: &str,
     expected_digest: &str,
 ) -> Result<(), String> {
     let marker = read_marker(&root.join("extraction.complete"))?;
-    if marker.release_version != expected_version || marker.archive_digest != expected_digest {
+    if marker.release_version != manifest.release_version
+        || marker.archive_digest != expected_digest
+    {
         return Err("runtime extraction marker mismatch".into());
     }
-    let (manifest, manifest_sha256) = load_manifest(root, expected_version)?;
-    if marker.manifest_sha256 != manifest_sha256 {
+    let mut buffer = vec![0_u8; 1024 * 1024];
+    if marker.manifest_sha256 != manifest_sha256
+        || sha256_file(&root.join("runtime-manifest.json"), &mut buffer)? != manifest_sha256
+    {
         return Err("runtime manifest marker mismatch".into());
     }
-    let (file_count, total_size) = validate_manifest_entries(root, &manifest, false)?;
+    let (file_count, total_size) = validate_manifest_entries(root, manifest)?;
     if marker.file_count != file_count || marker.total_size != total_size {
         return Err("runtime extraction statistics mismatch".into());
     }
     Ok(())
 }
 
-fn acquire_runtime_lock(path: &Path) -> Result<RuntimeLock, String> {
+fn acquire_runtime_lock(path: &Path) -> Result<File, String> {
+    // Keep this file in place. The OS releases its lock even if the shell exits
+    // while extracting, and removing it would let contenders open different files.
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|error| error.to_string())?;
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
-        match OpenOptions::new().write(true).create_new(true).open(path) {
-            Ok(file) => {
-                drop(file);
-                return Ok(RuntimeLock(path.to_path_buf()));
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+        match file.try_lock() {
+            Ok(()) => return Ok(file),
+            Err(TryLockError::WouldBlock) => {
                 if Instant::now() >= deadline {
                     return Err("timed out waiting for runtime extraction lock".into());
                 }
                 thread::sleep(Duration::from_millis(100));
             }
-            Err(error) => return Err(error.to_string()),
+            Err(TryLockError::Error(error)) => return Err(error.to_string()),
         }
     }
 }
@@ -198,16 +259,19 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
     let runtime_parent = runtime_base.join(version);
     let runtime_root = runtime_parent.join(&actual_digest);
     fs::create_dir_all(&runtime_base).map_err(|error| error.to_string())?;
-    let _lock = acquire_runtime_lock(&runtime_base.join(".runtime.lock"))?;
+    let _lock = acquire_runtime_lock(&runtime_base.join(".runtime-extraction.lock"))?;
+    let mut archive = ZipArchive::new(std::io::Cursor::new(EMBEDDED_ARCHIVE))
+        .map_err(|error| error.to_string())?;
+    let (manifest, manifest_sha256) = load_embedded_manifest(&mut archive, version)?;
 
-    if fast_validate_extracted_runtime(&runtime_root, version, &actual_digest).is_err() {
+    if validate_extracted_runtime(&runtime_root, &manifest, &manifest_sha256, &actual_digest)
+        .is_err()
+    {
         fs::create_dir_all(&runtime_parent).map_err(|error| error.to_string())?;
         let temporary = runtime_parent.join(format!(".extract-{}", Uuid::new_v4()));
         fs::create_dir_all(&temporary).map_err(|error| error.to_string())?;
         let extraction_result = (|| {
-            let cursor = std::io::Cursor::new(EMBEDDED_ARCHIVE);
-            let mut archive = ZipArchive::new(cursor).map_err(|error| error.to_string())?;
-            let mut members = std::collections::HashSet::new();
+            let mut members = HashSet::new();
             for index in 0..archive.len() {
                 let mut member = archive.by_index(index).map_err(|error| error.to_string())?;
                 let member_name = member.name().map_err(|error| error.to_string())?;
@@ -234,8 +298,7 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
                     fs::File::create(destination).map_err(|error| error.to_string())?;
                 std::io::copy(&mut member, &mut output).map_err(|error| error.to_string())?;
             }
-            let (manifest, manifest_sha256) = load_manifest(&temporary, version)?;
-            let (file_count, total_size) = validate_manifest_entries(&temporary, &manifest, true)?;
+            let (file_count, total_size) = validate_manifest_entries(&temporary, &manifest)?;
             let marker = ExtractionMarker {
                 release_version: version.to_string(),
                 archive_digest: actual_digest.clone(),
@@ -258,6 +321,7 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
         }
         extraction_result?;
     }
+    prune_runtime_cache(&runtime_base, version);
     let data_root = app_root.join("data");
     fs::create_dir_all(data_root.join("settings")).map_err(|error| error.to_string())?;
     fs::create_dir_all(data_root.join("cache").join("logs")).map_err(|error| error.to_string())?;
@@ -270,12 +334,8 @@ pub fn prepare_runtime(version: &str) -> Result<RuntimePaths, String> {
     })
 }
 
-pub fn prune_runtime_cache(version: &str) {
-    let Ok(app_root) = local_app_root().map(|path| path.join("DILIGENT")) else {
-        return;
-    };
-    let runtime_base = app_root.join(RUNTIME_CACHE_DIR_NAME);
-    let Ok(entries) = fs::read_dir(&runtime_base) else {
+fn prune_runtime_cache(runtime_base: &Path, version: &str) {
+    let Ok(entries) = fs::read_dir(runtime_base) else {
         return;
     };
     for (inspected, entry) in entries.flatten().enumerate() {
@@ -284,9 +344,6 @@ pub fn prune_runtime_cache(version: &str) {
         }
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name == ".runtime.lock" {
-            continue;
-        }
         if name != version {
             if path.is_dir() {
                 let _ = fs::remove_dir_all(path);
@@ -311,7 +368,7 @@ pub fn prune_runtime_cache(version: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::safe_member_path;
+    use super::*;
 
     #[test]
     fn rejects_traversal_and_absolute_members() {
@@ -319,5 +376,52 @@ mod tests {
         assert!(safe_member_path("C:/escape").is_err());
         assert!(safe_member_path("/escape").is_err());
         assert!(safe_member_path("\\escape").is_err());
+    }
+
+    #[test]
+    fn persistent_lock_file_can_be_reused_after_the_holder_exits() {
+        let path = std::env::temp_dir().join(format!("diligent-lock-{}", Uuid::new_v4()));
+        fs::write(&path, b"left by the previous process").unwrap();
+        let holder = acquire_runtime_lock(&path).unwrap();
+        let contender = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        assert!(matches!(
+            contender.try_lock(),
+            Err(TryLockError::WouldBlock)
+        ));
+        drop(holder);
+        contender.try_lock().unwrap();
+        drop(contender);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_same_size_changes_and_unlisted_files_in_the_extracted_runtime() {
+        let root = std::env::temp_dir().join(format!("diligent-runtime-{}", Uuid::new_v4()));
+        fs::create_dir_all(root.join("b")).unwrap();
+        let executable = root.join("b/DILIGENTBackend.exe");
+        fs::write(&executable, b"original").unwrap();
+        let manifest = RuntimeManifest {
+            release_version: "3.6.1".into(),
+            files: vec![RuntimeFile {
+                path: "b/DILIGENTBackend.exe".into(),
+                size: 8,
+                sha256: format!("{:x}", Sha256::digest(b"original")),
+            }],
+        };
+        assert!(validate_manifest_entries(&root, &manifest).is_ok());
+        fs::write(&executable, b"modified").unwrap();
+        assert!(validate_manifest_entries(&root, &manifest)
+            .unwrap_err()
+            .contains("hash mismatch"));
+        fs::write(&executable, b"original").unwrap();
+        fs::write(root.join("b/injected.dll"), b"unlisted").unwrap();
+        assert!(validate_manifest_entries(&root, &manifest)
+            .unwrap_err()
+            .contains("unexpected runtime entry"));
+        fs::remove_dir_all(root).unwrap();
     }
 }

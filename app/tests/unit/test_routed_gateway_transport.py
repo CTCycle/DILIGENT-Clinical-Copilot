@@ -57,6 +57,7 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    monkeypatch.setattr(routed_gateway, "resolve_application_version", lambda: "9.8.7")
     transport = _transport()
     captured: dict[str, object] = {}
 
@@ -117,7 +118,7 @@ def test_opencode_go_chat_bypasses_catalog_failure_and_uses_direct_chat_route(
     headers = captured["default_headers"]
     assert isinstance(headers, dict)
     assert headers["x-opencode-session"]
-    assert headers["User-Agent"] == "diligent-clinical-copilot/3.6.0"
+    assert headers["User-Agent"] == "diligent-clinical-copilot/9.8.7"
     assert "clinical prompt" not in caplog.text
     assert "route_source=documented_opencode_go_route@2026-10-30" in caplog.text
     assert "Cloud chat request attempted" in caplog.text

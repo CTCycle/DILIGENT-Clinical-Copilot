@@ -11,7 +11,7 @@ param(
     [switch]$InstallMsi,
     [switch]$TestUpgrade,
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$UpgradeFromVersion = '3.5.0',
+    [string]$UpgradeFromVersion = '3.6.0',
     [string]$PreviousMsiPath,
     [string]$PreviousChecksumPath,
     [switch]$RequireUnsigned,
