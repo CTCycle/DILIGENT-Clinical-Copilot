@@ -514,7 +514,14 @@ class DataInspectionService(
                 stream_batch_size=rag_settings.vector_stream_batch_size,
             )
             if vector_db.has_collection():
-                for row in vector_db.load_embeddings():
+                for row in vector_db.read_columns(
+                    [
+                        "file_name",
+                        "metadata",
+                        "vector_model_provider",
+                        "vector_model_name",
+                    ]
+                ):
                     file_name = str(row.get("file_name") or "")
                     relative_path = ""
                     metadata = row.get("metadata")

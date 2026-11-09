@@ -568,3 +568,27 @@ def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
         assert False, "Expected timeout mapping"
     except embeddings_module.LLMTimeout:
         pass
+
+
+###############################################################################
+def test_vector_metadata_checks_read_only_projected_columns(tmp_path: Path) -> None:
+    import lancedb
+    from repositories.vectors import LanceVectorDatabase
+
+    path = str(tmp_path / "vectors")
+    lancedb.connect(path).create_table(
+        "docs",
+        data=[
+            {"document_id": "a", "embedding_fingerprint": "fp", "vector_model_signature": "sig", "vector": [0.1, 0.2]},
+            {"document_id": "b", "embedding_fingerprint": "fp", "vector_model_signature": "sig", "vector": [0.3, 0.4]},
+        ],
+    )
+    database = LanceVectorDatabase(path, "docs")
+
+    assert database.read_columns(["document_id"]) == [{"document_id": "a"}, {"document_id": "b"}]
+    assert database.count_embeddings() == 2
+    assert database.count_distinct_documents() == 2
+    assert database.get_vector_model_signatures() == {"sig"}
+    database.assert_embedding_fingerprint_matches("fp")
+    with pytest.raises(ValueError):
+        database.assert_embedding_fingerprint_matches("other")

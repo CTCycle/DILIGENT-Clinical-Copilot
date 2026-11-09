@@ -228,7 +228,7 @@ export async function requestJson<T>(
   if (!result.json) {
     throw new Error("[ERROR] Service returned an invalid response. Please retry.");
   }
-  return JSON.parse(JSON.stringify(result.json));
+  return result.json as T;
 }
 
 export function buildQueryString(

@@ -3,66 +3,56 @@
 
 import { Routes } from '@angular/router';
 
-import { DiliAgentPageComponent } from './pages/dili-agent/dili-agent-page.component';
-import { DiliReportPageComponent } from './pages/dili-report/dili-report-page.component';
-import { DataInspectionPageComponent } from './pages/data-inspection/data-inspection-page.component';
-import { ClinicalSessionsPageComponent } from './pages/clinical-sessions/clinical-sessions-page.component';
-import { ModelConfigPageComponent } from './pages/model-config/model-config-page.component';
-import { PatientTimetablePageComponent } from './pages/patient-timetable/patient-timetable-page.component';
-import { SettingsPageComponent } from './pages/settings/settings-page.component';
-import { OperationalSettingsPageComponent } from './pages/settings/components/operational-settings-page.component';
-import { DatabaseSettingsComponent } from './pages/settings/components/database-settings.component';
-
 export const routes: Routes = [
-  { path: '', component: DiliAgentPageComponent, title: 'DILI Agent | DILIGENT' },
-  { path: 'report/:sessionId', component: DiliReportPageComponent, title: 'DILI Report | DILIGENT' },
-  { path: 'clinical-sessions', component: ClinicalSessionsPageComponent, title: 'Clinical Sessions | DILIGENT' },
-  { path: 'data', component: DataInspectionPageComponent, title: 'Knowledge | DILIGENT' },
-  { path: 'sessions/:sessionId/timetable/:timelineId', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
-  { path: 'sessions/:sessionId/timetable', component: PatientTimetablePageComponent, title: 'Patient Timeline | DILIGENT' },
+  { path: '', loadComponent: () => import('./pages/dili-agent/dili-agent-page.component').then((m) => m.DiliAgentPageComponent), title: 'DILI Agent | DILIGENT' },
+  { path: 'report/:sessionId', loadComponent: () => import('./pages/dili-report/dili-report-page.component').then((m) => m.DiliReportPageComponent), title: 'DILI Report | DILIGENT' },
+  { path: 'clinical-sessions', loadComponent: () => import('./pages/clinical-sessions/clinical-sessions-page.component').then((m) => m.ClinicalSessionsPageComponent), title: 'Clinical Sessions | DILIGENT' },
+  { path: 'data', loadComponent: () => import('./pages/data-inspection/data-inspection-page.component').then((m) => m.DataInspectionPageComponent), title: 'Knowledge | DILIGENT' },
+  { path: 'sessions/:sessionId/timetable/:timelineId', loadComponent: () => import('./pages/patient-timetable/patient-timetable-page.component').then((m) => m.PatientTimetablePageComponent), title: 'Patient Timeline | DILIGENT' },
+  { path: 'sessions/:sessionId/timetable', loadComponent: () => import('./pages/patient-timetable/patient-timetable-page.component').then((m) => m.PatientTimetablePageComponent), title: 'Patient Timeline | DILIGENT' },
   {
     path: 'settings',
-    component: SettingsPageComponent,
+    loadComponent: () => import('./pages/settings/settings-page.component').then((m) => m.SettingsPageComponent),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'general' },
       {
         path: 'general',
-        component: OperationalSettingsPageComponent,
+        loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'general' },
         title: 'General Settings | DILIGENT',
       },
       {
         path: 'models',
-        component: ModelConfigPageComponent,
+        loadComponent: () => import('./pages/model-config/model-config-page.component').then((m) => m.ModelConfigPageComponent),
         title: 'Model Settings | DILIGENT',
       },
       {
         path: 'data',
-        component: OperationalSettingsPageComponent,
+        loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'data' },
         title: 'Data Processing Settings | DILIGENT',
       },
       {
         path: 'integrations',
-        component: OperationalSettingsPageComponent,
+        loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'integrations' },
         title: 'Integration Settings | DILIGENT',
       },
       {
         path: 'matching',
-        component: OperationalSettingsPageComponent,
+        loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'matching' },
         title: 'Drug Matching Settings | DILIGENT',
       },
       {
         path: 'advanced',
-        component: OperationalSettingsPageComponent,
+        loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'advanced' },
         title: 'Advanced Settings | DILIGENT',
       },
       {
         path: 'database',
-        component: DatabaseSettingsComponent,
+        loadComponent: () => import('./pages/settings/components/database-settings.component').then((m) => m.DatabaseSettingsComponent),
         title: 'Database Settings | DILIGENT',
       },
     ],

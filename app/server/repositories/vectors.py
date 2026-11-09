@@ -458,10 +458,19 @@ class LanceVectorDatabase:
         return data.to_pylist()
 
     # -------------------------------------------------------------------------
+    def read_columns(self, columns: list[str]) -> list[dict[str, Any]]:
+        """Read only the named columns so vectors and text are never materialized."""
+        table = self.get_table()
+        total = int(table.count_rows())
+        if total <= 0:
+            return []
+        return table.search().select(columns).limit(total).to_arrow().to_pylist()
+
+    # -------------------------------------------------------------------------
     def get_vector_model_signatures(self) -> set[str]:
         if not self.has_collection():
             return set()
-        records = self.load_embeddings()
+        records = self.read_columns(["vector_model_signature"])
         signatures: set[str] = set()
         for row in records:
             value = row.get("vector_model_signature")
@@ -484,7 +493,7 @@ class LanceVectorDatabase:
         """Reject missing, mixed, or incompatible canonical vector metadata."""
         if not self.has_collection():
             raise ValueError("RAG vector collection is missing")
-        records = self.load_embeddings()
+        records = self.read_columns(["embedding_fingerprint"])
         fingerprints = {
             str(row.get("embedding_fingerprint") or "").strip() for row in records
         }
@@ -500,7 +509,7 @@ class LanceVectorDatabase:
             return 0
         table = self.get_table()
         try:
-            return int(table.to_arrow().num_rows)
+            return int(table.count_rows())
         except Exception:  # noqa: BLE001
             return 0
 
@@ -508,13 +517,11 @@ class LanceVectorDatabase:
     def count_distinct_documents(self) -> int:
         if not self.has_collection():
             return 0
-        table = self.get_table()
         try:
-            data = table.to_arrow().select(["document_id"])
+            rows = self.read_columns(["document_id"])
         except Exception:  # noqa: BLE001
             return 0
-        values = data.column("document_id").to_pylist() if data.num_rows else []
-        distinct = {str(item) for item in values if item}
+        distinct = {str(row["document_id"]) for row in rows if row.get("document_id")}
         return len(distinct)
 
     # -------------------------------------------------------------------------
