@@ -84,8 +84,8 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
   },
   {
     id: 'rag-boundary',
-    title: 'Control RAG per assessment',
-    body: 'RAG settings define retrieval behaviour; the DILI Agent checkbox decides whether the current assessment uses indexed evidence.',
+    title: 'Choose evidence in the analysis wizard',
+    body: 'RAG settings define retrieval behaviour; the evidence selection step in the DILI analysis wizard decides what the current assessment uses.',
   },
   {
     id: 'session-review',

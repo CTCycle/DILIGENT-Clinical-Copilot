@@ -62,6 +62,7 @@ export class DatabaseSettingsComponent implements OnInit {
     if (!current) return;
     this.configuration.set({ ...current, backend });
     this.testResult.set(null);
+    this.error.set(null);
   }
 
   patchConfiguration(patch: Partial<DatabaseConfiguration>): void {

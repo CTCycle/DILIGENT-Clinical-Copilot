@@ -174,6 +174,12 @@ export class DiliAgentPageComponent {
   }
 
   clearAll(): void {
+    if (
+      this.vm.isDirty &&
+      !globalThis.confirm('Clear all case input? Unsaved changes will be discarded and cannot be recovered.')
+    ) {
+      return;
+    }
     this.pageError.set(null);
     this.wizard()?.reset();
     this.drafts.reset();

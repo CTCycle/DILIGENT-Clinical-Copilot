@@ -533,8 +533,13 @@ class DataInspectionUpdateJobRunner:
             progress_callback=progress_callback,
         )
         self.report_phase_by_target(job_id, "rag", 12, "Loading source documents")
+        if stop_check():
+            return {}
         updater.prepare_vector_database()
         if stop_check():
+            # Preparation creates the temporary build collection; drop it so a
+            # cancelled update leaves no partial vector state behind.
+            updater.vector_database.clear_collection()
             return {}
         self.report_phase_by_target(job_id, "rag", 30, "Generating embeddings")
         result = updater.refresh_embeddings()

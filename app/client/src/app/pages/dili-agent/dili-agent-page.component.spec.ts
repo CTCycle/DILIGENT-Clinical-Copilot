@@ -167,4 +167,17 @@ describe('DiliAgentPageComponent', () => {
     expect(component.vm.draftSessionId).toBeNull();
     expect(sessionCalls().some((call: string) => call.startsWith('DELETE'))).toBe(false);
   });
+
+  it('keeps unsaved input unless clearing is confirmed', async () => {
+    await create({ session: '5' });
+    component.handleFormChange('clinicalInput', 'Unsaved edit');
+    const confirm = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+
+    component.clearAll();
+    expect(component.vm.form.clinicalInput).toBe('Unsaved edit');
+
+    confirm.mockReturnValue(true);
+    component.clearAll();
+    expect(component.vm.form.clinicalInput).toBe('');
+  });
 });
