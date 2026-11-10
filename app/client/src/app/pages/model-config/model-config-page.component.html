@@ -510,6 +510,7 @@
         @if (activeRagSettingsSection() === 'general') {
         <section class="model-config-rag-settings-section">
           <h3>Retrieval Settings</h3>
+          <p class="model-config-rag-settings-intro">How many candidates are retrieved and how they are ranked before entering the model context.</p>
           <div class="model-config-rag-setting-row">
             <label for="rag-candidate-count">
               Retrieved documents
@@ -601,6 +602,7 @@
         @if (activeRagSettingsSection() === 'chunking') {
         <section class="model-config-rag-settings-section">
           <h3>Chunking Settings</h3>
+          <p class="model-config-rag-settings-intro">How source text is split into chunks for indexing.</p>
           <div class="model-config-rag-setting-row">
             <label for="rag-chunk-size">
               Chunk size
@@ -621,6 +623,7 @@
         @if (activeRagSettingsSection() === 'embeddings') {
         <section class="model-config-rag-settings-section">
           <h3>Embedding Settings</h3>
+          <p class="model-config-rag-settings-intro">Embedding model runtime and batching behavior.</p>
           <div class="model-config-rag-setting-row">
             <label>Canonical embedding model</label>
             <span>{{ currentRagModelLabel() }}</span>
@@ -652,6 +655,7 @@
         @if (activeRagSettingsSection() === 'models') {
         <section class="model-config-rag-settings-section">
           <h3>Ranking Settings</h3>
+          <p class="model-config-rag-settings-intro">Local reranking applied to retrieved candidates.</p>
           <div class="model-config-rag-setting-row">
             <label for="rag-reranker-model">
               Reranker profile
@@ -669,6 +673,7 @@
         @if (activeRagSettingsSection() === 'storage') {
         <section class="model-config-rag-settings-section">
           <h3>Index & Storage</h3>
+          <p class="model-config-rag-settings-intro">Vector index configuration and current index state.</p>
           <div class="model-config-rag-setting-row">
             <label for="rag-collection-name">
               Vector collection name
@@ -712,6 +717,7 @@
             </label>
             <input id="rag-stream-batch" type="number" min="1" step="1" [ngModel]="draftRagSettings().vector_stream_batch_size" (ngModelChange)="setDraftRagNumber('vector_stream_batch_size', $event)" />
           </div>
+          <h4>Index status</h4>
           <div class="model-config-rag-setting-row">
             <label>Index status</label>
             <span>{{ embeddingIndex()?.status || 'reindex_required' }}</span>

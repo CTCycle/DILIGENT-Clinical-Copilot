@@ -123,11 +123,11 @@ function updateErrorMessage(error: unknown, fallback: string): string {
 
 function statusMessage(status: InspectionUpdateJobStatusResponse): string {
   const result = status.result;
+  if (status.status === 'cancelled') return 'Update cancelled.';
   if (result?.progress_message) return result.progress_message;
   if (status.error) return status.error;
   if (status.status === 'completed') return 'Update completed.';
   if (status.status === 'failed') return 'Update failed.';
-  if (status.status === 'cancelled') return 'Update cancelled.';
   return 'Update running...';
 }
 
@@ -327,7 +327,7 @@ export class InspectionUpdateJobTrackerService {
     else if (target === 'terminology') await cancelInspectionTerminologyUpdateJob(jobId);
     else if (target === 'dilirank') await cancelInspectionDiliRankUpdateJob(jobId);
     else await cancelInspectionRagUpdateJob(jobId);
-    this.patch(target, { message: 'Cancellation requested.' });
+    this.patch(target, { message: 'Cancellation requested. The update stops at the next safe checkpoint.' });
   }
 
   private statusRequest(target: InspectionUpdateTarget, jobId: string): Promise<InspectionUpdateJobStatusResponse> {

@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-11-02
+Last updated: 2026-11-10
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -126,6 +126,8 @@ On application shutdown the lifespan stops new jobs, requests cooperative stops,
 - Runner code must check `get_job_manager().should_stop(job_id)` or an injected `JobManager` at safe checkpoints.
 
 If a runner does not check stop requests, cancellation is delayed.
+
+RAG updates check for stop requests only between phases: before updater construction, before preparation, and after `prepare_vector_database`. Embedding-backend validation (which may download the model) and vector initialization are not interruptible, so a stop requested during them takes effect afterward, and the temporary build collection is then dropped. A cancelled job always reports `Update cancelled.` regardless of its last progress message.
 
 ## Clinical Session Lifecycle
 

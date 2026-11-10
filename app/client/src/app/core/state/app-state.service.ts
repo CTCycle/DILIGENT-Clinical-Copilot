@@ -66,10 +66,31 @@ export const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   isPulling: false,
 };
 
+const THEME_STORAGE_KEY = 'diligent.theme';
+
+function readStoredTheme(): ThemeMode | null {
+  try {
+    const value = globalThis.localStorage?.getItem(THEME_STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeTheme(theme: ThemeMode): void {
+  try {
+    globalThis.localStorage?.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Storage may be unavailable; the choice then lasts for this session only.
+  }
+}
+
 function createDefaultAppState(): AppState {
   return {
     activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? '/'),
-    theme: globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light',
+    theme:
+      readStoredTheme() ??
+      (globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light'),
     diliAgent: { ...DEFAULT_DILI_AGENT_STATE },
   };
 }
@@ -92,10 +113,11 @@ export class AppStateService {
 
   setTheme(theme: ThemeMode): void {
     this.state.update((prev) => ({ ...prev, theme }));
+    storeTheme(theme);
   }
 
   toggleTheme(): void {
-    this.state.update((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' }));
+    this.setTheme(this.state().theme === 'dark' ? 'light' : 'dark');
   }
 
   updateDiliAgent(updates: Partial<DiliAgentState>): void {

@@ -5559,8 +5559,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Model Configuration RAG settings dialog */
 .model-config-rag-modal {
-  --modal-max-width: 1090px;
-  height: min(760px, calc(100dvh - (2 * var(--space-md))));
+  --modal-max-width: 1000px;
+  height: min(680px, calc(100dvh - (2 * var(--space-md))));
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
@@ -5570,55 +5570,67 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 @media (max-height: 640px) {
   .model-config-rag-modal {
-    height: min(760px, calc(100dvh - (2 * var(--space-sm))));
+    height: min(680px, calc(100dvh - (2 * var(--space-sm))));
   }
 }
 
 .model-config-rag-modal-body {
   display: grid;
-  grid-template-columns: 176px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
   min-height: 0;
 }
 
 .model-config-rag-modal-tabs {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 2px;
   min-height: 0;
-  padding: 14px 14px 86px;
+  padding: var(--space-md) 0;
   border-right: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-surface-alt) 45%, var(--color-surface));
 }
 
 .model-config-rag-modal-tabs button {
   display: grid;
-  grid-template-columns: 17px minmax(0, 1fr);
+  grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  min-height: 32px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  min-height: 36px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  padding: 0 9px;
+  padding: 0 var(--space-lg) 0 calc(var(--space-lg) - 3px);
   text-align: left;
-  font-size: var(--font-xs);
-  font-weight: 650;
+  font-size: var(--font-sm);
+  font-weight: 600;
   cursor: pointer;
 }
 
+.model-config-rag-modal-tabs button:hover {
+  background: color-mix(in srgb, var(--color-surface-alt) 70%, transparent);
+  color: var(--color-text-primary);
+}
+
+.model-config-rag-modal-tabs button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
 .model-config-rag-modal-tabs button.is-active {
-  border-color: color-mix(in srgb, var(--color-brand) 38%, var(--color-border-subtle));
+  border-left-color: var(--color-brand);
   background: var(--color-brand-bg);
   color: var(--color-brand);
 }
 
 .model-config-rag-modal-tabs svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.9;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -5626,83 +5638,154 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-rag-modal-scroll {
   min-height: 0;
   overflow: auto;
-  padding: var(--space-md) var(--space-xl) var(--space-2xl);
+  padding: var(--space-lg) var(--space-xl) var(--space-xl);
   scrollbar-gutter: stable;
 }
 
 .model-config-rag-settings-section {
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--space-xl);
 }
 
 .model-config-rag-settings-section h3 {
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--color-text-primary);
   font-size: var(--font-base);
-  font-weight: 760;
-  line-height: 1.25;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.model-config-rag-settings-section h4 {
+  margin: var(--space-xl) 0 0;
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.model-config-rag-settings-intro {
+  margin: var(--space-xs) 0 var(--space-sm);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  line-height: 1.45;
 }
 
 .model-config-rag-setting-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(220px, 390px);
+  grid-template-columns: minmax(0, 1fr) 220px;
   align-items: center;
-  min-height: 49px;
-  border: 1px solid var(--color-border-subtle);
-  border-bottom: 0;
-  background: color-mix(in srgb, var(--color-surface-alt) 72%, var(--color-surface));
-  padding: var(--space-sm) var(--space-md);
-}
-
-.model-config-rag-setting-row:first-of-type {
-  border-top-left-radius: var(--radius-sm);
-  border-top-right-radius: var(--radius-sm);
-}
-
-.model-config-rag-setting-row:last-child {
-  border-bottom: 1px solid var(--color-border-subtle);
-  border-bottom-left-radius: var(--radius-sm);
-  border-bottom-right-radius: var(--radius-sm);
+  column-gap: var(--space-xl);
+  min-height: 56px;
+  margin: 0 calc(-1 * var(--space-sm));
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-sm);
 }
 
 .model-config-rag-setting-row.is-invalid {
-  border-color: var(--color-status-error-border);
+  border-bottom-color: var(--color-status-error-border);
   background: var(--color-status-error-bg);
 }
 
 .model-config-rag-setting-row label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 3px;
   margin: 0;
   color: var(--color-text-primary);
-  font-size: var(--font-xs);
-  font-weight: 750;
-  line-height: 1.2;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .model-config-rag-setting-row label small {
   color: var(--color-text-secondary);
   font-size: var(--font-xs);
-  font-weight: 500;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.model-config-rag-setting-row > span {
+  justify-self: end;
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .model-config-rag-setting-row input:not([type="checkbox"]),
 .model-config-rag-setting-row select {
   width: 100%;
-  min-height: 31px;
-  border: 1px solid var(--color-border-subtle);
+  min-height: 32px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  padding: 0 11px;
+  padding: 0 var(--space-sm);
   font-size: var(--font-sm);
 }
 
-.model-config-rag-checkbox {
+.model-config-rag-setting-row input:not([type="checkbox"]):focus-visible,
+.model-config-rag-setting-row select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.model-config-rag-setting-row input:disabled,
+.model-config-rag-setting-row select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Checkbox rendered as a compact switch. */
+.model-config-rag-setting-row input[type="checkbox"] {
+  appearance: none;
+  position: relative;
   justify-self: end;
   width: 34px;
   height: 20px;
-  accent-color: var(--color-brand);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.model-config-rag-setting-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.model-config-rag-setting-row input[type="checkbox"]:checked {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+}
+
+.model-config-rag-setting-row input[type="checkbox"]:checked::after {
+  background: #ffffff;
+  transform: translateX(14px);
+}
+
+.model-config-rag-setting-row input[type="checkbox"]:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.model-config-rag-setting-row input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .model-config-rag-modal-footer {
@@ -5710,9 +5793,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-lg);
-  min-height: 70px;
-  padding: 13px 16px;
-  border-top: 1px solid var(--color-divider);
 }
 
 .model-config-rag-modal-footer span {
@@ -5738,9 +5818,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   justify-content: center;
   min-height: 32px;
   border-radius: var(--radius-sm);
-  padding: 0 15px;
-  font-size: var(--font-xs);
-  font-weight: 760;
+  padding: 0 var(--space-lg);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .model-config-rag-modal-primary {
@@ -5756,9 +5837,49 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-rag-modal-secondary {
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid var(--color-border);
   background: var(--color-surface);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+
+.model-config-rag-modal-secondary:hover {
+  background: var(--color-surface-alt);
+}
+
+@media (max-width: 720px) {
+  .model-config-rag-modal-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .model-config-rag-modal-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  .model-config-rag-modal-tabs button {
+    width: auto;
+    border-left: 0;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+
+  .model-config-rag-modal-tabs button.is-active {
+    border-bottom-color: var(--color-brand);
+  }
+
+  .model-config-rag-setting-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-sm);
+  }
+
+  .model-config-rag-setting-row > span,
+  .model-config-rag-setting-row input[type="checkbox"] {
+    justify-self: start;
+  }
 }
 
 @media (max-width: 1500px) {

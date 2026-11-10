@@ -67,8 +67,9 @@ A status applies only to its stated scope. In particular, PUBLISHED is not a gen
 | Issue | Impact | Concept documentation |
 | --- | --- | --- |
 | Hy's Law temporal criteria await clinician sign-off | The 30-day bilirubin lag window and the abnormal-baseline reference are implemented from FDA 2009 / EASL 2019 guidance but not clinically reviewed; a release should record the reviewer decision or a waiver. | [DILI pipeline](architecture/dili_assessment_pipeline.md) |
-| DILI Agent guidance and clearing need follow-up | A 2026-11-01 browser pilot found that walkthrough step 1 could not locate the visible clinical input, Help & Tips still described a removed DILI Agent RAG checkbox, and Clear All immediately cleared unsaved input. No later rendered review of these interactions is recorded. | [UI experience](ui/experience.md); [DILI workflow](user/dili_assessment_workflow.md) |
+| Web E2E QA 2026-11-09 follow-up | Clear All now confirms before discarding unsaved input, the RAG tip and database-error reset were corrected, cancelled update jobs always show `Update cancelled.`, and the theme choice persists in browser storage. RAG stop remains cooperative: embedding-backend validation and vector initialization are not interruptible. Provider-backed assessment, populated imports/retrieval, report export, accessibility, and packaged runtime are still unvalidated. | [Background jobs](architecture/background_jobs.md); [UI experience](ui/experience.md) |
 | `app/shared/openapi.json` is stale | It no longer matches the generated schema (for example `/api/inspection/sessions` parameters and the 2026-11-02 attachment/manual-edit contracts); nothing checks it. | [API surface](architecture/api_surface.md) |
+| RAG settings screenshot is outdated | The 2026-11-09 RAG settings dialog redesign (flat rows, switch controls, side rail) makes `assets/figures/06-rag-settings.jpg`, embedded in the README, stale. Replace it with a fresh capture during the next release cycle. | [Settings UI](runtime/settings_ui.md) |
 
 ## Deferred validation
 

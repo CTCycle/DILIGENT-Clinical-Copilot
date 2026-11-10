@@ -33,6 +33,16 @@ describe('AppStateService', () => {
     expect(localStorage.length).toBe(0);
   });
 
+  it('persists an explicit theme choice across service instances', () => {
+    TestBed.inject(AppStateService).toggleTheme();
+    const chosen = TestBed.inject(AppStateService).state().theme;
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+
+    expect(TestBed.inject(AppStateService).state().theme).toBe(chosen);
+  });
+
   it('maps configuration routes to Settings', () => {
     expect(resolvePageIdFromPath('/clinical-sessions?session=3&tab=preview')).toBe('clinical-sessions');
     expect(resolvePageIdFromPath('/settings/general')).toBe('settings');

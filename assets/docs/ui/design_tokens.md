@@ -1,5 +1,5 @@
 # Design Tokens
-Last updated: 2026-10-27
+Last updated: 2026-11-10
 
 ## Scope
 Frontend styling guidance applies to `app/client/src`.
@@ -36,6 +36,7 @@ Frontend styling guidance applies to `app/client/src`.
 
 ## Color System
 - Theme model:
+  - explicit user choice persists in browser storage (`diligent.theme`); otherwise follows `prefers-color-scheme`
   - light theme in `:root`
   - dark theme in `:root[data-theme="dark"]`
 - Core palette tokens:
