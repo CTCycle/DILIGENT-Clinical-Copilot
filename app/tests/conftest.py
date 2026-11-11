@@ -39,6 +39,11 @@ def _configure_test_embedded_database_path() -> None:
     temp_root = PYTEST_CACHE_ROOT / "databases"
     temp_root.mkdir(parents=True, exist_ok=True)
     db_path = temp_root / f"embedded-{uuid.uuid4().hex}.db"
+    # Keep generated access-key encryption material out of the real data directory.
+    os.environ.setdefault(
+        "DILIGENT_ACCESS_KEY_MATERIAL_FILE",
+        str(temp_root / f"access-key-material-{uuid.uuid4().hex}.json"),
+    )
     database_config.DATABASE_CONFIG_FILE_PATH = (
         temp_root / f"database-config-{uuid.uuid4().hex}.json"
     )
