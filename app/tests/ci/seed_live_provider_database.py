@@ -15,6 +15,13 @@ if str(SERVER_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVER_ROOT))
 
 from configurations.startup import get_server_settings  # noqa: E402
+from domain.agents import (  # noqa: E402
+    AGENT_CONFIG_SCHEMA_VERSION,
+    AGENT_KINDS,
+    agent_config_hash,
+    parse_agent_config,
+)
+from repositories.agent_repository import AgentRepository  # noqa: E402
 from repositories.context import RepositoryContext  # noqa: E402
 from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
 from repositories.drug_catalog_repository import DrugCatalogRepository  # noqa: E402
@@ -24,6 +31,39 @@ from services.updater.terminology.snapshot import (  # noqa: E402
     StagedConcept,
     TerminologySnapshot,
 )
+
+
+# The provider and model the live-provider browser gate runs with.
+LIVE_PROVIDER = "opencode_go"
+LIVE_MODEL = "deepseek-v4.1-flash"
+
+
+###############################################################################
+def _route_default_agents(context: RepositoryContext) -> None:
+    """Run every role of the default agents on the live provider model."""
+    agents = AgentRepository(context)
+    ref = {"provider": LIVE_PROVIDER, "model": LIVE_MODEL}
+    for kind in AGENT_KINDS:
+        record = agents.get_default(kind)
+        if record is None:
+            raise RuntimeError(f"Database initialization did not seed a {kind} agent.")
+        configuration = dict(record["revision"]["configuration"])
+        models = dict(configuration["models"])
+        roles = ("extraction", "clinical", "timeline") if kind == "dili" else ("planning",)
+        models.update({role: dict(ref) for role in roles})
+        configuration.update(models=models, reasoning_level="off")
+        config = parse_agent_config(configuration)
+        if agent_config_hash(config) == record["revision"]["configuration_hash"]:
+            continue
+        agents.create_revision(
+            agent_id=record["id"],
+            expected_revision=int(record["current_revision"]),
+            name=record["name"],
+            description=record["description"],
+            configuration=config.model_dump(mode="json"),
+            configuration_hash=agent_config_hash(config),
+            schema_version=AGENT_CONFIG_SCHEMA_VERSION,
+        )
 
 
 ###############################################################################
@@ -49,6 +89,7 @@ def seed_live_provider_database() -> tuple[int, int]:
 
     initialize_sqlite_database(database_settings)
     context = RepositoryContext.create()
+    _route_default_agents(context)
     terminology = TerminologyRepository(context)
     _seed_rxnorm_fixture(terminology)
     KnowledgeRepository(context).save_livertox_records(

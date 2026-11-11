@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+import pytest
 from api import session as session_module
 from domain.clinical import (
     ClinicalLabEntry,
@@ -23,6 +24,8 @@ from domain.clinical import (
 from domain.clinical.entities import DeterministicDrugExtractionResult
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.session.workflow_shared import resolve_rucam_source
+
+pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
 
 ###############################################################################

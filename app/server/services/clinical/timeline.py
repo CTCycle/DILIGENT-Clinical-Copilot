@@ -204,12 +204,14 @@ class PatientTimelineExtractor:
         llm_provider = cls._coerce_optional_text(
             runtime_settings.get("llm_provider")
         ).lower()
-        if llm_provider not in get_cloud_model_choices():
-            raise ValueError(f"Unsupported cloud provider: {llm_provider or '<empty>'}")
         if not timeline_model:
             raise ValueError("Runtime settings require an explicit timeline_model.")
 
         if use_cloud_services:
+            if llm_provider not in get_cloud_model_choices():
+                raise ValueError(
+                    f"Unsupported cloud provider: {llm_provider or '<empty>'}"
+                )
             return llm_provider, timeline_model
 
         return "ollama", timeline_model

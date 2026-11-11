@@ -6,9 +6,16 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from typing import Any
+
 import pytest
-from domain.patient_timeline import PatientTimeline, PatientTimelineEvent, PatientTimelineExtraction, PatientTimelineGenerationErrorCode, SessionTimelineRegenerateRequest
 from common.utils.clinical_dates import DateOrder
+from domain.patient_timeline import (
+    PatientTimeline,
+    PatientTimelineEvent,
+    PatientTimelineExtraction,
+    PatientTimelineGenerationErrorCode,
+    SessionTimelineRegenerateRequest,
+)
 from domain.timeline_dates import normalize_timeline_interval
 from repositories.serialization.session_timelines import build_timeline_preview_payload
 from services.clinical import timeline as timeline_service
@@ -16,6 +23,8 @@ from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection import timeline as inspection_timeline
 from services.inspection.timeline import _timeline_error_code, _timeline_fallback_note
 from services.llm.cloud import LLMError
+
+pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
 
 ###############################################################################
@@ -643,7 +652,11 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
 def test_timeline_runtime_settings_follow_the_originating_agent_revision() -> None:
     from types import SimpleNamespace
 
-    from domain.agents import AgentExecutionContext, agent_config_hash, parse_agent_config
+    from domain.agents import (
+        AgentExecutionContext,
+        agent_config_hash,
+        parse_agent_config,
+    )
 
     config = parse_agent_config(
         {

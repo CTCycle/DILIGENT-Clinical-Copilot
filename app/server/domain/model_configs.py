@@ -37,15 +37,8 @@ class ReasoningLevel(StrEnum):
 ###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
-    clinical_model: str | None
-    text_extraction_model: str | None
-    use_cloud_models: bool
-    cloud_provider: str | None
-    cloud_model: str | None
-    revision_model: str | None = None
-    timeline_model: str | None = None
-    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
-    ollama_seed: int | None = 42
+    """Shared, non-execution configuration; agents own models and roles."""
+
     rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
@@ -76,20 +69,15 @@ class ModelCatalogOperationResponse(BaseModel):
 
 
 ###############################################################################
-class RagSettingsUpdateRequest(BaseModel):
+class SharedRagSettingsUpdateRequest(BaseModel):
+    """Shared knowledge-index settings; retrieval preferences live on agents."""
+
     model_config = ConfigDict(extra="forbid")
     allow_local_filesystem_access: bool | None = None
     vector_collection_name: str | None = Field(default=None, min_length=1, max_length=255)
     chunk_size: int | None = Field(default=None, ge=1, le=100000)
     chunk_overlap: int | None = Field(default=None, ge=0, le=100000)
     embedding_batch_size: int | None = Field(default=None, ge=1, le=4096)
-    use_hybrid_search: bool | None = None
-    use_reranking: bool | None = None
-    retrieval_candidate_count: int | None = Field(default=None, ge=1, le=10000)
-    retrieval_selected_count: int | None = Field(default=None, ge=1, le=10000)
-    reranker_model: str | None = Field(default=None, min_length=1, max_length=255)
-    hybrid_vector_weight: float | None = Field(default=None, ge=0.0, le=1.0)
-    hybrid_text_weight: float | None = Field(default=None, ge=0.0, le=1.0)
     vector_index_metric: str | None = Field(default=None, min_length=1, max_length=32)
     vector_index_type: str | None = Field(default=None, min_length=1, max_length=64)
     vector_stream_batch_size: int | None = Field(default=None, ge=1, le=100000)
@@ -97,7 +85,7 @@ class RagSettingsUpdateRequest(BaseModel):
 
 
 ###############################################################################
-class RagSettingsResponse(BaseModel):
+class SharedRagSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     allow_local_filesystem_access: bool
@@ -105,13 +93,6 @@ class RagSettingsResponse(BaseModel):
     chunk_size: int
     chunk_overlap: int
     embedding_batch_size: int
-    use_hybrid_search: bool
-    use_reranking: bool
-    retrieval_candidate_count: int
-    retrieval_selected_count: int
-    reranker_model: str
-    hybrid_vector_weight: float
-    hybrid_text_weight: float
     vector_index_metric: str
     vector_index_type: str
     vector_stream_batch_size: int
@@ -121,16 +102,7 @@ class RagSettingsResponse(BaseModel):
 ###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    use_cloud_services: bool | None = None
-    llm_provider: CloudProviderId | None = None
-    cloud_model: str | None = None
-    text_extraction_model: str | None = None
-    clinical_model: str | None = None
-    revision_model: str | None = None
-    timeline_model: str | None = None
-    reasoning_level: ReasoningLevel | None = None
-    ollama_seed: int | None = Field(default=None, ge=0)
-    rag_settings: RagSettingsUpdateRequest | None = None
+    rag_settings: SharedRagSettingsUpdateRequest | None = None
 
 
 ###############################################################################
@@ -156,16 +128,7 @@ class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
     cloud_providers: list[CloudProviderDescriptor]
     local_catalog: LocalCatalogMetadata
-    use_cloud_services: bool
-    llm_provider: CloudProviderId
-    cloud_model: str | None
-    text_extraction_model: str
-    clinical_model: str
-    revision_model: str
-    timeline_model: str
-    reasoning_level: ReasoningLevel
-    ollama_seed: int | None
-    rag_settings: RagSettingsResponse
+    rag_settings: SharedRagSettingsResponse
     embedding_runtime: EmbeddingRuntimeStatus
     embedding_index: EmbeddingIndexStatus
     updated_at: datetime | None = None
@@ -175,16 +138,7 @@ class ModelConfigStateResponse(BaseModel):
 class ModelConfigPersistResponse(BaseModel):
     """Configuration values returned after a persistence-only update."""
 
-    use_cloud_services: bool
-    llm_provider: CloudProviderId
-    cloud_model: str | None
-    text_extraction_model: str
-    clinical_model: str
-    revision_model: str
-    timeline_model: str
-    reasoning_level: ReasoningLevel
-    ollama_seed: int | None
-    rag_settings: RagSettingsResponse
+    rag_settings: SharedRagSettingsResponse
     updated_at: datetime | None = None
 
 

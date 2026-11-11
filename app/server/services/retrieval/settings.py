@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from common.exceptions import ServiceValidationError
 from common.utils.types import (
     coerce_bool,
     coerce_float,
@@ -13,8 +12,8 @@ from common.utils.types import (
     coerce_str,
 )
 from configurations.startup import get_server_settings
-from domain.model_configs import RagSettingsResponse
-from domain.settings.configuration import RagSettings
+from domain.model_configs import SharedRagSettingsResponse
+from domain.settings.configuration import SHARED_RAG_SETTING_KEYS, RagSettings
 
 
 ###############################################################################
@@ -109,23 +108,7 @@ def normalize_rag_settings_patch(
     *,
     persisted_settings: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    current = build_effective_rag_settings(
-        persisted_settings=(
-            dict(persisted_settings) if persisted_settings is not None else None
-        )
-    )
-    candidate_count = coerce_positive_int(
-        payload.get("retrieval_candidate_count"),
-        current.retrieval_candidate_count,
-    )
-    selected_count = coerce_positive_int(
-        payload.get("retrieval_selected_count"),
-        current.retrieval_selected_count,
-    )
-    if selected_count > candidate_count:
-        raise ServiceValidationError(
-            "Selected RAG documents cannot exceed retrieved RAG documents."
-        )
+    """Merge a shared RAG settings patch over the persisted shared settings."""
     return rag_settings_payload(
         build_effective_rag_settings(
             dict(payload),
@@ -137,23 +120,10 @@ def normalize_rag_settings_patch(
 
 
 ###############################################################################
-def rag_settings_payload(settings: RagSettings | None = None) -> RagSettingsResponse:
+def rag_settings_payload(
+    settings: RagSettings | None = None,
+) -> SharedRagSettingsResponse:
     resolved = settings or build_effective_rag_settings()
-    return RagSettingsResponse(
-        allow_local_filesystem_access=resolved.allow_local_filesystem_access,
-        vector_collection_name=resolved.vector_collection_name,
-        chunk_size=resolved.chunk_size,
-        chunk_overlap=resolved.chunk_overlap,
-        embedding_batch_size=resolved.embedding_batch_size,
-        use_hybrid_search=resolved.use_hybrid_search,
-        use_reranking=resolved.use_reranking,
-        retrieval_candidate_count=resolved.retrieval_candidate_count,
-        retrieval_selected_count=resolved.retrieval_selected_count,
-        reranker_model=resolved.reranker_model,
-        hybrid_vector_weight=resolved.hybrid_vector_weight,
-        hybrid_text_weight=resolved.hybrid_text_weight,
-        vector_index_metric=resolved.vector_index_metric,
-        vector_index_type=resolved.vector_index_type,
-        vector_stream_batch_size=resolved.vector_stream_batch_size,
-        embedding_offline_mode=resolved.embedding_offline_mode,
+    return SharedRagSettingsResponse.model_validate(
+        {key: getattr(resolved, key) for key in SHARED_RAG_SETTING_KEYS}
     )

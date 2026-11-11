@@ -124,19 +124,19 @@ def agent_service(tmp_path: Path) -> AgentService:
 def test_default_agents_seed_once_from_legacy_configuration(
     agent_service: AgentService,
 ) -> None:
-    snapshot = ModelConfigSnapshot(
-        use_cloud_models=True,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gpt-4.1",
-        text_extraction_model="gpt-4.1-mini",
-        revision_model="gpt-4.1",
-        timeline_model="gpt-4.1-mini",
-        rag_settings={"retrieval_selected_count": 4, "chunk_size": 999},
-    )
+    payload = {
+        "use_cloud_models": True,
+        "cloud_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "clinical_model": "gpt-4.1",
+        "text_extraction_model": "gpt-4.1-mini",
+        "revision_model": "gpt-4.1",
+        "timeline_model": "gpt-4.1-mini",
+        "rag_settings": {"retrieval_selected_count": 4, "chunk_size": 999},
+    }
     repository = agent_service.repository
-    assert ensure_default_agents(repository, snapshot) == ["dili", "revision"]
-    assert ensure_default_agents(repository, snapshot) == []
+    assert ensure_default_agents(repository, payload) == ["dili", "revision"]
+    assert ensure_default_agents(repository, payload) == []
     dili = agent_service.resolve_for_execution(kind="dili")
     assert isinstance(dili.configuration, DiliAgentConfig)
     assert dili.configuration.models.clinical.model_dump() == {
@@ -246,16 +246,7 @@ def _context(config_payload: dict[str, Any], revision_id: int) -> AgentExecution
 ###############################################################################
 @pytest.fixture
 def persisted_snapshot(monkeypatch: pytest.MonkeyPatch) -> ModelConfigSnapshot:
-    snapshot = ModelConfigSnapshot(
-        use_cloud_models=False,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="qwen3:8b",
-        text_extraction_model="qwen3:8b",
-        revision_model="qwen3:8b",
-        timeline_model="qwen3:8b",
-        rag_settings={"chunk_size": 777, "retrieval_selected_count": 2},
-    )
+    snapshot = ModelConfigSnapshot(rag_settings={"chunk_size": 777})
     monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
     return snapshot
 
@@ -311,7 +302,7 @@ def test_frozen_agent_snapshot_replays_after_live_settings_change(
     monkeypatch.setattr(
         ModelConfigSerializer,
         "load_snapshot",
-        lambda self: replace(persisted_snapshot, clinical_model="other:1b"),
+        lambda self: replace(persisted_snapshot, rag_settings={"chunk_size": 1}),
     )
     with LLMRuntimeConfig.override_for_run(snapshot):
         assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
@@ -319,6 +310,7 @@ def test_frozen_agent_snapshot_replays_after_live_settings_change(
             "gpt-4.1",
         )
         assert LLMRuntimeConfig.get_clinical_model() == "gpt-4.1"
+        assert LLMRuntimeConfig.get_rag_settings()["chunk_size"] == 777
 
 
 ###############################################################################
@@ -354,6 +346,14 @@ def test_concurrent_agent_runs_do_not_share_configuration(
         "second": ("anthropic", "claude-x"),
     }
     assert LLMRuntimeConfig.has_role_routing() is False
+
+
+###############################################################################
+def test_role_resolution_requires_an_active_agent_runtime() -> None:
+    with pytest.raises(ValueError, match="No agent runtime is active for 'clinical'"):
+        LLMRuntimeConfig.resolve_provider_and_model("clinical")
+    assert LLMRuntimeConfig.is_cloud_enabled() is False
+    assert LLMRuntimeConfig.get_clinical_model() == ""
 
 
 ###############################################################################

@@ -737,7 +737,7 @@ class ClinicalSessionExtractionPipelineMixin:
         lookup_timeout_s = min(
             float(runtime.livertox_llm_timeout),
             float(runtime.cloud_llm_timeout_cap)
-            if LLMRuntimeConfig.is_cloud_enabled()
+            if LLMRuntimeConfig.is_cloud_purpose("parser")
             else float(runtime.local_llm_timeout_cap),
         )
         lookup_timed_out = False

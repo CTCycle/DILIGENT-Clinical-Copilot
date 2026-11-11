@@ -3,13 +3,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+from configurations.management import (
+    build_default_agent_seed_payload,
+    environment_snapshot_from_os_env,
+)
 from domain.agents import (
     AGENT_CONFIG_SCHEMA_VERSION,
+    AgentExecutionContext,
+    AgentKind,
     AgentModelRef,
     AgentRetrievalPolicy,
     DiliAgentConfig,
@@ -17,6 +25,7 @@ from domain.agents import (
     agent_config_hash,
 )
 from repositories.agent_repository import AgentRepository
+from repositories.agent_seed import agent_configs_from_legacy_payload
 from repositories.schemas.base import Base
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
@@ -25,6 +34,7 @@ from repositories.knowledge_repository import KnowledgeRepository
 from repositories.session_revision_repository import SessionRevisionRepository
 from repositories.session_timeline_repository import SessionTimelineRepository
 from services.agents import AgentService
+from services.llm.runtime_config import LLMRuntimeConfig
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -107,3 +117,38 @@ def build_dili_agent_service(
         model_config_service=cast(Any, models),
         access_key_service=cast(Any, SimpleNamespace(list_access_keys=list_access_keys)),
     )
+
+
+###############################################################################
+def legacy_model_payload(**values: Any) -> dict[str, Any]:
+    """Pre-agent singleton model configuration (configured defaults + values)."""
+    payload = build_default_agent_seed_payload(environment_snapshot_from_os_env())
+    payload.update(values)
+    return payload
+
+
+###############################################################################
+def agent_context_from_legacy(
+    kind: AgentKind = "dili", **values: Any
+) -> AgentExecutionContext:
+    config = agent_configs_from_legacy_payload(legacy_model_payload(**values))[kind]
+    return AgentExecutionContext(
+        agent_id=f"test-{kind}",
+        agent_name=f"Test {kind} agent",
+        agent_revision_id=1,
+        revision_number=1,
+        kind=kind,
+        config_hash=agent_config_hash(config),
+        configuration=config,
+    )
+
+
+###############################################################################
+@contextmanager
+def agent_runtime(kind: AgentKind = "dili", **values: Any) -> Iterator[None]:
+    """Execute under an agent run override built from legacy-style values."""
+    context = agent_context_from_legacy(kind, **values)
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(context)
+    ):
+        yield

@@ -8,6 +8,7 @@ from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from domain.clinical import (
     DiseaseContextEntry,
     DrugEntry,
@@ -23,6 +24,8 @@ from services.clinical.deterministic_extraction import extract_deterministic_dis
 from services.clinical.disease import DiseaseExtractor
 from services.clinical.job_progress import ClinicalJobCancelled
 from services.session.session_service import ClinicalSessionService
+
+pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
 
 ###############################################################################

@@ -8,6 +8,7 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
+import pytest
 from domain.clinical import (
     ClinicalLabEntry,
     DrugEntry,
@@ -17,10 +18,12 @@ from domain.clinical import (
     PatientRucamAssessmentBundle,
 )
 from domain.clinical.extractor_contracts import LocalDrugEntryDraft, LocalPatientDrugs
-from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.dili_evidence import DiliEvidenceBuilder
-from services.clinical.preparation import ClinicalKnowledgePreparation
+from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.parser import DrugsParser
+from services.clinical.preparation import ClinicalKnowledgePreparation
+
+pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
 
 ###############################################################################

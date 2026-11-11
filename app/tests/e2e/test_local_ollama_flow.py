@@ -39,26 +39,46 @@ def _clinical_input() -> str:
 
 
 ###############################################################################
+def _save_agent(
+    api_context: APIRequestContext, agent: dict, configuration: dict
+) -> dict:
+    response = api_context.put(
+        f"/api/agents/{agent['id']}",
+        data={
+            "expected_revision": agent["current_revision"],
+            "name": agent["name"],
+            "description": agent["description"],
+            "configuration": configuration,
+        },
+    )
+    assert response.status == 200, response.text()
+    return response.json()
+
+
+###############################################################################
 def test_completed_assessment_on_local_ollama(
     page: Page,
     base_url: str,
     api_context: APIRequestContext,
 ) -> None:
-    original = api_context.get("/api/model-config").json()
     refresh = api_context.post("/api/model-config/catalogs/ollama/refresh")
     assert refresh.status == 200, refresh.text()
-    config = api_context.put(
-        "/api/model-config",
-        data={
-            "use_cloud_services": False,
-            "text_extraction_model": MODEL,
-            "clinical_model": MODEL,
-            "revision_model": MODEL,
-            "timeline_model": MODEL,
-            "reasoning_level": "off",
+    listing = api_context.get("/api/agents?kind=dili")
+    assert listing.status == 200, listing.text()
+    agent = next(item for item in listing.json()["agents"] if item["is_default"])
+    original = agent["revision"]["configuration"]
+    local = {"provider": "ollama", "model": MODEL}
+    configuration = {
+        **original,
+        "models": {
+            **original["models"],
+            "extraction": local,
+            "clinical": local,
+            "timeline": local,
         },
-    )
-    assert config.status == 200, config.text()
+        "reasoning_level": "off",
+    }
+    updated = _save_agent(api_context, agent, configuration)
     try:
         page.goto(base_url)
         page.get_by_label("Clinical Input").fill(_clinical_input())
@@ -98,17 +118,4 @@ def test_completed_assessment_on_local_ollama(
         assert session.status == 200, session.text()
         assert session.json()["session_id"] == session_id
     finally:
-        api_context.put(
-            "/api/model-config",
-            data={
-                key: original[key]
-                for key in (
-                    "use_cloud_services",
-                    "text_extraction_model",
-                    "clinical_model",
-                    "revision_model",
-                    "timeline_model",
-                    "reasoning_level",
-                )
-            },
-        )
+        _save_agent(api_context, updated, original)

@@ -188,7 +188,7 @@ class ClinicalLabExtractor:
         timeout_floor = max(self.minimum_timeout_floor_s, float(self.timeout_s))
         timeout_cap = (
             self.cloud_llm_timeout_cap_s
-            if LLMRuntimeConfig.is_cloud_enabled()
+            if LLMRuntimeConfig.is_cloud_purpose("parser")
             else float(self.LOCAL_LLM_CHUNK_TIMEOUT_CAP_S)
         )
         return min(timeout_floor, max(timeout_cap, self.minimum_timeout_floor_s))

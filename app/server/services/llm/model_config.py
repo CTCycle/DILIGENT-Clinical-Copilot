@@ -4,10 +4,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable
-from dataclasses import replace
 from datetime import datetime
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -19,7 +17,6 @@ from common.utils.logger import logger
 from domain.llm.providers import (
     CloudModelDescriptor,
     CloudProviderDescriptor,
-    CloudProviderId,
 )
 from domain.model_configs import (
     CatalogProviderId,
@@ -35,7 +32,7 @@ from domain.model_configs import (
     ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
-    ReasoningLevel,
+    SharedRagSettingsResponse,
 )
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
@@ -76,18 +73,7 @@ class ModelConfigSnapshotStore(Protocol):
 
     # -------------------------------------------------------------------------
     def save_snapshot(
-        self,
-        *,
-        clinical_model: str | None | object = ...,
-        text_extraction_model: str | None | object = ...,
-        revision_model: str | None | object = ...,
-        timeline_model: str | None | object = ...,
-        use_cloud_models: bool | object = ...,
-        cloud_provider: str | None | object = ...,
-        cloud_model: str | None | object = ...,
-        reasoning_level: ReasoningLevel | object = ...,
-        ollama_seed: int | None | object = ...,
-        rag_settings: dict[str, object] | object = ...,
+        self, *, rag_settings: dict[str, object] | object = ...
     ) -> ModelConfigSnapshot: ...
 
 
@@ -119,21 +105,14 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     async def get_state(self) -> ModelConfigStateResponse:
         snapshot = await asyncio.to_thread(self.load_current_snapshot)
-        local_models = await self.list_local_model_cards(
-            selected_models=(
-                snapshot.clinical_model,
-                snapshot.text_extraction_model,
-                snapshot.revision_model,
-                snapshot.timeline_model,
-            ),
-        )
+        local_models = await self.list_local_model_cards()
         local_catalog = await asyncio.to_thread(
             model_catalog.local_catalog_metadata, self.catalog_cache
         )
         return self.build_response(
             snapshot=snapshot,
             local_models=local_models,
-            cloud_providers=await self.discover_provider_descriptors(snapshot),
+            cloud_providers=await self.discover_provider_descriptors(),
             local_catalog=local_catalog,
         )
 
@@ -142,40 +121,14 @@ class ModelConfigService:
         self, payload: ModelConfigUpdateRequest
     ) -> ModelConfigPersistResponse:
         snapshot = await asyncio.to_thread(self.load_current_snapshot)
-        fields_set = payload.model_fields_set
-        local_roles_updated = self._local_roles_updated(fields_set)
-        target_use_cloud_models = (
-            bool(payload.use_cloud_services)
-            if "use_cloud_services" in fields_set
-            else bool(snapshot.use_cloud_models)
-        )
-        requires_local_model_availability = not target_use_cloud_models and (
-            local_roles_updated
-            or ("use_cloud_services" in fields_set and not target_use_cloud_models)
-        )
-        available_local_model_names: set[str] = set()
-        if requires_local_model_availability:
-            available_local_model_names = await self.list_available_ollama_models()
-        local_model_names = await self._build_local_model_names(
-            snapshot=snapshot,
-            refresh_from_ollama=not target_use_cloud_models and local_roles_updated,
-        )
-        updates = self._build_updates(
-            payload=payload,
-            snapshot=snapshot,
-            fields_set=fields_set,
-            local_model_names=local_model_names,
-            available_local_model_names=available_local_model_names,
-        )
-
-        if updates:
-            await asyncio.to_thread(
-                self.validate_current_snapshot, replace(snapshot, **updates)
+        if payload.rag_settings is not None:
+            rag_settings = normalize_rag_settings_patch(
+                payload.rag_settings.model_dump(exclude_unset=True),
+                persisted_settings=snapshot.rag_settings,
             )
             snapshot = await asyncio.to_thread(
-                self.serializer.save_snapshot, **updates
+                self.serializer.save_snapshot, rag_settings=rag_settings
             )
-
         return self.build_persist_response(snapshot)
 
     # -------------------------------------------------------------------------
@@ -233,242 +186,10 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _local_roles_updated(fields_set: set[str]) -> bool:
-        return bool(
-            fields_set
-            & {
-                "clinical_model",
-                "text_extraction_model",
-                "revision_model",
-                "timeline_model",
-            }
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
     def _normalize_connectivity_preview(response: object) -> str:
         preview = response if isinstance(response, str) else str(response)
         preview = " ".join(preview.split())
         return preview[:200]
-
-    # -------------------------------------------------------------------------
-    async def _build_local_model_names(
-        self,
-        *,
-        snapshot: ModelConfigSnapshot,
-        refresh_from_ollama: bool,
-    ) -> set[str]:
-        local_model_names = await asyncio.to_thread(self.known_local_model_names)
-        for model_name in (
-            snapshot.clinical_model,
-            snapshot.text_extraction_model,
-            snapshot.revision_model,
-            snapshot.timeline_model,
-        ):
-            if model_name:
-                local_model_names.add(model_name)
-        if not refresh_from_ollama:
-            return local_model_names
-        available_models = await self.list_available_ollama_models()
-        return local_model_names | available_models
-
-    # -------------------------------------------------------------------------
-    def _build_updates(
-        self,
-        *,
-        payload: ModelConfigUpdateRequest,
-        snapshot: ModelConfigSnapshot,
-        fields_set: set[str],
-        local_model_names: set[str],
-        available_local_model_names: set[str],
-    ) -> dict[str, Any]:
-        updates: dict[str, Any] = {}
-        target_use_cloud_models = (
-            bool(payload.use_cloud_services)
-            if "use_cloud_services" in fields_set
-            else bool(snapshot.use_cloud_models)
-        )
-        provider = self.resolve_provider(
-            payload.llm_provider
-            if "llm_provider" in fields_set
-            else snapshot.cloud_provider
-        )
-        self._collect_local_model_updates(
-            payload=payload,
-            fields_set=fields_set,
-            local_model_names=local_model_names,
-            available_local_model_names=available_local_model_names,
-            use_cloud_models=target_use_cloud_models,
-            cloud_provider=provider,
-            active_cloud_model=(
-                self.normalize_optional_text(payload.cloud_model)
-                if "cloud_model" in fields_set
-                else self.normalize_optional_text(snapshot.cloud_model)
-            ),
-            updates=updates,
-        )
-        self._collect_cloud_model_updates(
-            payload=payload,
-            fields_set=fields_set,
-            provider=provider,
-            updates=updates,
-        )
-        self._collect_runtime_option_updates(
-            payload=payload,
-            fields_set=fields_set,
-            updates=updates,
-        )
-        self._collect_rag_settings_updates(
-            payload=payload,
-            fields_set=fields_set,
-            snapshot=snapshot,
-            updates=updates,
-        )
-        return updates
-
-    # -------------------------------------------------------------------------
-    def _collect_local_model_updates(
-        self,
-        *,
-        payload: ModelConfigUpdateRequest,
-        fields_set: set[str],
-        local_model_names: set[str],
-        available_local_model_names: set[str],
-        use_cloud_models: bool,
-        cloud_provider: str,
-        active_cloud_model: str | None,
-        updates: dict[str, Any],
-    ) -> None:
-        for field_name, role_name in (
-            ("clinical_model", "clinical"),
-            ("text_extraction_model", "text_extraction"),
-            ("revision_model", "revision"),
-            ("timeline_model", "timeline"),
-        ):
-            if field_name not in fields_set:
-                continue
-            updates[field_name] = self.resolve_role_model_selection(
-                role_name=role_name,
-                model_name=self.normalize_optional_text(getattr(payload, field_name)),
-                local_model_names=local_model_names,
-                available_local_model_names=available_local_model_names,
-                use_cloud_models=use_cloud_models,
-                cloud_provider=cloud_provider,
-                active_cloud_model=active_cloud_model,
-            )
-
-    # -------------------------------------------------------------------------
-    def _collect_cloud_model_updates(
-        self,
-        *,
-        payload: ModelConfigUpdateRequest,
-        fields_set: set[str],
-        provider: str,
-        updates: dict[str, Any],
-    ) -> None:
-        if "llm_provider" in fields_set:
-            updates["cloud_provider"] = provider
-
-        if "cloud_model" in fields_set or "llm_provider" in fields_set:
-            requested_cloud_model = (
-                payload.cloud_model if "cloud_model" in fields_set else None
-            )
-            updates["cloud_model"] = self.resolve_cloud_model(
-                provider=provider,
-                model_name=requested_cloud_model,
-            )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _collect_runtime_option_updates(
-        *,
-        payload: ModelConfigUpdateRequest,
-        fields_set: set[str],
-        updates: dict[str, Any],
-    ) -> None:
-        if "use_cloud_services" in fields_set:
-            updates["use_cloud_models"] = bool(payload.use_cloud_services)
-
-        if "reasoning_level" in fields_set and payload.reasoning_level is not None:
-            updates["reasoning_level"] = payload.reasoning_level
-        if "ollama_seed" in fields_set:
-            updates["ollama_seed"] = payload.ollama_seed
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _collect_rag_settings_updates(
-        *,
-        payload: ModelConfigUpdateRequest,
-        fields_set: set[str],
-        snapshot: ModelConfigSnapshot,
-        updates: dict[str, Any],
-    ) -> None:
-        if "rag_settings" not in fields_set or payload.rag_settings is None:
-            return
-        updates["rag_settings"] = normalize_rag_settings_patch(
-            payload.rag_settings.model_dump(exclude_unset=True),
-            persisted_settings=snapshot.rag_settings,
-        )
-
-    # -------------------------------------------------------------------------
-    def resolve_role_model_selection(
-        self,
-        *,
-        role_name: str,
-        model_name: str | None,
-        local_model_names: set[str],
-        available_local_model_names: set[str],
-        use_cloud_models: bool,
-        cloud_provider: str,
-        active_cloud_model: str | None,
-    ) -> str | None:
-        if model_name is None:
-            return None
-        if use_cloud_models:
-            cloud_model_names = self.known_provider_model_names(cloud_provider)
-            if not cloud_model_names:
-                if active_cloud_model and model_name == active_cloud_model:
-                    return model_name
-                raise ServiceValidationError(
-                    "Select a model explicitly from the provider catalog."
-                )
-            if model_name not in cloud_model_names:
-                raise ServiceValidationError(
-                    f"Model '{model_name}' is not valid for provider '{cloud_provider}'."
-                )
-            return model_name
-        if not local_model_names:
-            raise ServiceValidationError("No model catalog entries are available.")
-        if model_name not in local_model_names:
-            raise ServiceValidationError(
-                f"Model '{model_name}' is not supported for role '{role_name}'.",
-            )
-        if model_name not in available_local_model_names:
-            raise ServiceValidationError(
-                f"Install local Ollama model '{model_name}' before using it for role '{role_name}'.",
-            )
-        return model_name
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_provider(provider: str | None) -> str:
-        normalized = (provider or "").strip().lower()
-        try:
-            return provider_registry.get(normalized).provider_id
-        except ValueError as exc:
-            raise ServiceValidationError(str(exc)) from exc
-
-    # -------------------------------------------------------------------------
-    def resolve_cloud_model(self, provider: str, model_name: str | None) -> str | None:
-        normalized = (model_name or "").strip()
-        if not normalized:
-            return None
-        known_models = self.known_provider_model_names(provider)
-        if known_models and normalized not in known_models:
-            raise ServiceValidationError(
-                f"Model '{normalized}' is not valid for provider '{provider}'."
-            )
-        return normalized
 
     # -------------------------------------------------------------------------
     def known_provider_model_names(self, provider: str) -> set[str]:
@@ -487,81 +208,11 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     def load_current_snapshot(self) -> ModelConfigSnapshot:
-        """Load the canonical persisted configuration without changing it."""
+        """Load the persisted shared configuration without changing it."""
         try:
-            snapshot = self.serializer.load_snapshot()
+            return self.serializer.load_snapshot()
         except ValueError as exc:
             raise ServiceValidationError(str(exc)) from exc
-        self.validate_current_snapshot(snapshot)
-        return snapshot
-
-    # -------------------------------------------------------------------------
-    def validate_current_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
-        missing_roles = [
-            field_name
-            for field_name, model_name in (
-                ("clinical_model", snapshot.clinical_model),
-                ("text_extraction_model", snapshot.text_extraction_model),
-                ("revision_model", snapshot.revision_model),
-                ("timeline_model", snapshot.timeline_model),
-            )
-            if self.normalize_optional_text(model_name) is None
-        ]
-        if missing_roles:
-            raise ServiceValidationError(
-                "Persisted model configuration is missing required role assignments: "
-                + ", ".join(missing_roles)
-            )
-        provider = self.normalize_optional_text(snapshot.cloud_provider)
-        cloud_model = self.normalize_optional_text(snapshot.cloud_model)
-        if provider is None:
-            raise ServiceValidationError(
-                "Model configuration requires a cloud provider selection."
-            )
-        provider = self.resolve_provider(provider)
-
-        known_local_model_names = self.known_local_model_names()
-        for role_name, model_name in (
-            ("clinical", snapshot.clinical_model),
-            ("text_extraction", snapshot.text_extraction_model),
-            ("revision", snapshot.revision_model),
-            ("timeline", snapshot.timeline_model),
-        ):
-            model_name = self.normalize_optional_text(model_name)
-            if model_name is None:
-                raise ServiceValidationError(
-                    f"An explicit model is required for the '{role_name}' role."
-                )
-            if (
-                model_name not in known_local_model_names
-                and not snapshot.use_cloud_models
-            ):
-                raise ServiceValidationError(
-                    f"Model '{model_name}' is not supported for role '{role_name}'."
-                )
-
-        if snapshot.use_cloud_models:
-            if cloud_model is None:
-                raise ServiceValidationError(
-                    "Cloud mode requires both a provider and a model."
-                )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def normalize_optional_text(value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip()
-        return normalized or None
-
-    # -------------------------------------------------------------------------
-    def _required_role_model(self, model_name: str | None, role_name: str) -> str:
-        normalized = self.normalize_optional_text(model_name)
-        if normalized is None:
-            raise ServiceValidationError(
-                f"An explicit model is required for the '{role_name}' role."
-            )
-        return normalized
 
     # -------------------------------------------------------------------------
     def known_local_model_names(self) -> set[str]:
@@ -637,11 +288,7 @@ class ModelConfigService:
         }
 
     # -------------------------------------------------------------------------
-    async def list_local_model_cards(
-        self,
-        *,
-        selected_models: Iterable[str | None] = (),
-    ) -> list[LocalModelCard]:
+    async def list_local_model_cards(self) -> list[LocalModelCard]:
         available_models = await self.list_available_ollama_models()
 
         cards = [
@@ -654,13 +301,8 @@ class ModelConfigService:
             for name, family, description in self.local_model_catalog
         ]
 
-        selected_candidates = {
-            candidate.strip()
-            for candidate in selected_models
-            if isinstance(candidate, str) and candidate.strip()
-        }
         extra_models = sorted(
-            (available_models | selected_candidates) - self.local_model_names,
+            available_models - self.local_model_names,
             key=str.casefold,
         )
         cards.extend(
@@ -679,29 +321,8 @@ class ModelConfigService:
         self,
         snapshot: ModelConfigSnapshot,
     ) -> ModelConfigPersistResponse:
-        clinical_model = self._required_role_model(snapshot.clinical_model, "clinical")
-        text_extraction_model = self._required_role_model(
-            snapshot.text_extraction_model, "text_extraction"
-        )
-        revision_model = self._required_role_model(snapshot.revision_model, "revision")
-        timeline_model = self._required_role_model(snapshot.timeline_model, "timeline")
         return ModelConfigPersistResponse(
-            use_cloud_services=bool(snapshot.use_cloud_models),
-            llm_provider=cast(
-                CloudProviderId, self.resolve_provider(snapshot.cloud_provider)
-            ),
-            cloud_model=self.normalize_optional_text(snapshot.cloud_model),
-            clinical_model=clinical_model,
-            text_extraction_model=text_extraction_model,
-            revision_model=revision_model,
-            timeline_model=timeline_model,
-            reasoning_level=snapshot.reasoning_level,
-            ollama_seed=snapshot.ollama_seed,
-            rag_settings=rag_settings_payload(
-                build_effective_rag_settings(
-                    persisted_settings=snapshot.rag_settings,
-                )
-            ),
+            rag_settings=self.shared_rag_settings(snapshot),
             updated_at=snapshot.updated_at,
         )
 
@@ -714,14 +335,6 @@ class ModelConfigService:
         cloud_providers: list[CloudProviderDescriptor] | None = None,
         local_catalog: LocalCatalogMetadata | None = None,
     ) -> ModelConfigStateResponse:
-        provider = self.resolve_provider(snapshot.cloud_provider)
-        cloud_model = self.normalize_optional_text(snapshot.cloud_model)
-        clinical_model = self._required_role_model(snapshot.clinical_model, "clinical")
-        text_extraction_model = self._required_role_model(
-            snapshot.text_extraction_model, "text_extraction"
-        )
-        revision_model = self._required_role_model(snapshot.revision_model, "revision")
-        timeline_model = self._required_role_model(snapshot.timeline_model, "timeline")
         return ModelConfigStateResponse(
             local_models=local_models,
             cloud_providers=(
@@ -731,21 +344,17 @@ class ModelConfigService:
             ),
             local_catalog=local_catalog
             or model_catalog.local_catalog_metadata(self.catalog_cache),
-            use_cloud_services=bool(snapshot.use_cloud_models),
-            llm_provider=cast(CloudProviderId, provider),
-            cloud_model=cloud_model,
-            clinical_model=clinical_model,
-            text_extraction_model=text_extraction_model,
-            revision_model=revision_model,
-            timeline_model=timeline_model,
-            reasoning_level=snapshot.reasoning_level,
-            ollama_seed=snapshot.ollama_seed,
-            rag_settings=rag_settings_payload(
-                build_effective_rag_settings(persisted_settings=snapshot.rag_settings)
-            ),
+            rag_settings=self.shared_rag_settings(snapshot),
             embedding_runtime=self.build_embedding_runtime_status(),
             embedding_index=self.build_embedding_index_status(),
             updated_at=snapshot.updated_at,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def shared_rag_settings(snapshot: ModelConfigSnapshot) -> SharedRagSettingsResponse:
+        return rag_settings_payload(
+            build_effective_rag_settings(persisted_settings=snapshot.rag_settings)
         )
 
     # -------------------------------------------------------------------------
@@ -822,9 +431,7 @@ class ModelConfigService:
         ]
 
     # -------------------------------------------------------------------------
-    async def discover_provider_descriptors(
-        self, snapshot: ModelConfigSnapshot
-    ) -> list[CloudProviderDescriptor]:
+    async def discover_provider_descriptors(self) -> list[CloudProviderDescriptor]:
         descriptors: list[CloudProviderDescriptor] = []
         for item in provider_registry.all():
             if item.models:
@@ -873,11 +480,9 @@ class ModelConfigService:
                         else "unavailable"
                     )
                     catalog_updated_at = None
-                    message = record.last_error or self._configured_catalog_message(
-                        models
-                    )
-                    models = self._configured_provider_models(
-                        snapshot, item.provider_id
+                    message = (
+                        record.last_error
+                        or "The provider catalog could not be refreshed. Try again shortly."
                     )
             descriptors.append(
                 CloudProviderDescriptor(
@@ -999,38 +604,3 @@ class ModelConfigService:
                 error=message,
                 state=await self.get_state(),
             )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _configured_provider_models(
-        snapshot: ModelConfigSnapshot, provider_id: CloudProviderId
-    ) -> list[CloudModelDescriptor]:
-        if not snapshot.use_cloud_models or snapshot.cloud_provider != provider_id:
-            return []
-        model_names = {
-            model.strip()
-            for model in (
-                snapshot.cloud_model,
-                snapshot.clinical_model,
-                snapshot.text_extraction_model,
-                snapshot.revision_model,
-                snapshot.timeline_model,
-            )
-            if isinstance(model, str) and model.strip()
-        }
-        return [
-            enrich_model_descriptor(
-                provider=provider_id,
-                descriptor=CloudModelDescriptor(id=model, display_name=model),
-            )
-            for model in sorted(model_names, key=str.casefold)
-        ]
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _configured_catalog_message(models: list[CloudModelDescriptor]) -> str:
-        if models:
-            return "Provider catalog unavailable; showing the configured model."
-        return "The provider catalog could not be refreshed. Try again shortly."
-
-    # -------------------------------------------------------------------------

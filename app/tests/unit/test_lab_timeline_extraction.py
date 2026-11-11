@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pytest
 from domain.clinical import (
     ClinicalLabEntry,
     LiverInjuryOnsetContext,
@@ -13,9 +14,11 @@ from domain.clinical import (
 )
 from domain.clinical.extractor_contracts import HepaticPatternResolutionInput
 from domain.clinical.extras import LabExtractionPayload
-from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.extraction_strategy import decide_extraction_strategy
+from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.pattern_resolution import resolve_hepatic_pattern
+
+pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
 
 ###############################################################################

@@ -19,10 +19,8 @@ from domain.patient_timeline import (
     PatientTimelineExtraction,
 )
 from domain.timeline_dates import extract_single_explicit_timeline_date
-from domain.model_configs import ModelConfigSnapshot
 from repositories.agent_seed import ensure_default_agents
 from repositories.schemas.base import Base
-from repositories.serialization.model_configs import ModelConfigSerializer
 from repositories.schemas.clinical import ClinicalDrugMention, ClinicalSession
 from repositories.schemas.knowledge import (
     Drug,
@@ -31,7 +29,7 @@ from repositories.schemas.knowledge import (
     KbMatchCache,
     LiverToxMonograph,
 )
-from repository_fixtures import build_repository_graph
+from repository_fixtures import build_repository_graph, legacy_model_payload
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.timeline import PatientTimelineExtractor
@@ -46,7 +44,7 @@ from sqlalchemy.pool import StaticPool
 
 ###############################################################################
 def build_repository_graph_for_test(
-    agent_snapshot: ModelConfigSnapshot | None = None,
+    agent_snapshot: dict[str, Any] | None = None,
 ) -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -54,7 +52,7 @@ def build_repository_graph_for_test(
     # Timelines run the session's DILI agent (default for pre-agent sessions).
     ensure_default_agents(
         graph.agent_repository,
-        agent_snapshot or ModelConfigSerializer().load_snapshot(),
+        agent_snapshot or legacy_model_payload(),
     )
     return graph, engine
 
@@ -1030,10 +1028,8 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
 ###############################################################################
 def test_timeline_generation_follows_the_dili_agent_not_session_settings() -> None:
     repository_graph, _ = build_repository_graph_for_test(
-        ModelConfigSnapshot(
+        legacy_model_payload(
             use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
             clinical_model="qwen3.5:9b",
             text_extraction_model="qwen3.5:9b",
             revision_model="qwen3.5:9b",
@@ -1180,7 +1176,7 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
     ensure_default_agents(
-        repository_graph.agent_repository, ModelConfigSerializer().load_snapshot()
+        repository_graph.agent_repository, legacy_model_payload()
     )
     save_session(
         repository_graph,
@@ -1231,7 +1227,7 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
     ensure_default_agents(
-        repository_graph.agent_repository, ModelConfigSerializer().load_snapshot()
+        repository_graph.agent_repository, legacy_model_payload()
     )
     save_session(
         repository_graph,
@@ -1345,7 +1341,7 @@ def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() ->
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
     ensure_default_agents(
-        repository_graph.agent_repository, ModelConfigSerializer().load_snapshot()
+        repository_graph.agent_repository, legacy_model_payload()
     )
     save_session(
         repository_graph,

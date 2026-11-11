@@ -8,15 +8,24 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from domain.settings.configuration import DEFAULT_RAG_SETTINGS, DatabaseSettings
+from domain.settings.configuration import (
+    DEFAULT_RAG_SETTINGS,
+    SHARED_RAG_SETTING_KEYS,
+    DatabaseSettings,
+)
+from repositories.agent_repository import AgentRepository
+from repositories.context import RepositoryContext
 from repositories.database.initializer import initialize_sqlite_database
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.base import Base
 from repositories.schemas.configuration import (
+    AgentDefinition,
+    AgentRevision,
     ApplicationConfiguration,
     ReferenceCatalogEntry,
 )
-from sqlalchemy import create_engine, func, inspect, select
+from repositories.serialization.model_configs import LEGACY_EXECUTION_KEYS
+from sqlalchemy import create_engine, delete, func, inspect, select
 
 
 ###############################################################################
@@ -165,15 +174,41 @@ def test_sqlite_initializer_seeds_complete_application_configuration(
         "clinical_language_detection",
         "drugs_matcher",
     }.issubset(payload)
-    assert set(payload["rag_settings"]) == set(DEFAULT_RAG_SETTINGS)
+    assert set(payload["rag_settings"]) == set(SHARED_RAG_SETTING_KEYS)
+    assert not LEGACY_EXECUTION_KEYS & set(payload)
     assert "rag" not in payload
 
 
 ###############################################################################
-def test_existing_model_configuration_receives_missing_defaults_without_replacement(
+def _read_configuration_and_agents(
+    settings: DatabaseSettings,
+) -> tuple[dict[str, object], dict[str, dict[str, object]], int]:
+    repository = SQLiteRepository(settings)
+    try:
+        with repository.session_factory() as db_session:
+            configuration = db_session.get(ApplicationConfiguration, 1)
+            assert configuration is not None
+            payload = dict(configuration.payload)
+        agents = AgentRepository(
+            RepositoryContext.create(
+                engine=repository.engine, session_factory=repository.session_factory
+            )
+        )
+        defaults = {
+            kind: dict(record["revision"]["configuration"])
+            for kind in ("dili", "revision")
+            if (record := agents.get_default(kind)) is not None
+        }
+        return payload, defaults, agents.count_agents()
+    finally:
+        repository.engine.dispose()
+
+
+###############################################################################
+def test_legacy_model_configuration_migrates_into_default_agents_once(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
-    database_path = tmp_path / "merge-config.db"
+    database_path = tmp_path / "legacy-config.db"
     monkeypatch.setattr(
         "repositories.database.sqlite.DATABASE_FILE_PATH",
         database_path,
@@ -181,37 +216,66 @@ def test_existing_model_configuration_receives_missing_defaults_without_replacem
     settings = _build_settings()
     initialize_sqlite_database(settings, seed_catalogs=False)
 
+    # Recreate a pre-agent database: legacy execution keys, no agents.
     repository = SQLiteRepository(settings)
     with repository.session_factory() as db_session:
+        db_session.execute(delete(AgentRevision))
+        db_session.execute(delete(AgentDefinition))
         configuration = db_session.get(ApplicationConfiguration, 1)
         assert configuration is not None
         configuration.payload = {
-            "clinical_model": "custom-clinical",
-            "text_extraction_model": "custom-parser",
-            "revision_model": "custom-revision",
-            "timeline_model": "custom-timeline",
+            **dict(configuration.payload),
+            "clinical_model": "gpt-clinical",
+            "text_extraction_model": "gpt-parser",
+            "revision_model": "gpt-revision",
+            "timeline_model": "gpt-timeline",
             "use_cloud_models": True,
             "cloud_provider": "openai",
-            "cloud_model": "custom-cloud",
+            "cloud_model": "gpt-clinical",
+            "reasoning_level": "high",
+            "ollama_seed": 7,
+            "rag_settings": {
+                **DEFAULT_RAG_SETTINGS,
+                "chunk_size": 777,
+                "use_reranking": False,
+                "reranker_model": "custom-reranker",
+                "retrieval_candidate_count": 30,
+                "retrieval_selected_count": 5,
+            },
         }
         db_session.add(configuration)
         db_session.commit()
     repository.engine.dispose()
 
     initialize_sqlite_database(settings, seed_catalogs=False)
-    repository = SQLiteRepository(settings)
-    try:
-        with repository.session_factory() as db_session:
-            configuration = db_session.get(ApplicationConfiguration, 1)
-            assert configuration is not None
-            payload = dict(configuration.payload)
-    finally:
-        repository.engine.dispose()
+    payload, agents, agent_count = _read_configuration_and_agents(settings)
 
-    assert payload["clinical_model"] == "custom-clinical"
-    assert payload["text_extraction_model"] == "custom-parser"
-    assert payload["revision_model"] == "custom-revision"
-    assert payload["timeline_model"] == "custom-timeline"
-    assert payload["use_cloud_models"] is True
-    assert payload["rag_settings"] == DEFAULT_RAG_SETTINGS
+    dili, revision = agents["dili"], agents["revision"]
+    assert dili["models"]["clinical"] == {
+        "provider": "openai",
+        "model": "gpt-clinical",
+        "reasoning_level": None,
+    }
+    assert dili["models"]["extraction"]["model"] == "gpt-parser"
+    assert dili["models"]["timeline"]["model"] == "gpt-timeline"
+    assert dili["reasoning_level"] == "high"
+    assert dili["ollama_seed"] == 7
+    assert dili["retrieval"]["use_reranking"] is False
+    assert dili["retrieval"]["reranker_model"] == "custom-reranker"
+    assert dili["retrieval"]["retrieval_candidate_count"] == 30
+    assert dili["retrieval"]["retrieval_selected_count"] == 5
+    assert revision["models"]["planning"]["provider"] == "openai"
+    assert revision["models"]["planning"]["model"] == "gpt-revision"
+
+    assert not LEGACY_EXECUTION_KEYS & set(payload)
+    assert set(payload["rag_settings"]) == set(SHARED_RAG_SETTING_KEYS)
+    assert payload["rag_settings"]["chunk_size"] == 777
     assert payload["runtime"]["cloud_llm_timeout_cap"] == 1800.0
+
+    initialize_sqlite_database(settings, seed_catalogs=False)
+    second_payload, second_agents, second_count = _read_configuration_and_agents(
+        settings
+    )
+    assert second_payload == payload
+    assert second_agents == agents
+    assert second_count == agent_count == 2

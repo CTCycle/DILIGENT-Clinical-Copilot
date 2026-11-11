@@ -157,8 +157,7 @@ class SystemStatusService:
     # -------------------------------------------------------------------------
     async def _count_providers(self) -> ProviderAvailability:
         """Cloud providers with an active key and a usable cached catalog."""
-        snapshot = self.model_config.load_current_snapshot()
-        descriptors = await self.model_config.discover_provider_descriptors(snapshot)
+        descriptors = await self.model_config.discover_provider_descriptors()
         active = sum(1 for item in descriptors if self._is_operational(item))
         return ProviderAvailability(active=active, total=len(descriptors))
 

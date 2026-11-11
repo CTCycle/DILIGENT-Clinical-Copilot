@@ -261,3 +261,13 @@ def patch_asyncio_run(monkeypatch: pytest.MonkeyPatch):
     """
     monkeypatch.setattr(asyncio, "run", AsyncioRunPatch(asyncio.run))
     yield
+
+
+###############################################################################
+@pytest.fixture
+def dili_agent_runtime():
+    """Run the test under the configured default DILI agent's runtime."""
+    from repository_fixtures import agent_runtime
+
+    with agent_runtime("dili"):
+        yield

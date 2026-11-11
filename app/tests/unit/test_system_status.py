@@ -29,11 +29,7 @@ class _StubModelConfig:
         self.descriptors = descriptors
 
     # -------------------------------------------------------------------------
-    def load_current_snapshot(self) -> None:
-        return None
-
-    # -------------------------------------------------------------------------
-    async def discover_provider_descriptors(self, snapshot: None) -> list[Any]:
+    async def discover_provider_descriptors(self) -> list[Any]:
         return self.descriptors
 
 

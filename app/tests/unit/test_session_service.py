@@ -6,27 +6,29 @@ from __future__ import annotations
 import asyncio
 from datetime import date
 from types import SimpleNamespace
+from typing import Any
+
 import pytest
 from common.exceptions import ServiceValidationError
+from domain.clinical import DrugEntry, PatientData, PatientDrugs
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
     EvidenceSelection,
 )
-from domain.clinical.extras import HepatoxPreparedInputs
-from repository_fixtures import build_dili_agent_service
-from services.runtime.jobs import JobErrorSanitizer, get_job_manager
-from services.session.factory import build_clinical_session_service
-from services.session.session_service import ClinicalSessionService
-from services.session.session_workflow import validate_clinical_launch_workflow
-from typing import Any
-from domain.clinical import DrugEntry, PatientData, PatientDrugs
-from domain.clinical.extras import LabExtractionPayload
+from domain.clinical.extras import HepatoxPreparedInputs, LabExtractionPayload
 from services.clinical.job_progress import ClinicalJobCancelled
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
-from services.runtime.jobs import JobManager
+from services.runtime.jobs import JobErrorSanitizer, JobManager, get_job_manager
 from services.session import extraction_pipeline, factory
+from services.session.factory import build_clinical_session_service
+from services.session.session_service import ClinicalSessionService
+from services.session.session_workflow import validate_clinical_launch_workflow
+
+from repository_fixtures import build_dili_agent_service
+
+pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
 
 ###############################################################################

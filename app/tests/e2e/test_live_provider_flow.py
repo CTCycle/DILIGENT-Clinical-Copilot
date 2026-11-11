@@ -308,28 +308,20 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
             activate_key.json(), provider_key, scope="access-key activation response"
         )
 
-        config = api_context.put(
-            "/api/model-config",
-            data={
-                "use_cloud_services": True,
-                "llm_provider": PROVIDER,
-                "cloud_model": MODEL,
-                "text_extraction_model": MODEL,
-                "clinical_model": MODEL,
-                "revision_model": MODEL,
-                "timeline_model": MODEL,
-                "reasoning_level": "off",
-            },
-        )
-        assert config.status == 200, config.text()
-        config_payload = config.json()
-        _assert_secret_absent(
-            config_payload, provider_key, scope="model config response"
-        )
-        assert config_payload["llm_provider"] == PROVIDER
-        assert config_payload["cloud_model"] == MODEL
-        assert config_payload["clinical_model"] == MODEL
-        assert config_payload["revision_model"] == MODEL
+        # The seeded default agents run every role on the live provider model.
+        for kind in ("dili", "revision"):
+            listing = api_context.get(f"/api/agents?kind={kind}")
+            assert listing.status == 200, listing.text()
+            default_agent = next(
+                item for item in listing.json()["agents"] if item["is_default"]
+            )
+            models = default_agent["revision"]["configuration"]["models"]
+            roles = ("extraction", "clinical", "timeline") if kind == "dili" else (
+                "planning",
+            )
+            for role in roles:
+                assert models[role]["provider"] == PROVIDER
+                assert models[role]["model"] == MODEL
 
         connectivity = api_context.post(
             "/api/model-config/connectivity-check",

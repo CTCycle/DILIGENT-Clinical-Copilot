@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from collections.abc import Mapping
 from datetime import datetime
 from functools import partial
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
-from domain.settings.configuration import DEFAULT_RAG_SETTINGS
+from domain.model_configs import ModelConfigSnapshot
+from domain.settings.configuration import DEFAULT_SHARED_RAG_SETTINGS
 from repositories.database.session import resolve_engine, resolve_session_factory
 from repositories.schemas.configuration import ApplicationConfiguration
 from repositories.serialization.application_configuration import (
@@ -20,23 +20,28 @@ from repositories.serialization.application_configuration import (
 
 UNSET = object()
 
+# Execution settings the singleton held before agents owned them. They are
+# read once to seed the default agents and then pruned from the payload.
+LEGACY_EXECUTION_KEYS: frozenset[str] = frozenset(
+    {
+        "use_cloud_models",
+        "use_cloud_services",
+        "cloud_provider",
+        "llm_provider",
+        "cloud_model",
+        "text_extraction_model",
+        "clinical_model",
+        "revision_model",
+        "timeline_model",
+        "reasoning_level",
+        "ollama_seed",
+    }
+)
+
 
 ###############################################################################
 class ModelConfigSerializer:
-    """Persist the validated model configuration as one singleton document."""
-
-    REQUIRED_ROLE_FIELDS = (
-        "clinical_model",
-        "text_extraction_model",
-        "revision_model",
-        "timeline_model",
-    )
-
-    RAG_OPERATIONAL_FIELDS = frozenset(
-        DEFAULT_RAG_SETTINGS
-    )
-    DEFAULT_REASONING_LEVEL = ReasoningLevel.OFF
-    DEFAULT_OLLAMA_SEED = 42
+    """Persist the shared (non-execution) configuration as one singleton."""
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -68,36 +73,20 @@ class ModelConfigSerializer:
                 raise ValueError(
                     "Persisted model configuration payload must be an object."
                 )
-            payload = dict(row.payload)
-            return self.snapshot_from_payload(payload, updated_at=row.updated_at)
+            return self.snapshot_from_payload(
+                dict(row.payload), updated_at=row.updated_at
+            )
 
     # -------------------------------------------------------------------------
-    def seed_if_missing(self, payload: dict[str, object]) -> bool:
-        """Seed a complete configuration without replacing existing state."""
-        self._require_required_roles(payload)
-        normalized_payload = dict(payload)
-        normalized_payload["reasoning_level"] = self.reasoning_level_from_payload(
-            normalized_payload
-        )
-        normalized_payload["ollama_seed"] = self.normalize_optional_seed(
-            normalized_payload.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
-        )
-        normalized_payload["rag_settings"] = self.normalize_rag_settings(
-            normalized_payload.get("rag_settings")
-        )
-        return self.application_configuration.save_if_missing(normalized_payload)
+    def load_raw_payload(self) -> dict[str, object] | None:
+        """Return the stored payload unchanged (legacy keys included)."""
+        payload, _ = self.application_configuration.load_with_metadata()
+        return dict(payload) if isinstance(payload, dict) else None
 
     # -------------------------------------------------------------------------
     def ensure_defaults(self, payload: dict[str, object]) -> bool:
-        """Fill missing singleton defaults while preserving saved selections."""
-        self._require_required_roles(payload)
-        defaults = dict(payload)
-        defaults["reasoning_level"] = self.reasoning_level_from_payload(
-            defaults
-        ).value
-        defaults["ollama_seed"] = self.normalize_optional_seed(
-            defaults.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
-        )
+        """Fill missing shared defaults, preserve saved values, prune legacy keys."""
+        defaults = self.prune_legacy_keys(payload)
         defaults["rag_settings"] = self.normalize_rag_settings(
             defaults.get("rag_settings")
         )
@@ -107,7 +96,7 @@ class ModelConfigSerializer:
             return self.application_configuration.save_if_missing(defaults)
 
         merged = dict(defaults)
-        merged.update(current)
+        merged.update(self.prune_legacy_keys(current))
         for block_name in (
             "jobs",
             "runtime",
@@ -132,15 +121,6 @@ class ModelConfigSerializer:
             **self.normalize_rag_settings(defaults.get("rag_settings")),
             **self.normalize_rag_settings(current.get("rag_settings")),
         }
-        for field_name in self.REQUIRED_ROLE_FIELDS:
-            if self.normalize_optional_text(current.get(field_name)) is None:
-                merged[field_name] = defaults[field_name]
-        merged["reasoning_level"] = self.reasoning_level_from_payload(
-            current
-        ).value
-        merged["ollama_seed"] = self.normalize_optional_seed(
-            current.get("ollama_seed", defaults["ollama_seed"])
-        )
         if merged == current:
             return False
         self.application_configuration.save(merged)
@@ -150,37 +130,13 @@ class ModelConfigSerializer:
     def save_snapshot(
         self,
         *,
-        clinical_model: str | None | object = UNSET,
-        text_extraction_model: str | None | object = UNSET,
-        revision_model: str | None | object = UNSET,
-        timeline_model: str | None | object = UNSET,
-        use_cloud_models: bool | object = UNSET,
-        cloud_provider: str | None | object = UNSET,
-        cloud_model: str | None | object = UNSET,
-        reasoning_level: ReasoningLevel | object = UNSET,
-        ollama_seed: int | None | object = UNSET,
         rag_settings: dict[str, object] | object = UNSET,
     ) -> ModelConfigSnapshot:
-        updates = {
-            "clinical_model": clinical_model,
-            "text_extraction_model": text_extraction_model,
-            "revision_model": revision_model,
-            "timeline_model": timeline_model,
-            "use_cloud_models": use_cloud_models,
-            "cloud_provider": cloud_provider,
-            "cloud_model": cloud_model,
-            "reasoning_level": reasoning_level,
-            "ollama_seed": ollama_seed,
-            "rag_settings": rag_settings,
-        }
-        updates = {key: value for key, value in updates.items() if value is not UNSET}
-
-        merge_latest_configuration = partial(
-            self._merge_latest_configuration, updates
-        )
-
+        updates: dict[str, object] = {}
+        if rag_settings is not UNSET:
+            updates["rag_settings"] = self.normalize_rag_settings(rag_settings)
         saved_payload, updated_at = self.application_configuration.update_payload(
-            merge_latest_configuration,
+            partial(self._merge_latest_configuration, updates),
             return_metadata=True,
         )
         return self.snapshot_from_payload(saved_payload, updated_at=updated_at)
@@ -190,93 +146,43 @@ class ModelConfigSerializer:
         self, updates: dict[str, object], payload: dict[str, object]
     ) -> None:
         payload.pop("database", None)
-        current = asdict(self.snapshot_from_payload(payload, updated_at=None))
-        current.pop("updated_at", None)
-        current.update(updates)
-        self._require_required_roles(current)
-        current["reasoning_level"] = self.reasoning_level_from_payload(current)
-        current["ollama_seed"] = self.normalize_optional_seed(
-            current.get("ollama_seed", self.DEFAULT_OLLAMA_SEED)
+        for key in LEGACY_EXECUTION_KEYS:
+            payload.pop(key, None)
+        payload["rag_settings"] = self.normalize_rag_settings(
+            payload.get("rag_settings")
         )
-        current["rag_settings"] = self.normalize_rag_settings(
-            current.get("rag_settings")
-        )
-        payload.update(current)
+        payload.update(updates)
 
     # -------------------------------------------------------------------------
     @classmethod
     def snapshot_from_payload(
-        cls, payload: dict[str, object], *, updated_at: datetime | None
+        cls, payload: Mapping[str, object], *, updated_at: datetime | None
     ) -> ModelConfigSnapshot:
-        cls._require_required_roles(payload)
         return ModelConfigSnapshot(
-            clinical_model=cls.normalize_optional_text(payload.get("clinical_model")),
-            text_extraction_model=cls.normalize_optional_text(
-                payload.get("text_extraction_model")
-            ),
-            use_cloud_models=bool(payload.get("use_cloud_models", False)),
-            cloud_provider=cls.normalize_optional_text(payload.get("cloud_provider")),
-            cloud_model=cls.normalize_optional_text(payload.get("cloud_model")),
-            revision_model=cls.normalize_optional_text(payload.get("revision_model")),
-            timeline_model=cls.normalize_optional_text(payload.get("timeline_model")),
-            reasoning_level=cls.reasoning_level_from_payload(payload),
-            ollama_seed=cls.normalize_optional_seed(
-                payload.get("ollama_seed", cls.DEFAULT_OLLAMA_SEED)
-            ),
             rag_settings=cls.normalize_rag_settings(payload.get("rag_settings")),
             updated_at=updated_at,
         )
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def _require_required_roles(cls, payload: dict[str, object]) -> None:
-        missing = [
-            field_name
-            for field_name in cls.REQUIRED_ROLE_FIELDS
-            if cls.normalize_optional_text(payload.get(field_name)) is None
-        ]
-        if missing:
-            raise ValueError(
-                "Persisted model configuration is missing required role assignments: "
-                + ", ".join(missing)
-            )
-
-    # -------------------------------------------------------------------------
     @staticmethod
-    def normalize_optional_text(value: object) -> str | None:
-        if value is None:
-            return None
-        normalized = str(value).strip()
-        return normalized or None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def reasoning_level_from_payload(cls, payload: dict[str, object]) -> ReasoningLevel:
-        raw_level = payload.get("reasoning_level")
-        if isinstance(raw_level, ReasoningLevel):
-            return raw_level
-        if isinstance(raw_level, str):
-            try:
-                return ReasoningLevel(raw_level.strip().lower())
-            except ValueError:
-                pass
-        return cls.DEFAULT_REASONING_LEVEL
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def normalize_rag_settings(cls, value: object) -> dict[str, object]:
-        source = value if isinstance(value, dict) else {}
+    def prune_legacy_keys(payload: Mapping[str, object]) -> dict[str, object]:
         return {
-            key: source.get(key, default)
-            for key, default in DEFAULT_RAG_SETTINGS.items()
+            key: value
+            for key, value in payload.items()
+            if key not in LEGACY_EXECUTION_KEYS
         }
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def normalize_optional_seed(value: object) -> int | None:
-        if value is None:
-            return None
-        try:
-            return max(0, int(str(value).strip()))
-        except TypeError, ValueError:
-            return None
+    def has_legacy_keys(payload: Mapping[str, object]) -> bool:
+        return bool(LEGACY_EXECUTION_KEYS & set(payload))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_rag_settings(value: object) -> dict[str, object]:
+        """Keep only shared index settings; agent retrieval keys are dropped."""
+        source = value if isinstance(value, Mapping) else {}
+        return {
+            key: source.get(key, default)
+            for key, default in DEFAULT_SHARED_RAG_SETTINGS.items()
+        }

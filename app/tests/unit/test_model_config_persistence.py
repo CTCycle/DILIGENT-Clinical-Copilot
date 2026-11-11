@@ -4,23 +4,24 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 import services.llm.model_config as model_config_module
-import services.llm.runtime_config as runtime_config_module
-from common.exceptions import ServiceValidationError
 from domain.llm.providers import CloudModelDescriptor, CloudProviderDescriptor
 from domain.model_configs import (
     ConnectivityCheckRequest,
     ModelConfigSnapshot,
     ModelConfigUpdateRequest,
-    ReasoningLevel,
 )
+from domain.settings.configuration import SHARED_RAG_SETTING_KEYS
+from pydantic import ValidationError
 from repositories.schemas.base import Base
-from repositories.serialization.model_configs import ModelConfigSerializer
+from repositories.serialization.model_configs import (
+    LEGACY_EXECUTION_KEYS,
+    ModelConfigSerializer,
+)
 from repositories.serialization.provider_model_catalog_cache import (
     ProviderModelCatalogCacheRecord,
     ProviderModelCatalogCacheSerializer,
@@ -28,8 +29,6 @@ from repositories.serialization.provider_model_catalog_cache import (
 from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
 from services.llm.ollama_client import OllamaError
-from services.llm.runtime_config import LLMRuntimeConfig
-from services.retrieval.settings import build_effective_rag_settings
 from sqlalchemy import create_engine, text
 
 
@@ -59,46 +58,11 @@ def test_model_config_serializer_has_no_clean_break_migration() -> None:
 
 
 ###############################################################################
-@pytest.mark.parametrize(
-    ("payload", "expected"),
-    [
-        ({}, "off"),
-        ({"reasoning_level": "invalid"}, "off"),
-        ({"reasoning_level": "high"}, "high"),
-    ],
-)
-def test_model_config_serializer_reads_only_reasoning_level(
-    payload: dict[str, object], expected: str
-) -> None:
-    payload = {
-        "clinical_model": "clinical-model",
-        "text_extraction_model": "parser-model",
-        "revision_model": "revision-model",
-        "timeline_model": "timeline-model",
-        **payload,
-    }
-    snapshot = ModelConfigSerializer.snapshot_from_payload(payload, updated_at=None)
-
-    assert snapshot.reasoning_level.value == expected
-
-
-###############################################################################
 def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
     Base.metadata.create_all(engine)
     serializer = ModelConfigSerializer(engine=engine)
-    serializer.seed_if_missing(
-        {
-            "clinical_model": "qwen3.5:2b",
-            "text_extraction_model": "qwen3.5:2b",
-            "revision_model": "qwen3.5:2b",
-            "timeline_model": "qwen3.5:2b",
-            "use_cloud_models": False,
-            "cloud_provider": "openai",
-            "cloud_model": None,
-        }
-    )
-    serializer.save_snapshot(clinical_model="qwen3.5:2b")
+    serializer.ensure_defaults({})
     with engine.begin() as connection:
         connection.execute(
             text(
@@ -107,26 +71,27 @@ def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
             )
         )
 
-    snapshot = serializer.save_snapshot(text_extraction_model="qwen3.5:2b")
+    snapshot = serializer.save_snapshot(rag_settings={"chunk_size": 256})
 
     assert snapshot.updated_at is not None
     assert snapshot.updated_at.year > 2000
+    assert snapshot.rag_settings is not None
+    assert snapshot.rag_settings["chunk_size"] == 256
 
 
 ###############################################################################
-def test_model_config_update_preserves_other_application_settings(tmp_path) -> None:
+def test_model_config_update_preserves_other_settings_and_prunes_legacy_keys(
+    tmp_path,
+) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'settings-merge.db'}")
     Base.metadata.create_all(engine)
     serializer = ModelConfigSerializer(engine=engine)
-    serializer.seed_if_missing(
+    serializer.application_configuration.save(
         {
             "clinical_model": "clinical-model",
-            "text_extraction_model": "parser-model",
-            "revision_model": "revision-model",
-            "timeline_model": "timeline-model",
             "use_cloud_models": False,
-            "cloud_provider": "openai",
-            "cloud_model": None,
+            "reasoning_level": "high",
+            "rag_settings": {"chunk_size": 300, "use_reranking": False},
             "jobs": {"polling_interval": 2.5},
             "runtime": {"livertox_archive": "custom.tar.gz"},
             "ingestion": {"drug_name_min_length": 4},
@@ -134,16 +99,67 @@ def test_model_config_update_preserves_other_application_settings(tmp_path) -> N
         }
     )
 
-    updated_snapshot = serializer.save_snapshot(reasoning_level=ReasoningLevel.HIGH)
+    updated_snapshot = serializer.save_snapshot(
+        rag_settings={"chunk_size": 400, "use_reranking": True}
+    )
     saved = serializer.application_configuration.load()
 
-    assert updated_snapshot.reasoning_level is ReasoningLevel.HIGH
+    assert updated_snapshot.rag_settings is not None
+    assert updated_snapshot.rag_settings["chunk_size"] == 400
     assert saved is not None
-    assert saved["reasoning_level"] == "high"
+    assert not LEGACY_EXECUTION_KEYS & set(saved)
+    assert set(saved["rag_settings"]) == set(SHARED_RAG_SETTING_KEYS)
     assert saved["jobs"] == {"polling_interval": 2.5}
     assert saved["runtime"]["livertox_archive"] == "custom.tar.gz"
     assert saved["ingestion"] == {"drug_name_min_length": 4}
     assert "database" not in saved
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"use_cloud_services": True},
+        {"clinical_model": "gpt-4.1"},
+        {"reasoning_level": "high"},
+        {"rag_settings": {"use_reranking": False}},
+        {"rag_settings": {"retrieval_selected_count": 3}},
+    ],
+)
+def test_model_config_update_rejects_agent_owned_fields(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        ModelConfigUpdateRequest.model_validate(payload)
+
+
+###############################################################################
+def test_shared_rag_save_does_not_probe_ollama_or_remote_catalogs(
+    monkeypatch,
+) -> None:
+    serializer = InMemorySerializer(_snapshot(rag_settings={"chunk_size": 512}))
+    service = ModelConfigService(serializer=serializer)
+
+    async def unexpected_remote_call() -> object:
+        raise AssertionError("saving must not refresh remote availability")
+
+    monkeypatch.setattr(service, "list_available_ollama_models", unexpected_remote_call)
+    monkeypatch.setattr(
+        service, "discover_provider_descriptors", unexpected_remote_call
+    )
+
+    response = asyncio.run(
+        service.update_state(
+            ModelConfigUpdateRequest.model_validate(
+                {"rag_settings": {"chunk_size": 1024}}
+            )
+        )
+    )
+
+    assert response.rag_settings.chunk_size == 1024
+    assert serializer.snapshot.rag_settings is not None
+    assert serializer.snapshot.rag_settings["chunk_size"] == 1024
+    assert set(response.model_dump()) == {"rag_settings", "updated_at"}
 
 
 ###############################################################################
@@ -174,163 +190,16 @@ def test_application_configuration_concurrent_patches_do_not_drop_updates(
 
 
 ###############################################################################
-def test_model_config_serializer_persists_independent_revision_and_timeline_roles(
-    tmp_path,
-) -> None:
-    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config-roles.db'}")
-    Base.metadata.create_all(engine)
-    serializer = ModelConfigSerializer(engine=engine)
-
-    serializer.seed_if_missing(
-        {
-            "clinical_model": "clinical-model",
-            "text_extraction_model": "parser-model",
-            "revision_model": "revision-model",
-            "timeline_model": "timeline-model",
-            "use_cloud_models": True,
-            "cloud_provider": "openai",
-            "cloud_model": "gpt-4.1-mini",
-        }
-    )
-    snapshot = serializer.save_snapshot(
-        clinical_model="clinical-model",
-        text_extraction_model="parser-model",
-        revision_model="revision-model",
-        timeline_model="timeline-model",
-        use_cloud_models=True,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-    )
-    reloaded = serializer.load_snapshot()
-
-    assert snapshot.revision_model == "revision-model"
-    assert snapshot.timeline_model == "timeline-model"
-    assert reloaded.revision_model == "revision-model"
-    assert reloaded.timeline_model == "timeline-model"
-
-
-###############################################################################
-def test_model_config_service_rejects_missing_current_role_assignments() -> None:
+def test_model_config_state_returns_only_shared_rag_settings(monkeypatch) -> None:
     serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model=None,
-            text_extraction_model=None,
-            use_cloud_models=False,
-            cloud_provider=None,
-            cloud_model=None,
-            updated_at=None,
-        )
-    )
-    with pytest.raises(ServiceValidationError, match="required role assignments"):
-        ModelConfigService(serializer=serializer).load_current_snapshot()
-
-
-###############################################################################
-@pytest.mark.parametrize(
-    ("cloud_provider", "cloud_model"),
-    [("legacy-openai", "gpt-4.1-mini")],
-)
-def test_model_config_service_rejects_invalid_persisted_cloud_selection(
-    cloud_provider: str, cloud_model: str
-) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="qwen3.5:2b",
-            text_extraction_model="qwen3.5:2b",
-            revision_model="qwen3.5:2b",
-            timeline_model="qwen3.5:2b",
-            use_cloud_models=False,
-            cloud_provider=cloud_provider,
-            cloud_model=cloud_model,
-            updated_at=datetime.now(),
-        )
-    )
-    with pytest.raises(ServiceValidationError):
-        ModelConfigService(serializer=serializer).load_current_snapshot()
-
-
-###############################################################################
-def test_model_config_service_allows_persisted_deepseek_model_before_refresh() -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="deepseek-v4-flash",
-            text_extraction_model="deepseek-v4-flash",
-            revision_model="deepseek-v4-flash",
-            timeline_model="deepseek-v4-flash",
-            use_cloud_models=True,
-            cloud_provider="deepseek",
-            cloud_model="deepseek-v4-flash",
-            updated_at=datetime.now(),
-        )
-    )
-
-    snapshot = ModelConfigService(serializer=serializer).load_current_snapshot()
-
-    assert snapshot.cloud_provider == "deepseek"
-    assert snapshot.cloud_model == "deepseek-v4-flash"
-
-
-###############################################################################
-def test_model_config_state_survives_provider_catalog_drift(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="deepseek",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    async def fake_discover_provider_descriptors(
-        _snapshot: ModelConfigSnapshot,
-    ) -> list[CloudProviderDescriptor]:
-        return ModelConfigService.build_provider_descriptors()
-
-    monkeypatch.setattr(
-        service,
-        "discover_provider_descriptors",
-        fake_discover_provider_descriptors,
-    )
-
-    response = asyncio.run(service.get_state())
-
-    assert response.llm_provider == "deepseek"
-    assert response.cloud_model == "gpt-4.1-mini"
-
-
-###############################################################################
-def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="qwen3.5:2b",
-            text_extraction_model="qwen3.5:2b",
-            revision_model="qwen3.5:2b",
-            timeline_model="qwen3.5:2b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            rag_settings={
-                "use_hybrid_search": False,
-                "retrieval_candidate_count": 12,
-                "retrieval_selected_count": 4,
-                "reranker_model": "persisted-reranker",
-            },
-            updated_at=datetime.now(UTC),
-        )
+        _snapshot(rag_settings={"chunk_size": 321, "vector_index_type": "HNSW"})
     )
     service = ModelConfigService(serializer=serializer)
 
     async def fake_list_local_model_cards(**_: Any) -> list[Any]:
         return []
 
-    async def fake_discover_provider_descriptors(
-        _snapshot: ModelConfigSnapshot,
-    ) -> list[CloudProviderDescriptor]:
+    async def fake_discover_provider_descriptors() -> list[CloudProviderDescriptor]:
         return ModelConfigService.build_provider_descriptors()
 
     monkeypatch.setattr(service, "list_local_model_cards", fake_list_local_model_cards)
@@ -340,26 +209,19 @@ def test_model_config_state_returns_persisted_rag_settings(monkeypatch) -> None:
 
     response = asyncio.run(service.get_state())
 
-    assert response.rag_settings.use_hybrid_search is False
-    assert response.rag_settings.retrieval_candidate_count == 12
-    assert response.rag_settings.retrieval_selected_count == 4
-    assert response.rag_settings.reranker_model == "persisted-reranker"
+    assert response.rag_settings.chunk_size == 321
+    assert response.rag_settings.vector_index_type == "HNSW"
+    assert set(response.rag_settings.model_dump()) == set(SHARED_RAG_SETTING_KEYS)
+    assert not {"use_cloud_services", "llm_provider", "clinical_model"} & set(
+        response.model_dump()
+    )
 
 
 ###############################################################################
 def test_get_state_does_not_write_persisted_configuration(
     monkeypatch, tmp_path
 ) -> None:
-    snapshot = ModelConfigSnapshot(
-        clinical_model="qwen3.5:2b",
-        text_extraction_model="qwen3.5:2b",
-        revision_model="qwen3.5:2b",
-        timeline_model="qwen3.5:2b",
-        use_cloud_models=False,
-        cloud_provider="openai",
-        cloud_model=None,
-        updated_at=datetime.now(UTC),
-    )
+    snapshot = _snapshot()
 
 
     ###############################################################################
@@ -375,9 +237,7 @@ def test_get_state_does_not_write_persisted_configuration(
     async def fake_list_local_model_cards(**_: Any) -> list[Any]:
         return []
 
-    async def fake_discover_provider_descriptors(
-        _snapshot: ModelConfigSnapshot,
-    ) -> list[CloudProviderDescriptor]:
+    async def fake_discover_provider_descriptors() -> list[CloudProviderDescriptor]:
         return []
 
     monkeypatch.setattr(service, "list_local_model_cards", fake_list_local_model_cards)
@@ -387,9 +247,7 @@ def test_get_state_does_not_write_persisted_configuration(
 
     response = asyncio.run(service.get_state())
 
-    assert response.clinical_model == "qwen3.5:2b"
-    assert response.revision_model == "qwen3.5:2b"
-    assert response.timeline_model == "qwen3.5:2b"
+    assert response.updated_at == snapshot.updated_at
 
 
 ###############################################################################
@@ -413,21 +271,8 @@ def test_malformed_cached_catalog_entry_is_skipped() -> None:
 
 
 ###############################################################################
-def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
-    monkeypatch,
-) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        )
-    )
+def test_model_config_catalog_reports_failed_refresh(monkeypatch) -> None:
+    serializer = InMemorySerializer(_snapshot())
 
 
     ###############################################################################
@@ -463,323 +308,13 @@ def test_model_config_catalog_keeps_configured_model_when_refresh_fails(
 
     assert operation.outcome == "failed"
     assert openai.catalog_status == "unavailable"
-    assert [model.id for model in openai.models] == ["gpt-4.1-mini"]
+    assert openai.models == []
     assert openai.catalog_message == "provider catalog unavailable"
 
 
 ###############################################################################
-def test_model_config_service_rejects_switching_cloud_model_roles_to_local_mode(
-    monkeypatch,
-) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="deepseek-v4-flash",
-            text_extraction_model="deepseek-v4-flash",
-            revision_model="deepseek-v4-flash",
-            timeline_model="deepseek-v4-flash",
-            use_cloud_models=True,
-            cloud_provider="deepseek",
-            cloud_model="deepseek-v4-flash",
-            reasoning_level="medium",
-            ollama_seed=42,
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    async def fake_list_available_ollama_models() -> set[str]:
-        return {"qwen3.5:2b"}
-
-    monkeypatch.setattr(
-        service,
-        "list_available_ollama_models",
-        fake_list_available_ollama_models,
-    )
-
-    with pytest.raises(
-        ServiceValidationError, match="not supported for role 'clinical'"
-    ):
-        asyncio.run(
-            service.update_state(ModelConfigUpdateRequest(use_cloud_services=False))
-        )
-
-    assert serializer.snapshot.use_cloud_models is True
-
-
-###############################################################################
-def test_model_config_service_allows_installed_dynamic_local_model(
-    monkeypatch,
-) -> None:
-    dynamic_model = "huihui_ai/gpt-oss-abliterated:20b"
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="deepseek-v4-flash",
-            text_extraction_model="deepseek-v4-flash",
-            revision_model="deepseek-v4-pro",
-            timeline_model="deepseek-v4-flash",
-            use_cloud_models=True,
-            cloud_provider="deepseek",
-            cloud_model="deepseek-v4-flash",
-            updated_at=datetime.now(UTC),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-    cached_catalog = ProviderModelCatalogCacheRecord(
-        provider_id="ollama",
-        configuration_fingerprint="ollama-test-fingerprint",
-        models=[{"id": dynamic_model, "display_name": dynamic_model}],
-        last_success_at=datetime.now(UTC),
-        last_attempt_at=datetime.now(UTC),
-        last_attempt_status="success",
-        last_error=None,
-    )
-
-    monkeypatch.setattr(
-        model_config_module.model_catalog,
-        "load_catalog_record",
-        lambda _cache, _provider: cached_catalog,
-    )
-
-    async def fake_list_available_ollama_models() -> set[str]:
-        return {dynamic_model}
-
-    monkeypatch.setattr(
-        service,
-        "list_available_ollama_models",
-        fake_list_available_ollama_models,
-    )
-
-    asyncio.run(
-        service.update_state(
-            ModelConfigUpdateRequest(
-                use_cloud_services=False,
-                clinical_model=dynamic_model,
-                text_extraction_model=dynamic_model,
-                revision_model=dynamic_model,
-                timeline_model=dynamic_model,
-            )
-        )
-    )
-
-    assert serializer.snapshot.use_cloud_models is False
-    assert serializer.snapshot.clinical_model == dynamic_model
-    assert serializer.snapshot.revision_model == dynamic_model
-    assert serializer.snapshot.timeline_model == dynamic_model
-
-
-###############################################################################
-def test_model_config_service_rejects_invalid_persisted_local_model() -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="legacy-local-model",
-            text_extraction_model="qwen3.5:2b",
-            revision_model="qwen3.5:2b",
-            timeline_model="qwen3.5:2b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    with pytest.raises(ServiceValidationError):
-        ModelConfigService(serializer=serializer).load_current_snapshot()
-
-
-###############################################################################
-def test_model_config_roundtrip_preserves_cloud_selection() -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-oss:20b",
-            text_extraction_model="qwen3:1.7b",
-            revision_model="gpt-oss:20b",
-            timeline_model="qwen3:1.7b",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    service.serializer.save_snapshot(
-        use_cloud_models=True,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gpt-oss:20b",
-        text_extraction_model="qwen3:1.7b",
-    )
-    snapshot = service.serializer.load_snapshot()
-
-    assert snapshot.use_cloud_models is True
-    assert snapshot.cloud_provider == "openai"
-    assert snapshot.cloud_model == "gpt-4.1-mini"
-    assert snapshot.clinical_model == "gpt-oss:20b"
-    assert snapshot.text_extraction_model == "qwen3:1.7b"
-
-
-###############################################################################
-def test_model_config_service_accepts_cloud_models_for_role_assignments() -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-oss:20b",
-            text_extraction_model="qwen3:14b",
-            revision_model="gpt-oss:20b",
-            timeline_model="qwen3:14b",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    payload = ModelConfigUpdateRequest(
-        use_cloud_services=True,
-        llm_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gpt-4.1-mini",
-        text_extraction_model="gpt-4.1-mini",
-    )
-
-    response = asyncio.run(service.update_state(payload))
-
-    assert response.clinical_model == "gpt-4.1-mini"
-    assert response.text_extraction_model == "gpt-4.1-mini"
-    assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
-    assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
-
-
-###############################################################################
-def test_model_config_cloud_save_does_not_refresh_remote_catalogs_or_ollama(
-    monkeypatch,
-) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    async def unexpected_remote_call() -> object:
-        raise AssertionError("saving must not refresh remote availability")
-
-    monkeypatch.setattr(service, "list_available_ollama_models", unexpected_remote_call)
-    monkeypatch.setattr(
-        service, "discover_provider_descriptors", unexpected_remote_call
-    )
-
-    response = asyncio.run(
-        service.update_state(
-            ModelConfigUpdateRequest(
-                use_cloud_services=True,
-                llm_provider="openai",
-                cloud_model="gpt-4.1-mini",
-                clinical_model="gpt-4.1-mini",
-                text_extraction_model="gpt-4.1-mini",
-            )
-        )
-    )
-
-    assert response.llm_provider == "openai"
-    assert response.cloud_model == "gpt-4.1-mini"
-    assert not hasattr(response, "cloud_providers")
-
-
-###############################################################################
-@pytest.mark.parametrize(
-    "patch",
-    [
-        {"reasoning_level": "medium"},
-        {"rag_settings": {"use_hybrid_search": False}},
-    ],
-)
-def test_local_option_saves_do_not_probe_ollama(
-    monkeypatch, patch: dict[str, object]
-) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="qwen3.5:2b",
-            text_extraction_model="qwen3.5:2b",
-            revision_model="qwen3.5:2b",
-            timeline_model="qwen3.5:2b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            rag_settings={"use_hybrid_search": True},
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    async def unexpected_probe() -> set[str]:
-        raise AssertionError("option persistence must not probe Ollama")
-
-    monkeypatch.setattr(service, "list_available_ollama_models", unexpected_probe)
-
-    response = asyncio.run(
-        service.update_state(ModelConfigUpdateRequest.model_validate(patch))
-    )
-
-    assert response.updated_at is not None
-
-
-###############################################################################
-def test_local_model_save_reuses_cached_availability(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    async def cached_availability() -> set[str]:
-        return {"qwen3.5:2b"}
-
-    monkeypatch.setattr(service, "list_available_ollama_models", cached_availability)
-    response = asyncio.run(
-        service.update_state(
-            ModelConfigUpdateRequest(
-                use_cloud_services=False,
-                clinical_model="qwen3.5:2b",
-                text_extraction_model="qwen3.5:2b",
-                revision_model="qwen3.5:2b",
-                timeline_model="qwen3.5:2b",
-            )
-        )
-    )
-
-    assert response.use_cloud_services is False
-    assert serializer.snapshot.clinical_model == "qwen3.5:2b"
-
-
-###############################################################################
 def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
+    serializer = InMemorySerializer(_snapshot())
     service = ModelConfigService(serializer=serializer)
     calls = 0
 
@@ -816,84 +351,10 @@ def test_cold_local_catalog_loads_ollama_once(monkeypatch) -> None:
 
 
 ###############################################################################
-def test_model_config_service_rejects_stale_local_roles_in_cloud_mode() -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gemma4:31b",
-            text_extraction_model="qwen3.5:9b",
-            revision_model="gemma4:31b",
-            timeline_model="qwen3.5:9b",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    payload = ModelConfigUpdateRequest(
-        use_cloud_services=True,
-        llm_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gemma4:31b",
-        text_extraction_model="qwen3.5:9b",
-    )
-
-    with pytest.raises(ServiceValidationError, match="Select a model explicitly"):
-        asyncio.run(service.update_state(payload))
-
-
-###############################################################################
-def test_model_config_service_rejects_uninstalled_local_models(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="qwen3.5:2b",
-            text_extraction_model="qwen3.5:2b",
-            revision_model="qwen3.5:2b",
-            timeline_model="qwen3.5:2b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
-    service = ModelConfigService(serializer=serializer)
-
-    async def fake_list_available_ollama_models() -> set[str]:
-        return {"qwen3.5:2b"}
-
-    monkeypatch.setattr(
-        service,
-        "list_available_ollama_models",
-        fake_list_available_ollama_models,
-    )
-
-    payload = ModelConfigUpdateRequest(
-        use_cloud_services=False,
-        clinical_model="gpt-oss:20b",
-        text_extraction_model="qwen3.5:2b",
-    )
-
-    with pytest.raises(ServiceValidationError, match="Install local Ollama model"):
-        asyncio.run(service.update_state(payload))
-
-
-###############################################################################
 def test_model_config_service_prioritizes_recommended_installed_local_models(
     monkeypatch,
 ) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="qwen3.5:2b",
-            text_extraction_model="qwen3.5:9b",
-            revision_model="qwen3.5:2b",
-            timeline_model="qwen3.5:9b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
+    serializer = InMemorySerializer(_snapshot())
     service = ModelConfigService(serializer=serializer)
 
     async def fake_list_available_ollama_models() -> set[str]:
@@ -914,18 +375,7 @@ def test_model_config_service_prioritizes_recommended_installed_local_models(
 
 ###############################################################################
 def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-oss:20b",
-            text_extraction_model="qwen3:14b",
-            revision_model="gpt-oss:20b",
-            timeline_model="qwen3:14b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
+    serializer = InMemorySerializer(_snapshot())
     service = ModelConfigService(serializer=serializer)
 
 
@@ -961,18 +411,7 @@ def test_failed_ollama_catalog_load_is_persisted_without_retry(monkeypatch) -> N
 
 ###############################################################################
 def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-oss:20b",
-            text_extraction_model="qwen3.5:9b",
-            revision_model="gpt-oss:20b",
-            timeline_model="qwen3.5:9b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(),
-        )
-    )
+    serializer = InMemorySerializer(_snapshot())
     calls: list[dict[str, Any]] = []
 
 
@@ -1014,18 +453,7 @@ def test_connectivity_check_uses_requested_provider_and_model(monkeypatch) -> No
 
 ###############################################################################
 def test_connectivity_check_reports_llm_error(monkeypatch) -> None:
-    serializer = InMemorySerializer(
-        ModelConfigSnapshot(
-            clinical_model="gpt-oss:20b",
-            text_extraction_model="qwen3.5:9b",
-            revision_model="gpt-oss:20b",
-            timeline_model="qwen3.5:9b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model=None,
-            updated_at=datetime.now(),
-        )
-    )
+    serializer = InMemorySerializer(_snapshot())
 
 
     ###############################################################################
@@ -1110,16 +538,7 @@ def test_empty_ollama_catalog_is_saved_as_a_valid_empty_result(
 ) -> None:
     service = _catalog_test_service(
         tmp_path,
-        ModelConfigSnapshot(
-            clinical_model="gpt-oss:20b",
-            text_extraction_model="qwen3:14b",
-            revision_model="gpt-oss:20b",
-            timeline_model="qwen3:14b",
-            use_cloud_models=False,
-            cloud_provider="openai",
-            cloud_model=None,
-            updated_at=datetime.now(),
-        ),
+        _snapshot(),
     )
 
 
@@ -1174,16 +593,7 @@ def test_catalog_provider_switching_keeps_provider_specific_lists(
 ) -> None:
     service = _catalog_test_service(
         tmp_path,
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        ),
+        _snapshot(),
     )
 
 
@@ -1233,16 +643,7 @@ def test_concurrent_catalog_loads_share_one_provider_fetch(
 ) -> None:
     service = _catalog_test_service(
         tmp_path,
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        ),
+        _snapshot(),
     )
     calls = 0
 
@@ -1295,16 +696,7 @@ def test_catalog_fingerprint_change_invalidates_saved_models(
 ) -> None:
     service = _catalog_test_service(
         tmp_path,
-        ModelConfigSnapshot(
-            clinical_model="gpt-4.1-mini",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1-mini",
-            timeline_model="gpt-4.1-mini",
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        ),
+        _snapshot(),
     )
     service.catalog_cache.save_success(
         provider_id="openai",
@@ -1325,165 +717,5 @@ def test_catalog_fingerprint_change_invalidates_saved_models(
 
 
 ###############################################################################
-def test_cloud_runtime_uses_each_configured_role_model() -> None:
-    with LLMRuntimeConfig.override_for_run(
-        {
-            "use_cloud_models": True,
-            "cloud_provider": "openai",
-            "cloud_model": "gpt-4.1-mini",
-            "clinical_model": "gpt-oss:20b",
-            "text_extraction_model": "qwen3:8b",
-            "revision_model": "gpt-oss:20b",
-            "timeline_model": "qwen3:8b",
-        }
-    ):
-        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
-            "openai",
-            "gpt-oss:20b",
-        )
-        assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
-            "openai",
-            "qwen3:8b",
-        )
-
-
-###############################################################################
-def test_frozen_run_snapshot_replays_cloud_provider_and_rag(monkeypatch) -> None:
-    live = ModelConfigSnapshot(
-        use_cloud_models=False,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gpt-4.1",
-        text_extraction_model="gpt-4.1-mini",
-        revision_model="gpt-4.1",
-        timeline_model="gpt-4.1-mini",
-        rag_settings={"retrieval_selected_count": 3},
-        updated_at=datetime.now(UTC),
-    )
-    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: live)
-    frozen = {
-        "use_cloud_services": True,
-        "llm_provider": "openai",
-        "cloud_model": "gpt-4.1-mini",
-        "clinical_model": "gpt-4.1",
-        "text_extraction_model": "gpt-4.1-mini",
-        "revision_model": "gpt-4.1",
-        "timeline_model": "gpt-4.1-mini",
-        "rag_settings": {"retrieval_selected_count": 9},
-    }
-    live_revision = LLMRuntimeConfig.get_revision()
-
-    with LLMRuntimeConfig.override_for_run(frozen):
-        assert LLMRuntimeConfig.is_cloud_enabled() is True
-        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
-            "openai",
-            "gpt-4.1",
-        )
-        assert build_effective_rag_settings().retrieval_selected_count == 9
-        frozen_revision = LLMRuntimeConfig.get_revision()
-        assert frozen_revision != live_revision
-
-    live_changed = replace(live, updated_at=datetime.now(UTC) + timedelta(hours=1))
-    monkeypatch.setattr(
-        ModelConfigSerializer, "load_snapshot", lambda self: live_changed
-    )
-    with LLMRuntimeConfig.override_for_run(frozen):
-        assert LLMRuntimeConfig.get_revision() == frozen_revision
-    assert build_effective_rag_settings().retrieval_selected_count == 3
-
-
-###############################################################################
-def test_local_runtime_accepts_cached_dynamic_ollama_model(monkeypatch) -> None:
-    dynamic_model = "huihui_ai/gpt-oss-abliterated:20b"
-    snapshot = ModelConfigSnapshot(
-        use_cloud_models=False,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model=dynamic_model,
-        text_extraction_model=dynamic_model,
-        revision_model=dynamic_model,
-        timeline_model=dynamic_model,
-    )
-    cached_catalog = ProviderModelCatalogCacheRecord(
-        provider_id="ollama",
-        configuration_fingerprint="ollama-runtime-test-fingerprint",
-        models=[{"id": dynamic_model, "display_name": dynamic_model}],
-        last_success_at=datetime.now(UTC),
-        last_attempt_at=datetime.now(UTC),
-        last_attempt_status="success",
-        last_error=None,
-    )
-    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
-    monkeypatch.setattr(
-        runtime_config_module.model_catalog,
-        "load_catalog_record",
-        lambda _cache, _provider: cached_catalog,
-    )
-
-    assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
-        "ollama",
-        dynamic_model,
-    )
-    assert LLMRuntimeConfig.resolve_provider_and_model("timeline") == (
-        "ollama",
-        dynamic_model,
-    )
-
-
-###############################################################################
-def test_cloud_runtime_preserves_valid_cloud_role_override() -> None:
-    with LLMRuntimeConfig.override_for_run(
-        {
-            "use_cloud_models": True,
-            "cloud_provider": "openai",
-            "cloud_model": "gpt-4.1-mini",
-            "clinical_model": "gpt-4.1",
-            "text_extraction_model": "gpt-4.1-mini",
-            "revision_model": "gpt-4.1",
-            "timeline_model": "gpt-4.1-mini",
-        }
-    ):
-        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
-            "openai",
-            "gpt-4.1",
-        )
-        assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
-            "openai",
-            "gpt-4.1-mini",
-        )
-
-
-###############################################################################
-def test_cloud_runtime_accepts_persisted_cloud_role_models(monkeypatch) -> None:
-    snapshot = ModelConfigSnapshot(
-        use_cloud_models=True,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gpt-4.1-mini",
-        text_extraction_model="gpt-4.1-mini",
-        revision_model="gpt-4.1",
-        timeline_model="gpt-4.1-mini",
-    )
-    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
-
-    assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
-        "openai",
-        "gpt-4.1-mini",
-    )
-    assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
-        "openai",
-        "gpt-4.1-mini",
-    )
-
-
-###############################################################################
-def _cloud_snapshot() -> ModelConfigSnapshot:
-    return ModelConfigSnapshot(
-        use_cloud_models=True,
-        cloud_provider="openai",
-        cloud_model="gpt-4.1-mini",
-        clinical_model="gpt-4.1-mini",
-        text_extraction_model="gpt-4.1-mini",
-        revision_model="gpt-4.1-mini",
-        timeline_model="gpt-4.1-mini",
-    )
+def _snapshot(rag_settings: dict[str, object] | None = None) -> ModelConfigSnapshot:
+    return ModelConfigSnapshot(rag_settings=rag_settings, updated_at=datetime.now(UTC))

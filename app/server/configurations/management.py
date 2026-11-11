@@ -40,6 +40,7 @@ from domain.model_configs import ReasoningLevel
 from domain.settings.configuration import (
     ClinicalLanguageDetectionSettings,
     DEFAULT_RAG_SETTINGS,
+    SHARED_RAG_SETTING_KEYS,
     DrugsMatcherSettings,
     FastAPISettings,
     IngestionSettings,
@@ -524,9 +525,23 @@ def build_settings_payload(
 def build_default_application_configuration_payload(
     env: EnvironmentSnapshot,
 ) -> dict[str, Any]:
-    """Return the complete database seed without reading legacy file state."""
-    llm_defaults = _default_llm_runtime_defaults(env)
+    """Return the shared configuration seed; agents own execution settings."""
     payload = build_settings_payload({}, env)
+    return {
+        "rag_settings": {key: payload["rag"][key] for key in SHARED_RAG_SETTING_KEYS},
+        "jobs": payload["jobs"],
+        "runtime": payload["runtime"],
+        "ingestion": payload["ingestion"],
+        "session_pipeline": payload["session_pipeline"],
+        "clinical_language_detection": payload["clinical_language_detection"],
+        "drugs_matcher": payload["drugs_matcher"],
+    }
+
+
+###############################################################################
+def build_default_agent_seed_payload(env: EnvironmentSnapshot) -> dict[str, Any]:
+    """Legacy-shaped execution defaults used only to seed agents on a fresh DB."""
+    llm_defaults = _default_llm_runtime_defaults(env)
     return {
         "clinical_model": llm_defaults.clinical_model,
         "text_extraction_model": llm_defaults.text_extraction_model,
@@ -545,11 +560,5 @@ def build_default_application_configuration_payload(
         "cloud_model": llm_defaults.cloud_model,
         "reasoning_level": llm_defaults.reasoning_level.value,
         "ollama_seed": 42,
-        "rag_settings": payload["rag"],
-        "jobs": payload["jobs"],
-        "runtime": payload["runtime"],
-        "ingestion": payload["ingestion"],
-        "session_pipeline": payload["session_pipeline"],
-        "clinical_language_detection": payload["clinical_language_detection"],
-        "drugs_matcher": payload["drugs_matcher"],
+        "rag_settings": dict(DEFAULT_RAG_SETTINGS),
     }

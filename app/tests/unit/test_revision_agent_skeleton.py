@@ -23,8 +23,7 @@ from domain.inspection import (
 from pydantic import ValidationError
 from repositories.schemas.base import Base
 from repositories.agent_seed import ensure_default_agents
-from repositories.serialization.model_configs import ModelConfigSerializer
-from repository_fixtures import build_repository_graph
+from repository_fixtures import build_repository_graph, legacy_model_payload
 from services.inspection.revision_agent import (
     REVISION_PROVIDER_MAX_RETRIES,
     RevisionAgentRunner,
@@ -44,16 +43,16 @@ from sqlalchemy import create_engine
 
 
 ###############################################################################
-def build_file_serializer(tmp_path: Path) -> Any:
+def build_file_serializer(tmp_path: Path, **legacy_values: Any) -> Any:
     engine = create_engine(
         f"sqlite+pysqlite:///{tmp_path / 'revision.db'}", future=True
     )
     Base.metadata.create_all(engine)
     graph = build_repository_graph(engine=engine)
-    # Revision jobs run the default Revision agent, seeded from the active
-    # model configuration exactly as database initialization does.
+    # Revision jobs run the default Revision agent, seeded from a model
+    # configuration exactly as database initialization does.
     ensure_default_agents(
-        graph.agent_repository, ModelConfigSerializer().load_snapshot()
+        graph.agent_repository, legacy_model_payload(**legacy_values)
     )
     return graph
 
@@ -1962,43 +1961,43 @@ def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:
 def test_revision_job_keeps_runtime_frozen_at_creation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from dataclasses import replace
-
-    from domain.model_configs import ModelConfigSnapshot
+    from domain.agents import agent_config_hash, parse_agent_config
     from services.llm.runtime_config import LLMRuntimeConfig
 
-    live = {
-        "snapshot": ModelConfigSnapshot(
-            use_cloud_models=True,
-            cloud_provider="openai",
-            cloud_model="gpt-4.1-mini",
-            clinical_model="gpt-4.1",
-            text_extraction_model="gpt-4.1-mini",
-            revision_model="gpt-4.1",
-            timeline_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        )
-    }
-    monkeypatch.setattr(
-        ModelConfigSerializer, "load_snapshot", lambda self: live["snapshot"]
-    )
     monkeypatch.setattr(
         "services.agents.AccessKeyService.list_access_keys",
         lambda self, provider: [type("Key", (), {"is_active": True})()],
     )
+    serializer = build_file_serializer(
+        tmp_path,
+        use_cloud_models=True,
+        cloud_provider="openai",
+        revision_model="gpt-4.1",
+    )
+    agents = serializer.agent_repository
     observed: list[tuple[str, str]] = []
 
     def recording_call(**kwargs: Any) -> dict[str, Any]:
-        # Simulate a settings edit while the job is running.
-        live["snapshot"] = replace(
-            live["snapshot"],
-            revision_model="gpt-4.1-mini",
-            updated_at=datetime.now(UTC),
-        )
+        # Simulate an agent edit while the job is running.
+        record = agents.get_default("revision")
+        if record["current_revision"] == 1:
+            config = dict(record["revision"]["configuration"])
+            config["models"] = {
+                "planning": {"provider": "openai", "model": "gpt-4.1-mini"}
+            }
+            parsed = parse_agent_config(config)
+            agents.create_revision(
+                agent_id=record["id"],
+                expected_revision=1,
+                name=record["name"],
+                description=record["description"],
+                configuration=parsed.model_dump(mode="json"),
+                configuration_hash=agent_config_hash(parsed),
+                schema_version=parsed.schema_version,
+            )
         observed.append(LLMRuntimeConfig.resolve_provider_and_model("revision"))
         return fake_issue_scan_call(**kwargs)
 
-    serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
     jobs = JobManager()
     service = build_service(serializer, jobs)

@@ -17,14 +17,21 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "no-store" in response.headers["cache-control"]
 
     payload = response.json()
-    assert "use_cloud_services" in payload
-    assert "llm_provider" in payload
-    assert "cloud_model" in payload
-    assert "clinical_model" in payload
-    assert "text_extraction_model" in payload
-    assert "revision_model" in payload
-    assert "timeline_model" in payload
-    assert payload["reasoning_level"] in {"off", "low", "medium", "high"}
+    # Execution settings (models, roles, reasoning, seed) live on agents.
+    for removed in (
+        "use_cloud_services",
+        "llm_provider",
+        "cloud_model",
+        "clinical_model",
+        "text_extraction_model",
+        "revision_model",
+        "timeline_model",
+        "reasoning_level",
+        "ollama_seed",
+    ):
+        assert removed not in payload
+    assert "chunk_size" in payload["rag_settings"]
+    assert "use_reranking" not in payload["rag_settings"]
     assert payload["local_catalog"]["status"] in {
         "available",
         "cached",
@@ -37,16 +44,16 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
 
 
 ###############################################################################
-def test_model_config_put_rejects_removed_reasoning_boolean(
+def test_model_config_put_rejects_agent_owned_fields(
     api_context: APIRequestContext,
 ):
     response = api_context.put(
         "/api/model-config",
-        data={"ollama_reasoning": True},
+        data={"use_cloud_services": True},
     )
     assert response.status == 422
     detail = response.json().get("detail") or []
-    assert any("ollama_reasoning" in str(item.get("loc", [])) for item in detail)
+    assert any("use_cloud_services" in str(item.get("loc", [])) for item in detail)
 
 
 ###############################################################################
@@ -70,11 +77,11 @@ def test_model_config_put_rejects_unknown_nested_rag_field(
 ):
     response = api_context.put(
         "/api/model-config",
-        data={"rag_settings": {"use_hybrid_search": True, "future_setting": True}},
+        data={"rag_settings": {"chunk_size": 512, "use_hybrid_search": True}},
     )
     assert response.status == 422
     detail = response.json().get("detail") or []
-    assert any("future_setting" in str(item.get("loc", [])) for item in detail)
+    assert any("use_hybrid_search" in str(item.get("loc", [])) for item in detail)
 
 
 ###############################################################################
@@ -83,16 +90,16 @@ def test_model_config_put_returns_persisted_values_without_catalog_refresh(
 ):
     original = api_context.get("/api/model-config")
     assert original.status == 200
-    original_reasoning = original.json().get("reasoning_level")
-    next_reasoning = "high" if original_reasoning != "high" else "low"
+    original_rag = original.json()["rag_settings"]
+    next_batch = 16 if original_rag["embedding_batch_size"] != 16 else 8
     try:
         response = api_context.put(
             "/api/model-config",
-            data={"reasoning_level": next_reasoning},
+            data={"rag_settings": {"embedding_batch_size": next_batch}},
         )
         assert response.status == 200
         payload = response.json()
-        assert payload["reasoning_level"] == next_reasoning
+        assert payload["rag_settings"]["embedding_batch_size"] == next_batch
         assert "updated_at" in payload
         assert "local_models" not in payload
         assert "cloud_providers" not in payload
@@ -101,7 +108,11 @@ def test_model_config_put_returns_persisted_values_without_catalog_refresh(
     finally:
         restored = api_context.put(
             "/api/model-config",
-            data={"reasoning_level": original_reasoning},
+            data={
+                "rag_settings": {
+                    "embedding_batch_size": original_rag["embedding_batch_size"]
+                }
+            },
         )
         assert restored.status == 200
 

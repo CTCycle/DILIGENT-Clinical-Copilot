@@ -226,3 +226,20 @@ DEFAULT_RAG_SETTINGS = {
     "vector_stream_batch_size": 1024,
     "embedding_offline_mode": False,
 }
+
+# Shared knowledge-index infrastructure; per-agent retrieval preferences
+# (hybrid search, reranking, candidate counts, weights) live on agents.
+SHARED_RAG_SETTING_KEYS: tuple[str, ...] = (
+    "allow_local_filesystem_access",
+    "vector_collection_name",
+    "chunk_size",
+    "chunk_overlap",
+    "embedding_batch_size",
+    "vector_index_metric",
+    "vector_index_type",
+    "vector_stream_batch_size",
+    "embedding_offline_mode",
+)
+DEFAULT_SHARED_RAG_SETTINGS = {
+    key: DEFAULT_RAG_SETTINGS[key] for key in SHARED_RAG_SETTING_KEYS
+}

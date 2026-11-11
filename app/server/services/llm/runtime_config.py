@@ -7,19 +7,15 @@ from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
-from dataclasses import replace
 import hashlib
 import json
 from typing import Literal, cast
 
-from common.catalogs.model_choices import (
-    get_clinical_model_choices,
-    get_text_extraction_model_choices,
-)
 from common.prompts.agent_guidance import append_agent_guidance
 from domain.agents import AgentExecutionContext, AgentModelRef, DiliAgentConfig
-from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
-from domain.llm.providers import CloudModelDescriptor, CloudProviderId
+from domain.model_configs import ReasoningLevel
+from domain.llm.providers import CloudModelDescriptor
+from domain.settings.configuration import SHARED_RAG_SETTING_KEYS
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
@@ -27,7 +23,6 @@ from repositories.serialization.provider_model_catalog_cache import (
     ProviderModelCatalogCacheSerializer,
 )
 from services.llm import model_catalog
-from services.llm.provider_registry import provider_registry
 from services.llm.generation_policy import (
     GenerationPolicy,
     GenerationPurpose,
@@ -75,123 +70,9 @@ class LLMRuntimeConfig:
             cls._stage.reset(token)
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalize_provider(value: str | None) -> CloudProviderId:
-        normalized = (value or "").strip().lower()
-        try:
-            return provider_registry.get(normalized).provider_id
-        except ValueError as exc:
-            raise ValueError(f"Unsupported cloud provider: {normalized}") from exc
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _normalize_cloud_model(provider: str, value: str | None) -> str:
-        normalized = (value or "").strip()
-        if not normalized:
-            raise ValueError("Cloud model is required")
-        if not provider or not provider_registry.is_valid_model(
-            cast(CloudProviderId, provider), normalized
-        ):
-            raise ValueError(
-                f"Model '{normalized}' is not valid for provider '{provider}'"
-            )
-        return normalized
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _local_model_choices() -> set[str]:
-        choices = set(get_clinical_model_choices()) | set(
-            get_text_extraction_model_choices()
-        )
-        try:
-            record = model_catalog.load_catalog_record(
-                ProviderModelCatalogCacheSerializer(), "ollama"
-            )
-        except Exception:
-            return choices
-        choices.update(
-            str(item.get("id"))
-            for item in (record.models if record else [])
-            if str(item.get("id") or "").strip()
-        )
-        return choices
-
-    # -------------------------------------------------------------------------
     @classmethod
-    def _load_snapshot(cls) -> ModelConfigSnapshot:
-        snapshot = ModelConfigSerializer().load_snapshot()
-        overrides = cls._active_overrides()
-        if not overrides:
-            return snapshot
-        role_models = cls._role_models(overrides)
-        if role_models:
-            return cls._snapshot_from_role_models(snapshot, overrides, role_models)
-
-        use_cloud_models = cls._coerce_bool(
-            overrides.get("use_cloud_models", snapshot.use_cloud_models)
-        )
-        provider = cls._normalize_provider(
-            cls._coerce_optional_text(overrides.get("cloud_provider"))
-            if "cloud_provider" in overrides
-            else snapshot.cloud_provider
-        )
-        requested_cloud_model = (
-            cls._coerce_optional_text(overrides.get("cloud_model"))
-            if "cloud_model" in overrides
-            else snapshot.cloud_model
-        )
-        cloud_model = (
-            cls._normalize_cloud_model(provider, requested_cloud_model)
-            if use_cloud_models
-            else requested_cloud_model
-        )
-        role_values: dict[str, str] = {}
-        for field_name in (
-            "clinical_model",
-            "text_extraction_model",
-            "revision_model",
-            "timeline_model",
-        ):
-            value = (
-                cls._coerce_optional_text(overrides[field_name])
-                if field_name in overrides
-                else getattr(snapshot, field_name)
-            )
-            if not value:
-                raise ValueError(
-                    f"Runtime configuration requires an explicit '{field_name}' assignment."
-                )
-            role_values[field_name] = value
-
-        if not use_cloud_models:
-            local_choices = cls._local_model_choices()
-            for field_name, model_name in role_values.items():
-                if model_name not in local_choices:
-                    raise ValueError(
-                        f"Model '{model_name}' is not supported for role '{field_name}'."
-                    )
-
-        return replace(
-            snapshot,
-            **role_values,
-            use_cloud_models=use_cloud_models,
-            cloud_provider=provider,
-            cloud_model=cloud_model,
-            reasoning_level=cls._resolve_reasoning_level(
-                overrides=overrides,
-                persisted_level=snapshot.reasoning_level,
-            ),
-            ollama_seed=(
-                cls._coerce_optional_int(overrides.get("ollama_seed"))
-                if "ollama_seed" in overrides
-                else snapshot.ollama_seed
-            ),
-            rag_settings=(
-                dict(cast(Mapping[str, object], overrides["rag_settings"]))
-                if isinstance(overrides.get("rag_settings"), Mapping)
-                else snapshot.rag_settings
-            ),
-        )
+    def _overrides(cls) -> dict[str, object]:
+        return dict(cls._runtime_override.get() or {})
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -207,60 +88,20 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _snapshot_from_role_models(
-        cls,
-        persisted: ModelConfigSnapshot,
-        overrides: Mapping[str, object],
-        role_models: dict[str, dict[str, object]],
-    ) -> ModelConfigSnapshot:
-        """Project agent per-role routing onto the legacy snapshot view.
+    def _role_model(cls, role: RolePurpose) -> str:
+        item = cls._role_models(cls._overrides()).get(role)
+        return (cls._coerce_optional_text(item.get("model")) or "") if item else ""
 
-        Agent configurations are validated by the agent service, so the
-        legacy single-provider validation does not apply. ``use_cloud_models``
-        here means "at least one role uses a cloud provider".
-        """
-
-        def model_for(role: str) -> str | None:
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _cloud_role(cls) -> dict[str, object] | None:
+        """First cloud-routed role of the active agent ("clinical" first)."""
+        role_models = cls._role_models(cls._overrides())
+        for role in ("clinical", *ROLE_PURPOSES):
             item = role_models.get(role)
-            return cls._coerce_optional_text(item.get("model")) if item else None
-
-        cloud_roles = [
-            item
-            for role in ("clinical", *ROLE_PURPOSES)
-            if (item := role_models.get(role))
-            and str(item.get("provider") or "ollama") != "ollama"
-        ]
-        cloud = cloud_roles[0] if cloud_roles else None
-        return replace(
-            persisted,
-            clinical_model=model_for("clinical"),
-            text_extraction_model=model_for("parser"),
-            revision_model=model_for("revision"),
-            timeline_model=model_for("timeline"),
-            use_cloud_models=cloud is not None,
-            cloud_provider=(
-                str(cloud.get("provider")) if cloud else persisted.cloud_provider
-            ),
-            cloud_model=(
-                cls._coerce_optional_text(cloud.get("model"))
-                if cloud
-                else persisted.cloud_model
-            ),
-            reasoning_level=cls._resolve_reasoning_level(
-                overrides=dict(overrides),
-                persisted_level=persisted.reasoning_level,
-            ),
-            ollama_seed=(
-                cls._coerce_optional_int(overrides.get("ollama_seed"))
-                if "ollama_seed" in overrides
-                else persisted.ollama_seed
-            ),
-            rag_settings=(
-                dict(cast(Mapping[str, object], overrides["rag_settings"]))
-                if isinstance(overrides.get("rag_settings"), Mapping)
-                else persisted.rag_settings
-            ),
-        )
+            if item and str(item.get("provider") or "ollama") != "ollama":
+                return item
+        return None
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -351,42 +192,12 @@ class LLMRuntimeConfig:
         return append_agent_guidance(prompt, cls.active_agent_instructions(), keys)
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def _active_overrides(cls) -> dict[str, object]:
-        """Return the active override, mapping run-snapshot key aliases.
-
-        Frozen run snapshots record ``use_cloud_services``/``llm_provider``
-        (the public runtime-settings vocabulary); the snapshot fields are
-        ``use_cloud_models``/``cloud_provider``.
-        """
-        overrides = dict(cls._runtime_override.get() or {})
-        for alias, field_name in (
-            ("use_cloud_services", "use_cloud_models"),
-            ("llm_provider", "cloud_provider"),
-        ):
-            if alias in overrides and field_name not in overrides:
-                overrides[field_name] = overrides[alias]
-        return overrides
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def _coerce_optional_text(value: object) -> str | None:
         if value is None:
             return None
         normalized = str(value).strip()
         return normalized or None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _coerce_optional_float(value: object) -> float | None:
-        if value is None:
-            return None
-        if isinstance(value, (int, float)):
-            return float(value)
-        try:
-            return float(str(value).strip())
-        except ValueError:
-            return None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -397,31 +208,6 @@ class LLMRuntimeConfig:
             return max(0, int(str(value).strip()))
         except TypeError, ValueError:
             return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _coerce_bool(value: object) -> bool:
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in {"1", "true", "yes", "on"}:
-                return True
-            if normalized in {"0", "false", "no", "off"}:
-                return False
-        return bool(value)
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _resolve_reasoning_level(
-        cls,
-        *,
-        overrides: dict[str, object],
-        persisted_level: ReasoningLevel,
-    ) -> ReasoningLevel:
-        if "reasoning_level" in overrides:
-            return cls._coerce_reasoning_level(overrides["reasoning_level"])
-        return persisted_level
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -453,52 +239,62 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_text_extraction_model(cls) -> str:
-        return (cls._load_snapshot().text_extraction_model or "").strip()
+        return cls._role_model("parser")
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_clinical_model(cls) -> str:
-        return (cls._load_snapshot().clinical_model or "").strip()
+        return cls._role_model("clinical")
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_revision_model(cls) -> str:
-        return (cls._load_snapshot().revision_model or "").strip()
+        return cls._role_model("revision")
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_timeline_model(cls) -> str:
-        return (cls._load_snapshot().timeline_model or "").strip()
+        return cls._role_model("timeline")
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_llm_provider(cls) -> str:
-        return (cls._load_snapshot().cloud_provider or "").strip()
+        item = cls._cloud_role()
+        return str(item.get("provider") or "").strip() if item else ""
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_cloud_model(cls) -> str:
-        return (cls._load_snapshot().cloud_model or "").strip()
+        item = cls._cloud_role()
+        return (cls._coerce_optional_text(item.get("model")) or "") if item else ""
 
     # -------------------------------------------------------------------------
     @classmethod
     def is_cloud_enabled(cls) -> bool:
-        return bool(cls._load_snapshot().use_cloud_models)
+        """True when at least one role of the active agent uses a cloud provider."""
+        return cls._cloud_role() is not None
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_reasoning_level(cls) -> ReasoningLevel:
-        return cls._load_snapshot().reasoning_level
+        return cls._coerce_reasoning_level(cls._overrides().get("reasoning_level"))
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_ollama_seed(cls) -> int | None:
-        return cls._load_snapshot().ollama_seed
+        return cls._coerce_optional_int(cls._overrides().get("ollama_seed"))
 
     # -------------------------------------------------------------------------
     @classmethod
     def get_rag_settings(cls) -> dict[str, object]:
-        return dict(cls._load_snapshot().rag_settings or {})
+        """Persisted shared RAG settings overlaid by the active agent's settings."""
+        value = cls._overrides().get("rag_settings")
+        active = dict(cast(Mapping[str, object], value)) if isinstance(value, Mapping) else {}
+        if set(SHARED_RAG_SETTING_KEYS) <= set(active):
+            # Frozen at launch together with the shared settings.
+            return active
+        persisted = ModelConfigSerializer().load_snapshot().rag_settings or {}
+        return {**persisted, **active}
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -589,7 +385,7 @@ class LLMRuntimeConfig:
             "reasoning_level": cls.get_reasoning_level().value,
             "ollama_seed": cls.get_ollama_seed(),
             "evidence_sources": list(evidence_sources),
-            "rag_settings": cls._load_snapshot().rag_settings or {},
+            "rag_settings": cls.get_rag_settings(),
             "parser_provider": parser_provider,
             "parser_model": parser_model,
             "clinical_provider": clinical_provider,
@@ -757,7 +553,7 @@ class LLMRuntimeConfig:
                 overrides, sort_keys=True, default=str, separators=(",", ":")
             )
             return int(hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:15], 16)
-        updated_at = cls._load_snapshot().updated_at
+        updated_at = ModelConfigSerializer().load_snapshot().updated_at
         if not isinstance(updated_at, datetime):
             return 0
         return int(updated_at.timestamp() * 1_000_000)
@@ -770,34 +566,17 @@ class LLMRuntimeConfig:
         *,
         stage: str | None = None,
     ) -> tuple[str, str]:
-        role_models = cls._role_models(cls._runtime_override.get() or {})
-        if role_models:
-            stage = stage or cls._stage.get()
-            item = (role_models.get(f"{purpose}.{stage}") if stage else None) or (
-                role_models.get(purpose)
-            )
-            model = cls._coerce_optional_text(item.get("model")) if item else None
-            if not item or not model:
-                raise ValueError(f"Agent configuration has no model for '{purpose}'.")
-            return str(item.get("provider") or "ollama"), model
-        snapshot = cls._load_snapshot()
-        role_models = {
-            "parser": snapshot.text_extraction_model,
-            "clinical": snapshot.clinical_model,
-            "revision": snapshot.revision_model,
-            "timeline": snapshot.timeline_model,
-        }
-        local_model = (role_models[purpose] or "").strip()
-        if not local_model:
-            raise ValueError(
-                f"Persisted model configuration has no assignment for '{purpose}'."
-            )
-        if snapshot.use_cloud_models:
-            provider = (snapshot.cloud_provider or "").strip()
-            if not provider:
-                raise ValueError("Persisted model configuration has no cloud provider.")
-            return provider, local_model
-        return "ollama", local_model
+        role_models = cls._role_models(cls._overrides())
+        if not role_models:
+            raise ValueError(f"No agent runtime is active for '{purpose}'.")
+        stage = stage or cls._stage.get()
+        item = (role_models.get(f"{purpose}.{stage}") if stage else None) or (
+            role_models.get(purpose)
+        )
+        model = cls._coerce_optional_text(item.get("model")) if item else None
+        if not item or not model:
+            raise ValueError(f"Agent configuration has no model for '{purpose}'.")
+        return str(item.get("provider") or "ollama"), model
 
     # -------------------------------------------------------------------------
     @classmethod
