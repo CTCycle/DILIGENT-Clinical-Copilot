@@ -46,8 +46,8 @@ Last updated: 2026-11-01
 - The right column holds patient details, **Save as draft** with its saved /
   unsaved state, **Run DILI analysis**, and Clear all. It carries no job
   progress: execution lives on the report page.
-- **Run DILI analysis** opens the pre-run setup dialog (Preflight, Evidence
-  Sources, Models, Review) built on the shared modal shell, with a step list
+- **Run DILI analysis** opens the pre-run setup dialog (Preflight, Agent,
+  Review) built on the shared modal shell, with a step list
   using `aria-current="step"`; later steps are disabled while preflight
   blocks. **Start analysis** persists the input, launches the session,
   navigates to `/report/:sessionId`, and only then resets the form, so the

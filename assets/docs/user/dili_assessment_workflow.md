@@ -42,8 +42,8 @@ Patient has liver issue. Check DILI.
 When available, include the laboratory-specific upper limits of normal, pretreatment or baseline liver chemistry, exact drug start and stop dates, follow-up liver chemistry after discontinuation, and explicit alternative-cause workup. These details materially affect case qualification, R-ratio interpretation, dechallenge, and causality review.
 
 ## Run The Assessment
-Select **Run DILI analysis**. A short setup dialog opens with four steps:
-**Preflight → Evidence Sources → Models → Review**. Nothing is sent to a model
+Select **Run DILI analysis**. A short setup dialog opens with three steps:
+**Preflight → Agent → Review**. Nothing is sent to a model
 until you select **Start analysis**.
 
 1. **Preflight** runs the existing safety checks for the exact session
@@ -56,19 +56,18 @@ until you select **Start analysis**.
    are expanded. **Edit in clinical input** closes the dialog and selects that
    passage in the original text. This is a preliminary section assignment, not
    the final clinical extraction.
-2. **Evidence Sources** chooses what the assessment may consult for this
-   session only: **LiverTox** (recommended, selected by default), **FDA
-   DILIrank 2.0**, and **Indexed documents** (your RAG library). Selecting none
-   runs on LLM knowledge only. Unticking LiverTox shows an accuracy warning:
-   its drug-level hepatotoxicity evidence is then removed from the causality
-   assessment as well as from the narrative. The selection is enforced by the
-   backend, and the report states which sources were used.
-3. **Models** shows the provider and the text-extraction and clinical models.
-   Overrides apply to this session only; **Restore defaults** returns to the
-   saved configuration. Settings are never changed from here.
-4. **Review** summarizes patient, visit date, input readiness, sources,
-   effective models, and the preflight result. If you changed a source or
-   model, the checks re-run before **Start analysis** is enabled. Start can
+2. **Agent** chooses the DILI agent for this session (the default is
+   preselected). It shows the agent's revision, clinical, extraction and
+   timeline models, instructions and evidence sources. The agent's retrieval
+   policy decides the sources: **LiverTox**, **FDA DILIrank 2.0**, and
+   **Indexed documents**; none means LLM knowledge only. If the agent excludes
+   LiverTox, an accuracy warning is shown: its drug-level hepatotoxicity
+   evidence is then removed from the causality assessment as well as from the
+   narrative. Changing the agent re-runs the checks. Edit agents in **Agent
+   Studio**; nothing is changed from here.
+3. **Review** summarizes patient, visit date, input readiness, the agent and
+   revision, sources, and the preflight result. If you changed the agent,
+   the checks re-run before **Start analysis** is enabled. Start can
    only be triggered once per run.
 
 **Cancel** closes the dialog without starting and keeps your input; your

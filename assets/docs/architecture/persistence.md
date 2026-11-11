@@ -369,7 +369,16 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 - When `TEST_DATABASE_URL` is configured, the same contract runs against PostgreSQL.
 - CI runs both backends in the `persistence-contract` job.
 
+## Agent Persistence
+
+- `agent_definitions` holds one row per agent (kind `dili` or `revision`, name, description, default and archived flags); `agent_revisions` holds its immutable, numbered configuration snapshots with a configuration hash. Saving an agent appends a revision (optimistic concurrency via `expected_revision`); nothing is edited in place.
+- `clinical_sessions.agent_revision_id` and the revision-run records link each execution to the exact revision that produced it. The run snapshot also freezes the resolved agent configuration, so replays and queued work never pick up later edits.
+- Exactly one non-archived default agent exists per kind. The default cannot be archived; archived agents are hidden from selection but keep their revisions for past sessions.
+- Alembic `202611110001` creates the tables. At database initialization the legacy singleton model settings are migrated into a default DILI agent and a default Revision agent (models, reasoning, seed, retrieval policy), then the legacy rows are pruned (`repositories/agent_seed.py`). Sessions and timelines created before agents resolve to the default DILI agent.
+
 ## Model Configuration Persistence
+
+- `application_configuration` keeps only the shared RAG index settings (chunking, embeddings, vector index); model roles, reasoning, seed and per-agent retrieval choices (hybrid search, reranking, candidate counts) belong to agents.
 
 - A newly initialized database receives canonical model defaults.
 - Existing provider and model selections are read as stored; unsupported values fail validation and are not silently translated.

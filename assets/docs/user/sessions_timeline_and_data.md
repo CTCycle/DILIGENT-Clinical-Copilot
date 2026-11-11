@@ -76,8 +76,7 @@ marked as out of date with a **Regenerate** action.
 7. Compare exposure dates against lab abnormalities and symptoms.
 8. Use the timeline to refine DILI Agent input if needed.
 
-In the **Timeline** tab, the generation action uses the model assigned to the
-Timeline role in **Settings → Models**. Use **Manage model roles** when that
+In the **Timeline** tab, the generation action uses the Timeline model of the DILI agent that ran the session (the default DILI agent for sessions that predate agents). Use **Manage agents** when that
 assignment needs to change. Saved timelines appear as compact rows that record
 the run's provider, model, date range, event count, and evidence-quality
 warnings. Use **Open** to reopen a specific saved timeline or **Delete** to

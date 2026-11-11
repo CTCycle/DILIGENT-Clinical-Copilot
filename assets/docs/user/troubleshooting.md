@@ -58,7 +58,7 @@ and service status before retrying.
 
 ## Catalog Refresh Or Timeline Fallback
 
-- Opening **Settings → Models** reuses the last saved provider catalog. Use
+- Opening **Agent Studio → Providers & Resources** reuses the last saved provider catalog. Use
   **Refresh** when you intentionally want to contact the provider for a new
   listing.
 - If refresh fails, review the reported failure class and confirm the active

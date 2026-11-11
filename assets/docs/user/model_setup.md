@@ -1,4 +1,10 @@
 # Model Setup
+
+## Agents And Shared Resources
+Models are chosen per **agent**, not globally. Open **Agent Studio** (**My Agents**) to see the default DILI agent and default Revision agent, create a new agent from the current default, duplicate, set a default, or archive one. The **Agent Editor** tab edits an agent's name, instructions, models per role, reasoning, seed and retrieval policy (DILI) or planning model and limits (Revision). **Save agent** creates a new numbered revision; earlier sessions keep the revision they ran with. The default agent cannot be archived until another is made default.
+
+**Providers & Resources** is shared by every agent: access keys, provider model catalogs (install or refresh), and the knowledge-index (RAG) settings, which autosave. Per-agent model pickers use these catalogs.
+
 Last updated: 2026-10-19
 
 Sampling settings are selected automatically according to the provider, model
@@ -41,14 +47,14 @@ Expected behavior:
 - Cloud and Ollama catalogs are saved in the application database. Opening the page reuses the saved catalog and does not contact a provider again. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid catalog remains visible; an empty Ollama installation is saved as an empty catalog. Catalog state is scoped by provider endpoint and active credential fingerprint, so changing credentials or endpoints starts a new cache scope without exposing secrets.
 
 Recommended workflow:
-1. Open **Settings → Models**.
+1. Open **Agent Studio → Providers & Resources**.
 2. Choose the provider.
 3. Open the access-key dialog or management control.
 4. Paste the provider key.
 5. Save it. New keys remain inactive, so a rejected key cannot replace the current active key.
 6. Explicitly activate the key that should be used.
 7. Confirm the active-key indicator is shown.
-8. Return to **Settings → Models** and use **Refresh** for the selected provider when its catalog needs updating.
+8. Return to **Agent Studio → Providers & Resources** and use **Refresh** for the selected provider when its catalog needs updating.
 
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.
 

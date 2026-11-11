@@ -366,61 +366,86 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "draft",
-                    "queued",
-                    "running",
-                    "completed",
-                    "cancelled",
-                    "failed"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "enum": [
+                  "draft",
+                  "queued",
+                  "running",
+                  "completed",
+                  "cancelled",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              "default": [],
               "title": "Status"
             }
           },
           {
-            "name": "date_mode",
+            "name": "date_field",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "before",
-                    "after",
-                    "exact"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
+              "enum": [
+                "created",
+                "updated",
+                "visit"
               ],
-              "title": "Date Mode"
+              "type": "string",
+              "default": "created",
+              "title": "Date Field"
             }
           },
           {
-            "name": "date",
+            "name": "date_from",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Date"
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created Before"
             }
           },
           {
@@ -4653,6 +4678,434 @@
         }
       }
     },
+    "/api/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agents",
+        "operationId": "list_agents_api_agents_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "dili",
+                    "revision"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Archived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Create Agent",
+        "operationId": "create_agent_api_agents_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agent",
+        "operationId": "get_agent_api_agents__agent_id__get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Update Agent",
+        "operationId": "update_agent_api_agents__agent_id__put",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/duplicate": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Duplicate Agent",
+        "operationId": "duplicate_agent_api_agents__agent_id__duplicate_post",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AgentDuplicateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/validate": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Validate Agent",
+        "operationId": "validate_agent_api_agents__agent_id__validate_post",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentValidationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/default": {
+      "put": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Set Default",
+        "operationId": "set_default_api_agents__agent_id__default_put",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/archive": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Archive Agent",
+        "operationId": "archive_agent_api_agents__agent_id__archive_post",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/revisions": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Revisions",
+        "operationId": "list_revisions_api_agents__agent_id__revisions_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRevisionListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/status": {
       "get": {
         "tags": [
@@ -5130,6 +5583,441 @@
         "type": "object",
         "title": "AdvancedRuntimeSettingsPatch"
       },
+      "AgentCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "configuration": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DiliAgentConfig"
+              },
+              {
+                "$ref": "#/components/schemas/RevisionAgentConfig"
+              }
+            ],
+            "title": "Configuration",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "dili": "#/components/schemas/DiliAgentConfig",
+                "revision": "#/components/schemas/RevisionAgentConfig"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "configuration"
+        ],
+        "title": "AgentCreateRequest"
+      },
+      "AgentDuplicateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentDuplicateRequest"
+      },
+      "AgentListResponse": {
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentResponse"
+            },
+            "type": "array",
+            "title": "Agents"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agents"
+        ],
+        "title": "AgentListResponse"
+      },
+      "AgentModelRef": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "ollama",
+              "openai",
+              "gemini",
+              "deepseek",
+              "anthropic",
+              "opencode_zen",
+              "opencode_go"
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "reasoning_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "AgentModelRef",
+        "description": "A provider/model pair for one execution role."
+      },
+      "AgentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "dili",
+              "revision"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "current_revision": {
+            "type": "integer",
+            "title": "Current Revision"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "is_archived": {
+            "type": "boolean",
+            "title": "Is Archived"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/AgentRevisionResponse"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "description",
+          "current_revision",
+          "is_default",
+          "is_archived",
+          "revision"
+        ],
+        "title": "AgentResponse"
+      },
+      "AgentRetrievalPolicy": {
+        "properties": {
+          "evidence_sources": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "livertox",
+                "dilirank",
+                "documents"
+              ]
+            },
+            "type": "array",
+            "title": "Evidence Sources"
+          },
+          "use_hybrid_search": {
+            "type": "boolean",
+            "title": "Use Hybrid Search",
+            "default": true
+          },
+          "use_reranking": {
+            "type": "boolean",
+            "title": "Use Reranking",
+            "default": true
+          },
+          "reranker_model": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Reranker Model",
+            "default": "lightweight-balanced-v1"
+          },
+          "retrieval_candidate_count": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Retrieval Candidate Count",
+            "default": 40
+          },
+          "retrieval_selected_count": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Retrieval Selected Count",
+            "default": 6
+          },
+          "hybrid_vector_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Hybrid Vector Weight",
+            "default": 0.65
+          },
+          "hybrid_text_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Hybrid Text Weight",
+            "default": 0.35
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentRetrievalPolicy",
+        "description": "Per-agent retrieval preferences.\n\nPhysical index settings (chunking, embedding batch size, vector index\ntype/metric, collection name) are shared infrastructure, not agent\nconfiguration: changing an agent must never rebuild a shared index."
+      },
+      "AgentRevisionListResponse": {
+        "properties": {
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRevisionResponse"
+            },
+            "type": "array",
+            "title": "Revisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revisions"
+        ],
+        "title": "AgentRevisionListResponse"
+      },
+      "AgentRevisionResponse": {
+        "properties": {
+          "revision_id": {
+            "type": "integer",
+            "title": "Revision Id"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "configuration_hash": {
+            "type": "string",
+            "title": "Configuration Hash"
+          },
+          "configuration": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DiliAgentConfig"
+              },
+              {
+                "$ref": "#/components/schemas/RevisionAgentConfig"
+              }
+            ],
+            "title": "Configuration",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "dili": "#/components/schemas/DiliAgentConfig",
+                "revision": "#/components/schemas/RevisionAgentConfig"
+              }
+            }
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision_id",
+          "revision_number",
+          "schema_version",
+          "configuration_hash",
+          "configuration"
+        ],
+        "title": "AgentRevisionResponse"
+      },
+      "AgentUpdateRequest": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "configuration": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DiliAgentConfig"
+              },
+              {
+                "$ref": "#/components/schemas/RevisionAgentConfig"
+              }
+            ],
+            "title": "Configuration",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "dili": "#/components/schemas/DiliAgentConfig",
+                "revision": "#/components/schemas/RevisionAgentConfig"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "name",
+          "configuration"
+        ],
+        "title": "AgentUpdateRequest"
+      },
+      "AgentValidationIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "AgentValidationIssue"
+      },
+      "AgentValidationResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/AgentValidationIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "valid"
+        ],
+        "title": "AgentValidationResponse"
+      },
       "ClinicalInputPreflightIssue": {
         "properties": {
           "severity": {
@@ -5560,15 +6448,30 @@
             "type": "array",
             "title": "Evidence Sources"
           },
-          "model_overrides": {
+          "agent_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SessionModelOverrides"
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Agent Id"
+          },
+          "agent_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Revision"
           },
           "drugs": {
             "anyOf": [
@@ -5605,13 +6508,6 @@
               }
             ],
             "title": "Patient Image Base64"
-          },
-          "selected_model_providers": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Selected Model Providers"
           }
         },
         "additionalProperties": false,
@@ -6681,6 +7577,115 @@
           "status"
         ],
         "title": "DesktopShutdownResponse"
+      },
+      "DiliAgentConfig": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "dili",
+            "title": "Kind",
+            "default": "dili"
+          },
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "instructions": {
+            "$ref": "#/components/schemas/DiliAgentInstructions"
+          },
+          "models": {
+            "$ref": "#/components/schemas/DiliAgentModels"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel",
+            "default": "off"
+          },
+          "ollama_seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Seed",
+            "default": 42
+          },
+          "retrieval": {
+            "$ref": "#/components/schemas/AgentRetrievalPolicy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "DiliAgentConfig"
+      },
+      "DiliAgentInstructions": {
+        "properties": {
+          "assessment_focus": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Assessment Focus",
+            "default": ""
+          },
+          "report_style": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Report Style",
+            "default": ""
+          },
+          "extraction_guidance": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Extraction Guidance",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DiliAgentInstructions"
+      },
+      "DiliAgentModels": {
+        "properties": {
+          "extraction": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "clinical": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "timeline": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "extraction_overrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AgentModelRef"
+            },
+            "propertyNames": {
+              "enum": [
+                "therapy_drugs",
+                "anamnesis_drugs",
+                "diseases",
+                "laboratory"
+              ]
+            },
+            "type": "object",
+            "title": "Extraction Overrides"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "extraction",
+          "clinical",
+          "timeline"
+        ],
+        "title": "DiliAgentModels"
       },
       "DiliRankCatalogItem": {
         "properties": {
@@ -8458,6 +9463,11 @@
             "minLength": 1,
             "title": "Report Text"
           },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
           "edited_fields": {
             "items": {
               "type": "string"
@@ -8505,7 +9515,8 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "report_text"
+          "report_text",
+          "expected_version"
         ],
         "title": "ManualReportEditRequest"
       },
@@ -9105,65 +10116,8 @@
       },
       "ModelConfigPersistResponse": {
         "properties": {
-          "use_cloud_services": {
-            "type": "boolean",
-            "title": "Use Cloud Services"
-          },
-          "llm_provider": {
-            "type": "string",
-            "enum": [
-              "openai",
-              "gemini",
-              "deepseek",
-              "anthropic",
-              "opencode_zen",
-              "opencode_go"
-            ],
-            "title": "Llm Provider"
-          },
-          "cloud_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cloud Model"
-          },
-          "text_extraction_model": {
-            "type": "string",
-            "title": "Text Extraction Model"
-          },
-          "clinical_model": {
-            "type": "string",
-            "title": "Clinical Model"
-          },
-          "revision_model": {
-            "type": "string",
-            "title": "Revision Model"
-          },
-          "timeline_model": {
-            "type": "string",
-            "title": "Timeline Model"
-          },
-          "reasoning_level": {
-            "$ref": "#/components/schemas/ReasoningLevel"
-          },
-          "ollama_seed": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ollama Seed"
-          },
           "rag_settings": {
-            "$ref": "#/components/schemas/RagSettingsResponse"
+            "$ref": "#/components/schemas/SharedRagSettingsResponse"
           },
           "updated_at": {
             "anyOf": [
@@ -9180,15 +10134,6 @@
         },
         "type": "object",
         "required": [
-          "use_cloud_services",
-          "llm_provider",
-          "cloud_model",
-          "text_extraction_model",
-          "clinical_model",
-          "revision_model",
-          "timeline_model",
-          "reasoning_level",
-          "ollama_seed",
           "rag_settings"
         ],
         "title": "ModelConfigPersistResponse",
@@ -9213,65 +10158,8 @@
           "local_catalog": {
             "$ref": "#/components/schemas/LocalCatalogMetadata"
           },
-          "use_cloud_services": {
-            "type": "boolean",
-            "title": "Use Cloud Services"
-          },
-          "llm_provider": {
-            "type": "string",
-            "enum": [
-              "openai",
-              "gemini",
-              "deepseek",
-              "anthropic",
-              "opencode_zen",
-              "opencode_go"
-            ],
-            "title": "Llm Provider"
-          },
-          "cloud_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cloud Model"
-          },
-          "text_extraction_model": {
-            "type": "string",
-            "title": "Text Extraction Model"
-          },
-          "clinical_model": {
-            "type": "string",
-            "title": "Clinical Model"
-          },
-          "revision_model": {
-            "type": "string",
-            "title": "Revision Model"
-          },
-          "timeline_model": {
-            "type": "string",
-            "title": "Timeline Model"
-          },
-          "reasoning_level": {
-            "$ref": "#/components/schemas/ReasoningLevel"
-          },
-          "ollama_seed": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ollama Seed"
-          },
           "rag_settings": {
-            "$ref": "#/components/schemas/RagSettingsResponse"
+            "$ref": "#/components/schemas/SharedRagSettingsResponse"
           },
           "embedding_runtime": {
             "$ref": "#/components/schemas/EmbeddingRuntimeStatus"
@@ -9297,15 +10185,6 @@
           "local_models",
           "cloud_providers",
           "local_catalog",
-          "use_cloud_services",
-          "llm_provider",
-          "cloud_model",
-          "text_extraction_model",
-          "clinical_model",
-          "revision_model",
-          "timeline_model",
-          "reasoning_level",
-          "ollama_seed",
           "rag_settings",
           "embedding_runtime",
           "embedding_index"
@@ -9314,117 +10193,10 @@
       },
       "ModelConfigUpdateRequest": {
         "properties": {
-          "use_cloud_services": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Use Cloud Services"
-          },
-          "llm_provider": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "openai",
-                  "gemini",
-                  "deepseek",
-                  "anthropic",
-                  "opencode_zen",
-                  "opencode_go"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider"
-          },
-          "cloud_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cloud Model"
-          },
-          "text_extraction_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text Extraction Model"
-          },
-          "clinical_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clinical Model"
-          },
-          "revision_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Revision Model"
-          },
-          "timeline_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timeline Model"
-          },
-          "reasoning_level": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReasoningLevel"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "ollama_seed": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ollama Seed"
-          },
           "rag_settings": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RagSettingsUpdateRequest"
+                "$ref": "#/components/schemas/SharedRagSettingsUpdateRequest"
               },
               {
                 "type": "null"
@@ -10177,302 +10949,6 @@
         ],
         "title": "RagReadiness"
       },
-      "RagSettingsResponse": {
-        "properties": {
-          "allow_local_filesystem_access": {
-            "type": "boolean",
-            "title": "Allow Local Filesystem Access"
-          },
-          "vector_collection_name": {
-            "type": "string",
-            "title": "Vector Collection Name"
-          },
-          "chunk_size": {
-            "type": "integer",
-            "title": "Chunk Size"
-          },
-          "chunk_overlap": {
-            "type": "integer",
-            "title": "Chunk Overlap"
-          },
-          "embedding_batch_size": {
-            "type": "integer",
-            "title": "Embedding Batch Size"
-          },
-          "use_hybrid_search": {
-            "type": "boolean",
-            "title": "Use Hybrid Search"
-          },
-          "use_reranking": {
-            "type": "boolean",
-            "title": "Use Reranking"
-          },
-          "retrieval_candidate_count": {
-            "type": "integer",
-            "title": "Retrieval Candidate Count"
-          },
-          "retrieval_selected_count": {
-            "type": "integer",
-            "title": "Retrieval Selected Count"
-          },
-          "reranker_model": {
-            "type": "string",
-            "title": "Reranker Model"
-          },
-          "hybrid_vector_weight": {
-            "type": "number",
-            "title": "Hybrid Vector Weight"
-          },
-          "hybrid_text_weight": {
-            "type": "number",
-            "title": "Hybrid Text Weight"
-          },
-          "vector_index_metric": {
-            "type": "string",
-            "title": "Vector Index Metric"
-          },
-          "vector_index_type": {
-            "type": "string",
-            "title": "Vector Index Type"
-          },
-          "vector_stream_batch_size": {
-            "type": "integer",
-            "title": "Vector Stream Batch Size"
-          },
-          "embedding_offline_mode": {
-            "type": "boolean",
-            "title": "Embedding Offline Mode"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "allow_local_filesystem_access",
-          "vector_collection_name",
-          "chunk_size",
-          "chunk_overlap",
-          "embedding_batch_size",
-          "use_hybrid_search",
-          "use_reranking",
-          "retrieval_candidate_count",
-          "retrieval_selected_count",
-          "reranker_model",
-          "hybrid_vector_weight",
-          "hybrid_text_weight",
-          "vector_index_metric",
-          "vector_index_type",
-          "vector_stream_batch_size",
-          "embedding_offline_mode"
-        ],
-        "title": "RagSettingsResponse"
-      },
-      "RagSettingsUpdateRequest": {
-        "properties": {
-          "allow_local_filesystem_access": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Allow Local Filesystem Access"
-          },
-          "vector_collection_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vector Collection Name"
-          },
-          "chunk_size": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 100000.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chunk Size"
-          },
-          "chunk_overlap": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 100000.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chunk Overlap"
-          },
-          "embedding_batch_size": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 4096.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Embedding Batch Size"
-          },
-          "use_hybrid_search": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Use Hybrid Search"
-          },
-          "use_reranking": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Use Reranking"
-          },
-          "retrieval_candidate_count": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 10000.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Retrieval Candidate Count"
-          },
-          "retrieval_selected_count": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 10000.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Retrieval Selected Count"
-          },
-          "reranker_model": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reranker Model"
-          },
-          "hybrid_vector_weight": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 1.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hybrid Vector Weight"
-          },
-          "hybrid_text_weight": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 1.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hybrid Text Weight"
-          },
-          "vector_index_metric": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 32,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vector Index Metric"
-          },
-          "vector_index_type": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vector Index Type"
-          },
-          "vector_stream_batch_size": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 100000.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vector Stream Batch Size"
-          },
-          "embedding_offline_mode": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Embedding Offline Mode"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "RagSettingsUpdateRequest"
-      },
       "ReasoningLevel": {
         "type": "string",
         "enum": [
@@ -10567,6 +11043,101 @@
           "term"
         ],
         "title": "ReferenceCatalogRuntimeObservationUpsertRequest"
+      },
+      "RevisionAgentConfig": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "revision",
+            "title": "Kind",
+            "default": "revision"
+          },
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "instructions": {
+            "$ref": "#/components/schemas/RevisionAgentInstructions"
+          },
+          "models": {
+            "$ref": "#/components/schemas/RevisionAgentModels"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel",
+            "default": "off"
+          },
+          "ollama_seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Seed",
+            "default": 42
+          },
+          "limits": {
+            "$ref": "#/components/schemas/RevisionExecutionLimits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "RevisionAgentConfig"
+      },
+      "RevisionAgentInstructions": {
+        "properties": {
+          "review_objectives": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Review Objectives",
+            "default": ""
+          },
+          "editing_style": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Editing Style",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RevisionAgentInstructions"
+      },
+      "RevisionAgentModels": {
+        "properties": {
+          "planning": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "stage_overrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AgentModelRef"
+            },
+            "propertyNames": {
+              "enum": [
+                "planning",
+                "tool_selection",
+                "editing",
+                "qa"
+              ]
+            },
+            "type": "object",
+            "title": "Stage Overrides"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "planning"
+        ],
+        "title": "RevisionAgentModels"
       },
       "RevisionArtifactListResponse": {
         "properties": {
@@ -11148,6 +11719,42 @@
           "created_at"
         ],
         "title": "RevisionEntityResponse"
+      },
+      "RevisionExecutionLimits": {
+        "properties": {
+          "max_tasks": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Max Tasks",
+            "default": 8
+          },
+          "max_tool_iterations": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Max Tool Iterations",
+            "default": 24
+          },
+          "allowed_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 12
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Tools"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RevisionExecutionLimits"
       },
       "RevisionPipelineRunResponse": {
         "properties": {
@@ -11961,6 +12568,18 @@
             ],
             "title": "Patient Name"
           },
+          "visit_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Date"
+          },
           "session_timestamp": {
             "anyOf": [
               {
@@ -12271,38 +12890,6 @@
         ],
         "title": "SessionDetailResponse"
       },
-      "SessionModelOverrides": {
-        "properties": {
-          "text_extraction_model": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text Extraction Model"
-          },
-          "clinical_model": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clinical Model"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "SessionModelOverrides",
-        "description": "Model choices that apply only to one clinical session."
-      },
       "SessionRevisionRequest": {
         "properties": {
           "selected_text": {
@@ -12333,6 +12920,31 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "agent_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Revision"
           },
           "max_tasks": {
             "type": "integer",
@@ -12634,6 +13246,18 @@
             ],
             "title": "Report Text"
           },
+          "expected_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version"
+          },
           "edited_fields": {
             "items": {
               "type": "string"
@@ -12860,6 +13484,181 @@
           "updated_at"
         ],
         "title": "SessionVersionSummary"
+      },
+      "SharedRagSettingsResponse": {
+        "properties": {
+          "allow_local_filesystem_access": {
+            "type": "boolean",
+            "title": "Allow Local Filesystem Access"
+          },
+          "vector_collection_name": {
+            "type": "string",
+            "title": "Vector Collection Name"
+          },
+          "chunk_size": {
+            "type": "integer",
+            "title": "Chunk Size"
+          },
+          "chunk_overlap": {
+            "type": "integer",
+            "title": "Chunk Overlap"
+          },
+          "embedding_batch_size": {
+            "type": "integer",
+            "title": "Embedding Batch Size"
+          },
+          "vector_index_metric": {
+            "type": "string",
+            "title": "Vector Index Metric"
+          },
+          "vector_index_type": {
+            "type": "string",
+            "title": "Vector Index Type"
+          },
+          "vector_stream_batch_size": {
+            "type": "integer",
+            "title": "Vector Stream Batch Size"
+          },
+          "embedding_offline_mode": {
+            "type": "boolean",
+            "title": "Embedding Offline Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "allow_local_filesystem_access",
+          "vector_collection_name",
+          "chunk_size",
+          "chunk_overlap",
+          "embedding_batch_size",
+          "vector_index_metric",
+          "vector_index_type",
+          "vector_stream_batch_size",
+          "embedding_offline_mode"
+        ],
+        "title": "SharedRagSettingsResponse"
+      },
+      "SharedRagSettingsUpdateRequest": {
+        "properties": {
+          "allow_local_filesystem_access": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Local Filesystem Access"
+          },
+          "vector_collection_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Collection Name"
+          },
+          "chunk_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Size"
+          },
+          "chunk_overlap": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Overlap"
+          },
+          "embedding_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Batch Size"
+          },
+          "vector_index_metric": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Index Metric"
+          },
+          "vector_index_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Index Type"
+          },
+          "vector_stream_batch_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Stream Batch Size"
+          },
+          "embedding_offline_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Offline Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SharedRagSettingsUpdateRequest",
+        "description": "Shared knowledge-index settings; retrieval preferences live on agents."
       },
       "SystemStatusResponse": {
         "properties": {
@@ -13522,11 +14321,6 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Name"
-          },
-          "allow_external": {
-            "type": "boolean",
-            "title": "Allow External",
-            "default": true
           }
         },
         "additionalProperties": false,

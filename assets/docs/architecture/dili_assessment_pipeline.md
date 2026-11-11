@@ -54,7 +54,7 @@ sequenceDiagram
 ```
 
 ## Structured Extraction Contract
-Drug, disease, and laboratory extraction use provider-agnostic structured LLM calls for both cloud and local providers. The active runtime provider and model are resolved from persisted model configuration.
+Drug, disease, and laboratory extraction use provider-agnostic structured LLM calls for both cloud and local providers. The provider and model for each stage are resolved from the immutable DILI agent revision selected for the session (`agent_id`/`agent_revision`, default DILI agent when omitted). The revision is resolved once at launch, its configuration is frozen into the run snapshot, and per-stage routing (`extraction`, `clinical`, `timeline`, plus optional extraction-stage overrides) is applied through `LLMRuntimeConfig.override_for_run`. The agent's retrieval policy decides the evidence sources, hybrid search and reranking; agent instructions are added to the prompts but cannot override safety rules or report structure. Preflight reports the agent name and revision; a launch fails with a conflict if the agent changed after it was checked.
 
 Structured LLM output is validated against Pydantic schemas and semantic guardrails. Invalid or contaminated output is retried with the rejected output and validation feedback. If bounded LLM attempts fail, the pipeline falls back to direct rule-based parsers and records fallback warnings.
 

@@ -1,11 +1,14 @@
 # API Surface
 Last updated: 2026-11-02
 
-`/api/model-config` manages provider, model, reasoning, and RAG selection; it
-does not expose sampling temperature. `GET` returns the rich catalog and
-runtime-status view. `PUT` is a persistence-only response containing the
-saved configuration and timestamp; catalog and embedding refreshes remain
-explicit GET/status operations.
+`/api/agents` manages reusable versioned DILI and Revision agents (see
+Agent Routes below). `/api/model-config` manages only the shared provider
+catalogs and the shared RAG index settings; models, reasoning and per-agent
+retrieval live on agents, and it does not expose sampling temperature. `GET`
+returns the rich catalog and runtime-status view. `PUT` (`rag_settings` only;
+agent-owned fields are rejected with 422) is a persistence-only response
+containing the saved configuration and timestamp; catalog and embedding
+refreshes remain explicit GET/status operations.
 
 The persisted role assignments are independent: `clinical_model`,
 `text_extraction_model`, `revision_model`, and `timeline_model`. Revision and
@@ -41,21 +44,20 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 `POST /api/clinical/validate-input` and `POST .../launch` accept the
 same session configuration:
 
-- `evidence_sources`: any of `livertox`, `dilirank`, `documents` (the indexed
-  document library). The default is `["livertox"]`; an explicit `[]` means LLM
-  knowledge only. Unknown values are rejected.
-- `model_overrides`: optional `text_extraction_model` and `clinical_model`
-  names that apply to that session only. They are validated against the
-  active provider's cached catalog and are never written to the persisted
-  model configuration.
+- `agent_id` / `agent_revision`: optional DILI agent and the revision that
+  preflight checked. Omitted means the default DILI agent. The agent's
+  retrieval policy is authoritative for `evidence_sources` (any of `livertox`,
+  `dilirank`, `documents`; an empty list means LLM knowledge only); the
+  request no longer carries `model_overrides` or `selected_model_providers`.
+  Launch returns a conflict when the agent changed after preflight.
 
 Preflight validates the exact configuration that will run. The response adds
 an `evidence_sources` list (`source`, `label`, `selected`, `available`,
 `message`) and keeps `rag_readiness` for the document library. Selecting
 `documents` while the embedding cache is unavailable is blocking (code from
 `rag_readiness`, field `evidence_sources`); an unimported DILIrank is the
-non-blocking `dilirank_unavailable`; an invalid override is the blocking
-`session_model_unavailable` (field `model_overrides`).
+non-blocking `dilirank_unavailable`. `runtime_settings` echoes the resolved
+`agent_id`, `agent_name` and `agent_revision`.
 
 Every lifecycle route returns `ClinicalSessionState`: `session_id`, `status`
 (`draft|queued|running|completed|cancelled|failed`), patient name and visit
@@ -85,6 +87,23 @@ poll only `/status`; there are no clinical job ids on the frontend.
 - `POST /api/models/pull/jobs`
 - `GET /api/models/jobs/{job_id}`
 - `DELETE /api/models/jobs/{job_id}`
+
+## Agent Routes
+- `GET /api/agents` (query `kind`, `include_archived`)
+- `POST /api/agents` (name, description, full configuration)
+- `GET /api/agents/{agent_id}`
+- `PUT /api/agents/{agent_id}` (requires `expected_revision`; appends a new revision, `409` on a stale revision)
+- `POST /api/agents/{agent_id}/duplicate`
+- `POST /api/agents/{agent_id}/validate`
+- `PUT /api/agents/{agent_id}/default`
+- `POST /api/agents/{agent_id}/archive` (the default agent cannot be archived)
+- `GET /api/agents/{agent_id}/revisions`
+
+A DILI agent carries instructions, per-stage model references, reasoning level,
+Ollama seed and a retrieval policy; a Revision agent carries instructions,
+planning/stage model references and execution limits. Session revision jobs
+accept optional `agent_id`/`agent_revision` for a Revision agent (default when
+omitted).
 
 ## Model Configuration Routes
 - `GET /api/model-config`
@@ -203,8 +222,9 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - Terminology routes: `summary` reports per-source versions, last runs, counts, license and attribution, open conflicts and fuzzy-index statistics; `resolve` is the try-it resolver (takes only `name`; the RxNav fallback follows Settings → Drug Matching); `aliases/confirm` and `aliases/reject` store reviewer decisions as `reviewer` aliases (`404` for an unknown concept). `POST /api/inspection/rxnav/jobs` accepts only `force_full`; `POST /api/inspection/terminology/jobs` accepts `force_full`, `drugcentral_enabled`, `chembl_enabled` and `swissmedic_enabled`. See [drug_terminology.md](drug_terminology.md).
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
-  persisted `timeline_model` role at start; provider/model controls are managed
-  from Settings → Models. Timeline previews include source-evidence,
+  timeline model of the DILI agent revision that produced the session (the
+  default DILI agent for sessions that predate agents) at start; models are
+  managed in Agent Studio. Timeline previews include source-evidence,
   missing-evidence, uncertain, and undated counts, plus `is_stale` when the
   session input changed after generation. Drafts can generate timelines from
   the deterministic section split of their input; this never changes the
