@@ -1,0 +1,74 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<section class="agent-section" aria-labelledby="rev-instructions-heading">
+  <h3 id="rev-instructions-heading">Instructions</h3>
+  <p class="agent-section-note">
+    Guidance is added to the agent's prompts. It cannot override clinical safety rules or the
+    constraints on what a revision may change.
+  </p>
+  @for (field of instructionFields; track field.key) {
+    <label class="field">
+      {{ field.label }}
+      <textarea rows="4" [value]="config().instructions[field.key]"
+        (input)="setInstruction(field.key, $any($event.target).value)"></textarea>
+      <span class="field-counter" [class.is-over]="config().instructions[field.key].length > limit">
+        {{ config().instructions[field.key].length }} / {{ limit }}
+      </span>
+    </label>
+  }
+</section>
+
+<section class="agent-section" aria-labelledby="rev-models-heading">
+  <h3 id="rev-models-heading">Models</h3>
+  <app-agent-model-field label="Planning model" [ref]="config().models.planning"
+    [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setPlanning($event)" />
+  <h4>Stage overrides</h4>
+  <p class="agent-section-note">Optional. Stages without an override use the planning model.</p>
+  @for (item of overrideStages; track item.stage) {
+    <app-agent-model-field [label]="item.label + ' override'" [optional]="true"
+      [ref]="config().models.stage_overrides[item.stage]" [fallback]="config().models.planning"
+      [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setOverride(item.stage, $event)" />
+  }
+  <div class="field-grid">
+    <label class="field">Agent reasoning level
+      <select (change)="setReasoning($any($event.target).value)">
+        @for (level of reasoningLevels; track level) {
+          <option [value]="level" [selected]="config().reasoning_level === level">{{ level }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">Ollama seed
+      <input type="number" min="0" step="1" [value]="config().ollama_seed ?? ''"
+        (input)="setSeed($any($event.target).value)" />
+    </label>
+  </div>
+</section>
+
+<section class="agent-section" aria-labelledby="rev-limits-heading">
+  <h3 id="rev-limits-heading">Limits</h3>
+  <div class="field-grid">
+    <label class="field">Max tasks (1-8)
+      <input type="number" min="1" max="8" step="1" [value]="config().limits.max_tasks"
+        (input)="setLimit('max_tasks', $any($event.target).value)" />
+    </label>
+    <label class="field">Max tool iterations (1-24)
+      <input type="number" min="1" max="24" step="1" [value]="config().limits.max_tool_iterations"
+        (input)="setLimit('max_tool_iterations', $any($event.target).value)" />
+    </label>
+  </div>
+  <fieldset class="check-row">
+    <legend class="field-hint">Allowed tools</legend>
+    <label class="check">
+      <input type="checkbox" [checked]="allowsAllTools()" (change)="setAllTools($any($event.target).checked)" />
+      All tools
+    </label>
+    @if (!allowsAllTools()) {
+      @for (tool of toolNames; track tool) {
+        <label class="check">
+          <input type="checkbox" [checked]="toolAllowed(tool)" (change)="toggleTool(tool, $any($event.target).checked)" />
+          {{ tool }}
+        </label>
+      }
+    }
+  </fieldset>
+</section>

@@ -1,0 +1,83 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host { display: block; min-width: 0; }
+
+.agent-section {
+  display: grid;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+.agent-section > h3 {
+  margin: 0;
+  font-size: var(--font-md);
+}
+
+.agent-section-note,
+.field-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+  line-height: 1.45;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-md);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-xs);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 0;
+}
+
+.field input[type='text'],
+.field input[type='number'],
+.field select,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--control-height-md);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: 400;
+}
+
+.field textarea { resize: vertical; min-height: 84px; }
+
+.field-counter { font-weight: 400; color: var(--color-text-muted); font-size: var(--font-xs); }
+.field-counter.is-over { color: var(--color-status-error-text); font-weight: 600; }
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-base);
+  color: var(--color-text-primary);
+}
+
+.check-row { display: flex; flex-wrap: wrap; gap: var(--space-lg); }
+
+.model-field { display: grid; gap: var(--space-sm); }
+
+:is(input, select, textarea):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+fieldset.check-row { border: 0; margin: 0; padding: 0; }

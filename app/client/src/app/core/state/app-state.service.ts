@@ -6,13 +6,14 @@ import { Injectable, effect, signal } from '@angular/core';
 import { DEFAULT_FORM_STATE } from '../constants';
 import { ClinicalFormState } from '../models/types';
 
-export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'settings';
+export type PageId = 'dili-agent' | 'clinical-sessions' | 'agent-studio' | 'data-inspection' | 'settings';
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
 const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
   'clinical-sessions': '/clinical-sessions',
+  'agent-studio': '/agents',
   'data-inspection': '/data',
   settings: '/settings/general',
 };
@@ -29,6 +30,7 @@ export function normalizePathname(pathname: string): string {
 export function resolvePageIdFromPath(pathname: string): PageId {
   const normalized = normalizePathname(pathname.split(/[?#]/, 1)[0]);
   if (normalized === PAGE_PATHS['clinical-sessions'] || normalized.startsWith('/sessions/')) return 'clinical-sessions';
+  if (normalized === PAGE_PATHS['agent-studio']) return 'agent-studio';
   if (normalized === PAGE_PATHS['data-inspection']) return 'data-inspection';
   if (normalized === '/settings' || normalized.startsWith('/settings/')) return 'settings';
   return DEFAULT_PAGE;

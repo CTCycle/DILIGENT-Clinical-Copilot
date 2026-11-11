@@ -1,0 +1,72 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+.editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md) 0;
+  background: var(--app-background);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.editor-title { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; min-width: 0; }
+.editor-title h2 { margin: 0; font-size: var(--font-lg); overflow-wrap: anywhere; }
+.editor-revision { color: var(--color-text-muted); font-size: var(--font-sm); }
+.editor-actions { display: flex; gap: var(--space-sm); }
+
+.chip {
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-alt);
+}
+.chip.is-default { color: var(--color-brand); background: var(--color-brand-bg); border-color: var(--color-brand); }
+.chip.is-dirty {
+  color: var(--color-status-warning-text);
+  background: var(--color-status-warning-bg);
+  border-color: var(--color-status-warning-border);
+}
+
+.btn {
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn.is-primary { background: var(--color-brand); border-color: var(--color-brand); color: var(--color-text-on-brand); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.notice {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: start;
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-status-info-border);
+  border-radius: var(--radius-md);
+  background: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+  font-size: var(--font-sm);
+}
+.notice.is-error { background: var(--color-status-error-bg); border-color: var(--color-status-error-border); color: var(--color-status-error-text); }
+.notice.is-success { background: var(--color-status-success-bg); border-color: var(--color-status-success-border); color: var(--color-status-success-text); }
+.notice ul { margin: 0; padding-left: var(--space-lg); }
+
+.history { display: grid; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
+.history li { display: flex; flex-wrap: wrap; gap: var(--space-md); align-items: center; font-size: var(--font-sm); }

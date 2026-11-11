@@ -1,0 +1,95 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<div class="editor">
+  <header class="editor-bar">
+    <div class="editor-title">
+      <h2>{{ agent().name }}</h2>
+      <span class="chip">{{ agent().kind === 'dili' ? 'DILI' : 'Revision' }}</span>
+      @if (agent().is_default) { <span class="chip is-default">Default</span> }
+      @if (agent().is_archived) { <span class="chip">Archived</span> }
+      <span class="editor-revision">Active revision {{ agent().current_revision }}</span>
+      @if (dirty()) { <span class="chip is-dirty" role="status">Unsaved changes</span> }
+    </div>
+    <div class="editor-actions">
+      <button type="button" class="btn" (click)="validate()" [disabled]="validating()">
+        {{ validating() ? 'Validating...' : 'Validate' }}
+      </button>
+      <button type="button" class="btn is-primary" (click)="save()"
+        [disabled]="saving() || !dirty() || errors().length > 0 || agent().is_archived">
+        {{ saving() ? 'Saving...' : 'Save agent' }}
+      </button>
+    </div>
+  </header>
+
+  @if (conflict()) {
+    <div class="notice is-error" role="alert">
+      This agent was changed elsewhere. Reload to get the latest revision; your unsaved edits will be discarded.
+      <button type="button" class="btn" (click)="reload()">Reload</button>
+    </div>
+  }
+  @if (saveError()) { <div class="notice is-error" role="alert">{{ saveError() }}</div> }
+  @if (savedNotice() && !dirty()) { <div class="notice is-success" role="status">{{ savedNotice() }}</div> }
+  @if (errors().length > 0 && dirty()) {
+    <div class="notice is-error" role="alert">
+      <strong>Fix before saving</strong>
+      <ul>@for (error of errors(); track error) { <li>{{ error }}</li> }</ul>
+    </div>
+  }
+
+  @if (validationError()) { <div class="notice is-error" role="alert">{{ validationError() }}</div> }
+  @if (validation(); as result) {
+    <div class="notice" [class.is-success]="result.valid" [class.is-error]="!result.valid" role="status">
+      <strong>{{ result.valid ? 'Valid: no issues found.' : 'Validation found issues' }}</strong>
+      <small>Checks the saved revision{{ dirty() ? ', not your unsaved edits' : '' }}.</small>
+      @if (result.issues.length) {
+        <ul>
+          @for (issue of result.issues; track $index) {
+            <li>{{ issue.message }} @if (issue.field) { <code>{{ issue.field }}</code> }</li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <section class="agent-section" aria-labelledby="identity-heading">
+    <h3 id="identity-heading">Identity</h3>
+    <label class="field">Name
+      <input type="text" [value]="name()" [attr.maxlength]="nameLimit"
+        (input)="setName($any($event.target).value)" />
+    </label>
+    <label class="field">Description
+      <textarea rows="2" [value]="description()"
+        (input)="setDescription($any($event.target).value)"></textarea>
+      <span class="field-counter" [class.is-over]="description().length > descriptionLimit">
+        {{ description().length }} / {{ descriptionLimit }}
+      </span>
+    </label>
+  </section>
+
+  @if (dili(); as config) {
+    <app-dili-agent-sections [config]="config" [providerOptions]="providerOptions()" [catalog]="catalog()"
+      (configChange)="setConfig($event)" />
+  }
+  @if (revision(); as config) {
+    <app-revision-agent-sections [config]="config" [providerOptions]="providerOptions()" [catalog]="catalog()"
+      (configChange)="setConfig($event)" />
+  }
+
+  <section class="agent-section" aria-labelledby="history-heading">
+    <h3 id="history-heading">Revision history</h3>
+    @if (revisions().length === 0) {
+      <p class="agent-section-note">No revisions loaded.</p>
+    } @else {
+      <ol class="history">
+        @for (item of revisions(); track item.revision_id) {
+          <li>
+            <strong>Revision {{ item.revision_number }}</strong>
+            @if (item.revision_number === agent().current_revision) { <span class="chip is-default">Active</span> }
+            <span>{{ formatDate(item.created_at) }}</span>
+            <code title="Configuration hash">{{ item.configuration_hash.slice(0, 8) }}</code>
+          </li>
+        }
+      </ol>
+    }
+  </section>
+</div>

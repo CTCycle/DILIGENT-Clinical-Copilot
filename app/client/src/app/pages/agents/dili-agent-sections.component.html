@@ -1,0 +1,100 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<section class="agent-section" aria-labelledby="dili-instructions-heading">
+  <h3 id="dili-instructions-heading">Instructions</h3>
+  <p class="agent-section-note">
+    Guidance is added to the agent's prompts. It cannot override clinical safety rules, required report
+    structure or evidence handling.
+  </p>
+  @for (field of instructionFields; track field.key) {
+    <label class="field">
+      {{ field.label }}
+      <textarea rows="4" [value]="config().instructions[field.key]"
+        (input)="setInstruction(field.key, $any($event.target).value)"></textarea>
+      <span class="field-counter" [class.is-over]="config().instructions[field.key].length > limit">
+        {{ config().instructions[field.key].length }} / {{ limit }}
+      </span>
+    </label>
+  }
+</section>
+
+<section class="agent-section" aria-labelledby="dili-models-heading">
+  <h3 id="dili-models-heading">Models</h3>
+  <app-agent-model-field label="Extraction model" [ref]="config().models.extraction"
+    [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setModel('extraction', $event)" />
+  <app-agent-model-field label="Clinical model" [ref]="config().models.clinical"
+    [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setModel('clinical', $event)" />
+  <app-agent-model-field label="Timeline model" [ref]="config().models.timeline"
+    [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setModel('timeline', $event)" />
+
+  <h4>Extraction stage overrides</h4>
+  <p class="agent-section-note">Optional. Stages without an override use the extraction model.</p>
+  @for (item of extractionStages; track item.stage) {
+    <app-agent-model-field [label]="item.label + ' override'" [optional]="true"
+      [ref]="config().models.extraction_overrides[item.stage]" [fallback]="config().models.extraction"
+      [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setOverride(item.stage, $event)" />
+  }
+
+  <div class="field-grid">
+    <label class="field">Agent reasoning level
+      <select (change)="setReasoning($any($event.target).value)">
+        @for (level of reasoningLevels; track level) {
+          <option [value]="level" [selected]="config().reasoning_level === level">{{ level }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">Ollama seed
+      <input type="number" min="0" step="1" [value]="config().ollama_seed ?? ''"
+        (input)="setSeed($any($event.target).value)" />
+    </label>
+  </div>
+</section>
+
+<section class="agent-section" aria-labelledby="dili-rag-heading">
+  <h3 id="dili-rag-heading">Evidence and retrieval</h3>
+  <p class="agent-section-note">Index, chunking and embedding settings are shared; see Providers &amp; Resources.</p>
+  <fieldset class="check-row">
+    <legend class="field-hint">Evidence sources</legend>
+    @for (source of evidenceSources; track source.id) {
+      <label class="check">
+        <input type="checkbox" [checked]="config().retrieval.evidence_sources.includes(source.id)"
+          (change)="toggleSource(source.id, $any($event.target).checked)" />
+        {{ source.label }}
+      </label>
+    }
+  </fieldset>
+  <div class="check-row">
+    <label class="check">
+      <input type="checkbox" [checked]="config().retrieval.use_hybrid_search"
+        (change)="setFlag('use_hybrid_search', $any($event.target).checked)" />
+      Hybrid search
+    </label>
+    <label class="check">
+      <input type="checkbox" [checked]="config().retrieval.use_reranking"
+        (change)="setFlag('use_reranking', $any($event.target).checked)" />
+      Reranking
+    </label>
+  </div>
+  <div class="field-grid">
+    <label class="field">Reranker model
+      <input type="text" [value]="config().retrieval.reranker_model"
+        (input)="setReranker($any($event.target).value)" />
+    </label>
+    <label class="field">Candidate count
+      <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_candidate_count"
+        (input)="setNumber('retrieval_candidate_count', $any($event.target).value)" />
+    </label>
+    <label class="field">Selected count
+      <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_selected_count"
+        (input)="setNumber('retrieval_selected_count', $any($event.target).value)" />
+    </label>
+    <label class="field">Vector weight
+      <input type="number" min="0" max="1" step="0.05" [value]="config().retrieval.hybrid_vector_weight"
+        (input)="setNumber('hybrid_vector_weight', $any($event.target).value)" />
+    </label>
+    <label class="field">Text weight
+      <input type="number" min="0" max="1" step="0.05" [value]="config().retrieval.hybrid_text_weight"
+        (input)="setNumber('hybrid_text_weight', $any($event.target).value)" />
+    </label>
+  </div>
+</section>

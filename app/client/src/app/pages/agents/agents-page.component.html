@@ -1,0 +1,135 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<div class="studio">
+  <header class="studio-header">
+    <h1>Agent Studio</h1>
+    <p>Create and tune the DILI and Revision agents used by clinical sessions.</p>
+  </header>
+
+  <div class="studio-tabs" role="tablist" aria-label="Agent Studio sections">
+    @for (item of tabs; track item.id; let i = $index) {
+      <button type="button" role="tab" class="studio-tab" [id]="'agent-studio-tab-' + item.id"
+        [class.active]="tab() === item.id" [attr.aria-selected]="tab() === item.id"
+        [attr.aria-controls]="'agent-studio-panel-' + item.id" [attr.tabindex]="tab() === item.id ? 0 : -1"
+        (click)="selectTab(item.id)" (keydown)="onTabKeydown($event, i)">
+        {{ item.label }}
+      </button>
+    }
+  </div>
+
+  @if (message()) {
+    <div class="studio-message" [class.is-error]="messageIsError()" [attr.role]="messageIsError() ? 'alert' : 'status'">
+      {{ message() }}
+    </div>
+  }
+
+  <!-- My Agents -->
+  <section role="tabpanel" id="agent-studio-panel-agents" aria-labelledby="agent-studio-tab-agents"
+    [hidden]="tab() !== 'agents'">
+    <div class="toolbar">
+      <label class="search">
+        <span class="visually-hidden">Search agents by name</span>
+        <input type="search" placeholder="Search agents" [value]="search()"
+          (input)="search.set($any($event.target).value)" />
+      </label>
+      <label class="check">
+        <input type="checkbox" [checked]="showArchived()" [disabled]="busy()"
+          (change)="setShowArchived($any($event.target).checked)" />
+        Show archived
+      </label>
+      <span class="toolbar-spacer"></span>
+      <button type="button" class="btn" (click)="startCreate('dili')" [disabled]="busy() || !seedFor().dili"
+        [title]="seedFor().dili ? '' : 'No DILI agent to seed from'">New DILI agent</button>
+      <button type="button" class="btn" (click)="startCreate('revision')" [disabled]="busy() || !seedFor().revision"
+        [title]="seedFor().revision ? '' : 'No Revision agent to seed from'">New Revision agent</button>
+    </div>
+
+    @if (creating(); as draft) {
+      <form class="inline-form" (submit)="$event.preventDefault(); create()">
+        <label class="field">
+          Name for the new {{ kindLabel(draft.kind) }} agent
+          <input type="text" maxlength="120" [value]="draft.name"
+            (input)="creating.set({ kind: draft.kind, name: $any($event.target).value })" />
+        </label>
+        <small>Starts as a copy of "{{ seedFor()[draft.kind]?.name }}" (current default configuration).</small>
+        <div class="row-actions">
+          <button type="submit" class="btn is-primary" [disabled]="busy() || !draft.name.trim()">Create agent</button>
+          <button type="button" class="btn" (click)="creating.set(null)">Cancel</button>
+        </div>
+      </form>
+    }
+
+    @if (pendingSelectId()) {
+      <div class="studio-message is-warning" role="alertdialog" aria-label="Discard unsaved changes">
+        The open agent has unsaved changes. Opening another agent will discard them.
+        <span class="row-actions">
+          <button type="button" class="btn" (click)="discardAndOpen()">Discard and open</button>
+          <button type="button" class="btn" (click)="pendingSelectId.set(null)">Keep editing</button>
+        </span>
+      </div>
+    }
+
+    @if (state.status() === 'loading' && !state.agents().length) {
+      <p class="empty" role="status">Loading agents...</p>
+    } @else if (state.status() === 'error' && !state.agents().length) {
+      <p class="empty is-error" role="alert">{{ state.error() }}</p>
+    } @else if (!visibleAgents().length) {
+      <p class="empty">No agents match.</p>
+    } @else {
+      <ul class="agent-list">
+        @for (agent of visibleAgents(); track agent.id) {
+          <li class="agent-row" [class.is-selected]="agent.id === selectedId()">
+            <div class="agent-main">
+              <button type="button" class="agent-name" (click)="open(agent)">{{ agent.name }}</button>
+              <span class="chip">{{ kindLabel(agent.kind) }}</span>
+              @if (agent.is_default) { <span class="chip is-default">Default</span> }
+              @if (agent.is_archived) { <span class="chip">Archived</span> }
+              <span class="meta">Revision {{ agent.current_revision }} · {{ modelLabel(agent) }}</span>
+              @if (agent.description) { <span class="meta description">{{ agent.description }}</span> }
+            </div>
+            <div class="row-actions">
+              <button type="button" class="btn" (click)="duplicate(agent)" [disabled]="busy()"
+                [attr.aria-label]="'Duplicate ' + agent.name">Duplicate</button>
+              <button type="button" class="btn" (click)="setDefault(agent)"
+                [disabled]="busy() || agent.is_default || agent.is_archived"
+                [attr.aria-label]="'Set ' + agent.name + ' as default'">Set default</button>
+              <button type="button" class="btn" (click)="confirmArchiveId.set(agent.id)"
+                [disabled]="busy() || agent.is_default || agent.is_archived"
+                [title]="agent.is_default ? 'Make another agent the default before archiving this one' : ''"
+                [attr.aria-label]="'Archive ' + agent.name">Archive</button>
+            </div>
+            @if (confirmArchiveId() === agent.id) {
+              <div class="confirm" role="alertdialog" [attr.aria-label]="'Confirm archive ' + agent.name">
+                Archive "{{ agent.name }}"? It will no longer be offered for new sessions; past sessions keep their recorded revision.
+                <span class="row-actions">
+                  <button type="button" class="btn is-danger" (click)="archive(agent)">Archive agent</button>
+                  <button type="button" class="btn" (click)="confirmArchiveId.set(null)">Cancel</button>
+                </span>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <!-- Agent Editor -->
+  <section role="tabpanel" id="agent-studio-panel-editor" aria-labelledby="agent-studio-tab-editor"
+    [hidden]="tab() !== 'editor'">
+    @if (selected(); as agent) {
+      <app-agent-editor [agent]="agent" (dirtyChange)="editorDirty.set($event)" />
+    } @else {
+      <p class="empty">Select an agent in My Agents to edit it.</p>
+    }
+  </section>
+
+  <!-- Providers & Resources -->
+  <section role="tabpanel" id="agent-studio-panel-providers" aria-labelledby="agent-studio-tab-providers"
+    [hidden]="tab() !== 'providers'">
+    <p class="shared-note">
+      Providers, API keys and the knowledge index are shared by all agents. Changes here apply to every
+      agent, not just the one you are editing. Per-agent model choices live in the Agent Editor.
+    </p>
+    @if (providersVisited()) { <app-model-config-page /> }
+  </section>
+</div>
