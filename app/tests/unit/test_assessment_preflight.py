@@ -37,7 +37,6 @@ def _valid_input() -> str:
 ###############################################################################
 def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch, tmp_path) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_clinical_input",
@@ -62,7 +61,6 @@ def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch, tmp_
 ###############################################################################
 def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch, tmp_path) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_clinical_input",
@@ -93,7 +91,6 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch, 
 ###############################################################################
 def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch, tmp_path) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_clinical_input",
@@ -122,7 +119,6 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch, tmp
 ###############################################################################
 def test_malformed_sections_block_job_start(monkeypatch, tmp_path) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_clinical_input",
@@ -158,7 +154,6 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
     tmp_path,
 ) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_clinical_input",
@@ -217,7 +212,6 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     tmp_path,
 ) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
         "list_livertox_catalog",
@@ -268,7 +262,6 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
     tmp_path,
 ) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
         "list_livertox_catalog",
@@ -319,7 +312,6 @@ def test_job_start_uses_opencode_credential_scope_for_opencode_go(
         model="minimax-m2.5-free",
         requested_scopes=requested_scopes,
     )
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_assessment_prerequisites_without_llm",
@@ -344,7 +336,6 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
     tmp_path,
 ) -> None:
     service = _build_service(tmp_path)
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
         "list_livertox_catalog",
@@ -400,7 +391,6 @@ def test_job_start_rechecks_rag_readiness_before_submission(
     tmp_path,
 ) -> None:
     service = _build_service(tmp_path, evidence_sources=["documents"])
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
         "validate_assessment_prerequisites_without_llm",

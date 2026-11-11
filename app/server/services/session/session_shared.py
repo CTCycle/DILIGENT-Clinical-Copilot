@@ -461,7 +461,11 @@ async def execute_clinical_job(
     normalized_document: NormalizedDocument | None = None,
     report_mode: str = "faithful_only",
 ) -> dict[str, Any]:
-    service.apply_persisted_runtime_configuration()
+    # The agent revision was validated at launch and its frozen runtime is
+    # active here; nothing re-reads the global model configuration.
+    logger.info(
+        "Running clinical job %s with agent %s", job_id, LLMRuntimeConfig.active_agent()
+    )
     service.reset_runtime_diagnostics()
     ensure_not_cancelled = partial(
         ensure_clinical_job_not_cancelled,

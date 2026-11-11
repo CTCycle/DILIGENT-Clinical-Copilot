@@ -118,9 +118,6 @@ class FakeAnalyses:
 def analyses(monkeypatch) -> FakeAnalyses:
     fake = FakeAnalyses()
     monkeypatch.setattr(
-        ClinicalSessionService, "apply_persisted_runtime_configuration", lambda self: None
-    )
-    monkeypatch.setattr(
         ClinicalSessionService, "ensure_submission_requirements", lambda self, p: None
     )
     monkeypatch.setattr(

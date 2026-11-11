@@ -30,8 +30,6 @@ from services.llm.model_config import ModelConfigService
 from services.llm.ollama_client import OllamaError
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.retrieval.settings import build_effective_rag_settings
-from services.runtime.jobs import get_job_manager
-from services.session.factory import build_clinical_session_service
 from sqlalchemy import create_engine, text
 
 
@@ -617,17 +615,6 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     assert snapshot.cloud_model == "gpt-4.1-mini"
     assert snapshot.clinical_model == "gpt-oss:20b"
     assert snapshot.text_extraction_model == "qwen3:1.7b"
-
-
-###############################################################################
-def test_clinical_service_reads_runtime_from_persisted_config() -> None:
-    clinical_service = build_clinical_session_service(get_job_manager())
-    clinical_service.apply_persisted_runtime_configuration()
-    parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
-        "parser"
-    )
-    assert parser_provider
-    assert parser_model
 
 
 ###############################################################################

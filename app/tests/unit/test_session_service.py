@@ -68,7 +68,6 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
     monkeypatch,
 ) -> None:
     service = _build_service()
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
         "list_livertox_catalog",

@@ -405,6 +405,3 @@ class ClinicalSessionConsultationMixin:
             local_cap_s=float(runtime.local_llm_timeout_cap),
         )
 
-    # -------------------------------------------------------------------------
-    def apply_persisted_runtime_configuration(self: Any) -> None:
-        self.model_config_service.load_current_snapshot()

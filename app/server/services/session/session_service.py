@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from common.exceptions import (
     ServiceValidationError,
 )
-from common.utils.logger import logger
 from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
@@ -235,27 +234,6 @@ class ClinicalSessionService(
         if requested is None:
             return base
         return min(base, max(float(requested), minimum_timeout_s))
-
-    # -------------------------------------------------------------------------
-    def apply_persisted_runtime_configuration(self) -> None:
-        self.model_config_service.load_current_snapshot()
-        parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
-            "parser"
-        )
-        clinical_provider, clinical_model_resolved = (
-            LLMRuntimeConfig.resolve_provider_and_model("clinical")
-        )
-        logger.info(
-            "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s text_extraction_provider=%s text_extraction_model=%s clinical_provider=%s clinical_model=%s reasoning=%s",
-            LLMRuntimeConfig.is_cloud_enabled(),
-            LLMRuntimeConfig.get_llm_provider(),
-            LLMRuntimeConfig.get_cloud_model(),
-            parser_provider,
-            parser_model,
-            clinical_provider,
-            clinical_model_resolved,
-            LLMRuntimeConfig.get_reasoning_level().value,
-        )
 
     # -------------------------------------------------------------------------
     async def preprocess_unified_input(
