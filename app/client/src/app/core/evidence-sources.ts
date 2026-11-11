@@ -27,8 +27,6 @@ export const EVIDENCE_SOURCE_OPTIONS: readonly EvidenceSourceOption[] = [
   },
 ];
 
-export const DEFAULT_EVIDENCE_SOURCES: readonly EvidenceSourceId[] = ["livertox"];
-
 export function evidenceSourceLabel(id: string): string {
   return EVIDENCE_SOURCE_OPTIONS.find((option) => option.id === id)?.label ?? id;
 }

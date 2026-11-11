@@ -278,19 +278,13 @@ export type ClinicalSessionInputWrite = {
 
 export type EvidenceSourceId = "livertox" | "dilirank" | "documents";
 
-export type SessionModelOverrides = {
-  text_extraction_model?: string | null;
-  clinical_model?: string | null;
-};
-
 export type ClinicalRequestPayload = {
   name: string | null;
   visit_date: { day: number; month: number; year: number } | null;
   clinical_input: string | null;
-  selected_model_providers: string[];
   patient_image_base64?: string | null;
-  evidence_sources: EvidenceSourceId[];
-  model_overrides: SessionModelOverrides | null;
+  agent_id: string | null;
+  agent_revision: number | null;
 };
 
 export type ClinicalSectionTemplateResponse = {

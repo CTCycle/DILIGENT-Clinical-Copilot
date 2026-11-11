@@ -5,9 +5,6 @@ import {
   ClinicalFormState,
   ClinicalRequestPayload,
   ClinicalSessionInputWrite,
-  EvidenceSourceId,
-  RuntimeSettings,
-  SessionModelOverrides,
 } from "./models/types";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -122,27 +119,18 @@ function extractBase64Payload(dataUrl: string | null): string | null {
   return normalized;
 }
 
-function resolveSelectedModelProviders(settings: RuntimeSettings): string[] {
-  if (settings.useCloudServices) {
-    return settings.provider ? [settings.provider] : [];
-  }
-  return ["ollama"];
-}
-
 export function buildClinicalPayload(
   form: ClinicalFormState,
-  settings: RuntimeSettings,
-  evidenceSources: readonly EvidenceSourceId[],
-  modelOverrides: SessionModelOverrides | null,
+  agentId: string | null,
+  agentRevision: number | null,
 ): ClinicalRequestPayload {
   return {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
     clinical_input: sanitizeField(form.clinicalInput),
-    selected_model_providers: resolveSelectedModelProviders(settings),
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
-    evidence_sources: [...evidenceSources],
-    model_overrides: modelOverrides,
+    agent_id: agentId,
+    agent_revision: agentRevision,
   };
 }
 

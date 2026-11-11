@@ -5,16 +5,15 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Agent } from '../../../../core/models/agent-types';
 import {
   ClinicalInputPreflightIssue,
   ClinicalInputPreflightResponse,
   ClinicalRequestPayload,
-  ModelConfigStateResponse,
 } from '../../../../core/models/types';
 import { jsonResponse, sessionState } from '../../../../core/testing/clinical-session-fixtures';
 import { AppStateService } from '../../../../core/state/app-state.service';
-import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
-import { AnalysisWizardComponent, LIVERTOX_WARNING } from './analysis-wizard.component';
+import { AnalysisWizardComponent, AGENT_CHANGED_MESSAGE, LIVERTOX_WARNING } from './analysis-wizard.component';
 
 function issue(severity: 'blocking' | 'non_blocking', code: string, field: string): ClinicalInputPreflightIssue {
   return {
@@ -42,22 +41,46 @@ function preflight(blocking: ClinicalInputPreflightIssue[] = [], warnings: Clini
   } satisfies ClinicalInputPreflightResponse;
 }
 
-function modelConfig(): ModelConfigStateResponse {
+const ref = { provider: 'ollama', model: 'qwen3' };
+
+function agent(id: string, overrides: Partial<Agent> = {}, sources: string[] = ['livertox']): Agent {
   return {
-    local_models: [
-      { name: 'qwen:9b', available_in_ollama: true },
-      { name: 'other:7b', available_in_ollama: true },
-    ],
-    cloud_providers: [],
-    use_cloud_services: false,
-    llm_provider: '',
-    cloud_model: null,
-    clinical_model: 'qwen:9b',
-    text_extraction_model: 'qwen:9b',
-    revision_model: 'qwen:9b',
-    timeline_model: 'qwen:9b',
-    reasoning_level: 'off',
-  } as unknown as ModelConfigStateResponse;
+    id,
+    kind: 'dili',
+    name: `Agent ${id}`,
+    description: '',
+    current_revision: 2,
+    is_default: false,
+    is_archived: false,
+    created_at: null,
+    updated_at: null,
+    revision: {
+      revision_id: 1,
+      revision_number: 2,
+      schema_version: 1,
+      configuration_hash: 'h',
+      created_at: null,
+      configuration: {
+        kind: 'dili',
+        schema_version: 1,
+        instructions: { assessment_focus: 'Focus on RUCAM', report_style: 'Concise', extraction_guidance: '' },
+        models: { extraction: ref, clinical: { provider: 'openai', model: 'gpt-x' }, timeline: ref, extraction_overrides: {} },
+        reasoning_level: 'off',
+        ollama_seed: null,
+        retrieval: {
+          evidence_sources: sources as never,
+          use_hybrid_search: true,
+          use_reranking: true,
+          reranker_model: 'r',
+          retrieval_candidate_count: 40,
+          retrieval_selected_count: 6,
+          hybrid_vector_weight: 0.65,
+          hybrid_text_weight: 0.35,
+        },
+      },
+    },
+    ...overrides,
+  };
 }
 
 describe('AnalysisWizardComponent', () => {
@@ -68,6 +91,7 @@ describe('AnalysisWizardComponent', () => {
   let launchPayloads: ClinicalRequestPayload[];
   let launchResponse: () => Response;
   let payloads: ClinicalRequestPayload[];
+  let agents: Agent[];
   let responses: ClinicalInputPreflightResponse[];
 
   const root = () => fixture.nativeElement as HTMLElement;
@@ -89,6 +113,7 @@ describe('AnalysisWizardComponent', () => {
     localStorage.clear();
     payloads = [];
     responses = [];
+    agents = [agent('a1', { is_default: true }), agent('a2', { name: 'No LiverTox' }, ['dilirank'])];
     sessionRequests = [];
     launchPayloads = [];
     launchResponse = () => jsonResponse(sessionState({ status: 'queued', queue_position: 1 }), 202);
@@ -102,6 +127,9 @@ describe('AnalysisWizardComponent', () => {
         }
         return jsonResponse(sessionState(), init?.method === 'POST' ? 201 : 200);
       }
+      if (target.endsWith('/agents')) {
+        return jsonResponse({ agents });
+      }
       payloads.push(JSON.parse(String(init?.body)) as ClinicalRequestPayload);
       return jsonResponse(responses.shift() ?? preflight());
     });
@@ -109,7 +137,6 @@ describe('AnalysisWizardComponent', () => {
       imports: [AnalysisWizardComponent],
       providers: [provideRouter([])],
     }).compileComponents();
-    TestBed.inject(ModelConfigStateService).setFromApiState(modelConfig());
     appState = TestBed.inject(AppStateService);
     appState.updateDiliAgent({
       form: { patientName: 'P', visitDate: '2026-10-01', patientImageDataUrl: null, clinicalInput: 'text' },
@@ -125,11 +152,13 @@ describe('AnalysisWizardComponent', () => {
     vi.restoreAllMocks();
   });
 
-  it('runs preflight on open with LiverTox selected by default', () => {
+  it('runs preflight on open with the default agent and none of the removed fields', () => {
     expect(payloads).toHaveLength(1);
-    expect(payloads[0].evidence_sources).toEqual(['livertox']);
-    expect(payloads[0].model_overrides).toBeNull();
-    expect('use_rag' in payloads[0]).toBe(false);
+    expect(payloads[0].agent_id).toBe('a1');
+    expect(payloads[0].agent_revision).toBe(2);
+    for (const removed of ['evidence_sources', 'model_overrides', 'selected_model_providers']) {
+      expect(removed in payloads[0]).toBe(false);
+    }
   });
 
   it('returns to preflight when reopened after the clinical input changed', async () => {
@@ -149,22 +178,18 @@ describe('AnalysisWizardComponent', () => {
     expect(component.blockingCount()).toBe(1);
   });
 
-  it('labels LiverTox as recommended and warns when it is unticked, on both steps', async () => {
+  it('shows the selected agent summary and warns when LiverTox is excluded', () => {
     component.goTo(1);
     fixture.detectChanges();
-    expect(root().textContent).toContain('Recommended');
-    expect(root().textContent).not.toContain(LIVERTOX_WARNING);
+    const card = root().querySelector('[data-testid="agent-summary"]') as HTMLElement;
+    expect(card.textContent).toContain('Agent a1');
+    expect(card.textContent).toContain('Revision 2');
+    expect(card.textContent).toContain('openai / gpt-x');
+    expect(card.textContent).toContain('Focus on RUCAM');
+    expect(card.textContent).not.toContain(LIVERTOX_WARNING);
+    expect(root().querySelector('a[href="/agents"]')).not.toBeNull();
 
-    const livertox = root().querySelector('#evidence-livertox') as HTMLInputElement;
-    livertox.checked = false;
-    livertox.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-
-    expect(root().textContent).toContain(LIVERTOX_WARNING);
-    expect(root().textContent).toContain('LLM knowledge only');
-    expect(root().querySelector('[role="status"]')).not.toBeNull();
-
-    component.goTo(3);
+    component.selectAgent('a2');
     fixture.detectChanges();
     expect(root().textContent).toContain(LIVERTOX_WARNING);
   });
@@ -180,32 +205,30 @@ describe('AnalysisWizardComponent', () => {
     expect(root().textContent).toContain('1 blocking');
   });
 
-  it('invalidates the check when sources change and re-runs it on Review before Start enables', async () => {
+  it('invalidates the check when the agent changes and re-runs it on Review before Start enables', async () => {
     expect(component.checkCurrent()).toBe(true);
 
-    component.toggleSource('dilirank', true);
+    component.selectAgent('a2');
     expect(component.checkCurrent()).toBe(false);
 
-    component.goTo(3);
+    component.goTo(2);
     fixture.detectChanges();
     expect(startButton()?.disabled).toBe(true);
     await settle();
 
-    expect(payloads.at(-1)?.evidence_sources).toEqual(['livertox', 'dilirank']);
+    expect(payloads.at(-1)?.agent_id).toBe('a2');
     expect(component.checkCurrent()).toBe(true);
     expect(startButton()?.disabled).toBe(false);
   });
 
-  it('sends only changed roles as overrides and restores defaults', () => {
-    component.setModel('clinical_model', 'other:7b');
-    expect(component.modelOverrides()).toEqual({ clinical_model: 'other:7b' });
+  it('routes agent preflight issues to the Agent step', async () => {
+    responses.push(preflight([issue('blocking', 'agent_unavailable', 'agent')]));
+    component.reset();
+    await component.runPreflight();
 
-    component.setModel('clinical_model', 'qwen:9b');
-    expect(component.modelOverrides()).toBeNull();
+    component.fixInInput();
 
-    component.setModel('text_extraction_model', 'other:7b');
-    component.restoreModelDefaults();
-    expect(component.modelOverrides()).toBeNull();
+    expect(component.step()).toBe('agent');
   });
 
   describe('start', () => {
@@ -216,7 +239,7 @@ describe('AnalysisWizardComponent', () => {
       navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       started = vi.fn();
       component.started.subscribe(started);
-      component.goTo(3);
+      component.goTo(2);
       fixture.detectChanges();
     });
 
@@ -228,7 +251,8 @@ describe('AnalysisWizardComponent', () => {
         'POST /api/clinical/sessions',
         'POST /api/clinical/sessions/5/launch',
       ]);
-      expect(launchPayloads[0].evidence_sources).toEqual(['livertox']);
+      expect(launchPayloads[0]).toMatchObject({ agent_id: 'a1', agent_revision: 2 });
+      expect('evidence_sources' in launchPayloads[0]).toBe(false);
       expect(navigate).toHaveBeenCalledWith(['/report', 5], { replaceUrl: true });
       expect(started).toHaveBeenCalledTimes(1);
       expect(appState.state().diliAgent).toMatchObject({
@@ -236,7 +260,27 @@ describe('AnalysisWizardComponent', () => {
         isDirty: false,
         form: { patientName: '', clinicalInput: '' },
       });
-      expect(component.sources()).toEqual(['livertox']);
+      expect(component.selectedAgentId()).toBeNull();
+    });
+
+    it('launches with the agent revision returned by the successful preflight', async () => {
+      responses.push({ ...preflight(), runtime_settings: { agent_id: 'a1', agent_revision: 3 } });
+      await component.runPreflight();
+
+      await component.start();
+
+      expect(launchPayloads[0]).toMatchObject({ agent_id: 'a1', agent_revision: 3 });
+    });
+
+    it('returns to preflight and asks to re-run checks when the agent changed (409)', async () => {
+      launchResponse = () => jsonResponse({ detail: 'Agent revision changed.' }, 409);
+
+      await component.start();
+      await settle();
+
+      expect(component.step()).toBe('preflight');
+      expect(navigate).not.toHaveBeenCalled();
+      expect(root().textContent).toContain(AGENT_CHANGED_MESSAGE);
     });
 
     it('launches a clean stored draft without rewriting it', async () => {

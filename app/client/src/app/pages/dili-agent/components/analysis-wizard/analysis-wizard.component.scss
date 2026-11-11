@@ -103,8 +103,7 @@
   gap: var(--space-sm);
 }
 
-.wizard-inline-actions .btn,
-.wizard-restore {
+.wizard-inline-actions .btn {
   width: auto;
   flex: 0 1 auto;
   justify-self: start;
@@ -184,24 +183,21 @@
 }
 
 .wizard-issue dl,
-.wizard-review,
-.wizard-provider {
+.wizard-review {
   display: grid;
   gap: var(--space-sm);
   margin: 0;
 }
 
 .wizard-issue dl div,
-.wizard-review div,
-.wizard-provider div {
+.wizard-review div {
   display: grid;
   grid-template-columns: minmax(120px, 0.3fr) minmax(0, 1fr);
   gap: var(--space-md);
 }
 
 .wizard-issue dt,
-.wizard-review dt,
-.wizard-provider dt {
+.wizard-review dt {
   color: var(--color-text-muted);
   font-size: var(--font-xs);
   font-weight: 700;
@@ -210,54 +206,35 @@
 }
 
 .wizard-issue dd,
-.wizard-review dd,
-.wizard-provider dd {
+.wizard-review dd {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-sm);
   line-height: 1.5;
 }
 
-.wizard-options,
-.wizard-models {
+.wizard-agent-card {
   display: grid;
   gap: var(--space-sm);
-}
-
-.wizard-option {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-md);
-  align-items: start;
   padding: var(--space-md);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  cursor: pointer;
 }
 
-.wizard-option input {
-  width: 18px;
-  height: 18px;
-  margin: 2px 0 0;
+.wizard-agent-card h3 {
+  margin: 0;
+  font-size: var(--font-base);
 }
 
-.wizard-option > span {
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.wizard-option strong {
-  font-size: var(--font-sm);
-}
-
-.wizard-option small {
+.wizard-agent-card p {
+  margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-xs);
   line-height: 1.4;
 }
 
-.wizard-source-unavailable {
-  color: var(--color-status-warning-text);
+.wizard-agent-card .wizard-review dd {
+  overflow-wrap: anywhere;
 }
 
 .wizard-notice {

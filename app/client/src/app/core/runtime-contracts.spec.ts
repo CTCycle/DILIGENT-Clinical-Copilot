@@ -252,78 +252,26 @@ describe('model configuration mapping', () => {
 });
 
 describe('buildClinicalPayload', () => {
-  it('uses the configured cloud provider when cloud runtime is enabled', () => {
-    const form: ClinicalFormState = {
-      patientName: 'John',
-      visitDate: '2025-01-02',
-      patientImageDataUrl: null,
-      clinicalInput: 'test input',
-    };
-    const settings: RuntimeSettings = {
-      useCloudServices: true,
-      provider: 'openai',
-      cloudModel: null,
-      textExtractionModel: 'x',
-      clinicalModel: 'y',
-      revisionModel: 'y',
-      timelineModel: 'x',
-      reasoning: 'off',
-    };
+  const form: ClinicalFormState = {
+    patientName: 'John',
+    visitDate: '2025-01-02',
+    patientImageDataUrl: null,
+    clinicalInput: 'test input',
+  };
 
-    const payload = buildClinicalPayload(form, settings, ['livertox'], null);
-    expect(payload.selected_model_providers).toEqual(['openai']);
+  it('carries the agent id and revision and none of the removed fields', () => {
+    const payload = buildClinicalPayload(form, 'agent-1', 3);
+    expect(payload.agent_id).toBe('agent-1');
+    expect(payload.agent_revision).toBe(3);
+    for (const removed of ['selected_model_providers', 'model_overrides', 'evidence_sources', 'use_rag']) {
+      expect(removed in payload).toBe(false);
+    }
   });
 
-  it('uses ollama when local runtime is enabled', () => {
-    const form: ClinicalFormState = {
-      patientName: 'John',
-      visitDate: '2025-01-02',
-      patientImageDataUrl: null,
-      clinicalInput: 'test input',
-    };
-    const settings: RuntimeSettings = {
-      useCloudServices: false,
-      provider: 'openai',
-      cloudModel: null,
-      textExtractionModel: 'qwen3.5:9b',
-      clinicalModel: 'gpt-oss:20b',
-      revisionModel: 'gpt-oss:20b',
-      timelineModel: 'qwen3.5:9b',
-      reasoning: 'off',
-    };
-
-    const payload = buildClinicalPayload(form, settings, ['livertox'], null);
-    expect(payload.selected_model_providers).toEqual(['ollama']);
-  });
-
-  it('carries the per-session evidence sources and model overrides, and no use_rag flag', () => {
-    const form: ClinicalFormState = {
-      patientName: 'John',
-      visitDate: '2025-01-02',
-      patientImageDataUrl: null,
-      clinicalInput: 'test input',
-    };
-    const settings: RuntimeSettings = {
-      useCloudServices: false,
-      provider: '',
-      cloudModel: null,
-      textExtractionModel: 'qwen3.5:9b',
-      clinicalModel: 'gpt-oss:20b',
-      revisionModel: 'gpt-oss:20b',
-      timelineModel: 'qwen3.5:9b',
-      reasoning: 'off',
-    };
-
-    const llmOnly = buildClinicalPayload(form, settings, [], null);
-    expect(llmOnly.evidence_sources).toEqual([]);
-    expect(llmOnly.model_overrides).toBeNull();
-    expect('use_rag' in llmOnly).toBe(false);
-
-    const overridden = buildClinicalPayload(form, settings, ['dilirank', 'documents'], {
-      clinical_model: 'other:7b',
-    });
-    expect(overridden.evidence_sources).toEqual(['dilirank', 'documents']);
-    expect(overridden.model_overrides).toEqual({ clinical_model: 'other:7b' });
+  it('sends null agent fields to select the default agent', () => {
+    const payload = buildClinicalPayload(form, null, null);
+    expect(payload.agent_id).toBeNull();
+    expect(payload.agent_revision).toBeNull();
   });
 });
 

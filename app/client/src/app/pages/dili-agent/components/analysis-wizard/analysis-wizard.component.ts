@@ -2,51 +2,49 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { ModalShellComponent } from '../../../../components/modal-shell/modal-shell.component';
-import {
-  DEFAULT_EVIDENCE_SOURCES,
-  EVIDENCE_SOURCE_OPTIONS,
-  describeEvidenceSources,
-} from '../../../../core/evidence-sources';
+import { describeEvidenceSources } from '../../../../core/evidence-sources';
+import { summarizeAgent } from '../../../../core/models/agent-types';
 import {
   ClinicalInputPreflightIssue,
   ClinicalInputPreflightResponse,
   ClinicalRequestPayload,
-  EvidenceSourceId,
-  EvidenceSourceStatus,
-  RuntimeSettings,
-  SessionModelOverrides,
 } from '../../../../core/models/types';
 import { validateClinicalInput } from '../../../../core/services/clinical-api';
 import { ClinicalSessionDraftService } from '../../../../core/services/clinical-session-draft.service';
 import { launchClinicalSession } from '../../../../core/services/clinical-session-lifecycle-api';
+import { ApiHttpError } from '../../../../core/services/http-api';
+import { AgentsStateService } from '../../../../core/state/agents-state.service';
 import { AppStateService } from '../../../../core/state/app-state.service';
-import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
 import { buildClinicalPayload } from '../../../../core/utils';
 import { buildSectionPreviews, SourceSelection } from './section-preview';
 
-export type WizardStepId = 'preflight' | 'sources' | 'models' | 'review';
-type ModelRole = 'text_extraction_model' | 'clinical_model';
-type ModelOverrideDraft = Record<ModelRole, string | null>;
+export type WizardStepId = 'preflight' | 'agent' | 'review';
 
 export const WIZARD_STEPS: ReadonlyArray<{ id: WizardStepId; label: string }> = [
   { id: 'preflight', label: 'Preflight' },
-  { id: 'sources', label: 'Evidence Sources' },
-  { id: 'models', label: 'Models' },
+  { id: 'agent', label: 'Agent' },
   { id: 'review', label: 'Review' },
 ];
 
+export const AGENT_CHANGED_MESSAGE = 'The agent changed after it was checked — re-run checks.';
+
+function excerpt(text: string, limit = 160): string {
+  const normalized = text.trim().replace(/\s+/g, ' ');
+  return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized;
+}
+
 export const LIVERTOX_WARNING =
   'Excluding LiverTox removes drug-level hepatotoxicity evidence from the causality assessment and may reduce accuracy.';
-
-const NO_OVERRIDES: ModelOverrideDraft = { text_extraction_model: null, clinical_model: null };
 
 type PreflightRecord = {
   result: ClinicalInputPreflightResponse;
   formKey: string;
   configKey: string;
+  agentId: string | null;
+  agentRevision: number | null;
 };
 
 function preflightUnavailable(): ClinicalInputPreflightResponse {
@@ -77,7 +75,7 @@ function preflightUnavailable(): ClinicalInputPreflightResponse {
 
 @Component({
   selector: 'app-analysis-wizard',
-  imports: [ModalShellComponent],
+  imports: [ModalShellComponent, RouterLink],
   templateUrl: './analysis-wizard.component.html',
   styleUrl: './analysis-wizard.component.scss',
 })
@@ -89,17 +87,15 @@ export class AnalysisWizardComponent {
   readonly editSource = output<SourceSelection | null>();
 
   private readonly stateService = inject(AppStateService);
-  private readonly modelConfigState = inject(ModelConfigStateService);
+  private readonly agentsState = inject(AgentsStateService);
   private readonly drafts = inject(ClinicalSessionDraftService);
   private readonly router = inject(Router);
 
   readonly steps = WIZARD_STEPS;
-  readonly sourceOptions = EVIDENCE_SOURCE_OPTIONS;
   readonly livertoxWarning = LIVERTOX_WARNING;
 
   readonly step = signal<WizardStepId>('preflight');
-  readonly sources = signal<readonly EvidenceSourceId[]>(DEFAULT_EVIDENCE_SOURCES);
-  readonly overrides = signal<ModelOverrideDraft>(NO_OVERRIDES);
+  readonly selectedAgentId = signal<string | null>(null);
   readonly record = signal<PreflightRecord | null>(null);
   readonly checking = signal(false);
   readonly starting = signal(false);
@@ -108,19 +104,13 @@ export class AnalysisWizardComponent {
   private checkAttempt = 0;
 
   readonly form = computed(() => this.stateService.state().diliAgent.form);
-  readonly settings = computed(() => this.modelConfigState.settings());
   readonly stepIndex = computed(() => this.steps.findIndex((item) => item.id === this.step()));
   readonly formKey = computed(() => JSON.stringify(this.form()));
-  readonly modelOverrides = computed<SessionModelOverrides | null>(() => {
-    const draft = this.overrides();
-    const active: SessionModelOverrides = {};
-    if (draft.text_extraction_model) active.text_extraction_model = draft.text_extraction_model;
-    if (draft.clinical_model) active.clinical_model = draft.clinical_model;
-    return Object.keys(active).length ? active : null;
+  readonly agent = computed(() => {
+    const selected = this.selectedAgentId();
+    return (selected ? this.agentsState.byId(selected) : null) ?? this.agentsState.defaultDiliAgent();
   });
-  readonly configKey = computed(() =>
-    JSON.stringify([[...this.sources()].sort(), this.modelOverrides()]),
-  );
+  readonly configKey = computed(() => JSON.stringify([this.agent()?.id ?? null, this.agent()?.current_revision ?? null]));
 
   private readonly formCurrent = computed(() => this.record()?.formKey === this.formKey());
   readonly result = computed(() => (this.formCurrent() ? this.record()!.result : null));
@@ -144,46 +134,32 @@ export class AnalysisWizardComponent {
   readonly canStart = computed(
     () => this.inputReady() && this.checkCurrent() && !this.checking() && !this.starting(),
   );
-  readonly livertoxExcluded = computed(() => !this.sources().includes('livertox'));
-  readonly sourcesSummary = computed(() => describeEvidenceSources(this.sources()));
-  readonly sourceStatuses = computed(() => {
-    const entries = this.result()?.evidence_sources ?? [];
-    return new Map<EvidenceSourceId, EvidenceSourceStatus>(entries.map((entry) => [entry.source, entry]));
+  readonly agentSummary = computed(() => {
+    const agent = this.agent();
+    return agent ? summarizeAgent(agent) : null;
   });
-
-  readonly provider = computed(() => {
-    const settings = this.settings();
-    if (!settings) return '';
-    return settings.useCloudServices ? settings.provider : 'Ollama (local)';
+  readonly instructionExcerpts = computed(() => {
+    const config = this.agent()?.revision.configuration;
+    if (!config || config.kind !== 'dili') return [];
+    const { instructions } = config;
+    return [
+      { label: 'Assessment focus', text: excerpt(instructions.assessment_focus) },
+      { label: 'Report style', text: excerpt(instructions.report_style) },
+      { label: 'Extraction guidance', text: excerpt(instructions.extraction_guidance) },
+    ].filter((row) => row.text);
   });
-  readonly modelRoles = computed(() => {
-    const settings = this.settings();
-    const draft = this.overrides();
-    const options = this.modelOptions(settings);
-    const rows: Array<{ role: ModelRole; label: string }> = [
-      { role: 'text_extraction_model', label: 'Text extraction model' },
-      { role: 'clinical_model', label: 'Clinical model' },
-    ];
-    return rows.map(({ role, label }) => {
-      const defaultModel = this.defaultModel(settings, role);
-      const effective = draft[role] ?? defaultModel;
-      return {
-        role,
-        label,
-        defaultModel,
-        effective,
-        overridden: draft[role] !== null,
-        options: options.includes(effective) ? options : [effective, ...options].filter(Boolean),
-      };
-    });
+  readonly livertoxExcluded = computed(() => {
+    const summary = this.agentSummary();
+    return summary !== null && !summary.evidenceSources.includes('livertox');
   });
-  readonly hasOverrides = computed(() => this.modelOverrides() !== null);
+  readonly sourcesSummary = computed(() => describeEvidenceSources(this.agentSummary()?.evidenceSources ?? []));
+  readonly agents = this.agentsState.diliAgents;
 
   constructor() {
     effect(() => {
       if (this.isOpen()) {
         untracked(() => {
-          void this.modelConfigState.load().catch(() => undefined);
+          void this.agentsState.load({ force: true }).catch(() => undefined);
           // The input changed since the last check: restart from preflight.
           if (!this.formCurrent()) {
             this.step.set('preflight');
@@ -196,7 +172,7 @@ export class AnalysisWizardComponent {
         && !this.checkCurrent()
         && !this.checking()
         && (this.step() === 'preflight' || this.step() === 'review')
-        && this.settings() !== null;
+        && (this.agentsState.status() === 'ready' || this.agentsState.status() === 'error');
       if (needsCheck) {
         untracked(() => void this.runPreflight());
       }
@@ -205,8 +181,7 @@ export class AnalysisWizardComponent {
 
   reset(): void {
     this.checkAttempt += 1;
-    this.sources.set(DEFAULT_EVIDENCE_SOURCES);
-    this.overrides.set(NO_OVERRIDES);
+    this.selectedAgentId.set(null);
     this.record.set(null);
     this.checking.set(false);
     this.starting.set(false);
@@ -232,32 +207,21 @@ export class AnalysisWizardComponent {
     this.goTo(Math.max(this.stepIndex() - 1, 0));
   }
 
-  toggleSource(source: EvidenceSourceId, checked: boolean): void {
+  selectAgent(agentId: string): void {
     this.startError.set(null);
-    this.sources.update((current) => {
-      const next = current.filter((item) => item !== source);
-      return checked ? [...next, source] : next;
-    });
-  }
-
-  setModel(role: ModelRole, value: string): void {
-    const defaultModel = this.defaultModel(this.settings(), role);
-    this.overrides.update((current) => ({ ...current, [role]: value && value !== defaultModel ? value : null }));
-  }
-
-  restoreModelDefaults(): void {
-    this.overrides.set(NO_OVERRIDES);
+    this.selectedAgentId.set(agentId || null);
   }
 
   async runPreflight(): Promise<void> {
     const attempt = ++this.checkAttempt;
     const formKey = this.formKey();
     const configKey = this.configKey();
+    const agentId = this.agent()?.id ?? null;
+    const agentRevision = this.agent()?.current_revision ?? null;
     this.checking.set(true);
     let result: ClinicalInputPreflightResponse;
     try {
-      const payload = await this.buildPayload();
-      result = await validateClinicalInput(payload);
+      result = await validateClinicalInput(this.buildPayload(agentId, agentRevision));
     } catch (error) {
       console.error('Clinical pre-flight request failed.', error);
       result = preflightUnavailable();
@@ -265,7 +229,7 @@ export class AnalysisWizardComponent {
     if (attempt !== this.checkAttempt) {
       return;
     }
-    this.record.set({ result, formKey, configKey });
+    this.record.set({ result, formKey, configKey, agentId, agentRevision });
     this.checking.set(false);
   }
 
@@ -290,8 +254,13 @@ export class AnalysisWizardComponent {
     this.starting.set(true);
     this.startError.set(null);
     let sessionId: number;
+    const checked = this.record()!;
+    const checkedRevision = checked.result.runtime_settings['agent_revision'];
     try {
-      const payload = await this.buildPayload();
+      const payload = this.buildPayload(
+        checked.agentId,
+        typeof checkedRevision === 'number' ? checkedRevision : checked.agentRevision,
+      );
       const { draftSessionId, isDirty } = this.stateService.state().diliAgent;
       const savedId = draftSessionId !== null && !isDirty ? draftSessionId : await this.drafts.save();
       if (savedId === null) {
@@ -301,6 +270,13 @@ export class AnalysisWizardComponent {
       await launchClinicalSession(sessionId, payload);
     } catch (error) {
       this.starting.set(false);
+      if (error instanceof ApiHttpError && error.statusCode === 409) {
+        await this.agentsState.load({ force: true }).catch(() => undefined);
+        this.record.set(null);
+        this.startError.set(AGENT_CHANGED_MESSAGE);
+        this.step.set('preflight');
+        return;
+      }
       this.startError.set(error instanceof Error ? error.message : 'The analysis could not be started.');
       return;
     }
@@ -312,30 +288,8 @@ export class AnalysisWizardComponent {
     this.started.emit();
   }
 
-  private async buildPayload(): Promise<ClinicalRequestPayload> {
-    let settings = this.settings();
-    if (!settings) {
-      await this.modelConfigState.load();
-      settings = this.settings();
-    }
-    if (!settings) {
-      throw new Error('Persisted model configuration is unavailable.');
-    }
-    return buildClinicalPayload(this.form(), settings, this.sources(), this.modelOverrides());
-  }
-
-  private defaultModel(settings: RuntimeSettings | null, role: ModelRole): string {
-    if (!settings) return '';
-    return role === 'text_extraction_model' ? settings.textExtractionModel : settings.clinicalModel;
-  }
-
-  private modelOptions(settings: RuntimeSettings | null): string[] {
-    const data = this.modelConfigState.data();
-    if (!settings || !data) return [];
-    const names = settings.useCloudServices
-      ? (data.cloud_providers.find((provider) => provider.id === settings.provider)?.models ?? []).map((model) => model.id)
-      : data.local_models.filter((model) => model.available_in_ollama).map((model) => model.name);
-    return [...new Set(names)];
+  private buildPayload(agentId: string | null, agentRevision: number | null): ClinicalRequestPayload {
+    return buildClinicalPayload(this.form(), agentId, agentRevision);
   }
 }
 
@@ -344,11 +298,9 @@ export const PREFLIGHT_FIELD_TARGETS: Record<string, string> = {
   clinical_input: 'clinical-input',
   drugs: 'clinical-input',
   laboratory_analysis: 'clinical-input',
-  selected_model_providers: 'run-analysis-button',
   visit_date: 'visit-date',
 };
 
 const CONFIGURATION_STEPS: Record<string, WizardStepId> = {
-  evidence_sources: 'sources',
-  model_overrides: 'models',
+  agent: 'agent',
 };

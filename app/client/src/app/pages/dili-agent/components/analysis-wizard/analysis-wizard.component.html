@@ -59,6 +59,9 @@
             }
           </div>
         </div>
+        @if (startError(); as error) {
+          <p class="wizard-notice is-error" role="alert">{{ error }}</p>
+        }
         <div class="wizard-issues" data-testid="preflight-issue-list" tabindex="0">
           @for (issue of issues(); track issue.code + '-' + $index) {
             <article
@@ -109,73 +112,49 @@
         }
       }
 
-      @case ('sources') {
-        <p class="wizard-lede">Choose the evidence the assessment may use. Your selection is enforced for this session.</p>
-        <div class="wizard-options">
-          @for (option of sourceOptions; track option.id) {
-            <label class="wizard-option" [for]="'evidence-' + option.id">
-              <input
-                type="checkbox"
-                [id]="'evidence-' + option.id"
-                [checked]="sources().includes(option.id)"
-                (change)="toggleSource(option.id, $any($event.target).checked)"
-              />
-              <span>
-                <strong>
-                  {{ option.label }}
-                  @if (option.id === 'livertox') {
-                    <span class="wizard-tag">Recommended</span>
-                  }
-                </strong>
-                <small>{{ option.description }}</small>
-                @if (sourceStatuses().get(option.id); as status) {
-                  @if (status.selected && !status.available && status.message) {
-                    <small class="wizard-source-unavailable">{{ status.message }}</small>
-                  }
-                }
-              </span>
-            </label>
-          }
-        </div>
-        @if (livertoxExcluded()) {
-          <p class="wizard-notice" role="status">{{ livertoxWarning }}</p>
+      @case ('agent') {
+        <p class="wizard-lede">Choose the DILI agent that runs this analysis. Its models, instructions and evidence sources are applied for the whole session.</p>
+        @if (agents().length) {
+          <div class="field">
+            <label class="field-label" for="wizard-agent">Agent</label>
+            <select
+              id="wizard-agent"
+              [value]="agent()?.id ?? ''"
+              (change)="selectAgent($any($event.target).value)"
+            >
+              @for (option of agents(); track option.id) {
+                <option [value]="option.id" [selected]="option.id === agent()?.id">
+                  {{ option.name }}{{ option.is_default ? ' (default)' : '' }}
+                </option>
+              }
+            </select>
+          </div>
+        } @else {
+          <p class="wizard-notice" role="status">No saved DILI agent is available. The default agent will be used.</p>
         }
-        @if (!sources().length) {
-          <p class="wizard-caption">No sources selected → LLM knowledge only.</p>
+        @if (agent(); as current) {
+          <section class="wizard-agent-card" data-testid="agent-summary" [attr.aria-label]="current.name + ' summary'">
+            <h3>{{ current.name }} <span class="wizard-tag">Revision {{ current.current_revision }}</span></h3>
+            @if (current.description) {
+              <p>{{ current.description }}</p>
+            }
+            <dl class="wizard-review">
+              <div><dt>Clinical model</dt><dd>{{ agentSummary()?.clinicalModel }}</dd></div>
+              <div><dt>Extraction model</dt><dd>{{ agentSummary()?.extractionModel }}</dd></div>
+              <div><dt>Timeline model</dt><dd>{{ agentSummary()?.timelineModel }}</dd></div>
+              <div><dt>Evidence sources</dt><dd>{{ sourcesSummary() }}</dd></div>
+              @for (row of instructionExcerpts(); track row.label) {
+                <div><dt>{{ row.label }}</dt><dd>{{ row.text }}</dd></div>
+              }
+            </dl>
+            @if (livertoxExcluded()) {
+              <p class="wizard-notice" role="status">{{ livertoxWarning }}</p>
+            }
+          </section>
         }
-      }
-
-      @case ('models') {
-        <p class="wizard-lede">Override the models for this session only. Saved model settings are not changed.</p>
-        <dl class="wizard-provider">
-          <div><dt>Provider</dt><dd>{{ provider() }}</dd></div>
-        </dl>
-        <div class="wizard-models">
-          @for (row of modelRoles(); track row.role) {
-            <div class="field">
-              <label class="field-label" [for]="'model-' + row.role">
-                {{ row.label }}
-                @if (row.overridden) {
-                  <span class="wizard-tag">Override</span>
-                }
-              </label>
-              <select
-                [id]="'model-' + row.role"
-                [value]="row.effective"
-                (change)="setModel(row.role, $any($event.target).value)"
-              >
-                @for (option of row.options; track option) {
-                  <option [value]="option" [selected]="option === row.effective">
-                    {{ option }}{{ option === row.defaultModel ? ' (default)' : '' }}
-                  </option>
-                }
-              </select>
-            </div>
-          }
+        <div class="wizard-inline-actions">
+          <a class="btn btn-secondary" routerLink="/agents">Open Agent Studio</a>
         </div>
-        <button class="btn btn-secondary wizard-restore" type="button" [disabled]="!hasOverrides()" (click)="restoreModelDefaults()">
-          Restore defaults
-        </button>
       }
 
       @case ('review') {
@@ -198,19 +177,16 @@
               }
             </dd>
           </div>
+          <div>
+            <dt>Agent</dt>
+            <dd>
+              {{ agent()?.name ?? 'Default DILI agent' }}
+              @if (agent(); as current) {
+                <span class="wizard-tag">Revision {{ current.current_revision }}</span>
+              }
+            </dd>
+          </div>
           <div><dt>Evidence sources</dt><dd>{{ sourcesSummary() }}</dd></div>
-          @for (row of modelRoles(); track row.role) {
-            <div>
-              <dt>{{ row.label }}</dt>
-              <dd>
-                {{ row.effective }}
-                @if (row.overridden) {
-                  <span class="wizard-tag">Override</span>
-                }
-              </dd>
-            </div>
-          }
-          <div><dt>Provider</dt><dd>{{ provider() }}</dd></div>
         </dl>
         @if (livertoxExcluded()) {
           <p class="wizard-notice" role="status">{{ livertoxWarning }}</p>
