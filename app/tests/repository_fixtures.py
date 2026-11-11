@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from repositories.agent_repository import AgentRepository
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
 from repositories.drug_catalog_repository import DrugCatalogRepository
@@ -24,6 +25,7 @@ class RepositoryGraph:
     clinical_session_repository: ClinicalSessionRepository
     session_timeline_repository: SessionTimelineRepository
     session_revision_repository: SessionRevisionRepository
+    agent_repository: AgentRepository
 
 
 ###############################################################################
@@ -41,4 +43,5 @@ def build_repository_graph(
         clinical_session_repository=clinical_session_repository,
         session_timeline_repository=SessionTimelineRepository(context),
         session_revision_repository=SessionRevisionRepository(context),
+        agent_repository=AgentRepository(context),
     )
