@@ -244,6 +244,7 @@ def _create_repository(configuration: DatabaseConfiguration):
 def _rebind_database_services() -> None:
     from api import (
         access_keys,
+        agents,
         data_inspection,
         model_config,
         session,
@@ -253,6 +254,7 @@ def _rebind_database_services() -> None:
 
     for module in (
         access_keys,
+        agents,
         data_inspection,
         model_config,
         session,

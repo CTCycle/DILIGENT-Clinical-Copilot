@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.access_keys import router as access_keys_router
+from api.agents import router as agents_router
 from api.data_inspection import router as data_inspection_router
 from api.desktop import router as desktop_router
 from api.database import router as database_router
@@ -229,6 +230,7 @@ def create_app() -> FastAPI:
         settings_router,
         database_router,
         access_keys_router,
+        agents_router,
         system_status_router,
         desktop_router,
     ):
