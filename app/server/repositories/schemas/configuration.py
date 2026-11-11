@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     JSON,
@@ -19,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from repositories.schemas.base import Base
+from repositories.schemas.base import Base, UtcDateTime
 
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
@@ -147,4 +149,71 @@ class ReferenceCatalogManifest(Base):
     __table_args__ = (
         UniqueConstraint("manifest", name="uq_reference_catalog_manifests_manifest"),
         Index("ix_reference_catalog_manifests_hash", "manifest_hash"),
+    )
+
+
+###############################################################################
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+###############################################################################
+class AgentDefinition(Base):
+    __tablename__ = "agent_definitions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=text("''")
+    )
+    current_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    # Equals ``kind`` while this agent is the default, else NULL; the unique
+    # constraint then allows at most one default per kind on every backend.
+    default_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), nullable=False, default=_utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), nullable=False, default=_utc_now
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('dili', 'revision')", name="ck_agent_definitions_kind"
+        ),
+        UniqueConstraint("default_kind", name="uq_agent_definitions_default_kind"),
+        Index("ix_agent_definitions_kind", "kind"),
+    )
+
+
+###############################################################################
+class AgentRevision(Base):
+    __tablename__ = "agent_revisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    agent_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("agent_definitions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    configuration_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    configuration_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), nullable=False, default=_utc_now
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "agent_id", "revision_number", name="uq_agent_revisions_agent_revision"
+        ),
+        Index("ix_agent_revisions_agent_id", "agent_id"),
     )

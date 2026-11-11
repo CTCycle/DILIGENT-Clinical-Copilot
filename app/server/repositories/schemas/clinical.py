@@ -27,6 +27,7 @@ from repositories.schemas.base import Base, UtcDateTime
 
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
+AGENT_REVISIONS_ID_FK = "agent_revisions.id"
 
 
 ###############################################################################
@@ -65,6 +66,9 @@ class ClinicalSession(Base):
     queued_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    agent_revision_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(AGENT_REVISIONS_ID_FK), nullable=True
+    )
 
     sections: Mapped[list["ClinicalSessionSection"]] = relationship(
         "ClinicalSessionSection",
@@ -97,6 +101,7 @@ class ClinicalSession(Base):
         Index("ix_clinical_sessions_timestamp_id", "session_timestamp", "id"),
         Index("ix_clinical_sessions_status_queued_at", "session_status", "queued_at"),
         Index("ix_clinical_sessions_updated_at_id", "updated_at", "id"),
+        Index("ix_clinical_sessions_agent_revision_id", "agent_revision_id"),
         CheckConstraint(
             "session_status IN ('draft', 'queued', 'running', 'completed', "
             "'cancelled', 'failed')",
@@ -312,6 +317,9 @@ class ClinicalSessionRevisionRun(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_revision_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(AGENT_REVISIONS_ID_FK), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
@@ -353,6 +361,10 @@ class ClinicalSessionRevisionRun(Base):
         ),
         Index("ix_clinical_session_revision_runs_status", "status"),
         Index("ix_clinical_session_revision_runs_started_at", "started_at"),
+        Index(
+            "ix_clinical_session_revision_runs_agent_revision_id",
+            "agent_revision_id",
+        ),
     )
 
 
