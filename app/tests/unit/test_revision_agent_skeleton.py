@@ -1948,3 +1948,65 @@ def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:
     )
     assert shell is not None
     assert shell["source_version_id"] == original["version_id"]
+
+
+###############################################################################
+def test_revision_job_keeps_runtime_frozen_at_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dataclasses import replace
+
+    from domain.model_configs import ModelConfigSnapshot
+    from repositories.serialization.model_configs import ModelConfigSerializer
+    from services.llm.runtime_config import LLMRuntimeConfig
+
+    live = {
+        "snapshot": ModelConfigSnapshot(
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            clinical_model="gpt-4.1",
+            text_extraction_model="gpt-4.1-mini",
+            revision_model="gpt-4.1",
+            timeline_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        )
+    }
+    monkeypatch.setattr(
+        ModelConfigSerializer, "load_snapshot", lambda self: live["snapshot"]
+    )
+    observed: list[tuple[str, str]] = []
+
+    def recording_call(**kwargs: Any) -> dict[str, Any]:
+        # Simulate a settings edit while the job is running.
+        live["snapshot"] = replace(
+            live["snapshot"],
+            revision_model="gpt-4.1-mini",
+            updated_at=datetime.now(UTC),
+        )
+        observed.append(LLMRuntimeConfig.resolve_provider_and_model("revision"))
+        return fake_issue_scan_call(**kwargs)
+
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    jobs = JobManager()
+    service = build_service(serializer, jobs)
+    service.revision_agent_runner = build_runner(
+        serializer, structured_call=recording_call
+    )
+
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
+    for _ in range(100):
+        status = service.get_revision_job_status(started["job_id"])
+        if status and status["status"] in {"completed", "failed"}:
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Revision job did not finish")
+
+    assert observed
+    assert set(observed) == {("openai", "gpt-4.1")}
+    run = service.get_revision_run(started["result"]["pipeline_run_id"])
+    assert run is not None
+    assert run["configuration"]["model_name"] == "gpt-4.1"
+    assert run["configuration"]["runtime_snapshot_hash"]

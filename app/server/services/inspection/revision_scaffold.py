@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 from domain.inspection import SessionRevisionRequest
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.inspection.revision_agent import (
     REVISION_PROVIDER_MAX_RETRIES,
     RevisionAgentCancelled,
@@ -64,8 +65,18 @@ class InspectionRevisionScaffoldMixin:
             job_id,
             patch,
         )
+        runtime_snapshot = (
+            model_configuration.get("runtime_snapshot")
+            if isinstance(model_configuration, dict)
+            else None
+        )
         try:
-            result = self.revision_agent_runner.run_agentic(**kwargs)
+            # Replay the runtime frozen at job creation so a settings edit
+            # during the job cannot change the planning/editing/QA models.
+            with LLMRuntimeConfig.override_for_run(
+                runtime_snapshot if isinstance(runtime_snapshot, dict) else None
+            ):
+                result = self.revision_agent_runner.run_agentic(**kwargs)
         except RevisionAgentCancelled:
             self.session_revision_repository.cancel_revision_run(
                 pipeline_run_id=pipeline_run_id
@@ -147,7 +158,11 @@ class InspectionRevisionScaffoldMixin:
 
         pipeline_run_id = uuid.uuid4().hex
         job_id = uuid.uuid4().hex[:8]
-        runtime = resolve_revision_agent_runtime()
+        runtime_snapshot, runtime_snapshot_hash = (
+            LLMRuntimeConfig.capture_run_snapshot(evidence_sources=[])
+        )
+        with LLMRuntimeConfig.override_for_run(runtime_snapshot):
+            runtime = resolve_revision_agent_runtime()
         model_configuration = {
             "job_id": job_id,
             "pipeline_run_id": pipeline_run_id,
@@ -161,6 +176,8 @@ class InspectionRevisionScaffoldMixin:
             "model_name": runtime.model,
             "provider_max_retries": REVISION_PROVIDER_MAX_RETRIES,
             "metadata": dict(revision_request.metadata or {}),
+            "runtime_snapshot": runtime_snapshot,
+            "runtime_snapshot_hash": runtime_snapshot_hash,
         }
         shell = self.session_revision_repository.create_revision_version_shell(
             session_id,
