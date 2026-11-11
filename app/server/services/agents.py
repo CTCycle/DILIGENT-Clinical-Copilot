@@ -37,7 +37,6 @@ from repositories.agent_repository import (
     AgentRevisionConflictError,
 )
 from repositories.context import RepositoryContext
-from services.inspection.revision_tools import RevisionToolRegistry
 from services.llm.model_config import ModelConfigService
 from services.llm.provider_registry import provider_registry
 from services.security.access_keys import AccessKeyService
@@ -311,6 +310,9 @@ class AgentService:
                     )
                 )
         if isinstance(config, RevisionAgentConfig):
+            # Imported lazily: services.inspection imports this module.
+            from services.inspection.revision_tools import RevisionToolRegistry
+
             unknown = sorted(
                 set(config.limits.allowed_tools or []) - RevisionToolRegistry.names
             )
