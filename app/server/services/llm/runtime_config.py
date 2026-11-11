@@ -91,7 +91,7 @@ class LLMRuntimeConfig:
     @classmethod
     def _load_snapshot(cls) -> ModelConfigSnapshot:
         snapshot = ModelConfigSerializer().load_snapshot()
-        overrides = cls._runtime_override.get() or {}
+        overrides = cls._active_overrides()
         if not overrides:
             return snapshot
 
@@ -154,7 +154,30 @@ class LLMRuntimeConfig:
                 if "ollama_seed" in overrides
                 else snapshot.ollama_seed
             ),
+            rag_settings=(
+                dict(cast(Mapping[str, object], overrides["rag_settings"]))
+                if isinstance(overrides.get("rag_settings"), Mapping)
+                else snapshot.rag_settings
+            ),
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _active_overrides(cls) -> dict[str, object]:
+        """Return the active override, mapping run-snapshot key aliases.
+
+        Frozen run snapshots record ``use_cloud_services``/``llm_provider``
+        (the public runtime-settings vocabulary); the snapshot fields are
+        ``use_cloud_models``/``cloud_provider``.
+        """
+        overrides = dict(cls._runtime_override.get() or {})
+        for alias, field_name in (
+            ("use_cloud_services", "use_cloud_models"),
+            ("llm_provider", "cloud_provider"),
+        ):
+            if alias in overrides and field_name not in overrides:
+                overrides[field_name] = overrides[alias]
+        return overrides
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -289,6 +312,11 @@ class LLMRuntimeConfig:
     @classmethod
     def get_ollama_seed(cls) -> int | None:
         return cls._load_snapshot().ollama_seed
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_rag_settings(cls) -> dict[str, object]:
+        return dict(cls._load_snapshot().rag_settings or {})
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -536,6 +564,12 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_revision(cls) -> int:
+        overrides = cls._runtime_override.get()
+        if overrides:
+            canonical = json.dumps(
+                overrides, sort_keys=True, default=str, separators=(",", ":")
+            )
+            return int(hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:15], 16)
         updated_at = cls._load_snapshot().updated_at
         if not isinstance(updated_at, datetime):
             return 0

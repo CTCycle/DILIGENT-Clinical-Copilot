@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -28,6 +29,7 @@ from services.llm.cloud import LLMError
 from services.llm.model_config import ModelConfigService
 from services.llm.ollama_client import OllamaError
 from services.llm.runtime_config import LLMRuntimeConfig
+from services.retrieval.settings import build_effective_rag_settings
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from sqlalchemy import create_engine, text
@@ -1356,6 +1358,51 @@ def test_cloud_runtime_uses_each_configured_role_model() -> None:
             "openai",
             "qwen3:8b",
         )
+
+
+###############################################################################
+def test_frozen_run_snapshot_replays_cloud_provider_and_rag(monkeypatch) -> None:
+    live = ModelConfigSnapshot(
+        use_cloud_models=False,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="gpt-4.1",
+        text_extraction_model="gpt-4.1-mini",
+        revision_model="gpt-4.1",
+        timeline_model="gpt-4.1-mini",
+        rag_settings={"retrieval_selected_count": 3},
+        updated_at=datetime.now(UTC),
+    )
+    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: live)
+    frozen = {
+        "use_cloud_services": True,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "clinical_model": "gpt-4.1",
+        "text_extraction_model": "gpt-4.1-mini",
+        "revision_model": "gpt-4.1",
+        "timeline_model": "gpt-4.1-mini",
+        "rag_settings": {"retrieval_selected_count": 9},
+    }
+    live_revision = LLMRuntimeConfig.get_revision()
+
+    with LLMRuntimeConfig.override_for_run(frozen):
+        assert LLMRuntimeConfig.is_cloud_enabled() is True
+        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+            "openai",
+            "gpt-4.1",
+        )
+        assert build_effective_rag_settings().retrieval_selected_count == 9
+        frozen_revision = LLMRuntimeConfig.get_revision()
+        assert frozen_revision != live_revision
+
+    live_changed = replace(live, updated_at=datetime.now(UTC) + timedelta(hours=1))
+    monkeypatch.setattr(
+        ModelConfigSerializer, "load_snapshot", lambda self: live_changed
+    )
+    with LLMRuntimeConfig.override_for_run(frozen):
+        assert LLMRuntimeConfig.get_revision() == frozen_revision
+    assert build_effective_rag_settings().retrieval_selected_count == 3
 
 
 ###############################################################################

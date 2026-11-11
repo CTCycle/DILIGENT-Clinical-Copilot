@@ -15,16 +15,18 @@ from common.utils.types import (
 from configurations.startup import get_server_settings
 from domain.model_configs import RagSettingsResponse
 from domain.settings.configuration import RagSettings
-from repositories.serialization.model_configs import ModelConfigSerializer
 
 
 ###############################################################################
 def _runtime_rag_settings() -> dict[str, object]:
+    # Resolve through the runtime config so a frozen run snapshot wins over
+    # the live persisted settings.
+    from services.llm.runtime_config import LLMRuntimeConfig
+
     try:
-        snapshot = ModelConfigSerializer().load_snapshot()
+        return LLMRuntimeConfig.get_rag_settings()
     except Exception:
         return {}
-    return dict(snapshot.rag_settings or {})
 
 
 ###############################################################################
