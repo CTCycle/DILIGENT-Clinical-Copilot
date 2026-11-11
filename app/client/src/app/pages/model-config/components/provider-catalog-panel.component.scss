@@ -1,0 +1,219 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: contents;
+}
+
+:host :is(h2, p) {
+  letter-spacing: 0;
+}
+
+.model-config-catalog-panel {
+  min-width: 0;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
+  box-shadow: var(--mc-shadow);
+}
+
+.model-config-catalog-panel {
+  padding: 18px;
+}
+
+.model-config-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.model-config-panel-heading {
+  margin-bottom: 14px;
+}
+
+.model-config-panel-heading h2 {
+  margin: 0;
+  color: var(--mc-text);
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: var(--font-base);
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.model-config-panel-heading h2 {
+  font-size: 16px;
+}
+
+.model-config-panel-subtitle {
+  margin: 3px 0 0;
+  color: var(--mc-muted);
+  font-size: var(--font-xs);
+  line-height: 1.45;
+}
+
+.model-config-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px 38px;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.model-config-search {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.model-config-search input,
+.model-config-tag-select {
+  width: 100%;
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--radius-sm);
+  background: var(--mc-surface);
+  color: var(--mc-text);
+  font-size: var(--font-sm);
+}
+
+.model-config-search input {
+  padding: 0 38px 0 12px;
+}
+
+.model-config-search svg {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: var(--mc-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.model-config-catalog-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height-sm);
+  min-height: var(--control-height-sm);
+  font-size: var(--font-sm);
+  padding: 0;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--radius-sm);
+  background: var(--mc-surface);
+  color: var(--mc-muted);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-catalog-refresh:hover:not(:disabled) {
+  border-color: var(--mc-brand-2);
+  background: var(--mc-surface-soft);
+  color: var(--mc-brand);
+}
+
+.model-config-catalog-refresh:focus-visible {
+  outline: 2px solid var(--mc-brand-2);
+  outline-offset: 2px;
+}
+
+.model-config-catalog-refresh:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.model-config-catalog-refresh svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.model-config-tag-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 11px 0 12px;
+  text-align: left;
+}
+
+.model-config-tag-select svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+
+.model-config-cloud-filter-note {
+  margin: 0 0 14px;
+  color: var(--mc-muted);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.model-config-cloud-filter-note.is-warning {
+  color: var(--color-status-warning-text);
+}
+
+.model-config-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--control-height-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--mc-surface-soft);
+  color: var(--mc-text);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.model-config-filter-pill svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-filter-pill.is-active {
+  background: var(--mc-brand);
+  color: var(--color-text-on-brand);
+}
+
+.model-config-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  color: var(--mc-muted);
+  font-size: 12px;
+}
+
+.model-config-catalog-panel.is-disabled {
+  opacity: 0.72;
+  pointer-events: none;
+}

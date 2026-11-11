@@ -1,6 +1,6 @@
 /* Copyright © 2023–2025 Thomas Virdis */
-/* Licensed under the GNU General Public License, version 3 or later. */
 
+/* Licensed under the GNU General Public License, version 3 or later. */
 
 :host {
   display: block;
@@ -57,8 +57,6 @@
 }
 
 .model-config-runtime-card,
-.model-config-catalog-panel,
-.model-config-cloud-options,
 .model-config-summary-panel {
   min-width: 0;
   border: 1px solid var(--mc-border);
@@ -74,88 +72,7 @@
   min-height: 158px;
 }
 
-.model-config-rag-settings-card {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: var(--space-md);
-  min-width: 0;
-  min-height: 128px;
-  padding: var(--space-md) var(--space-lg);
-  border: 1px solid var(--mc-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
-  box-shadow: var(--mc-shadow);
-}
-
-.model-config-rag-settings-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-md);
-  min-height: 28px;
-}
-
-.model-config-rag-settings-card-body {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: var(--space-md);
-  align-items: start;
-  color: var(--mc-muted);
-  font-size: var(--font-sm);
-  line-height: 1.35;
-}
-
-.model-config-rag-settings-icon,
-.model-config-rag-settings-btn svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.model-config-rag-settings-icon {
-  width: 30px;
-  height: 30px;
-  color: var(--mc-brand);
-}
-
-.model-config-rag-settings-btn {
-  display: inline-grid;
-  place-items: center;
-  width: var(--icon-action-size);
-  height: var(--icon-action-size);
-  border: 1px solid var(--mc-border);
-  border-radius: var(--radius-sm);
-  background: var(--mc-surface-soft);
-  color: var(--mc-text);
-  cursor: pointer;
-}
-
-.model-config-rag-settings-card > .model-config-rag-settings-btn {
-  width: 150px;
-  min-width: 150px;
-  min-height: 28px;
-  height: 28px;
-  margin-inline: auto;
-  padding: 0 var(--space-md);
-  font-size: var(--font-sm);
-  font-weight: 750;
-}
-
-.model-config-rag-settings-btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.model-config-rag-settings-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 .model-config-section-kicker,
-.model-config-panel-heading,
-.model-config-cloud-options h2,
 .model-config-summary-panel h2 {
   display: flex;
   align-items: center;
@@ -164,8 +81,6 @@
 
 .model-config-section-kicker h2,
 .model-config-section-kicker strong,
-.model-config-panel-heading h2,
-.model-config-cloud-options h2,
 .model-config-summary-panel h2,
 .model-config-parameters h3 {
   margin: 0;
@@ -174,20 +89,6 @@
   font-size: var(--font-base);
   font-weight: 760;
   line-height: 1.2;
-}
-
-.model-config-section-kicker > span {
-  display: inline-grid;
-  place-items: center;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--mc-border-strong);
-  border-radius: 50%;
-  color: var(--mc-muted);
-  font-size: var(--font-xs);
-  font-style: normal;
-  line-height: 1;
-  text-align: center;
 }
 
 .model-config-runtime-options {
@@ -282,26 +183,6 @@
   border: 4px solid var(--mc-brand);
 }
 
-.model-config-catalog-panel {
-  padding: 18px;
-}
-
-.model-config-panel-heading {
-  margin-bottom: 14px;
-}
-
-.model-config-panel-heading h2,
-.model-config-cloud-options h2 {
-  font-size: 16px;
-}
-
-.model-config-panel-subtitle {
-  margin: 3px 0 0;
-  color: var(--mc-muted);
-  font-size: var(--font-xs);
-  line-height: 1.45;
-}
-
 .model-config-model-cell span {
   display: grid;
   gap: 2px;
@@ -314,22 +195,6 @@
   line-height: 1.2;
 }
 
-.model-config-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px 38px;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.model-config-search {
-  position: relative;
-  width: 100%;
-  min-width: 0;
-}
-
-.model-config-search input,
-.model-config-tag-select,
-.model-config-cloud-row select,
 .model-config-temperature-input {
   width: 100%;
   min-height: var(--control-height-sm);
@@ -338,134 +203,6 @@
   background: var(--mc-surface);
   color: var(--mc-text);
   font-size: var(--font-sm);
-}
-
-.model-config-search input {
-  padding: 0 38px 0 12px;
-}
-
-.model-config-search svg {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%);
-  fill: none;
-  stroke: var(--mc-muted);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-.model-config-catalog-refresh {
-  display: inline-grid;
-  place-items: center;
-  width: var(--control-height-sm);
-  min-height: var(--control-height-sm);
-  font-size: var(--font-sm);
-  padding: 0;
-  border: 1px solid var(--mc-border);
-  border-radius: var(--radius-sm);
-  background: var(--mc-surface);
-  color: var(--mc-muted);
-  cursor: pointer;
-  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
-}
-
-.model-config-catalog-refresh:hover:not(:disabled) {
-  border-color: var(--mc-brand-2);
-  background: var(--mc-surface-soft);
-  color: var(--mc-brand);
-}
-
-.model-config-catalog-refresh:focus-visible {
-  outline: 2px solid var(--mc-brand-2);
-  outline-offset: 2px;
-}
-
-.model-config-catalog-refresh:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.model-config-catalog-refresh svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.model-config-tag-select {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 11px 0 12px;
-  text-align: left;
-}
-
-.model-config-tag-select svg {
-  flex: none;
-  width: 13px;
-  height: 13px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.model-config-filter-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-bottom: 16px;
-}
-
-.model-config-cloud-filter-note {
-  margin: 0 0 14px;
-  color: var(--mc-muted);
-  font-size: 12px;
-  font-weight: 620;
-}
-
-.model-config-cloud-filter-note.is-warning {
-  color: var(--color-status-warning-text);
-}
-
-.model-config-filter-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: var(--control-height-sm);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--mc-surface-soft);
-  color: var(--mc-text);
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.model-config-filter-pill svg {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.model-config-filter-pill.is-active {
-  background: var(--mc-brand);
-  color: var(--color-text-on-brand);
 }
 
 .model-config-table-shell {
@@ -508,16 +245,22 @@
 
 /* Column widths: the Actions column is fixed to fit five icon buttons; the
    context label wraps instead of spilling into the adjacent Quant column. */
+
 .model-config-table th:first-child,
 .model-config-table td:first-child { width: 24%; }
+
 .model-config-table th:nth-child(2),
 .model-config-table td:nth-child(2) { width: 8%; }
+
 .model-config-table th:nth-child(3),
 .model-config-table td:nth-child(3) { width: 12%; }
+
 .model-config-table th:nth-child(4),
 .model-config-table td:nth-child(4) { width: 8%; }
+
 .model-config-table th:nth-child(5),
 .model-config-table td:nth-child(5) { width: 14%; }
+
 .model-config-table th:nth-child(6),
 .model-config-table td:nth-child(6) {
   width: 248px;
@@ -684,132 +427,6 @@
   box-shadow: inset 3px 0 0 var(--mc-brand);
 }
 
-.model-config-table-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-top: 16px;
-  color: var(--mc-muted);
-  font-size: 12px;
-}
-
-.model-config-cloud-options {
-  padding: 18px;
-}
-
-.model-config-cloud-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 16px;
-  align-items: center;
-  min-height: 64px;
-  border-top: 1px solid color-mix(in srgb, var(--mc-border) 64%, transparent);
-  padding: 10px 0;
-}
-
-.model-config-cloud-row:first-of-type {
-  margin-top: 10px;
-}
-
-.model-config-provider-name {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-}
-
-.model-config-provider-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  color: var(--mc-brand);
-}
-
-.model-config-provider-mark.is-openai {
-  color: var(--mc-text);
-  overflow: hidden;
-}
-
-.model-config-provider-logo-switch {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-}
-
-.model-config-provider-logo {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  display: block;
-}
-
-.model-config-provider-logo-dark {
-  display: none;
-}
-
-.model-config-provider-mark img {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  display: block;
-}
-
-.model-config-provider-mark.is-openai .model-config-provider-logo {
-  filter: none;
-  object-fit: cover;
-  object-position: left center;
-  transform: translateX(3px) scale(1.75);
-}
-
-.model-config-provider-name strong,
-.model-config-provider-name small {
-  display: block;
-}
-
-.model-config-provider-name strong {
-  color: var(--mc-text);
-  font-size: var(--font-base);
-}
-
-.model-config-provider-name small {
-  color: var(--mc-muted);
-  font-size: 11px;
-}
-
-.model-config-test-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 180px;
-  min-height: var(--control-height-sm);
-  border: 1px solid var(--mc-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--mc-surface);
-  color: var(--mc-brand);
-  padding: 0 12px;
-  font-size: var(--font-xs);
-  font-weight: 760;
-  white-space: nowrap;
-  justify-self: end;
-  align-self: center;
-  margin-bottom: 0;
-}
-
-.model-config-test-btn svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .model-config-summary-panel {
   position: sticky;
   top: 18px;
@@ -937,7 +554,6 @@
   line-height: 1.35;
 }
 
-.model-config-catalog-panel.is-disabled,
 .model-config-parameters.is-disabled {
   opacity: 0.72;
   pointer-events: none;
@@ -966,4 +582,3 @@
   color: var(--mc-muted);
   font-size: 11px;
 }
-

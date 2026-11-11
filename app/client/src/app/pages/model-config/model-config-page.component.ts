@@ -3,9 +3,7 @@
 
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 
-import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import {
   StatusMessageComponent,
   resolveStatusTone,
@@ -40,11 +38,15 @@ import {
   ModelPullProgressState,
 } from '../../core/services/model-pull-job.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
-import { AccessKeyModalComponent } from './components/access-key-modal.component';
 import { ModelConfigToggleCardComponent } from './components/model-config-toggle-card.component';
 import { ModelRoleActionButtonComponent } from './components/model-role-action-button.component';
+import { ProviderCatalogPanelComponent } from './components/provider-catalog-panel.component';
 import {
-  MODEL_FILTERS,
+  CredentialProviderOption,
+  ProviderCredentialsPanelComponent,
+} from './components/provider-credentials-panel.component';
+import { RagResourcesPanelComponent } from './components/rag-resources-panel.component';
+import {
   modelMatchesFilters,
   resolveDraftFromSettings,
 } from './model-catalog';
@@ -53,7 +55,11 @@ import {
   DraftRagSettings,
   ModelFilterKey,
   ModelRole,
+  RagBooleanKey,
+  RagFloatKey,
+  RagNumberKey,
   RagSettingsSectionKey,
+  RagTextKey,
 } from './model-config.types';
 import { EMPTY_RUNTIME_SETTINGS } from '../../core/model-config';
 
@@ -70,12 +76,6 @@ const PROVIDER_LOGOS: Partial<Record<AccessKeyProvider, { src: string; alt: stri
   opencode: { src: '/logos/opencode.svg', alt: 'OpenCode logo' },
 };
 const DEFAULT_RAG_SETTINGS_SECTION: RagSettingsSectionKey = 'general';
-const RERANKER_PROFILE_OPTIONS = [
-  { value: 'lightweight-balanced-v1', label: 'Balanced' },
-  { value: 'lightweight-lexical-v1', label: 'Lexical' },
-  { value: 'lightweight-phrase-v1', label: 'Phrase' },
-] as const;
-
 const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   allow_local_filesystem_access: true,
   vector_collection_name: 'documents',
@@ -95,28 +95,10 @@ const DEFAULT_RAG_SETTINGS: DraftRagSettings = {
   embedding_offline_mode: false,
 };
 
-const RAG_INDEX_METRIC_OPTIONS = [
-  { value: 'cosine', label: 'Cosine' },
-  { value: 'euclidean', label: 'Euclidean' },
-  { value: 'dot', label: 'Dot product' },
-] as const;
-
-const RAG_INDEX_TYPE_OPTIONS = [
-  { value: 'IVF_FLAT', label: 'IVF flat' },
-  { value: 'HNSW', label: 'HNSW' },
-  { value: 'FLAT', label: 'Flat' },
-] as const;
-
 const EMPTY_LOCAL_CATALOG: ModelConfigStateResponse['local_catalog'] = {
   status: 'not_loaded',
   updated_at: null,
   message: null,
-};
-
-type CredentialProviderOption = {
-  provider: AccessKeyProvider;
-  label: string;
-  description: string;
 };
 
 function resolveProviderLabel(provider: string, cloudProviders: ModelConfigStateResponse['cloud_providers']): string {
@@ -129,13 +111,13 @@ function resolveProviderLabel(provider: string, cloudProviders: ModelConfigState
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
-    ModalShellComponent,
     StatusMessageComponent,
-    AccessKeyModalComponent,
     ModelConfigToggleCardComponent,
     ModelRoleActionButtonComponent,
     HelpPopoverComponent,
+    ProviderCatalogPanelComponent,
+    ProviderCredentialsPanelComponent,
+    RagResourcesPanelComponent,
   ],
   templateUrl: './model-config-page.component.html',
   styleUrl: './model-config-page.component.scss',
@@ -145,10 +127,6 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly modelConfigState = inject(ModelConfigStateService);
   private readonly modelPullJobs = inject(ModelPullJobService);
 
-  readonly modelFilters = MODEL_FILTERS;
-  readonly rerankerProfileOptions = RERANKER_PROFILE_OPTIONS;
-  readonly ragIndexMetricOptions = RAG_INDEX_METRIC_OPTIONS;
-  readonly ragIndexTypeOptions = RAG_INDEX_TYPE_OPTIONS;
 
   readonly isLoading = signal(true);
   readonly savingOperations = signal<ReadonlySet<SaveOperation>>(new Set());
@@ -168,7 +146,6 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
   readonly modelSearchQuery = signal('');
   readonly visibleModelLimit = signal(MODEL_BATCH_SIZE);
   readonly statusMessage = signal('');
-  readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
   readonly previewReasoningLevel = signal(0);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
@@ -420,9 +397,17 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
       const description = labels.length > 1
         ? `This credential is used by ${labels.join(' and ')} cloud models.`
         : `Manage the API keys used to access ${label} cloud models.`;
-      return { provider, label, description };
+      return { provider, label, description, logo: this.providerLogo(provider) };
     });
   });
+  readonly credentialProviderLabels = computed(() =>
+    Object.fromEntries(
+      this.credentialProviderOptions().map((option) => [option.provider, this.resolveProviderLabel(option.provider)]),
+    ) as Partial<Record<AccessKeyProvider, string>>,
+  );
+  readonly providerSelectOptions = computed(() =>
+    this.cloudProviderOptions().map((provider) => ({ value: provider, label: this.resolveProviderLabel(provider) })),
+  );
   readonly selectedCredentialProvider = computed<AccessKeyProvider | null>(() =>
     this.cloudProviders().find((provider) => provider.id === this.draftProvider())?.credential_scope || null,
   );
@@ -792,18 +777,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     this.activeRagSettingsSection.set(section);
   }
 
-  setDraftRagNumber(
-    key: keyof Pick<
-      DraftRagSettings,
-      | 'chunk_size'
-      | 'chunk_overlap'
-      | 'embedding_batch_size'
-      | 'retrieval_candidate_count'
-      | 'retrieval_selected_count'
-      | 'vector_stream_batch_size'
-    >,
-    value: string,
-  ): void {
+  setDraftRagNumber(key: RagNumberKey, value: string): void {
     const parsed = Number.parseInt(value, 10);
     this.draftRagSettings.update((previous) => ({
       ...previous,
@@ -812,10 +786,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     this.onRagDraftChanged();
   }
 
-  setDraftRagFloat(
-    key: keyof Pick<DraftRagSettings, 'hybrid_vector_weight' | 'hybrid_text_weight'>,
-    value: string,
-  ): void {
+  setDraftRagFloat(key: RagFloatKey, value: string): void {
     const parsed = Number.parseFloat(value);
     this.draftRagSettings.update((previous) => ({
       ...previous,
@@ -824,10 +795,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     this.onRagDraftChanged();
   }
 
-  setDraftRagText(
-    key: keyof Pick<DraftRagSettings, 'reranker_model' | 'vector_collection_name' | 'vector_index_metric' | 'vector_index_type'>,
-    value: string,
-  ): void {
+  setDraftRagText(key: RagTextKey, value: string): void {
     this.draftRagSettings.update((previous) => ({
       ...previous,
       [key]: value,
@@ -835,13 +803,7 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     this.onRagDraftChanged();
   }
 
-  setDraftRagBoolean(
-    key: keyof Pick<
-      DraftRagSettings,
-      'allow_local_filesystem_access' | 'use_hybrid_search' | 'use_reranking' | 'embedding_offline_mode'
-    >,
-    value: boolean,
-  ): void {
+  setDraftRagBoolean(key: RagBooleanKey, value: boolean): void {
     this.draftRagSettings.update((previous) => ({
       ...previous,
       [key]: value,
@@ -999,14 +961,6 @@ export class ModelConfigPageComponent implements OnInit, OnDestroy {
     if (this.ragSaveTimer === null) return;
     clearTimeout(this.ragSaveTimer);
     this.ragSaveTimer = null;
-  }
-
-  openKeys(provider: AccessKeyProvider): void {
-    this.openProviderModal.set(provider);
-  }
-
-  closeKeys(): void {
-    this.openProviderModal.set(null);
   }
 
   async pullModelByName(modelName: string): Promise<void> {

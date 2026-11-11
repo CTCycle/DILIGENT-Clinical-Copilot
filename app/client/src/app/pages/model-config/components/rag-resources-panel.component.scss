@@ -1,0 +1,105 @@
+/* Copyright © 2023–2025 Thomas Virdis */
+/* Licensed under the GNU General Public License, version 3 or later. */
+
+:host {
+  display: contents;
+}
+
+:host :is(h3, p) {
+  letter-spacing: 0;
+}
+
+.model-config-rag-settings-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-md);
+  min-width: 0;
+  min-height: 128px;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mc-surface) 94%, transparent);
+  box-shadow: var(--mc-shadow);
+}
+
+.model-config-rag-settings-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 28px;
+}
+
+.model-config-rag-settings-card-body {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: start;
+  color: var(--mc-muted);
+  font-size: var(--font-sm);
+  line-height: 1.35;
+}
+
+.model-config-rag-settings-icon,
+.model-config-rag-settings-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-rag-settings-icon {
+  width: 30px;
+  height: 30px;
+  color: var(--mc-brand);
+}
+
+.model-config-rag-settings-btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--icon-action-size);
+  height: var(--icon-action-size);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--radius-sm);
+  background: var(--mc-surface-soft);
+  color: var(--mc-text);
+  cursor: pointer;
+}
+
+.model-config-rag-settings-card > .model-config-rag-settings-btn {
+  width: 150px;
+  min-width: 150px;
+  min-height: 28px;
+  height: 28px;
+  margin-inline: auto;
+  padding: 0 var(--space-md);
+  font-size: var(--font-sm);
+  font-weight: 750;
+}
+
+.model-config-rag-settings-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.model-config-rag-settings-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+
+.model-config-section-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.model-config-section-kicker strong {
+  margin: 0;
+  color: var(--mc-text);
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: var(--font-base);
+  font-weight: 760;
+  line-height: 1.2;
+}

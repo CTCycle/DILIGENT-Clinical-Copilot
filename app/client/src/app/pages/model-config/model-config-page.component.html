@@ -56,36 +56,24 @@
             </div>
           </div>
 
-          <section class="model-config-rag-settings-card" aria-label="RAG settings">
-            <span class="model-config-rag-settings-card-top">
-              <span class="model-config-section-kicker">
-                <strong>RAG settings</strong>
-                <app-help-popover
-                  ariaLabel="Explain RAG settings"
-                  title="What RAG settings control"
-                  body="These settings shape indexing and retrieval quality. They do not turn evidence on for every run; the DILI Agent checkbox still controls whether an assessment uses indexed evidence."
-                ></app-help-popover>
-              </span>
-            </span>
-            <span class="model-config-rag-settings-card-body">
-              <svg class="model-config-rag-settings-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <ellipse cx="12" cy="6" rx="6.5" ry="2.75" />
-                <path d="M5.5 6v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75V6" />
-                <path d="M5.5 11v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75v-5" />
-              </svg>
-              <span>Configure retrieval, reranking, embeddings, chunking, and vector update parameters.</span>
-            </span>
-            <button
-              class="model-config-rag-settings-btn"
-              type="button"
-              aria-label="Configure RAG settings"
-              title="Configure RAG settings"
-              (click)="openRagSettingsPanel()"
-              [disabled]="isRagSaving() || isLoading()"
-            >
-              Configure
-            </button>
-          </section>
+          <app-rag-resources-panel
+            [draft]="draftRagSettings()"
+            [modalOpen]="ragSettingsModalOpen()"
+            [activeSection]="activeRagSettingsSection()"
+            [disabled]="isRagSaving() || isLoading()"
+            [status]="ragSettingsStatus()"
+            [statusIsError]="!!ragSettingsValidationMessage() || !!ragSettingsSaveError()"
+            [modelLabel]="currentRagModelLabel()"
+            [embeddingRuntime]="embeddingRuntime()"
+            [embeddingIndex]="embeddingIndex()"
+            (openRequested)="openRagSettingsPanel()"
+            (closeRequested)="closeRagSettingsPanel()"
+            (sectionChange)="setActiveRagSettingsSection($event)"
+            (numberChange)="setDraftRagNumber($event.key, $event.value)"
+            (floatChange)="setDraftRagFloat($event.key, $event.value)"
+            (textChange)="setDraftRagText($event.key, $event.value)"
+            (booleanChange)="setDraftRagBoolean($event.key, $event.value)"
+          ></app-rag-resources-panel>
 
           <app-model-config-toggle-card
             title="Reasoning"
@@ -100,312 +88,195 @@
           ></app-model-config-toggle-card>
         </section>
 
-        <section id="model-roles" class="model-config-catalog-panel" [class.is-disabled]="isConfigurationSaving() || isLoading()" [attr.aria-disabled]="isConfigurationSaving() || isLoading()">
-          <div class="model-config-panel-heading">
-            <div>
-              <h2>{{ draftConfig().useCloudServices ? 'Cloud Model Catalog' : 'Local Model Catalog' }}</h2>
-              <p class="model-config-panel-subtitle">Assign a model per task.</p>
-            </div>
-          </div>
-
-          <div class="model-config-toolbar">
-            <div class="model-config-search">
-              <input
-                type="search"
-                placeholder="Search models..."
-                [ngModel]="modelSearchQuery()"
-                (ngModelChange)="setModelSearchQuery($event)"
-              />
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
-              </svg>
-            </div>
-            @if (draftConfig().useCloudServices) {
-              <select
-                class="model-config-tag-select"
-                aria-label="Cloud provider"
-                [ngModel]="draftProvider()"
-                (ngModelChange)="handleProviderChange($event)"
-                [disabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
-              >
-                @for (provider of cloudProviderOptions(); track provider) {
-                  <option [value]="provider">{{ resolveProviderLabel(provider) }}</option>
-                }
-              </select>
-            } @else {
-              <button class="model-config-tag-select" type="button" disabled>
-                <span>All Tags</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-              </button>
-            }
-            <button
-              class="model-config-catalog-refresh"
-              type="button"
-              aria-label="Refresh model catalog"
-              title="Refresh model catalog"
-              (click)="refreshSelectedCatalog()"
-              [disabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M20 11a8 8 0 0 0-13.8-4.9L4 8.3M4 5v3.3h3.3M4 13a8 8 0 0 0 13.8 4.9L20 15.7M20 19v-3.3h-3.3" />
-              </svg>
-            </button>
-          </div>
-
-          @if (!draftConfig().useCloudServices) {
-          <div class="model-config-filter-pills" aria-label="Model filters">
-            <button
-              type="button"
-              class="model-config-filter-pill"
-              [class.is-active]="!isFilterActive('installed') && !isFilterActive('missing') && !isFilterActive('small') && !isFilterActive('large') && !isFilterActive('quantized')"
-              (click)="clearFilters()"
-            >
-              All
-            </button>
-            <button
-              type="button"
-              class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('installed')"
-              (click)="toggleFilter('installed')"
-            >
-              Installed in Ollama
-            </button>
-            <button
-              type="button"
-              class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('missing')"
-              (click)="toggleFilter('missing')"
-            >
-              Not installed
-            </button>
-            <button
-              type="button"
-              class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('small')"
-              (click)="toggleFilter('small')"
-            >
-              Up to 8B
-            </button>
-            <button
-              type="button"
-              class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('large')"
-              (click)="toggleFilter('large')"
-            >
-              Above 8B
-            </button>
-            <button
-              type="button"
-              class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('quantized')"
-              (click)="toggleFilter('quantized')"
-            >
-              Quantized (Q*)
-            </button>
-          </div>
-          @if (localCatalog().message) {
-          <p class="model-config-cloud-filter-note" [class.is-warning]="localCatalog().status !== 'available'">
-            {{ localCatalog().message }}
-          </p>
-          }
-          } @else {
-          <p class="model-config-cloud-filter-note" [class.is-warning]="selectedCloudProvider()?.catalog_status !== 'available'">
-            {{ cloudCatalogMessage() || 'Tag filters are available only for local catalog metadata.' }}
-          </p>
-          }
-
-          <div class="model-config-table-shell" (scroll)="onModelCatalogScroll($event)">
-            <table class="model-config-table">
-              <thead>
-                <tr>
-                  <th>Model</th>
-                  <th>Size</th>
-                  <th>Context</th>
-                  <th>Quant</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @if (catalogEmptyMessage()) {
+        <app-provider-catalog-panel
+          [useCloud]="draftConfig().useCloudServices"
+          [disabled]="isConfigurationSaving() || isLoading()"
+          [actionsDisabled]="isConfigurationSaving() || isLoading() || !!catalogProviderInFlight()"
+          [searchQuery]="modelSearchQuery()"
+          [provider]="draftProvider()"
+          [providerOptions]="providerSelectOptions()"
+          [activeFilters]="activeFilters()"
+          [localCatalogStatus]="localCatalog().status"
+          [localCatalogMessage]="localCatalog().message"
+          [cloudCatalogStatus]="selectedCloudProvider()?.catalog_status ?? null"
+          [cloudCatalogMessage]="cloudCatalogMessage()"
+          [rangeStart]="visibleModelRangeStart()"
+          [rangeEnd]="visibleModelRangeEnd()"
+          [totalCount]="filteredModelCount()"
+          (searchQueryChange)="setModelSearchQuery($event)"
+          (providerChange)="handleProviderChange($event)"
+          (refreshRequested)="refreshSelectedCatalog()"
+          (filterToggled)="toggleFilter($event)"
+          (filtersCleared)="clearFilters()"
+        >
+            <div class="model-config-table-shell" (scroll)="onModelCatalogScroll($event)">
+              <table class="model-config-table">
+                <thead>
                   <tr>
-                    <td colspan="6" class="model-config-empty-note">{{ catalogEmptyMessage() }}</td>
+                    <th>Model</th>
+                    <th>Size</th>
+                    <th>Context</th>
+                    <th>Quant</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
-                }
-                @if (!draftConfig().useCloudServices) {
-                @for (model of visibleLocalModels(); track model.name; let index = $index) {
-                  <tr [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name || draftConfig().revisionModel === model.name || draftConfig().timelineModel === model.name">
-                    <td>
-                      <div class="model-config-model-cell">
-                        <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="8" y="6.5" width="8" height="11" rx="1.5" />
-                          <path d="M5.75 9.25h2.25M5.75 14.75h2.25M16 9.25h2.25M16 14.75h2.25" />
-                          <path d="M10.25 9.75h3.5M10.25 12h3.5M10.25 14.25h2" />
-                        </svg>
-                        <span>
-                          <strong>{{ model.name }}</strong>
-                          @if (localRecommendationLabel(model); as recommendation) {
-                            <small class="model-config-model-note">{{ recommendation }}</small>
-                          }
-                        </span>
-                      </div>
-                    </td>
-                    <td>{{ modelSizeLabel(model.name) }}</td>
-                    <td>{{ modelContextLabel(model.name) }}</td>
-                    <td>{{ modelQuantLabel(model.name) }}</td>
-                    <td>
-                      <span
-                        class="model-config-status-pill"
-                        [class.is-installed]="modelStatus(model) === 'Installed'"
-                        [class.is-missing]="modelStatus(model) === 'Not installed'"
-                      >
-                        {{ modelStatus(model) }}
-                      </span>
-                    </td>
-                    <td>
-                      <div class="model-config-actions">
-                        <button
-                          class="model-config-action-btn"
-                          [class.is-disabled]="modelStatus(model) === 'Installed'"
-                          type="button"
-                          [attr.aria-label]="'Install ' + model.name"
-                          [attr.title]="modelStatus(model) === 'Installed' ? 'Already installed' : 'Install model'"
-                          (click)="pullModelByName(model.name)"
-                          [disabled]="isConfigurationSaving() || isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
+                </thead>
+                <tbody>
+                  @if (catalogEmptyMessage()) {
+                    <tr>
+                      <td colspan="6" class="model-config-empty-note">{{ catalogEmptyMessage() }}</td>
+                    </tr>
+                  }
+                  @if (!draftConfig().useCloudServices) {
+                  @for (model of visibleLocalModels(); track model.name; let index = $index) {
+                    <tr [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name || draftConfig().revisionModel === model.name || draftConfig().timelineModel === model.name">
+                      <td>
+                        <div class="model-config-model-cell">
+                          <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="8" y="6.5" width="8" height="11" rx="1.5" />
+                            <path d="M5.75 9.25h2.25M5.75 14.75h2.25M16 9.25h2.25M16 14.75h2.25" />
+                            <path d="M10.25 9.75h3.5M10.25 12h3.5M10.25 14.25h2" />
+                          </svg>
+                          <span>
+                            <strong>{{ model.name }}</strong>
+                            @if (localRecommendationLabel(model); as recommendation) {
+                              <small class="model-config-model-note">{{ recommendation }}</small>
+                            }
+                          </span>
+                        </div>
+                      </td>
+                      <td>{{ modelSizeLabel(model.name) }}</td>
+                      <td>{{ modelContextLabel(model.name) }}</td>
+                      <td>{{ modelQuantLabel(model.name) }}</td>
+                      <td>
+                        <span
+                          class="model-config-status-pill"
+                          [class.is-installed]="modelStatus(model) === 'Installed'"
+                          [class.is-missing]="modelStatus(model) === 'Not installed'"
                         >
-                          <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
-                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
-                        </button>
-                        <app-model-role-action-button
-                          role="clinical"
-                          [modelName]="model.name"
-                          [selected]="draftConfig().clinicalModel === model.name"
-                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
-                          (roleSelected)="handleRoleSelection($event, model.name)"
-                        />
-                        <app-model-role-action-button
-                          role="text_extraction"
-                          [modelName]="model.name"
-                          [selected]="draftConfig().textExtractionModel === model.name"
-                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
-                          (roleSelected)="handleRoleSelection($event, model.name)"
-                        />
-                        <app-model-role-action-button
-                          role="revision"
-                          [modelName]="model.name"
-                          [selected]="draftConfig().revisionModel === model.name"
-                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
-                          (roleSelected)="handleRoleSelection($event, model.name)"
-                        />
-                        <app-model-role-action-button
-                          role="timeline"
-                          [modelName]="model.name"
-                          [selected]="draftConfig().timelineModel === model.name"
-                          [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
-                          (roleSelected)="handleRoleSelection($event, model.name)"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                  @if (progressForModel(model.name); as progress) {
-                    <tr class="model-config-progress-row">
-                      <td colspan="6">
-                        <div class="model-config-pull-progress" role="status" aria-live="polite">
-                          <div class="model-config-pull-progress-track" aria-hidden="true">
-                            <div class="model-config-pull-progress-fill" [style.width.%]="progress.progress"></div>
+                          {{ modelStatus(model) }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="model-config-actions">
+                          <button
+                            class="model-config-action-btn"
+                            [class.is-disabled]="modelStatus(model) === 'Installed'"
+                            type="button"
+                            [attr.aria-label]="'Install ' + model.name"
+                            [attr.title]="modelStatus(model) === 'Installed' ? 'Already installed' : 'Install model'"
+                            (click)="pullModelByName(model.name)"
+                            [disabled]="isConfigurationSaving() || isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
+                          >
+                            <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
+                          </button>
+                          <app-model-role-action-button
+                            role="clinical"
+                            [modelName]="model.name"
+                            [selected]="draftConfig().clinicalModel === model.name"
+                            [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
+                            (roleSelected)="handleRoleSelection($event, model.name)"
+                          />
+                          <app-model-role-action-button
+                            role="text_extraction"
+                            [modelName]="model.name"
+                            [selected]="draftConfig().textExtractionModel === model.name"
+                            [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
+                            (roleSelected)="handleRoleSelection($event, model.name)"
+                          />
+                          <app-model-role-action-button
+                            role="revision"
+                            [modelName]="model.name"
+                            [selected]="draftConfig().revisionModel === model.name"
+                            [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
+                            (roleSelected)="handleRoleSelection($event, model.name)"
+                          />
+                          <app-model-role-action-button
+                            role="timeline"
+                            [modelName]="model.name"
+                            [selected]="draftConfig().timelineModel === model.name"
+                            [disabled]="isConfigurationSaving() || isLoading() || !isModelRoleSelectable(model)"
+                            (roleSelected)="handleRoleSelection($event, model.name)"
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                    @if (progressForModel(model.name); as progress) {
+                      <tr class="model-config-progress-row">
+                        <td colspan="6">
+                          <div class="model-config-pull-progress" role="status" aria-live="polite">
+                            <div class="model-config-pull-progress-track" aria-hidden="true">
+                              <div class="model-config-pull-progress-fill" [style.width.%]="progress.progress"></div>
+                            </div>
+                            <p class="model-config-pull-progress-label">{{ progress.message }}</p>
                           </div>
-                          <p class="model-config-pull-progress-label">{{ progress.message }}</p>
+                        </td>
+                      </tr>
+                    }
+                  }
+                  } @else {
+                  @for (modelName of visibleCloudModels(); track modelName) {
+                    <tr [class.is-selected]="draftCloudModel() === modelName || draftConfig().clinicalModel === modelName || draftConfig().textExtractionModel === modelName || draftConfig().revisionModel === modelName || draftConfig().timelineModel === modelName">
+                      <td>
+                        <div class="model-config-model-cell">
+                          <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
+                          </svg>
+                          <span><strong>{{ modelName }}</strong></span>
+                        </div>
+                      </td>
+                      <td>Cloud</td>
+                      <td>{{ cloudModelContextLabel(modelName) }}</td>
+                      <td>N/A</td>
+                      <td><span class="model-config-status-pill is-installed">Available</span></td>
+                      <td>
+                        <div class="model-config-actions model-config-actions-end">
+                          <app-model-role-action-button
+                            role="clinical"
+                            [modelName]="modelName"
+                            [selected]="draftConfig().clinicalModel === modelName"
+                            [disabled]="isConfigurationSaving() || isLoading()"
+                            (roleSelected)="handleRoleSelection($event, modelName)"
+                          />
+                          <app-model-role-action-button
+                            role="text_extraction"
+                            [modelName]="modelName"
+                            [selected]="draftConfig().textExtractionModel === modelName"
+                            [disabled]="isConfigurationSaving() || isLoading()"
+                            (roleSelected)="handleRoleSelection($event, modelName)"
+                          />
+                          <app-model-role-action-button
+                            role="revision"
+                            [modelName]="modelName"
+                            [selected]="draftConfig().revisionModel === modelName"
+                            [disabled]="isConfigurationSaving() || isLoading()"
+                            (roleSelected)="handleRoleSelection($event, modelName)"
+                          />
+                          <app-model-role-action-button
+                            role="timeline"
+                            [modelName]="modelName"
+                            [selected]="draftConfig().timelineModel === modelName"
+                            [disabled]="isConfigurationSaving() || isLoading()"
+                            (roleSelected)="handleRoleSelection($event, modelName)"
+                          />
                         </div>
                       </td>
                     </tr>
                   }
-                }
-                } @else {
-                @for (modelName of visibleCloudModels(); track modelName) {
-                  <tr [class.is-selected]="draftCloudModel() === modelName || draftConfig().clinicalModel === modelName || draftConfig().textExtractionModel === modelName || draftConfig().revisionModel === modelName || draftConfig().timelineModel === modelName">
-                    <td>
-                      <div class="model-config-model-cell">
-                        <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
-                        </svg>
-                        <span><strong>{{ modelName }}</strong></span>
-                      </div>
-                    </td>
-                    <td>Cloud</td>
-                    <td>{{ cloudModelContextLabel(modelName) }}</td>
-                    <td>N/A</td>
-                    <td><span class="model-config-status-pill is-installed">Available</span></td>
-                    <td>
-                      <div class="model-config-actions model-config-actions-end">
-                        <app-model-role-action-button
-                          role="clinical"
-                          [modelName]="modelName"
-                          [selected]="draftConfig().clinicalModel === modelName"
-                          [disabled]="isConfigurationSaving() || isLoading()"
-                          (roleSelected)="handleRoleSelection($event, modelName)"
-                        />
-                        <app-model-role-action-button
-                          role="text_extraction"
-                          [modelName]="modelName"
-                          [selected]="draftConfig().textExtractionModel === modelName"
-                          [disabled]="isConfigurationSaving() || isLoading()"
-                          (roleSelected)="handleRoleSelection($event, modelName)"
-                        />
-                        <app-model-role-action-button
-                          role="revision"
-                          [modelName]="modelName"
-                          [selected]="draftConfig().revisionModel === modelName"
-                          [disabled]="isConfigurationSaving() || isLoading()"
-                          (roleSelected)="handleRoleSelection($event, modelName)"
-                        />
-                        <app-model-role-action-button
-                          role="timeline"
-                          [modelName]="modelName"
-                          [selected]="draftConfig().timelineModel === modelName"
-                          [disabled]="isConfigurationSaving() || isLoading()"
-                          (roleSelected)="handleRoleSelection($event, modelName)"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                }
-                }
-              </tbody>
-            </table>
-          </div>
-
-          <div class="model-config-table-footer">
-            <span>Showing {{ visibleModelRangeStart() }}-{{ visibleModelRangeEnd() }} of {{ filteredModelCount() }} models</span>
-          </div>
-        </section>
-
-        <section class="model-config-cloud-options">
-          <h2>Cloud Provider Keys</h2>
-          @for (provider of credentialProviderOptions(); track provider.provider) {
-            <div class="model-config-cloud-row" [class.is-active]="selectedCredentialProvider() === provider.provider">
-              <div class="model-config-provider-name">
-                <span class="model-config-provider-mark" [class.is-openai]="provider.provider === 'openai'" [class.is-gemini]="provider.provider === 'gemini'" [class.is-monochrome]="provider.provider === 'openai' || provider.provider === 'anthropic' || provider.provider === 'opencode'">
-                  @if (providerLogo(provider.provider); as logo) {
-                    <img class="model-config-provider-logo" [src]="logo.src" [alt]="logo.alt" />
-                  } @else {
-                    <span aria-hidden="true">{{ provider.label.slice(0, 1) }}</span>
                   }
-                </span>
-                <span>
-                  <strong>{{ provider.label }}</strong>
-                  <small>{{ provider.description }}</small>
-                </span>
-              </div>
-              <button type="button" class="model-config-test-btn" (click)="openKeys(provider.provider)" [disabled]="isConfigurationSaving() || isLoading()">
-                Manage keys
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="12" r="8.25" />
-                  <path d="m8.4 12.2 2.35 2.35 4.85-5.1" />
-                </svg>
-              </button>
+                </tbody>
+              </table>
             </div>
-          }
-        </section>
+        </app-provider-catalog-panel>
+
+        <app-provider-credentials-panel
+          [providers]="credentialProviderOptions()"
+          [selectedProvider]="selectedCredentialProvider()"
+          [disabled]="isConfigurationSaving() || isLoading()"
+          [providerLabels]="credentialProviderLabels()"
+          (keysChanged)="loadModelConfig(false)"
+        ></app-provider-credentials-panel>
       </div>
 
       <aside class="model-config-summary-panel">
@@ -464,288 +335,4 @@
     presentation="inline"
   ></app-status-message>
 
-  <app-access-key-modal
-    [isOpen]="openProviderModal() !== null"
-    [provider]="openProviderModal() || 'openai'"
-    [providerLabel]="resolveProviderLabel(openProviderModal() || 'openai')"
-    (closed)="closeKeys()"
-    (keysChanged)="loadModelConfig(false)"
-  ></app-access-key-modal>
-
-  <app-modal-shell
-    [isOpen]="ragSettingsModalOpen()"
-    title="RAG settings"
-    subtitle="Configure retrieval, ranking, chunking, embeddings, and vector indexing behavior."
-    titleId="rag-settings-title"
-    ariaLabelledBy="rag-settings-title"
-    dialogClassName="modal-container model-config-rag-modal"
-    [footer]="true"
-    (close)="closeRagSettingsPanel()"
-  >
-    <div class="model-config-rag-modal-body">
-      <nav class="model-config-rag-modal-tabs" aria-label="RAG settings sections">
-        <button type="button" [class.is-active]="activeRagSettingsSection() === 'general'" (click)="setActiveRagSettingsSection('general')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h16M4 15.5h16M8.5 4v16M15.5 4v16" /></svg>
-          Retrieval
-        </button>
-        <button type="button" [class.is-active]="activeRagSettingsSection() === 'chunking'" (click)="setActiveRagSettingsSection('chunking')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h8l6 6v8H5V5Z" /><path d="M13 5v6h6" /></svg>
-          Chunking
-        </button>
-        <button type="button" [class.is-active]="activeRagSettingsSection() === 'embeddings'" (click)="setActiveRagSettingsSection('embeddings')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14" /><path d="M8 4v4M16 10v4M11 16v4" /></svg>
-          Embeddings
-        </button>
-        <button type="button" [class.is-active]="activeRagSettingsSection() === 'models'" (click)="setActiveRagSettingsSection('models')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V7l6-3 6 3v10l-6 3-6-3Z" /><path d="m9.5 9.5 5 5M14.5 9.5l-5 5" /></svg>
-          Ranking
-        </button>
-        <button type="button" [class.is-active]="activeRagSettingsSection() === 'storage'" (click)="setActiveRagSettingsSection('storage')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" /><path d="M8 9h8M8 13h5" /></svg>
-          Index
-        </button>
-      </nav>
-
-      <div class="model-config-rag-modal-scroll">
-        @if (activeRagSettingsSection() === 'general') {
-        <section class="model-config-rag-settings-section">
-          <h3>Retrieval Settings</h3>
-          <p class="model-config-rag-settings-intro">How many candidates are retrieved and how they are ranked before entering the model context.</p>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-candidate-count">
-              Retrieved documents
-              <small>Hybrid results collected before reranking</small>
-            </label>
-            <input
-              id="rag-candidate-count"
-              type="number"
-              min="1"
-              step="1"
-              [ngModel]="draftRagSettings().retrieval_candidate_count"
-              (ngModelChange)="setDraftRagNumber('retrieval_candidate_count', $event)"
-            />
-          </div>
-          <div class="model-config-rag-setting-row" [class.is-invalid]="draftRagSettings().retrieval_selected_count > draftRagSettings().retrieval_candidate_count">
-            <label for="rag-selected-count">
-              Selected documents
-              <small>Documents retained for the LLM context after ranking</small>
-            </label>
-            <input
-              id="rag-selected-count"
-              type="number"
-              min="1"
-              step="1"
-              [attr.max]="draftRagSettings().retrieval_candidate_count"
-              [ngModel]="draftRagSettings().retrieval_selected_count"
-              (ngModelChange)="setDraftRagNumber('retrieval_selected_count', $event)"
-            />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-hybrid-toggle">
-              Hybrid search
-              <small>Blend vector similarity with text relevance</small>
-            </label>
-            <input
-              id="rag-hybrid-toggle"
-              class="model-config-rag-checkbox"
-              type="checkbox"
-              [ngModel]="draftRagSettings().use_hybrid_search"
-              (ngModelChange)="setDraftRagBoolean('use_hybrid_search', $event)"
-            />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-vector-weight">
-              Vector weight
-              <small>Relative contribution of semantic vector matches during hybrid fusion</small>
-            </label>
-            <input
-              id="rag-vector-weight"
-              type="number"
-              min="0"
-              step="0.05"
-              [disabled]="!draftRagSettings().use_hybrid_search"
-              [ngModel]="draftRagSettings().hybrid_vector_weight"
-              (ngModelChange)="setDraftRagFloat('hybrid_vector_weight', $event)"
-            />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-text-weight">
-              Text weight
-              <small>Relative contribution of lexical text matches during hybrid fusion</small>
-            </label>
-            <input
-              id="rag-text-weight"
-              type="number"
-              min="0"
-              step="0.05"
-              [disabled]="!draftRagSettings().use_hybrid_search"
-              [ngModel]="draftRagSettings().hybrid_text_weight"
-              (ngModelChange)="setDraftRagFloat('hybrid_text_weight', $event)"
-            />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-rerank-toggle">
-              Reranking
-              <small>Rank retrieved candidates before context injection</small>
-            </label>
-            <input
-              id="rag-rerank-toggle"
-              class="model-config-rag-checkbox"
-              type="checkbox"
-              [ngModel]="draftRagSettings().use_reranking"
-              (ngModelChange)="setDraftRagBoolean('use_reranking', $event)"
-            />
-          </div>
-        </section>
-        }
-
-        @if (activeRagSettingsSection() === 'chunking') {
-        <section class="model-config-rag-settings-section">
-          <h3>Chunking Settings</h3>
-          <p class="model-config-rag-settings-intro">How source text is split into chunks for indexing.</p>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-chunk-size">
-              Chunk size
-              <small>Target tokens per clinical text chunk</small>
-            </label>
-            <input id="rag-chunk-size" type="number" min="1" step="1" [ngModel]="draftRagSettings().chunk_size" (ngModelChange)="setDraftRagNumber('chunk_size', $event)" />
-          </div>
-          <div class="model-config-rag-setting-row" [class.is-invalid]="draftRagSettings().chunk_overlap >= draftRagSettings().chunk_size">
-            <label for="rag-chunk-overlap">
-              Chunk overlap
-              <small>Token overlap between adjacent chunks</small>
-            </label>
-            <input id="rag-chunk-overlap" type="number" min="0" step="1" [ngModel]="draftRagSettings().chunk_overlap" (ngModelChange)="setDraftRagNumber('chunk_overlap', $event)" />
-          </div>
-        </section>
-        }
-
-        @if (activeRagSettingsSection() === 'embeddings') {
-        <section class="model-config-rag-settings-section">
-          <h3>Embedding Settings</h3>
-          <p class="model-config-rag-settings-intro">Embedding model runtime and batching behavior.</p>
-          <div class="model-config-rag-setting-row">
-            <label>Canonical embedding model</label>
-            <span>{{ currentRagModelLabel() }}</span>
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label>
-              Runtime device
-              <small>Resolved by the embedding runtime and shown for diagnostics</small>
-            </label>
-            <span>{{ embeddingRuntime()?.device || 'Not loaded' }}</span>
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-batch-size">
-              Embedding batch size
-              <small>Number of chunks embedded per batch</small>
-            </label>
-            <input id="rag-batch-size" type="number" min="1" step="1" [ngModel]="draftRagSettings().embedding_batch_size" (ngModelChange)="setDraftRagNumber('embedding_batch_size', $event)" />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-embedding-offline">
-              Offline model loading
-              <small>Require the embedding model to be available from the local cache</small>
-            </label>
-            <input id="rag-embedding-offline" type="checkbox" [ngModel]="draftRagSettings().embedding_offline_mode" (ngModelChange)="setDraftRagBoolean('embedding_offline_mode', $event)" />
-          </div>
-        </section>
-        }
-
-        @if (activeRagSettingsSection() === 'models') {
-        <section class="model-config-rag-settings-section">
-          <h3>Ranking Settings</h3>
-          <p class="model-config-rag-settings-intro">Local reranking applied to retrieved candidates.</p>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-reranker-model">
-              Reranker profile
-              <small>Choose the local reranking strategy: balanced, lexical, or phrase-focused</small>
-            </label>
-            <select id="rag-reranker-model" [disabled]="!draftRagSettings().use_reranking" [ngModel]="draftRagSettings().reranker_model" (ngModelChange)="setDraftRagText('reranker_model', $event)">
-              @for (option of rerankerProfileOptions; track option.value) {
-              <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
-          </div>
-        </section>
-        }
-
-        @if (activeRagSettingsSection() === 'storage') {
-        <section class="model-config-rag-settings-section">
-          <h3>Index & Storage</h3>
-          <p class="model-config-rag-settings-intro">Vector index configuration and current index state.</p>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-collection-name">
-              Vector collection name
-              <small>Database collection used for the canonical document index</small>
-            </label>
-            <input id="rag-collection-name" type="text" [ngModel]="draftRagSettings().vector_collection_name" (ngModelChange)="setDraftRagText('vector_collection_name', $event)" />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-index-metric">
-              Index metric
-              <small>Similarity metric used by the vector index</small>
-            </label>
-            <select id="rag-index-metric" [ngModel]="draftRagSettings().vector_index_metric" (ngModelChange)="setDraftRagText('vector_index_metric', $event)">
-              @for (option of ragIndexMetricOptions; track option.value) {
-              <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-index-type">
-              Index type
-              <small>Vector index structure used for retrieval</small>
-            </label>
-            <select id="rag-index-type" [ngModel]="draftRagSettings().vector_index_type" (ngModelChange)="setDraftRagText('vector_index_type', $event)">
-              @for (option of ragIndexTypeOptions; track option.value) {
-              <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-local-filesystem">
-              Allow local filesystem access
-              <small>Permit retrieval workflows to read approved local source files</small>
-            </label>
-            <input id="rag-local-filesystem" type="checkbox" class="model-config-rag-checkbox" [ngModel]="draftRagSettings().allow_local_filesystem_access" (ngModelChange)="setDraftRagBoolean('allow_local_filesystem_access', $event)" />
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label for="rag-stream-batch">
-              Vector stream batch
-              <small>Records streamed per vector write batch</small>
-            </label>
-            <input id="rag-stream-batch" type="number" min="1" step="1" [ngModel]="draftRagSettings().vector_stream_batch_size" (ngModelChange)="setDraftRagNumber('vector_stream_batch_size', $event)" />
-          </div>
-          <h4>Index status</h4>
-          <div class="model-config-rag-setting-row">
-            <label>Index status</label>
-            <span>{{ embeddingIndex()?.status || 'reindex_required' }}</span>
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label>Indexed documents</label>
-            <span>{{ embeddingIndex()?.document_count || 0 }}</span>
-          </div>
-          <div class="model-config-rag-setting-row">
-            <label>Indexed chunks</label>
-            <span>{{ embeddingIndex()?.chunk_count || 0 }}</span>
-          </div>
-        </section>
-        }
-      </div>
-    </div>
-
-    <div modal-footer class="model-config-rag-modal-footer">
-      <span
-        [class.is-error]="!!ragSettingsValidationMessage() || !!ragSettingsSaveError()"
-        role="status"
-        aria-live="polite"
-      >
-        {{ ragSettingsStatus() }}
-      </span>
-      <div>
-        <button type="button" class="model-config-rag-modal-secondary" (click)="closeRagSettingsPanel()">Done</button>
-      </div>
-    </div>
-  </app-modal-shell>
 </main>
