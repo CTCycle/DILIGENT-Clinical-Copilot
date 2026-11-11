@@ -247,6 +247,8 @@ def _fallback_event_context(source_text: str) -> tuple[str, dict[str, Any]]:
 ###############################################################################
 class InspectionTimelineMixin:
     session_timeline_repository: Any
+    clinical_session_repository: Any
+    agent_service: Any
     timeline_extractor: Any
     timeline_generation_lock: Any
     timeline_generation_inflight: set[int]
@@ -303,20 +305,41 @@ class InspectionTimelineMixin:
         )
 
     # -------------------------------------------------------------------------
-    def _build_timeline_runtime_settings(self) -> dict[str, Any]:
-        # Timeline generation follows the latest persisted model configuration
-        # (what the status-bar models popover shows), never the settings frozen
-        # into the session's analysis result or the session record.
-        _, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
+    def _timeline_agent_overrides(self, session_id: int) -> dict[str, Any]:
+        """Runtime override for a session's timeline.
+
+        Timelines use the DILI agent revision that produced the session, so a
+        timeline is generated with the same models, reasoning and seed as the
+        analysis. Sessions created before agents use the default DILI agent.
+        """
+        revision_id = self.clinical_session_repository.get_session_agent_revision_id(
+            session_id
+        )
+        context = (
+            self.agent_service.resolve_revision(revision_id)
+            if revision_id is not None
+            else self.agent_service.resolve_for_execution(kind="dili")
+        )
+        return LLMRuntimeConfig.agent_runtime_overrides(context)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_timeline_runtime_settings() -> dict[str, Any]:
+        """Describe the active timeline runtime (call under the agent override)."""
+        provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
+        use_cloud = provider != "ollama"
         return {
-            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
+            "use_cloud_services": use_cloud,
+            "llm_provider": provider if use_cloud else LLMRuntimeConfig.get_llm_provider(),
+            "cloud_model": model if use_cloud else LLMRuntimeConfig.get_cloud_model(),
             "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
             "timeline_model": model,
-            "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
+            "reasoning_level": LLMRuntimeConfig.get_reasoning_level_for(
+                "timeline"
+            ).value,
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
+            "agent": LLMRuntimeConfig.active_agent(),
         }
 
     # -------------------------------------------------------------------------
@@ -463,7 +486,9 @@ class InspectionTimelineMixin:
             timeline_timeout_s = max(
                 20.0, min(330.0, attempt_timeout_s * max(1, attempts) + 15.0)
             )
-            requested_runtime_settings = self._build_timeline_runtime_settings()
+            agent_overrides = self._timeline_agent_overrides(safe_session_id)
+            with LLMRuntimeConfig.override_for_run(agent_overrides):
+                requested_runtime_settings = self._build_timeline_runtime_settings()
             _report_progress(progress_callback, 15, "Configuring timeline model")
             source_model = (
                 requested_runtime_settings["timeline_model"]
@@ -480,7 +505,7 @@ class InspectionTimelineMixin:
                 _report_progress(
                     progress_callback, 25, "Extracting clinical timeline events"
                 )
-                with LLMRuntimeConfig.override_for_run(requested_runtime_settings):
+                with LLMRuntimeConfig.override_for_run(agent_overrides):
                     timeline = asyncio.run(
                         asyncio.wait_for(
                             _await_with_stop_check(

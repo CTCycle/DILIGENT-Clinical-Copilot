@@ -148,8 +148,11 @@ class DataInspectionService(
         )
         self.session_timeline_repository = session_timeline_repository
         self.session_revision_repository = session_revision_repository
-        self.agent_service = agent_service or AgentService(
-            AgentRepository(session_revision_repository.context)
+        revision_context = getattr(session_revision_repository, "context", None)
+        self.agent_service = agent_service or (
+            AgentService(AgentRepository(revision_context))
+            if isinstance(revision_context, RepositoryContext)
+            else AgentService()
         )
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs

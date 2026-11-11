@@ -19,7 +19,10 @@ from domain.patient_timeline import (
     PatientTimelineExtraction,
 )
 from domain.timeline_dates import extract_single_explicit_timeline_date
+from domain.model_configs import ModelConfigSnapshot
+from repositories.agent_seed import ensure_default_agents
 from repositories.schemas.base import Base
+from repositories.serialization.model_configs import ModelConfigSerializer
 from repositories.schemas.clinical import ClinicalDrugMention, ClinicalSession
 from repositories.schemas.knowledge import (
     Drug,
@@ -33,7 +36,6 @@ from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection import DataInspectionService
-from services.inspection import timeline as inspection_timeline
 from services.inspection.timeline import InspectionTimelineMixin
 from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
@@ -43,10 +45,18 @@ from sqlalchemy.pool import StaticPool
 
 
 ###############################################################################
-def build_repository_graph_for_test() -> tuple[Any, Any]:
+def build_repository_graph_for_test(
+    agent_snapshot: ModelConfigSnapshot | None = None,
+) -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    return build_repository_graph(engine=engine), engine
+    graph = build_repository_graph(engine=engine)
+    # Timelines run the session's DILI agent (default for pre-agent sessions).
+    ensure_default_agents(
+        graph.agent_repository,
+        agent_snapshot or ModelConfigSerializer().load_snapshot(),
+    )
+    return graph, engine
 
 
 ###############################################################################
@@ -1018,19 +1028,18 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
 
 
 ###############################################################################
-def test_timeline_generation_follows_current_configuration_not_session_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    config = inspection_timeline.LLMRuntimeConfig
-    monkeypatch.setattr(
-        config, "resolve_provider_and_model", lambda purpose: ("ollama", "qwen3.5:9b")
+def test_timeline_generation_follows_the_dili_agent_not_session_settings() -> None:
+    repository_graph, _ = build_repository_graph_for_test(
+        ModelConfigSnapshot(
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            clinical_model="qwen3.5:9b",
+            text_extraction_model="qwen3.5:9b",
+            revision_model="qwen3.5:9b",
+            timeline_model="qwen3.5:9b",
+        )
     )
-    monkeypatch.setattr(config, "is_cloud_enabled", lambda: False)
-    monkeypatch.setattr(config, "get_llm_provider", lambda: "ollama")
-    monkeypatch.setattr(config, "get_cloud_model", lambda: "")
-    monkeypatch.setattr(config, "get_text_extraction_model", lambda: "qwen3.5:9b")
-    monkeypatch.setattr(config, "get_clinical_model", lambda: "qwen3.5:9b")
-    repository_graph, _ = build_repository_graph_for_test()
     persisted_runtime_settings = {
         "use_cloud_services": True,
         "llm_provider": "opencode_go",
@@ -1067,7 +1076,6 @@ def test_timeline_generation_follows_current_configuration_not_session_settings(
     assert generated is not None
     assert extractor.last_runtime_settings is not None
     assert extractor.last_runtime_settings["use_cloud_services"] is False
-    assert extractor.last_runtime_settings["llm_provider"] == "ollama"
     assert extractor.last_runtime_settings["timeline_model"] == "qwen3.5:9b"
     assert generated.source_kind == "local"
     assert generated.model_provider == "ollama"
@@ -1171,6 +1179,9 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     )
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
+    ensure_default_agents(
+        repository_graph.agent_repository, ModelConfigSerializer().load_snapshot()
+    )
     save_session(
         repository_graph,
         patient_name="Timeline Snapshot Patient",
@@ -1219,6 +1230,9 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
     )
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
+    ensure_default_agents(
+        repository_graph.agent_repository, ModelConfigSerializer().load_snapshot()
+    )
     save_session(
         repository_graph,
         patient_name="Synthetic Timeline Cancellation",
@@ -1330,6 +1344,9 @@ def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() ->
     )
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
+    ensure_default_agents(
+        repository_graph.agent_repository, ModelConfigSerializer().load_snapshot()
+    )
     save_session(
         repository_graph,
         patient_name="Synthetic Timeline Persistence Failure",

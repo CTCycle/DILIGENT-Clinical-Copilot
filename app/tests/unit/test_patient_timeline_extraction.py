@@ -640,26 +640,56 @@ def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_field
 
 
 ###############################################################################
-def test_timeline_runtime_settings_follow_persisted_model_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    config = inspection_timeline.LLMRuntimeConfig
-    monkeypatch.setattr(
-        config, "resolve_provider_and_model", lambda purpose: ("opencode_go", "beam-free")
-    )
-    monkeypatch.setattr(config, "is_cloud_enabled", lambda: True)
-    monkeypatch.setattr(config, "get_llm_provider", lambda: "opencode_go")
-    monkeypatch.setattr(config, "get_cloud_model", lambda: "beam-free")
-    monkeypatch.setattr(config, "get_text_extraction_model", lambda: "beam-free")
-    monkeypatch.setattr(config, "get_clinical_model", lambda: "beam-free")
-    monkeypatch.setattr(config, "get_ollama_seed", lambda: None)
+def test_timeline_runtime_settings_follow_the_originating_agent_revision() -> None:
+    from types import SimpleNamespace
 
-    settings = (
-        inspection_timeline.InspectionTimelineMixin()._build_timeline_runtime_settings()
-    )
+    from domain.agents import AgentExecutionContext, agent_config_hash, parse_agent_config
 
+    config = parse_agent_config(
+        {
+            "kind": "dili",
+            "models": {
+                "extraction": {"provider": "ollama", "model": "qwen3:8b"},
+                "clinical": {"provider": "ollama", "model": "qwen3:8b"},
+                "timeline": {
+                    "provider": "opencode_go",
+                    "model": "beam-free",
+                    "reasoning_level": "low",
+                },
+            },
+        }
+    )
+    context = AgentExecutionContext(
+        agent_id="agent-1",
+        agent_name="Origin",
+        agent_revision_id=41,
+        revision_number=3,
+        kind="dili",
+        config_hash=agent_config_hash(config),
+        configuration=config,
+    )
+    resolved: list[int] = []
+
+    def resolve_revision(revision_id: int) -> AgentExecutionContext:
+        resolved.append(revision_id)
+        return context
+
+    mixin = inspection_timeline.InspectionTimelineMixin()
+    mixin.clinical_session_repository = SimpleNamespace(
+        get_session_agent_revision_id=lambda session_id: 41
+    )
+    mixin.agent_service = SimpleNamespace(resolve_revision=resolve_revision)
+
+    overrides = mixin._timeline_agent_overrides(7)
+    with inspection_timeline.LLMRuntimeConfig.override_for_run(overrides):
+        settings = mixin._build_timeline_runtime_settings()
+
+    assert resolved == [41]
     assert settings["use_cloud_services"] is True
+    assert settings["llm_provider"] == "opencode_go"
     assert settings["timeline_model"] == "beam-free"
+    assert settings["reasoning_level"] == "low"
+    assert settings["agent"]["agent_revision_id"] == 41
     assert PatientTimelineExtractor._resolve_provider_model_from_runtime_settings(
         settings
     ) == ("opencode_go", "beam-free")
