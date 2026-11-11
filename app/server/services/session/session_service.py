@@ -55,6 +55,8 @@ from services.session.formatting_mixin import (
     ClinicalSessionFormattingMixin,
 )
 from services.session.payload import PayloadSanitizationService
+from repositories.agent_repository import AgentRepository
+from services.agents import AgentService
 from services.session.preflight import validate_clinical_input_preflight
 from services.session.text_section_parser import (
     InitialTextSectionParseResult,
@@ -99,6 +101,7 @@ class ClinicalSessionService(
         hepatox_consultation_cls: type[HepatoxConsultation] | None = None,
         job_manager: JobManager,
         model_config_service: ModelConfigService,
+        agent_service: AgentService | None = None,
     ) -> None:
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
@@ -118,6 +121,9 @@ class ClinicalSessionService(
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
         self.job_manager = job_manager
         self.model_config_service = model_config_service
+        self.agent_service = agent_service or AgentService(
+            AgentRepository(session_repository.context)
+        )
         self.reset_runtime_diagnostics()
 
     # -------------------------------------------------------------------------

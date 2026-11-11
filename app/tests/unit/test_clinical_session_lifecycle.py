@@ -49,7 +49,6 @@ def launch_payload(marker: str) -> dict[str, Any]:
         "visit_date": "2026-06-19",
         "clinical_input": clinical_input(marker),
         "evidence_sources": ["livertox"],
-        "selected_model_providers": ["ollama"],
     }
 
 

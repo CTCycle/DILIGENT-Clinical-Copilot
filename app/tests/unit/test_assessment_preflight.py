@@ -4,12 +4,12 @@
 from __future__ import annotations
 
 from datetime import date
-from types import SimpleNamespace
 
 import pytest
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.clinical.robustness import RagReadiness
+from repository_fixtures import build_dili_agent_service
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
@@ -17,8 +17,12 @@ from services.session.session_workflow import validate_clinical_launch_workflow
 
 
 ###############################################################################
-def _build_service():
-    return build_clinical_session_service(get_job_manager())
+def _build_service(tmp_path, **agent_options):
+    service = build_clinical_session_service(get_job_manager())
+    service.agent_service = build_dili_agent_service(
+        tmp_path / "agents.db", **agent_options
+    )
+    return service
 
 
 ###############################################################################
@@ -31,8 +35,8 @@ def _valid_input() -> str:
 
 
 ###############################################################################
-def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> None:
-    service = _build_service()
+def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch, tmp_path) -> None:
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
@@ -56,8 +60,8 @@ def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> N
 
 
 ###############################################################################
-def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
-    service = _build_service()
+def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch, tmp_path) -> None:
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
@@ -87,8 +91,8 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) 
 
 
 ###############################################################################
-def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
-    service = _build_service()
+def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch, tmp_path) -> None:
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
@@ -116,8 +120,8 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
 
 
 ###############################################################################
-def test_malformed_sections_block_job_start(monkeypatch) -> None:
-    service = _build_service()
+def test_malformed_sections_block_job_start(monkeypatch, tmp_path) -> None:
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
@@ -151,8 +155,9 @@ def test_malformed_sections_block_job_start(monkeypatch) -> None:
 ###############################################################################
 def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
     monkeypatch,
+    tmp_path,
 ) -> None:
-    service = _build_service()
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,
@@ -197,20 +202,21 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
         visit_date=date(2025, 1, 15),
-        selected_model_providers=["ollama"],
     )
 
     result = validate_clinical_launch_workflow(service, request)
 
-    assert result["model_overrides"] == {}
+    assert result["agent_context"].kind == "dili"
+    assert result["runtime_snapshot"]["agent"]["agent_id"] == result["agent_context"].agent_id
     assert len(result["runtime_snapshot_hash"]) == 64
 
 
 ###############################################################################
 def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     monkeypatch,
+    tmp_path,
 ) -> None:
-    service = _build_service()
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
@@ -223,9 +229,6 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
         lambda **kwargs: ([{"id": 1}], 1),
     )
     monkeypatch.setattr(
-        "services.session.preflight._validate_provider_key", lambda blocking: None
-    )
-    monkeypatch.setattr(
         "services.session.preflight.LLMRuntimeConfig.resolve_provider_and_model",
         lambda role: (
             ("ollama", "qwen3.5:2b") if role == "parser" else ("ollama", "gpt-oss:20b")
@@ -233,7 +236,6 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
     )
     request = ClinicalSessionRequest(
         visit_date=date(2025, 3, 20),
-        selected_model_providers=["ollama"],
         clinical_input=(
             "## Anamnesis\n"
             "High grade ovarian serous carcinoma con carcinosi peritoneale.\n"
@@ -263,8 +265,9 @@ def test_preflight_returns_deterministic_diagnostics_for_complex_input(
 ###############################################################################
 def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
     monkeypatch,
+    tmp_path,
 ) -> None:
-    service = _build_service()
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
@@ -275,9 +278,6 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
         service.drug_catalog_repository,
         "list_rxnav_catalog",
         lambda **kwargs: ([{"id": 1}], 1),
-    )
-    monkeypatch.setattr(
-        "services.session.preflight._validate_provider_key", lambda blocking: None
     )
     monkeypatch.setattr(
         "services.session.preflight.extract_deterministic_diseases",
@@ -296,8 +296,7 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
         service,
         ClinicalSessionRequest(
             visit_date=date(2025, 3, 20),
-            selected_model_providers=["ollama"],
-            clinical_input=_valid_input(),
+                clinical_input=_valid_input(),
         ),
         knowledge_repository=service.knowledge_repository,
         drug_catalog_repository=service.drug_catalog_repository,
@@ -311,28 +310,16 @@ def test_preflight_does_not_warn_when_deterministic_disease_matching_is_empty(
 ###############################################################################
 def test_job_start_uses_opencode_credential_scope_for_opencode_go(
     monkeypatch,
+    tmp_path,
 ) -> None:
-    service = _build_service()
     requested_scopes: list[str] = []
+    service = _build_service(
+        tmp_path,
+        provider="opencode_go",
+        model="minimax-m2.5-free",
+        requested_scopes=requested_scopes,
+    )
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(
-        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: True,
-    )
-    monkeypatch.setattr(
-        "services.session.session_workflow.LLMRuntimeConfig.get_llm_provider",
-        lambda: "opencode_go",
-    )
-    monkeypatch.setattr(
-        "services.session.session_workflow.LLMRuntimeConfig.resolve_provider_and_model",
-        lambda role: ("opencode_go", "minimax-m2.5-free"),
-    )
-    monkeypatch.setattr(
-        "services.session.session_workflow.AccessKeyService.list_access_keys",
-        lambda _self, provider: (
-            requested_scopes.append(provider) or [SimpleNamespace(is_active=True)]
-        ),
-    )
     monkeypatch.setattr(
         service,
         "validate_assessment_prerequisites_without_llm",
@@ -345,7 +332,6 @@ def test_job_start_uses_opencode_credential_scope_for_opencode_go(
             ClinicalSessionRequest(
                 clinical_input=_valid_input(),
                 visit_date=date(2025, 3, 20),
-                selected_model_providers=["opencode_go"],
             ),
         )
 
@@ -355,8 +341,9 @@ def test_job_start_uses_opencode_credential_scope_for_opencode_go(
 ###############################################################################
 def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
     monkeypatch,
+    tmp_path,
 ) -> None:
-    service = _build_service()
+    service = _build_service(tmp_path)
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service.knowledge_repository,
@@ -367,9 +354,6 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
         service.drug_catalog_repository,
         "list_rxnav_catalog",
         lambda **kwargs: ([{"id": 1}], 1),
-    )
-    monkeypatch.setattr(
-        "services.session.preflight._validate_provider_key", lambda blocking: None
     )
     monkeypatch.setattr(
         "services.session.preflight.LLMRuntimeConfig.get_llm_provider",
@@ -384,7 +368,6 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
 
     request = ClinicalSessionRequest(
         visit_date=date(2025, 3, 20),
-        selected_model_providers=["ollama"],
         clinical_input=(
             "## Anamnesis\n"
             "The patient reports fatigue, pruritus, dark urine, and poor appetite after medication exposure.\n\n"
@@ -412,8 +395,11 @@ def test_preflight_accepts_ollama_when_effective_clinical_runtime_is_local(
 
 
 ###############################################################################
-def test_job_start_rechecks_rag_readiness_before_submission(monkeypatch) -> None:
-    service = _build_service()
+def test_job_start_rechecks_rag_readiness_before_submission(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    service = _build_service(tmp_path, evidence_sources=["documents"])
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
     monkeypatch.setattr(
         service,

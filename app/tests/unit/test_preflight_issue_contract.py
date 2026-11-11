@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from repository_fixtures import build_dili_agent_service
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
@@ -50,10 +51,12 @@ def _reject_incomplete_patient(request: ClinicalSessionRequest, **kwargs):
 @pytest.mark.parametrize("visit_date", [None, date(2026, 10, 18)])
 def test_visit_date_blocker_is_unique_and_other_validation_survives(
     monkeypatch,
+    tmp_path,
     visit_date: date | None,
 ) -> None:
     service = SimpleNamespace(
         apply_persisted_runtime_configuration=lambda: None,
+        agent_service=build_dili_agent_service(tmp_path / "agents.db"),
         prepare_structured_clinical_input=_reject_incomplete_patient,
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(
@@ -62,11 +65,8 @@ def test_visit_date_blocker_is_unique_and_other_validation_survives(
         ),
     )
     monkeypatch.setattr(
-        "services.session.preflight._validate_provider_key", lambda issues: None
-    )
-    monkeypatch.setattr(
         "services.session.preflight._runtime_settings",
-        lambda: {"clinical_provider": "ollama"},
+        lambda _agent_context: {"clinical_provider": "ollama"},
     )
     monkeypatch.setattr(
         "services.session.preflight.check_rag_readiness",
@@ -78,7 +78,6 @@ def test_visit_date_blocker_is_unique_and_other_validation_survives(
         service,
         ClinicalSessionRequest(
             visit_date=visit_date,
-            selected_model_providers=["ollama"],
             clinical_input="## Anamnesis\n"
             + "Clinical history. " * 65
             + "\n## Therapy\nAmoxicillin 500 mg daily.\n## Laboratory analysis\nALT 200 U/L.",
@@ -153,9 +152,12 @@ def test_too_short_input_is_presented_as_blocking() -> None:
 
 
 ###############################################################################
-def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) -> None:
+def test_missing_sections_do_not_add_a_generic_preflight_failure(
+    monkeypatch, tmp_path
+) -> None:
     service = SimpleNamespace(
         apply_persisted_runtime_configuration=lambda: None,
+        agent_service=build_dili_agent_service(tmp_path / "agents.db"),
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(
                 SimpleNamespace(connection=lambda: None)
@@ -169,11 +171,8 @@ def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) ->
         list_rxnav_catalog=lambda **kwargs: ([{"id": 1}], 1),
     )
     monkeypatch.setattr(
-        "services.session.preflight._validate_provider_key", lambda blocking: None
-    )
-    monkeypatch.setattr(
         "services.session.preflight._runtime_settings",
-        lambda: {"clinical_provider": "opencode_go"},
+        lambda _agent_context: {"clinical_provider": "opencode_go"},
     )
     monkeypatch.setattr(
         "services.session.preflight.check_rag_readiness",
@@ -190,7 +189,6 @@ def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) ->
         ClinicalSessionRequest(
             visit_date=date(2026, 9, 10),
             clinical_input="Short input.",
-            selected_model_providers=["opencode_go"],
         ),
         knowledge_repository=knowledge_repository,
         drug_catalog_repository=drug_catalog_repository,
@@ -205,9 +203,11 @@ def test_missing_sections_do_not_add_a_generic_preflight_failure(monkeypatch) ->
 ###############################################################################
 def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     monkeypatch,
+    tmp_path,
 ) -> None:
     service = SimpleNamespace(
         apply_persisted_runtime_configuration=lambda: None,
+        agent_service=build_dili_agent_service(tmp_path / "agents.db", evidence_sources=["documents"]),
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(
                 SimpleNamespace(connection=lambda: None)
@@ -225,12 +225,8 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
         ),
     )
     monkeypatch.setattr(
-        "services.session.preflight._validate_provider_key",
-        lambda blocking: None,
-    )
-    monkeypatch.setattr(
         "services.session.preflight._runtime_settings",
-        lambda: {"clinical_provider": "ollama", "llm_provider": "ollama"},
+        lambda _agent_context: {"clinical_provider": "ollama", "llm_provider": "ollama"},
     )
     monkeypatch.setattr(
         "services.session.preflight.check_rag_readiness",
@@ -249,7 +245,6 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
         ClinicalSessionRequest(
             visit_date=date(2026, 7, 17),
             clinical_input=None,
-            selected_model_providers=["ollama"],
             evidence_sources=["documents"],
         ),
         knowledge_repository=service.knowledge_repository,

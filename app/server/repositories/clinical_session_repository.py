@@ -361,6 +361,7 @@ class ClinicalSessionRepository:
         patient_image_base64: str | None,
         metadata: dict[str, Any],
         run_request: dict[str, Any],
+        agent_revision_id: int | None = None,
     ) -> bool:
         """Atomically move a draft into the queue; False when it is not a draft."""
         now = _utc_now()
@@ -380,6 +381,7 @@ class ClinicalSessionRepository:
                         patient_image_base64
                     ),
                     metadata_json=session_result_data.serialize_json_payload(metadata),
+                    agent_revision_id=agent_revision_id,
                     run_request_json=session_result_data.serialize_json_payload(
                         run_request
                     ),
@@ -743,6 +745,16 @@ class ClinicalSessionRepository:
             return items, total_rows
         finally:
             db_session.close()
+
+    # -------------------------------------------------------------------------
+    def get_session_agent_revision_id(self, session_id: int) -> int | None:
+        with self.session_factory() as db_session:
+            value = db_session.execute(
+                select(ClinicalSession.agent_revision_id).where(
+                    ClinicalSession.id == int(session_id)
+                )
+            ).scalar_one_or_none()
+            return int(value) if value is not None else None
 
     # -------------------------------------------------------------------------
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:

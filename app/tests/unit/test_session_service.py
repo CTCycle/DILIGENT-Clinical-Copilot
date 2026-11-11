@@ -14,6 +14,7 @@ from domain.clinical.entities import (
     EvidenceSelection,
 )
 from domain.clinical.extras import HepatoxPreparedInputs
+from repository_fixtures import build_dili_agent_service
 from services.runtime.jobs import JobErrorSanitizer, get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
@@ -112,8 +113,17 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
 ###############################################################################
 def test_launch_requires_active_cloud_key_before_extraction(
     monkeypatch,
+    tmp_path,
 ) -> None:
     service = _build_service()
+    requested_scopes: list[str] = []
+    service.agent_service = build_dili_agent_service(
+        tmp_path / "agents.db",
+        provider="gemini",
+        model="gemini-2.5-flash",
+        active_key=False,
+        requested_scopes=requested_scopes,
+    )
 
 
     ###############################################################################
@@ -126,35 +136,16 @@ def test_launch_requires_active_cloud_key_before_extraction(
             raise AssertionError("extractor should not run without a cloud key")
 
 
-    ###############################################################################
-    class FakeAccessKeyService:
-
-        # -------------------------------------------------------------------------
-        def list_access_keys(self, provider: str):
-            assert provider == "gemini"
-            return []
-
     service.clinical_input_extractor = FakeExtractor()  # type: ignore[assignment]
-    monkeypatch.setattr(
-        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: True,
-    )
-    monkeypatch.setattr(
-        "services.session.session_workflow.LLMRuntimeConfig.get_llm_provider",
-        lambda: "gemini",
-    )
-    monkeypatch.setattr(
-        "services.session.session_workflow.AccessKeyService",
-        FakeAccessKeyService,
-    )
-    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
 
     request = ClinicalSessionRequest(clinical_input="raw input")
     with pytest.raises(
-        ServiceValidationError,
-        match="Configure an active Gemini access key before running cloud analysis.",
-    ):
+        ServiceValidationError, match="Configure an active gemini access key"
+    ) as exc_info:
         validate_clinical_launch_workflow(service, request)
+
+    assert requested_scopes == ["gemini"]
+    assert exc_info.value.detail[0]["code"] == "provider_key_missing"
 
 
 ###############################################################################

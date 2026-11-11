@@ -118,7 +118,6 @@ def _request(**overrides: object) -> ClinicalSessionRequest:
     payload = {
         "visit_date": "2025-01-01",
         "clinical_input": _words(60),
-        "selected_model_providers": ["openai"],
     }
     payload.update(overrides)
     return ClinicalSessionRequest.model_validate(payload)
@@ -145,9 +144,3 @@ def test_fifty_nine_words_fails() -> None:
 ###############################################################################
 def test_sixty_words_pass() -> None:
     validate_clinical_session_request(_request(clinical_input=_words(60)))
-
-
-###############################################################################
-def test_empty_provider_list_fails() -> None:
-    with pytest.raises(HTTPException):
-        validate_clinical_session_request(_request(selected_model_providers=[]))

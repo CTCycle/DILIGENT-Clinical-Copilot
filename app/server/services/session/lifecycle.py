@@ -89,6 +89,8 @@ class ClinicalSessionLifecycleService:
     ) -> ClinicalSessionState:
         self._require_status(session_id, {"draft"}, "Only a draft session can be launched.")
         launch = self.clinical_service.validate_clinical_launch(request_payload)
+        request_payload = launch["request"]
+        agent_context = launch["agent_context"]
         patient = launch["patient_payload"]
         run_request = {
             "request": request_payload.model_dump(
@@ -105,9 +107,14 @@ class ClinicalSessionLifecycleService:
             patient_image_base64=request_payload.patient_image_base64,
             metadata={
                 "evidence_sources": list(request_payload.evidence_sources),
-                "model_overrides": launch["model_overrides"],
+                "agent": {
+                    key: value
+                    for key, value in agent_context.provenance().items()
+                    if key != "agent_configuration"
+                },
             },
             run_request=run_request,
+            agent_revision_id=agent_context.agent_revision_id,
         )
         if not launched:
             raise ServiceConflictError("This session was already launched.")

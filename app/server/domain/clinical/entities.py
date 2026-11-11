@@ -86,33 +86,6 @@ class EvidenceSelection:
 
 
 ###############################################################################
-class SessionModelOverrides(BaseModel):
-    """Model choices that apply only to one clinical session."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    text_extraction_model: str | None = Field(default=None, max_length=200)
-    clinical_model: str | None = Field(default=None, max_length=200)
-
-    # -------------------------------------------------------------------------
-    @field_validator("text_extraction_model", "clinical_model", mode="before")
-    @classmethod
-    def strip_model_name(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        stripped = str(value).strip()
-        return stripped or None
-
-    # -------------------------------------------------------------------------
-    def as_runtime_overrides(self) -> dict[str, str]:
-        return {
-            key: value
-            for key, value in self.model_dump().items()
-            if isinstance(value, str) and value
-        }
-
-
-###############################################################################
 class PatientData(BaseModel):
     """
     Input schema for submitting structured clinical data.
@@ -252,16 +225,19 @@ class ClinicalSessionRequest(BaseModel):
     )
     clinical_input: str | None = Field(default=None, max_length=100000)
     anamnesis: str | None = Field(default=None, max_length=20000)
+    # Set from the selected agent's retrieval policy at preflight/launch.
     evidence_sources: list[EvidenceSource] = Field(
         default_factory=lambda: list(DEFAULT_EVIDENCE_SOURCES)
     )
-    model_overrides: SessionModelOverrides | None = None
+    # None selects the default DILI agent.
+    agent_id: str | None = Field(default=None, min_length=1, max_length=64)
+    # Revision checked at preflight; launch fails if the agent changed since.
+    agent_revision: int | None = Field(default=None, ge=1)
     drugs: str | None = Field(default=None, max_length=20000)
     laboratory_analysis: str | None = Field(
         default=None, max_length=MAX_LAB_TEXT_LENGTH
     )
     patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
-    selected_model_providers: list[str] = Field(default_factory=list)
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -291,31 +267,6 @@ class ClinicalSessionRequest(BaseModel):
     @property
     def evidence(self) -> "EvidenceSelection":
         return EvidenceSelection.from_sources(self.evidence_sources)
-
-    # -------------------------------------------------------------------------
-    @field_validator("selected_model_providers", mode="before")
-    @classmethod
-    def normalize_selected_model_providers(cls, value: Any) -> list[str]:
-        if value is None:
-            return []
-        raw_values: list[Any]
-        if isinstance(value, str):
-            raw_values = [value]
-        elif isinstance(value, list):
-            raw_values = value
-        else:
-            raise ValueError(
-                "selected_model_providers must be a string or list of strings"
-            )
-
-        normalized: list[str] = []
-        for item in raw_values:
-            if not isinstance(item, str):
-                raise ValueError("selected_model_providers must contain only strings")
-            cleaned = item.strip()
-            if cleaned:
-                normalized.append(cleaned)
-        return normalized
 
 
 ###############################################################################

@@ -24,11 +24,6 @@ def validate_clinical_session_request(
     details: list[dict[str, str]] = []
 
     clinical_input = (request.clinical_input or "").strip()
-    providers = [
-        item.strip()
-        for item in request.selected_model_providers
-        if item and item.strip()
-    ]
 
     if request.visit_date is None:
         details.append({"field": "visit_date", "message": "Visit date is required."})
@@ -41,13 +36,6 @@ def validate_clinical_session_request(
             {
                 "field": "clinical_input",
                 "message": "Clinical input must contain at least 60 words.",
-            }
-        )
-    if not providers:
-        details.append(
-            {
-                "field": "selected_model_providers",
-                "message": "At least one model provider must be selected.",
             }
         )
 

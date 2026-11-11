@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from inspect import isawaitable
 from typing import Any, cast
 
-from common.exceptions import ServiceValidationError
+from common.exceptions import ServiceError, ServiceValidationError
 from common.utils.logger import logger
+from domain.agents import AgentExecutionContext
 from services.llm.runtime_config import LLMRuntimeConfig
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
@@ -28,9 +29,8 @@ from services.clinical.evidence_sources import (
     dilirank_repository_for,
 )
 from services.llm.provider_factory import select_llm_provider
-from services.llm.provider_registry import provider_registry
 from services.retrieval.readiness import check_rag_readiness
-from services.security.access_keys import AccessKeyService
+from services.session.agent_selection import resolve_dili_agent
 from services.session.robust_pipeline import build_extraction_artifact
 from services.session.text_section_parser import parse_initial_text_sections
 
@@ -166,17 +166,33 @@ def validate_clinical_input_preflight(
     knowledge_repository: KnowledgeRepository,
     drug_catalog_repository: DrugCatalogRepository,
 ) -> ClinicalInputPreflightResult:
-    overrides = (
-        request_payload.model_overrides.as_runtime_overrides()
-        if request_payload.model_overrides is not None
-        else {}
-    )
-    # Session-only model overrides are validated exactly as they will run.
-    with LLMRuntimeConfig.override_for_run(overrides):
+    try:
+        agent_context, request_payload = resolve_dili_agent(service, request_payload)
+    except ServiceError as exc:
+        return _result(
+            [
+                ClinicalInputPreflightIssue(
+                    severity="blocking",
+                    code="agent_unavailable",
+                    message=str(exc),
+                    field="agent",
+                )
+            ],
+            [],
+            {},
+            {},
+            {},
+            check_rag_readiness(requested=False),
+            [],
+        )
+    # The selected agent revision is validated exactly as it will run.
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(agent_context)
+    ):
         return _validate_clinical_input_preflight(
             service,
             request_payload,
-            overrides=overrides,
+            agent_context=agent_context,
             knowledge_repository=knowledge_repository,
             drug_catalog_repository=drug_catalog_repository,
         )
@@ -187,7 +203,7 @@ def _validate_clinical_input_preflight(
     service: Any,
     request_payload: ClinicalSessionRequest,
     *,
-    overrides: dict[str, str],
+    agent_context: AgentExecutionContext,
     knowledge_repository: KnowledgeRepository,
     drug_catalog_repository: DrugCatalogRepository,
 ) -> ClinicalInputPreflightResult:
@@ -207,35 +223,10 @@ def _validate_clinical_input_preflight(
         dilirank_repository=dilirank_repository_for(knowledge_repository),
         documents_readiness=documents_readiness,
     )
-    try:
-        if overrides:
-            service.model_config_service.validate_session_model_overrides(overrides)
-        service.apply_persisted_runtime_configuration()
-        runtime_settings = _runtime_settings()
-    except (ServiceValidationError, ValueError) as exc:
-        if not overrides:
-            raise
-        blocking.append(
-            ClinicalInputPreflightIssue(
-                severity="blocking",
-                code="session_model_unavailable",
-                message=str(exc),
-                field="model_overrides",
-            )
-        )
-        return _result(
-            blocking,
-            non_blocking,
-            {},
-            {},
-            deterministic_diagnostics,
-            rag_readiness,
-            evidence_statuses,
-        )
+    runtime_settings = _runtime_settings(agent_context)
     _validate_evidence_sources(evidence_statuses, rag_readiness, blocking, non_blocking)
     _validate_ui_metadata(request_payload, blocking)
-    _validate_provider_key(blocking)
-    _validate_requested_provider(request_payload, blocking, runtime_settings)
+    _validate_agent_readiness(service, agent_context, blocking)
     _validate_persistence(service, blocking)
     extraction_quality: dict[str, Any] = {}
     clinical_input = (request_payload.clinical_input or "").strip()
@@ -608,63 +599,22 @@ def _validate_ui_metadata(
 
 
 ###############################################################################
-def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
-    if not LLMRuntimeConfig.is_cloud_enabled():
-        return
-    provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
-    try:
-        credential_provider = provider_registry.get(provider).credential_scope
-    except ValueError:
-        return
-    active_keys = [
-        item
-        for item in AccessKeyService().list_access_keys(cast(Any, credential_provider))
-        if item.is_active
-    ]
-    if not active_keys:
-        blocking.append(
-            ClinicalInputPreflightIssue(
-                severity="blocking",
-                code="active_provider_key_missing",
-                message=f"Configure an active {provider.title()} access key before running cloud analysis.",
-                field="selected_model_providers",
-            )
-        )
-
-
-###############################################################################
-def _validate_requested_provider(
-    request_payload: ClinicalSessionRequest,
+def _validate_agent_readiness(
+    service: Any,
+    agent_context: AgentExecutionContext,
     blocking: list[ClinicalInputPreflightIssue],
-    runtime_settings: dict[str, Any],
 ) -> None:
-    selected = {
-        item.strip().lower()
-        for item in request_payload.selected_model_providers
-        if item and item.strip()
-    }
-    provider = str(
-        runtime_settings.get("clinical_provider")
-        or runtime_settings.get("llm_provider")
-        or ""
-    ).lower()
-    if not selected:
+    for issue in service.agent_service.collect_issues(agent_context.configuration):
         blocking.append(
             ClinicalInputPreflightIssue(
                 severity="blocking",
-                code="provider_selection_missing",
-                message="At least one model provider must be selected.",
-                field="selected_model_providers",
-            )
-        )
-        return
-    if provider and provider not in selected:
-        blocking.append(
-            ClinicalInputPreflightIssue(
-                severity="blocking",
-                code="requested_provider_mismatch",
-                message="The active runtime provider must match the requested provider exactly.",
-                field="selected_model_providers",
+                code=(
+                    "active_provider_key_missing"
+                    if issue.code == "provider_key_missing"
+                    else issue.code
+                ),
+                message=issue.message,
+                field="agent",
             )
         )
 
@@ -693,7 +643,7 @@ def _validate_persistence(
 
 
 ###############################################################################
-def _runtime_settings() -> dict[str, Any]:
+def _runtime_settings(agent_context: AgentExecutionContext) -> dict[str, Any]:
     parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
         "parser"
     )
@@ -708,6 +658,10 @@ def _runtime_settings() -> dict[str, Any]:
         "text_extraction_model": parser_model,
         "clinical_provider": clinical_provider,
         "clinical_model": clinical_model,
+        "agent_id": agent_context.agent_id,
+        "agent_name": agent_context.agent_name,
+        "agent_revision": agent_context.revision_number,
+        "agent_config_hash": agent_context.config_hash,
     }
 
 
@@ -771,10 +725,9 @@ _FIELD_LABELS = {
     "drugs": "Pharmacological therapy",
     "knowledge_base": "Clinical knowledge base",
     "laboratory_analysis": "Laboratory analysis",
-    "selected_model_providers": "Model configuration",
+    "agent": "Agent",
     "session_storage": "Session storage",
     "evidence_sources": "Evidence sources",
-    "model_overrides": "Session models",
     "visit_date": "Visit date",
 }
 

@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-from typing import cast
 from common.exceptions import ServiceValidationError
 from common.utils.languages import (
     MISSING_VISIT_LABEL_BY_LANGUAGE,
@@ -48,8 +47,7 @@ from services.clinical.pattern_resolution import (
 )
 from services.clinical.report_language import phrase
 from services.clinical.report_finalizer import ReportFinalizer
-from services.llm.provider_registry import provider_registry
-from services.security.access_keys import AccessKeyService
+from services.session.agent_selection import resolve_dili_agent
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.preflight import check_parser_batch_capacity
@@ -201,25 +199,6 @@ def _unavailable_evidence_sources(
     ):
         unavailable.append("dilirank")
     return unavailable
-
-
-###############################################################################
-def _validate_requested_provider_matches_runtime(
-    request_payload: ClinicalSessionRequest,
-) -> None:
-    selected = {
-        item.strip().lower()
-        for item in request_payload.selected_model_providers
-        if item and item.strip()
-    }
-    if not selected:
-        return
-    provider, _ = LLMRuntimeConfig.resolve_provider_and_model("clinical")
-    provider = (provider or LLMRuntimeConfig.get_llm_provider()).strip().lower()
-    if provider and provider not in selected:
-        raise ServiceValidationError(
-            "The active runtime provider must match the requested provider exactly."
-        )
 
 
 ###############################################################################
@@ -848,7 +827,7 @@ async def process_single_patient_workflow(
             "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
             "evidence_sources": list(payload.evidence_sources),
-            "model_overrides": LLMRuntimeConfig.active_model_overrides(),
+            "agent": LLMRuntimeConfig.active_agent(),
             "resolved_runtime": dict(service.resolved_runtime),
             "stage_elapsed_ms": dict(service.stage_elapsed_ms),
             "fallback_reasons": dict(service.fallback_reasons),
@@ -939,7 +918,7 @@ async def process_single_patient_workflow(
                 "version": session_version,
                 "metadata": {
                     "evidence_sources": list(payload.evidence_sources),
-                    "model_overrides": LLMRuntimeConfig.active_model_overrides(),
+                    "agent": LLMRuntimeConfig.active_agent(),
                 },
                 "session_kind": "standard_assessment",
                 "hepatic_pattern": pattern_score.classification,
@@ -1027,57 +1006,47 @@ def validate_clinical_launch_workflow(
     service: Any,
     request_payload: ClinicalSessionRequest,
 ) -> dict[str, Any]:
-    """Run every launch-time check and freeze the runtime for this session."""
-    model_overrides = (
-        request_payload.model_overrides.as_runtime_overrides()
-        if request_payload.model_overrides is not None
-        else {}
-    )
-    if model_overrides:
-        service.model_config_service.validate_session_model_overrides(model_overrides)
-    service.apply_persisted_runtime_configuration()
-    _validate_requested_provider_matches_runtime(request_payload)
-    if LLMRuntimeConfig.is_cloud_enabled():
-        provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
-        try:
-            credential_provider = provider_registry.get(provider).credential_scope
-        except ValueError:
-            raise ServiceValidationError(
-                f"Unsupported cloud provider '{provider}' for access-key validation."
-            )
-        active_keys = [
-            item
-            for item in AccessKeyService().list_access_keys(
-                cast(Any, credential_provider)
-            )
-            if item.is_active
-        ]
-        if not active_keys:
-            raise ServiceValidationError(
-                f"Configure an active {provider.title()} access key before running cloud analysis."
-            )
-
-    use_documents = request_payload.evidence.documents
-    rag_readiness = check_rag_readiness(requested=use_documents)
-    if use_documents and not rag_readiness.available:
+    """Run every launch-time check and freeze the selected agent revision."""
+    agent_context, request_payload = resolve_dili_agent(service, request_payload)
+    readiness_issues = service.agent_service.collect_issues(agent_context.configuration)
+    if readiness_issues:
         raise ServiceValidationError(
             [
                 {
                     "severity": "blocking",
-                    "code": rag_readiness.reason_code or "rag_unavailable",
-                    "message": rag_readiness.message or "RAG is unavailable.",
-                    "field": "evidence_sources",
+                    "code": issue.code,
+                    "message": issue.message,
+                    "field": "agent",
                 }
+                for issue in readiness_issues
             ]
         )
-    prepared = prepare_clinical_run_workflow(service, request_payload)
+
+    use_documents = request_payload.evidence.documents
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(agent_context)
+    ):
+        rag_readiness = check_rag_readiness(requested=use_documents)
+        if use_documents and not rag_readiness.available:
+            raise ServiceValidationError(
+                [
+                    {
+                        "severity": "blocking",
+                        "code": rag_readiness.reason_code or "rag_unavailable",
+                        "message": rag_readiness.message or "RAG is unavailable.",
+                        "field": "evidence_sources",
+                    }
+                ]
+            )
+        prepared = prepare_clinical_run_workflow(service, request_payload)
     runtime_snapshot, runtime_snapshot_hash = LLMRuntimeConfig.capture_run_snapshot(
         evidence_sources=list(request_payload.evidence_sources),
-        model_overrides=model_overrides,
+        agent_context=agent_context,
     )
     return {
+        "request": request_payload,
+        "agent_context": agent_context,
         "patient_payload": prepared["patient_payload"],
-        "model_overrides": model_overrides,
         "runtime_snapshot": runtime_snapshot,
         "runtime_snapshot_hash": runtime_snapshot_hash,
     }
