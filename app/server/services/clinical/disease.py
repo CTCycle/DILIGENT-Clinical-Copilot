@@ -386,6 +386,9 @@ class DiseaseExtractor:
                 source_text=cleaned,
                 candidate_checklist=candidate_text,
             )
+            user_prompt = LLMRuntimeConfig.with_agent_guidance(
+                user_prompt, "extraction_guidance"
+            )
             last_wrong_output = ""
             last_errors: list[str] = []
             max_attempts = max(1, self.extraction_retry_attempts + 1)
@@ -396,6 +399,9 @@ class DiseaseExtractor:
                         candidate_checklist=candidate_text,
                         validation_errors=last_errors,
                         previous_output=last_wrong_output,
+                    )
+                    user_prompt = LLMRuntimeConfig.with_agent_guidance(
+                        user_prompt, "extraction_guidance"
                     )
                 try:
                     schema = (

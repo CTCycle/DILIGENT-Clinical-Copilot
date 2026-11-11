@@ -354,3 +354,61 @@ def test_concurrent_agent_runs_do_not_share_configuration(
         "second": ("anthropic", "claude-x"),
     }
     assert LLMRuntimeConfig.has_role_routing() is False
+
+
+###############################################################################
+def test_agent_guidance_is_bounded_and_absent_by_default(
+    persisted_snapshot: ModelConfigSnapshot,
+) -> None:
+    prompt = "Extract medications. Return JSON."
+    default_context = _context(dili_payload(), 1)
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(default_context)
+    ):
+        # Empty instructions reproduce the pre-agent prompt exactly.
+        assert LLMRuntimeConfig.with_agent_guidance(prompt, "extraction_guidance") == prompt
+
+    guided = _context(
+        dili_payload(
+            instructions={
+                "assessment_focus": "Weigh   chronology.",
+                "extraction_guidance": "Brand names are common.",
+            }
+        ),
+        2,
+    )
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(guided)
+    ):
+        extraction = LLMRuntimeConfig.with_agent_guidance(prompt, "extraction_guidance")
+        assessment = LLMRuntimeConfig.with_agent_guidance(
+            prompt, "assessment_focus", "report_style"
+        )
+    assert extraction.startswith(prompt)
+    assert "Brand names are common." in extraction
+    assert "never overrides" in extraction
+    assert "Weigh chronology." in assessment
+    assert "Brand names" not in assessment
+
+
+###############################################################################
+def test_extraction_stage_scope_routes_stage_override(
+    persisted_snapshot: ModelConfigSnapshot,
+) -> None:
+    payload = dili_payload()
+    payload["models"]["extraction_overrides"] = {
+        "diseases": {"provider": "openai", "model": "gpt-4.1-mini"}
+    }
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(_context(payload, 3))
+    ):
+        with LLMRuntimeConfig.stage_scope("diseases"):
+            assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+                "openai",
+                "gpt-4.1-mini",
+            )
+        with LLMRuntimeConfig.stage_scope("laboratory"):
+            assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+                "ollama",
+                "qwen3:8b",
+            )

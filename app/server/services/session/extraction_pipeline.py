@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, TypeVar
@@ -63,6 +64,27 @@ async def _await_with_stop_check(
 
 
 ###############################################################################
+def extraction_stage(stage: str) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
+    """Run an extraction stage under its agent stage scope.
+
+    An agent may route one extraction stage to its own model; without an
+    override the stage keeps the agent's default extraction model.
+    """
+
+    def decorator(
+        function: Callable[..., Awaitable[T]],
+    ) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(function)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            with LLMRuntimeConfig.stage_scope(stage):
+                return await function(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+###############################################################################
 class ClinicalSessionExtractionOwner(Protocol):
     drugs_parser: Any
     disease_extractor: Any
@@ -90,6 +112,7 @@ class ClinicalSessionExtractionOwner(Protocol):
 class ClinicalSessionExtractionPipelineMixin:
 
     # -------------------------------------------------------------------------
+    @extraction_stage("therapy_drugs")
     async def extract_therapy_drugs(
         self: ClinicalSessionExtractionOwner,
         *,
@@ -188,6 +211,7 @@ class ClinicalSessionExtractionPipelineMixin:
         return therapy_drugs
 
     # -------------------------------------------------------------------------
+    @extraction_stage("anamnesis_drugs")
     async def extract_anamnesis_drugs(
         self: ClinicalSessionExtractionOwner,
         *,
@@ -267,6 +291,7 @@ class ClinicalSessionExtractionPipelineMixin:
         return anamnesis_drugs
 
     # -------------------------------------------------------------------------
+    @extraction_stage("diseases")
     async def extract_disease_context(
         self: ClinicalSessionExtractionOwner,
         *,
@@ -419,6 +444,7 @@ class ClinicalSessionExtractionPipelineMixin:
         return PatientDiseaseContext(entries=[])
 
     # -------------------------------------------------------------------------
+    @extraction_stage("laboratory")
     async def extract_lab_timeline(
         self: ClinicalSessionExtractionOwner,
         *,

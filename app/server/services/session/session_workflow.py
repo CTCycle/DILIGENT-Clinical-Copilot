@@ -324,7 +324,12 @@ async def process_single_patient_workflow(
     )
     parser_task_count = min(2, extraction_batch_size, extraction_max_concurrency)
     preflight = await check_parser_batch_capacity(task_count=parser_task_count)
-    if preflight.concurrency_allowed:
+    # One parser instance serves both drug stages; run them sequentially
+    # when an agent routes them to different models.
+    stage_models_differ = LLMRuntimeConfig.resolve_provider_and_model(
+        "parser", stage="therapy_drugs"
+    ) != LLMRuntimeConfig.resolve_provider_and_model("parser", stage="anamnesis_drugs")
+    if preflight.concurrency_allowed and not stage_models_differ:
         extract_drug_group = partial(
             _extract_drug_group,
             service=service,
@@ -342,18 +347,19 @@ async def process_single_patient_workflow(
             worker=extract_drug_group,
         )
     else:
-        logger.info(
-            "Parser batch preflight denied concurrency for provider=%s model=%s: %s",
-            preflight.provider,
-            preflight.model,
-            preflight.reason,
-        )
-        service.append_warning_issue(
-            issues,
-            code="parser_batch_preflight_sequential_fallback",
-            message="Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.",
-            field="clinical_input",
-        )
+        if not stage_models_differ:
+            logger.info(
+                "Parser batch preflight denied concurrency for provider=%s model=%s: %s",
+                preflight.provider,
+                preflight.model,
+                preflight.reason,
+            )
+            service.append_warning_issue(
+                issues,
+                code="parser_batch_preflight_sequential_fallback",
+                message="Parser batch preflight denied concurrent extraction; using sequential extraction for local runtime safety.",
+                field="clinical_input",
+            )
         therapy_drugs = await service.extract_therapy_drugs(
             cleaned_therapy_text=cleaned_therapy_text,
             issues=issues,

@@ -24,7 +24,6 @@ export type DiliAgentModels = {
   clinical: AgentModelRef;
   timeline: AgentModelRef;
   extraction_overrides: Partial<Record<ExtractionStage, AgentModelRef>>;
-  report_synthesis?: AgentModelRef | null;
 };
 
 export type AgentRetrievalPolicy = {

@@ -56,8 +56,6 @@ def _model_refs(config: AgentConfigModel) -> list[tuple[str, AgentModelRef]]:
             (f"models.extraction_overrides.{stage}", item)
             for stage, item in models.extraction_overrides.items()
         )
-        if models.report_synthesis is not None:
-            refs.append(("models.report_synthesis", models.report_synthesis))
         return refs
     refs = [("models.planning", config.models.planning)]
     refs.extend(

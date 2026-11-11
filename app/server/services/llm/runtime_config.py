@@ -16,6 +16,7 @@ from common.catalogs.model_choices import (
     get_clinical_model_choices,
     get_text_extraction_model_choices,
 )
+from common.prompts.agent_guidance import append_agent_guidance
 from domain.agents import AgentExecutionContext, AgentModelRef, DiliAgentConfig
 from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from domain.llm.providers import CloudModelDescriptor, CloudProviderId
@@ -60,6 +61,18 @@ class LLMRuntimeConfig:
         "llm_runtime_override",
         default=None,
     )
+    # Active pipeline stage, used for an agent's per-stage model overrides.
+    _stage: ContextVar[str | None] = ContextVar("llm_runtime_stage", default=None)
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    @contextmanager
+    def stage_scope(cls, stage: str):
+        token = cls._stage.set(stage)
+        try:
+            yield
+        finally:
+            cls._stage.reset(token)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -300,10 +313,6 @@ class LLMRuntimeConfig:
             role_models["revision"] = entry(models.clinical)
             for stage, ref in models.extraction_overrides.items():
                 role_models[f"parser.{stage}"] = entry(ref)
-            if models.report_synthesis is not None:
-                role_models["clinical.report_synthesis"] = entry(
-                    models.report_synthesis
-                )
             persisted = ModelConfigSerializer().load_snapshot().rag_settings or {}
             overrides["rag_settings"] = {
                 **dict(persisted),
@@ -334,6 +343,12 @@ class LLMRuntimeConfig:
         if not isinstance(value, Mapping):
             return {}
         return {str(key): str(item or "") for key, item in value.items()}
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def with_agent_guidance(cls, prompt: str, *keys: str) -> str:
+        """Append the active agent's bounded guidance fields to a user prompt."""
+        return append_agent_guidance(prompt, cls.active_agent_instructions(), keys)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -757,6 +772,7 @@ class LLMRuntimeConfig:
     ) -> tuple[str, str]:
         role_models = cls._role_models(cls._runtime_override.get() or {})
         if role_models:
+            stage = stage or cls._stage.get()
             item = (role_models.get(f"{purpose}.{stage}") if stage else None) or (
                 role_models.get(purpose)
             )

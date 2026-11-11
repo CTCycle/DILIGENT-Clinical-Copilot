@@ -33,6 +33,7 @@ from common.prompts.language import (
 )
 from common.utils.logger import logger
 from domain.clinical.entities import DrugRucamAssessment, DrugSuspensionContext
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.clinical import hepatox_scoring
 from services.clinical.exposure_timeline import ExposureTimelineService
 from services.clinical.livertox_likelihood import normalize_livertox_likelihood
@@ -134,6 +135,9 @@ class DrugAnalysisService:
             knowledge_prompt=self.escape_braces(knowledge_prompt),
             metadata_block=self.escape_braces(metadata_block),
             livertox_score=self.escape_braces(score),
+        )
+        user_prompt = LLMRuntimeConfig.with_agent_guidance(
+            user_prompt, "assessment_focus", "report_style"
         )
         messages = [
             {"role": "system", "content": system_template},
@@ -384,6 +388,9 @@ class DrugAnalysisService:
             report_language=self.escape_braces(report_language),
             clinical_context=self.escape_braces(context_body),
             multi_drug_report=self.escape_braces(report_body),
+        )
+        user_prompt = LLMRuntimeConfig.with_agent_guidance(
+            user_prompt, "assessment_focus", "report_style"
         )
         messages = [
             {"role": "system", "content": system_template},

@@ -63,8 +63,6 @@ class DiliAgentModels(_StrictModel):
     extraction_overrides: dict[ExtractionStage, AgentModelRef] = Field(
         default_factory=dict
     )
-    # Optional final-report model; absent uses ``clinical``.
-    report_synthesis: AgentModelRef | None = None
 
 
 ###############################################################################

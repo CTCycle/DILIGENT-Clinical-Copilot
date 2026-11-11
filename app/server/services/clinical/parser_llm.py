@@ -532,6 +532,9 @@ class DrugLlmExtractionMixin(ParserHost):
             source_text=source_text,
             source=source,
         )
+        user_prompt = LLMRuntimeConfig.with_agent_guidance(
+            user_prompt, "extraction_guidance"
+        )
         last_wrong_output = ""
         last_errors: list[str] = []
         max_attempts = 2
@@ -546,6 +549,9 @@ class DrugLlmExtractionMixin(ParserHost):
                     source_text=source_text,
                     validation_errors=last_errors,
                     previous_output=last_wrong_output,
+                )
+                user_prompt = LLMRuntimeConfig.with_agent_guidance(
+                    user_prompt, "extraction_guidance"
                 )
             raw_parsed = await asyncio.wait_for(
                 self.client.llm_structured_call(
