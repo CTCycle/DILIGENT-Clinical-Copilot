@@ -173,6 +173,25 @@ def _seed_model_configuration(
         "SQLite" if isinstance(repository, SQLiteRepository) else "PostgreSQL",
         changed,
     )
+    _seed_default_agents(repository, serializer)
+
+
+###############################################################################
+def _seed_default_agents(
+    repository: SQLiteRepository | PostgresRepository,
+    serializer: ModelConfigSerializer,
+) -> None:
+    from repositories.agent_repository import AgentRepository
+    from repositories.context import RepositoryContext
+    from repositories.agent_seed import ensure_default_agents
+
+    agent_repository = AgentRepository(
+        RepositoryContext.create(
+            engine=repository.engine,
+            session_factory=repository.session_factory,
+        )
+    )
+    ensure_default_agents(agent_repository, serializer.load_snapshot())
 
 
 ###############################################################################
