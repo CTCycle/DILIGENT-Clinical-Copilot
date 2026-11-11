@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
 import { JobPollingService } from '../../../core/services/job-polling.service';
-import { ModelConfigStateService } from '../../../core/state/model-config-state.service';
+import { AgentsStateService } from '../../../core/state/agents-state.service';
 import { ClinicalSessionTimelineWorkspaceComponent } from './clinical-session-timeline-workspace.component';
 
 type Deferred<T> = {
@@ -113,13 +113,24 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
       providers: [
         provideRouter([]),
         {
-          provide: ModelConfigStateService,
+          provide: AgentsStateService,
           useValue: {
-            data: signal(null),
             status: signal('ready'),
-            settings: signal({ timelineModel: 'timeline-model' }),
             error: signal(null),
-            load: vi.fn().mockResolvedValue(null),
+            defaultDiliAgent: signal({
+              revision: {
+                configuration: {
+                  kind: 'dili',
+                  models: {
+                    clinical: { provider: 'ollama', model: 'clinical' },
+                    extraction: { provider: 'ollama', model: 'parser' },
+                    timeline: { provider: 'ollama', model: 'timeline-model' },
+                  },
+                  retrieval: { evidence_sources: [] },
+                },
+              },
+            }),
+            load: vi.fn().mockResolvedValue([]),
           },
         },
       ],

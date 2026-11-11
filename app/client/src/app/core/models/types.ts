@@ -5,17 +5,6 @@ export type CloudProvider = string;
 
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
 
-export type RuntimeSettings = {
-  useCloudServices: boolean;
-  provider: CloudProvider;
-  cloudModel: string | null;
-  textExtractionModel: string;
-  clinicalModel: string;
-  revisionModel: string;
-  timelineModel: string;
-  reasoning: ReasoningLevel;
-};
-
 export type LocalModelCard = {
   name: string;
   description: string;
@@ -39,20 +28,13 @@ export type LocalCatalogMetadata = {
 };
 
 export type RagSettings = {
-    allow_local_filesystem_access: boolean;
-    vector_collection_name: string;
+  allow_local_filesystem_access: boolean;
+  vector_collection_name: string;
   chunk_size: number;
   chunk_overlap: number;
   embedding_batch_size: number;
-  use_hybrid_search: boolean;
-  use_reranking: boolean;
-  retrieval_candidate_count: number;
-  retrieval_selected_count: number;
-  reranker_model: string;
-  hybrid_vector_weight: number;
-  hybrid_text_weight: number;
-    vector_index_metric: string;
-    vector_index_type: string;
+  vector_index_metric: string;
+  vector_index_type: string;
   vector_stream_batch_size: number;
   embedding_offline_mode: boolean;
 };
@@ -61,15 +43,6 @@ export type ModelConfigStateResponse = {
   local_models: LocalModelCard[];
   cloud_providers: CloudProviderDescriptor[];
   local_catalog: LocalCatalogMetadata;
-  use_cloud_services: boolean;
-  llm_provider: string;
-  cloud_model: string | null;
-  clinical_model: string;
-  text_extraction_model: string;
-  revision_model: string;
-  timeline_model: string;
-  reasoning_level: ReasoningLevel;
-  ollama_seed: number | null;
   rag_settings: RagSettings;
   embedding_runtime: EmbeddingRuntimeStatus;
   embedding_index: EmbeddingIndexStatus;
@@ -77,15 +50,6 @@ export type ModelConfigStateResponse = {
 };
 
 export type ModelConfigPersistResponse = {
-  use_cloud_services: boolean;
-  llm_provider: CloudProvider;
-  cloud_model: string | null;
-  clinical_model: string;
-  text_extraction_model: string;
-  revision_model: string;
-  timeline_model: string;
-  reasoning_level: ReasoningLevel;
-  ollama_seed: number | null;
   rag_settings: RagSettings;
   updated_at: string | null;
 };
@@ -112,15 +76,6 @@ export type EmbeddingStatusResponse = {
 };
 
 export type ModelConfigUpdateRequest = {
-  use_cloud_services?: boolean;
-  llm_provider?: CloudProvider;
-  cloud_model?: string | null;
-  clinical_model?: string;
-  text_extraction_model?: string;
-  revision_model?: string;
-  timeline_model?: string;
-  reasoning_level?: ReasoningLevel;
-  ollama_seed?: number | null;
   rag_settings?: Partial<RagSettings>;
 };
 

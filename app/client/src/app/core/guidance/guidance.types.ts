@@ -6,7 +6,6 @@ export type GuidanceStatus = 'seen' | 'dismissed' | 'skipped' | 'completed' | 'r
 export type GuidanceId =
   | 'dili-first-assessment'
   | 'dili-assessment-tour'
-  | 'model-runtime-source'
   | 'model-rag-settings'
   | 'clinical-session-sections'
   | 'timeline-review-controls';

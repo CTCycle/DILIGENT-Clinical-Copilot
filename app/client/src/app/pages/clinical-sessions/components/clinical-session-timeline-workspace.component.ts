@@ -9,7 +9,8 @@ import { ModalShellComponent } from '../../../components/modal-shell/modal-shell
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
 import { cancelInspectionSessionTimelineJob, deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
-import { ModelConfigStateService } from '../../../core/state/model-config-state.service';
+import { summarizeAgent } from '../../../core/models/agent-types';
+import { AgentsStateService } from '../../../core/state/agents-state.service';
 import { formatUnknownError } from '../../../core/utils';
 
 @Component({
@@ -22,19 +23,21 @@ import { formatUnknownError } from '../../../core/utils';
 export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   private readonly router = inject(Router);
   private readonly jobPolling = inject(JobPollingService);
-  private readonly modelConfigState = inject(ModelConfigStateService);
+  private readonly agents = inject(AgentsStateService);
   @Input({ required: true }) session!: ClinicalSessionDetail;
 
   readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);
   readonly timelineListLoading = signal(false);
   readonly timelineListError = signal<string | null>(null);
-  readonly modelConfig = this.modelConfigState.data;
-  readonly modelConfigLoading = computed(() => this.modelConfigState.status() === 'loading');
-  readonly modelConfigError = computed(() => {
-    const error = this.modelConfigState.error();
-    return error ? formatUnknownError(error, 'Unable to load timeline model options.') : null;
+  readonly agentLoading = computed(() => this.agents.status() === 'loading');
+  readonly agentError = computed(() => {
+    const error = this.agents.error();
+    return error ? formatUnknownError(error, 'Unable to load the default agent.') : null;
   });
-  readonly modelName = computed(() => this.modelConfigState.settings()?.timelineModel ?? '');
+  readonly modelName = computed(() => {
+    const agent = this.agents.defaultDiliAgent();
+    return agent ? summarizeAgent(agent).timelineModel ?? '' : '';
+  });
   readonly generationRunning = signal(false);
   readonly generationStatus = signal<string | null>(null);
   readonly generationError = signal<string | null>(null);
@@ -49,7 +52,7 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
   private timelineLoadGeneration = 0;
 
   readonly selectedConfigurationLabel = computed(() => this.modelName() || 'No Timeline model configured');
-  readonly canGenerate = computed(() => Boolean(this.modelName()) && !this.generationRunning() && !this.modelConfigLoading() && !this.modelConfigError());
+  readonly canGenerate = computed(() => Boolean(this.modelName()) && !this.generationRunning() && !this.agentLoading() && !this.agentError());
   readonly sortedTimelinePreviews = computed(() => [...this.timelinePreviews()].sort((a, b) => Date.parse(b.generated_at) - Date.parse(a.generated_at)));
 
   ngOnInit(): void { this.resetAndLoad(); }
@@ -62,15 +65,15 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     this.stopTimelinePolling();
     this.timelinePreviews.set([]); this.timelineListError.set(null); this.generationError.set(null); this.generationStatus.set(null);
     this.generationJobId.set(null); this.generationProgress.set(0); this.generationProgressMessage.set(null); this.generationRunning.set(false); this.generationCancellationState.set('idle');
-    void this.loadModelConfiguration();
+    void this.loadDefaultAgent();
     void this.loadTimelineHistory(sessionId, loadGeneration);
   }
 
-  async loadModelConfiguration(): Promise<void> {
+  async loadDefaultAgent(): Promise<void> {
     try {
-      await this.modelConfigState.load();
+      await this.agents.load();
     } catch {
-      // The shared model-config resource exposes the visible error state.
+      // The shared agents resource exposes the visible error state.
     }
   }
 

@@ -7,7 +7,7 @@
       <app-help-popover
         ariaLabel="Explain RAG settings"
         title="What RAG settings control"
-        body="These settings shape indexing and retrieval quality. They do not turn evidence on for every run; the DILI Agent checkbox still controls whether an assessment uses indexed evidence."
+        body="These settings shape the shared document index used by every agent. Retrieval and reranking are configured per agent in the Agent Editor."
       ></app-help-popover>
     </span>
   </span>
@@ -17,7 +17,7 @@
       <path d="M5.5 6v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75V6" />
       <path d="M5.5 11v5c0 1.52 2.9 2.75 6.5 2.75s6.5-1.23 6.5-2.75v-5" />
     </svg>
-    <span>Configure retrieval, reranking, embeddings, chunking, and vector update parameters.</span>
+    <span>Configure chunking, embeddings, and vector index parameters.</span>
   </span>
   <button
     class="model-config-rag-settings-btn"
@@ -34,7 +34,7 @@
 <app-modal-shell
   [isOpen]="modalOpen()"
   title="RAG settings"
-  subtitle="Configure retrieval, ranking, chunking, embeddings, and vector indexing behavior."
+  subtitle="Configure chunking, embeddings, and vector indexing behavior."
   titleId="rag-settings-title"
   ariaLabelledBy="rag-settings-title"
   dialogClassName="modal-container model-config-rag-modal"
@@ -43,10 +43,6 @@
 >
   <div class="model-config-rag-modal-body">
     <nav class="model-config-rag-modal-tabs" aria-label="RAG settings sections">
-      <button type="button" [class.is-active]="activeSection() === 'general'" (click)="sectionChange.emit('general')">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h16M4 15.5h16M8.5 4v16M15.5 4v16" /></svg>
-        Retrieval
-      </button>
       <button type="button" [class.is-active]="activeSection() === 'chunking'" (click)="sectionChange.emit('chunking')">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h8l6 6v8H5V5Z" /><path d="M13 5v6h6" /></svg>
         Chunking
@@ -55,10 +51,6 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14" /><path d="M8 4v4M16 10v4M11 16v4" /></svg>
         Embeddings
       </button>
-      <button type="button" [class.is-active]="activeSection() === 'models'" (click)="sectionChange.emit('models')">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V7l6-3 6 3v10l-6 3-6-3Z" /><path d="m9.5 9.5 5 5M14.5 9.5l-5 5" /></svg>
-        Ranking
-      </button>
       <button type="button" [class.is-active]="activeSection() === 'storage'" (click)="sectionChange.emit('storage')">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" /><path d="M8 9h8M8 13h5" /></svg>
         Index
@@ -66,98 +58,6 @@
     </nav>
 
     <div class="model-config-rag-modal-scroll">
-      @if (activeSection() === 'general') {
-      <section class="model-config-rag-settings-section">
-        <h3>Retrieval Settings</h3>
-        <p class="model-config-rag-settings-intro">How many candidates are retrieved and how they are ranked before entering the model context.</p>
-        <div class="model-config-rag-setting-row">
-          <label for="rag-candidate-count">
-            Retrieved documents
-            <small>Hybrid results collected before reranking</small>
-          </label>
-          <input
-            id="rag-candidate-count"
-            type="number"
-            min="1"
-            step="1"
-            [ngModel]="draft().retrieval_candidate_count"
-            (ngModelChange)="numberChange.emit({ key: 'retrieval_candidate_count', value: $event })"
-          />
-        </div>
-        <div class="model-config-rag-setting-row" [class.is-invalid]="draft().retrieval_selected_count > draft().retrieval_candidate_count">
-          <label for="rag-selected-count">
-            Selected documents
-            <small>Documents retained for the LLM context after ranking</small>
-          </label>
-          <input
-            id="rag-selected-count"
-            type="number"
-            min="1"
-            step="1"
-            [attr.max]="draft().retrieval_candidate_count"
-            [ngModel]="draft().retrieval_selected_count"
-            (ngModelChange)="numberChange.emit({ key: 'retrieval_selected_count', value: $event })"
-          />
-        </div>
-        <div class="model-config-rag-setting-row">
-          <label for="rag-hybrid-toggle">
-            Hybrid search
-            <small>Blend vector similarity with text relevance</small>
-          </label>
-          <input
-            id="rag-hybrid-toggle"
-            class="model-config-rag-checkbox"
-            type="checkbox"
-            [ngModel]="draft().use_hybrid_search"
-            (ngModelChange)="booleanChange.emit({ key: 'use_hybrid_search', value: $event })"
-          />
-        </div>
-        <div class="model-config-rag-setting-row">
-          <label for="rag-vector-weight">
-            Vector weight
-            <small>Relative contribution of semantic vector matches during hybrid fusion</small>
-          </label>
-          <input
-            id="rag-vector-weight"
-            type="number"
-            min="0"
-            step="0.05"
-            [disabled]="!draft().use_hybrid_search"
-            [ngModel]="draft().hybrid_vector_weight"
-            (ngModelChange)="floatChange.emit({ key: 'hybrid_vector_weight', value: $event })"
-          />
-        </div>
-        <div class="model-config-rag-setting-row">
-          <label for="rag-text-weight">
-            Text weight
-            <small>Relative contribution of lexical text matches during hybrid fusion</small>
-          </label>
-          <input
-            id="rag-text-weight"
-            type="number"
-            min="0"
-            step="0.05"
-            [disabled]="!draft().use_hybrid_search"
-            [ngModel]="draft().hybrid_text_weight"
-            (ngModelChange)="floatChange.emit({ key: 'hybrid_text_weight', value: $event })"
-          />
-        </div>
-        <div class="model-config-rag-setting-row">
-          <label for="rag-rerank-toggle">
-            Reranking
-            <small>Rank retrieved candidates before context injection</small>
-          </label>
-          <input
-            id="rag-rerank-toggle"
-            class="model-config-rag-checkbox"
-            type="checkbox"
-            [ngModel]="draft().use_reranking"
-            (ngModelChange)="booleanChange.emit({ key: 'use_reranking', value: $event })"
-          />
-        </div>
-      </section>
-      }
-
       @if (activeSection() === 'chunking') {
       <section class="model-config-rag-settings-section">
         <h3>Chunking Settings</h3>
@@ -207,24 +107,6 @@
             <small>Require the embedding model to be available from the local cache</small>
           </label>
           <input id="rag-embedding-offline" type="checkbox" [ngModel]="draft().embedding_offline_mode" (ngModelChange)="booleanChange.emit({ key: 'embedding_offline_mode', value: $event })" />
-        </div>
-      </section>
-      }
-
-      @if (activeSection() === 'models') {
-      <section class="model-config-rag-settings-section">
-        <h3>Ranking Settings</h3>
-        <p class="model-config-rag-settings-intro">Local reranking applied to retrieved candidates.</p>
-        <div class="model-config-rag-setting-row">
-          <label for="rag-reranker-model">
-            Reranker profile
-            <small>Choose the local reranking strategy: balanced, lexical, or phrase-focused</small>
-          </label>
-          <select id="rag-reranker-model" [disabled]="!draft().use_reranking" [ngModel]="draft().reranker_model" (ngModelChange)="textChange.emit({ key: 'reranker_model', value: $event })">
-            @for (option of rerankerProfileOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-            }
-          </select>
         </div>
       </section>
       }

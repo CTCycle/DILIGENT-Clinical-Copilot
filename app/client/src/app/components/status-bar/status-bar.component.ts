@@ -3,20 +3,13 @@
 
 import { Component, ElementRef, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
 
-import { RuntimeSettings } from '../../core/models/types';
+import { summarizeAgent } from '../../core/models/agent-types';
 import { formatUnknownError } from '../../core/utils';
 import { MemoryUsage, startOllama, stopOllama } from '../../core/services/system-status-api';
-import { ModelConfigStateService } from '../../core/state/model-config-state.service';
+import { AgentsStateService } from '../../core/state/agents-state.service';
 import { SystemStatusStateService } from '../../core/state/system-status-state.service';
 
 type LedState = 'ok' | 'warning' | 'error' | 'pending' | 'unknown';
-
-const MODEL_ROLES: { label: string; key: keyof RuntimeSettings & `${string}Model` }[] = [
-  { label: 'Clinical', key: 'clinicalModel' },
-  { label: 'Text extraction', key: 'textExtractionModel' },
-  { label: 'Revision', key: 'revisionModel' },
-  { label: 'Timeline', key: 'timelineModel' },
-];
 
 type MemoryReading = { detail: string; percent: string };
 
@@ -40,7 +33,7 @@ function formatMemory(usage: MemoryUsage | null | undefined): MemoryReading | nu
 })
 export class StatusBarComponent implements OnDestroy {
   private readonly state = inject(SystemStatusStateService);
-  private readonly modelConfig = inject(ModelConfigStateService);
+  private readonly agents = inject(AgentsStateService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly notAvailable = NOT_AVAILABLE;
 
@@ -113,15 +106,17 @@ export class StatusBarComponent implements OnDestroy {
 
   readonly modelsOpen = signal(false);
 
+  /** Models of the default DILI agent plus the default Revision agent's planning model. */
   readonly modelRoles = computed<{ role: string; model: string | null }[]>(() => {
-    const settings = this.modelConfig.settings();
-    if (!settings) {
-      return MODEL_ROLES.map(({ label }) => ({ role: label, model: null }));
-    }
-    return MODEL_ROLES.map(({ label, key }) => ({
-      role: label,
-      model: settings[key] || (settings.useCloudServices ? settings.cloudModel : null) || null,
-    }));
+    const dili = this.agents.defaultDiliAgent();
+    const revision = this.agents.defaultRevisionAgent();
+    const diliModels = dili ? summarizeAgent(dili) : null;
+    return [
+      { role: 'Clinical', model: diliModels?.clinicalModel ?? null },
+      { role: 'Text extraction', model: diliModels?.extractionModel ?? null },
+      { role: 'Timeline', model: diliModels?.timelineModel ?? null },
+      { role: 'Revision', model: revision ? summarizeAgent(revision).clinicalModel : null },
+    ];
   });
 
   readonly models = computed<{ led: LedState; label: string }>(() => {
@@ -143,8 +138,8 @@ export class StatusBarComponent implements OnDestroy {
 
   constructor() {
     this.state.start();
-    if (this.modelConfig.status() === 'idle') {
-      this.modelConfig.load().catch(() => undefined);
+    if (this.agents.status() === 'idle') {
+      this.agents.load().catch(() => undefined);
     }
   }
 

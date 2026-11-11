@@ -24,7 +24,7 @@
         <span class="status-value">{{ models().label }}</span>
       </button>
       @if (modelsOpen()) {
-        <div class="models-popover" role="dialog" aria-label="Model roles">
+        <div class="models-popover" role="dialog" aria-label="Default agent models">
           @for (entry of modelRoles(); track entry.role) {
             <div class="models-row">
               <span class="status-label">{{ entry.role }}</span>

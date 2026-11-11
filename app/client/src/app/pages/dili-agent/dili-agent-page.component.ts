@@ -13,7 +13,6 @@ import {
   DraftNotEditableError,
 } from '../../core/services/clinical-session-draft.service';
 import { AppStateService } from '../../core/state/app-state.service';
-import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { formatUnknownError, normalizeVisitDateInput } from '../../core/utils';
 import { AnalysisWizardComponent } from './components/analysis-wizard/analysis-wizard.component';
 import { SourceSelection } from './components/analysis-wizard/section-preview';
@@ -43,7 +42,6 @@ export class DiliAgentPageComponent {
   @ViewChild('patientImageInput') private patientImageInput?: ElementRef<HTMLInputElement>;
 
   readonly stateService = inject(AppStateService);
-  readonly modelConfigState = inject(ModelConfigStateService);
   readonly guidanceDefinitions = GUIDANCE_DEFINITIONS;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -60,7 +58,6 @@ export class DiliAgentPageComponent {
 
   constructor() {
     void this.loadClinicalSectionTemplate();
-    void this.modelConfigState.load().catch(() => undefined);
     this.route.queryParamMap
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((params) => {
@@ -94,7 +91,7 @@ export class DiliAgentPageComponent {
   }
 
   openConfigurations(): void {
-    void this.router.navigateByUrl('/settings/models');
+    void this.router.navigateByUrl('/agents');
   }
 
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {

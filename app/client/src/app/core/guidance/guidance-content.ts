@@ -41,17 +41,11 @@ export const GUIDANCE_DEFINITIONS = {
     title: 'Get started with DILI Agent',
     description: 'Configure a model, structure the clinical input, and review the pre-flight check before running.',
   },
-  modelRuntimeSource: {
-    id: 'model-runtime-source',
-    version: GUIDANCE_CONTENT_VERSION,
-    title: 'Runtime source',
-    description: 'Choose Local for Ollama on this machine or Cloud for a configured external provider. This setting controls the runtime used by new work.',
-  },
   modelRagSettings: {
     id: 'model-rag-settings',
     version: GUIDANCE_CONTENT_VERSION,
     title: 'RAG settings',
-    description: 'These settings control chunking, embeddings, retrieval, and reranking. The DILI Agent checkbox still decides whether a run uses the index.',
+    description: 'These settings control the shared index: chunking, embeddings and storage. Retrieval and reranking are set per agent in Agent Studio.',
   },
   clinicalSessionSections: {
     id: 'clinical-session-sections',
@@ -77,15 +71,15 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
   },
   {
     id: 'model-roles',
-    title: 'Choose model roles',
-    body: 'The clinical role and text-extraction role can use different models. Choose each role in the catalog, then save the configuration.',
-    actionLabel: 'Open Settings',
+    title: 'Choose agent models',
+    body: 'Each DILI agent picks its own clinical, extraction and timeline models. Edit an agent in Agent Studio, then save a new revision.',
+    actionLabel: 'Open Agent Studio',
     action: 'configurations',
   },
   {
     id: 'rag-boundary',
     title: 'Choose evidence in the analysis wizard',
-    body: 'RAG settings define retrieval behaviour; the evidence selection step in the DILI analysis wizard decides what the current assessment uses.',
+    body: 'The retrieval policy of each agent defines retrieval behaviour; the evidence selection step in the DILI analysis wizard decides what the current assessment uses.',
   },
   {
     id: 'session-review',

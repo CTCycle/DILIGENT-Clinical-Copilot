@@ -14,7 +14,6 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 export class SettingsPageComponent {
   readonly navItems = [
     { path: '/settings/general', label: 'General' },
-    { path: '/settings/models', label: 'Models' },
     { path: '/settings/data', label: 'Data Processing' },
     { path: '/settings/integrations', label: 'Integrations' },
     { path: '/settings/matching', label: 'Drug Matching' },

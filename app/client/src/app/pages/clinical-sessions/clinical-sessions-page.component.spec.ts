@@ -387,7 +387,7 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
       }
       const detail = /\/inspection\/sessions\/(\d+)$/.exec(url);
       if (detail) return lifecycleJson(sessionDetail(Number(detail[1])));
-      return lifecycleJson({ items: [] });
+      return lifecycleJson({ items: [], agents: [] });
     });
     await TestBed.configureTestingModule({
       imports: [ClinicalSessionsPageComponent],

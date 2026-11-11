@@ -16,17 +16,16 @@ describe('SettingsPageComponent', () => {
     }).compileComponents();
   });
 
-  it('renders the persistent settings navigation without duplicate model configuration', () => {
+  it('renders the persistent settings navigation without model configuration', () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
 
     const links = Array.from(
       fixture.nativeElement.querySelectorAll('.settings-navigation-link') as NodeListOf<HTMLAnchorElement>,
     );
-    expect(links).toHaveLength(7);
+    expect(links).toHaveLength(6);
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       expect.stringContaining('General'),
-      expect.stringContaining('Models'),
       expect.stringContaining('Data Processing'),
       expect.stringContaining('Integrations'),
       expect.stringContaining('Drug Matching'),

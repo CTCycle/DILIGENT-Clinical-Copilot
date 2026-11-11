@@ -23,11 +23,6 @@ export const routes: Routes = [
         title: 'General Settings | DILIGENT',
       },
       {
-        path: 'models',
-        loadComponent: () => import('./pages/model-config/model-config-page.component').then((m) => m.ModelConfigPageComponent),
-        title: 'Model Settings | DILIGENT',
-      },
-      {
         path: 'data',
         loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'data' },

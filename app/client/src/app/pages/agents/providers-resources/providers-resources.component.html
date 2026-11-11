@@ -1,0 +1,154 @@
+<!-- Copyright © 2023–2025 Thomas Virdis -->
+<!-- Licensed under the GNU General Public License, version 3 or later. -->
+<div class="providers-resources">
+  <app-rag-resources-panel
+    [draft]="draftRagSettings()"
+    [modalOpen]="ragSettingsModalOpen()"
+    [activeSection]="activeRagSettingsSection()"
+    [disabled]="isRagSaving() || isLoading()"
+    [status]="ragSettingsStatus()"
+    [statusIsError]="!!ragSettingsValidationMessage() || !!ragSettingsSaveError()"
+    [modelLabel]="currentRagModelLabel()"
+    [embeddingRuntime]="embeddingRuntime()"
+    [embeddingIndex]="embeddingIndex()"
+    (openRequested)="openRagSettingsPanel()"
+    (closeRequested)="closeRagSettingsPanel()"
+    (sectionChange)="setActiveRagSettingsSection($event)"
+    (numberChange)="setDraftRagNumber($event.key, $event.value)"
+    (textChange)="setDraftRagText($event.key, $event.value)"
+    (booleanChange)="setDraftRagBoolean($event.key, $event.value)"
+  ></app-rag-resources-panel>
+
+  <app-provider-catalog-panel
+    [disabled]="isLoading()"
+    [actionsDisabled]="isLoading() || !!catalogProviderInFlight()"
+    [searchQuery]="modelSearchQuery()"
+    [source]="source()"
+    [sourceOptions]="sourceOptions()"
+    [activeFilters]="activeFilters()"
+    [localCatalogStatus]="localCatalog().status"
+    [localCatalogMessage]="localCatalog().message"
+    [cloudCatalogStatus]="selectedCloudProvider()?.catalog_status ?? null"
+    [cloudCatalogMessage]="cloudCatalogMessage()"
+    [rangeStart]="visibleModelRangeStart()"
+    [rangeEnd]="visibleModelRangeEnd()"
+    [totalCount]="filteredModelCount()"
+    (searchQueryChange)="setModelSearchQuery($event)"
+    (sourceChange)="handleSourceChange($event)"
+    (refreshRequested)="refreshSelectedCatalog()"
+    (filterToggled)="toggleFilter($event)"
+    (filtersCleared)="clearFilters()"
+  >
+    <div class="model-config-table-shell" (scroll)="onModelCatalogScroll($event)">
+      <table class="model-config-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Size</th>
+            <th>Context</th>
+            <th>Quant</th>
+            <th>Status</th>
+            @if (!useCloud()) {
+              <th>Actions</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @if (catalogEmptyMessage()) {
+            <tr>
+              <td colspan="6" class="model-config-empty-note">{{ catalogEmptyMessage() }}</td>
+            </tr>
+          }
+          @if (!useCloud()) {
+            @for (model of visibleLocalModels(); track model.name) {
+              <tr>
+                <td>
+                  <div class="model-config-model-cell">
+                    <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="8" y="6.5" width="8" height="11" rx="1.5" />
+                      <path d="M5.75 9.25h2.25M5.75 14.75h2.25M16 9.25h2.25M16 14.75h2.25" />
+                      <path d="M10.25 9.75h3.5M10.25 12h3.5M10.25 14.25h2" />
+                    </svg>
+                    <span>
+                      <strong>{{ model.name }}</strong>
+                      @if (localRecommendationLabel(model); as recommendation) {
+                        <small class="model-config-model-note">{{ recommendation }}</small>
+                      }
+                    </span>
+                  </div>
+                </td>
+                <td>{{ modelSizeLabel(model.name) }}</td>
+                <td>{{ modelContextLabel(model.name) }}</td>
+                <td>{{ modelQuantLabel(model.name) }}</td>
+                <td>
+                  <span
+                    class="model-config-status-pill"
+                    [class.is-installed]="modelStatus(model) === 'Installed'"
+                    [class.is-missing]="modelStatus(model) === 'Not installed'"
+                  >
+                    {{ modelStatus(model) }}
+                  </span>
+                </td>
+                <td>
+                  <div class="model-config-actions">
+                    <button
+                      class="model-config-action-btn"
+                      [class.is-disabled]="modelStatus(model) === 'Installed'"
+                      type="button"
+                      [attr.aria-label]="'Install ' + model.name"
+                      [attr.title]="modelStatus(model) === 'Installed' ? 'Already installed' : 'Install model'"
+                      (click)="pullModelByName(model.name)"
+                      [disabled]="isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
+                    >
+                      <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              @if (progressForModel(model.name); as progress) {
+                <tr class="model-config-progress-row">
+                  <td colspan="6">
+                    <div class="model-config-pull-progress" role="status" aria-live="polite">
+                      <div class="model-config-pull-progress-track" aria-hidden="true">
+                        <div class="model-config-pull-progress-fill" [style.width.%]="progress.progress"></div>
+                      </div>
+                      <p class="model-config-pull-progress-label">{{ progress.message }}</p>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          } @else {
+            @for (modelName of visibleCloudModels(); track modelName) {
+              <tr>
+                <td>
+                  <div class="model-config-model-cell">
+                    <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
+                    </svg>
+                    <span><strong>{{ modelName }}</strong></span>
+                  </div>
+                </td>
+                <td>Cloud</td>
+                <td>{{ cloudModelContextLabel(modelName) }}</td>
+                <td>N/A</td>
+                <td><span class="model-config-status-pill is-installed">Available</span></td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </app-provider-catalog-panel>
+
+  <app-provider-credentials-panel
+    [providers]="credentialProviderOptions()"
+    [selectedProvider]="selectedCredentialProvider()"
+    [disabled]="isLoading()"
+    [providerLabels]="credentialProviderLabels()"
+    (keysChanged)="loadModelConfig()"
+  ></app-provider-credentials-panel>
+
+  <app-status-message [message]="statusMessage()" [tone]="statusTone()" presentation="inline"></app-status-message>
+</div>

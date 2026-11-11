@@ -1,10 +1,10 @@
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
-<section id="model-roles" class="model-config-catalog-panel" [class.is-disabled]="disabled()" [attr.aria-disabled]="disabled()">
+<section class="model-config-catalog-panel" [class.is-disabled]="disabled()" [attr.aria-disabled]="disabled()">
   <div class="model-config-panel-heading">
     <div>
       <h2>{{ useCloud() ? 'Cloud Model Catalog' : 'Local Model Catalog' }}</h2>
-      <p class="model-config-panel-subtitle">Assign a model per task.</p>
+      <p class="model-config-panel-subtitle">Models available to agents. Choose them in the Agent Editor.</p>
     </div>
   </div>
 
@@ -20,24 +20,17 @@
         <path d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
       </svg>
     </div>
-    @if (useCloud()) {
-      <select
-        class="model-config-tag-select"
-        aria-label="Cloud provider"
-        [ngModel]="provider()"
-        (ngModelChange)="providerChange.emit($event)"
-        [disabled]="actionsDisabled()"
-      >
-        @for (option of providerOptions(); track option.value) {
-          <option [value]="option.value">{{ option.label }}</option>
-        }
-      </select>
-    } @else {
-      <button class="model-config-tag-select" type="button" disabled>
-        <span>All Tags</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-      </button>
-    }
+    <select
+      class="model-config-tag-select"
+      aria-label="Catalog source"
+      [ngModel]="source()"
+      (ngModelChange)="sourceChange.emit($event)"
+      [disabled]="actionsDisabled()"
+    >
+      @for (option of sourceOptions(); track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
     <button
       class="model-config-catalog-refresh"
       type="button"

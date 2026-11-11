@@ -1,13 +1,8 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { LocalModelCard, RuntimeSettings } from '../../core/models/types';
-import {
-  resolveCloudChoices,
-  resolveCloudModel,
-  resolveProvider,
-} from '../../core/model-config';
-import { DraftRuntimeConfig, ModelFilterKey } from './model-config.types';
+import { LocalModelCard } from '../../core/models/types';
+import { ModelFilterKey } from './model-config.types';
 
 export type ModelFilterOption = {
   key: ModelFilterKey;
@@ -59,19 +54,4 @@ export function modelMatchesFilters(
   if (filters.large && !isLargeModel(model)) return false;
   if (filters.quantized && !isQuantizedModel(model)) return false;
   return true;
-}
-
-export function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): DraftRuntimeConfig {
-  const choices = resolveCloudChoices(undefined);
-  const provider = resolveProvider(runtimeSettings.provider, choices);
-  const cloudModel = resolveCloudModel(provider, runtimeSettings.cloudModel, choices, true);
-  return {
-    useCloudServices: runtimeSettings.useCloudServices,
-    provider,
-    cloudModel,
-    clinicalModel: runtimeSettings.clinicalModel,
-    textExtractionModel: runtimeSettings.textExtractionModel,
-    revisionModel: runtimeSettings.revisionModel,
-    timelineModel: runtimeSettings.timelineModel,
-  };
 }

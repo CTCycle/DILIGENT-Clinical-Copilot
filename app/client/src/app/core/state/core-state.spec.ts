@@ -46,7 +46,7 @@ describe('AppStateService', () => {
   it('maps configuration routes to Settings', () => {
     expect(resolvePageIdFromPath('/clinical-sessions?session=3&tab=preview')).toBe('clinical-sessions');
     expect(resolvePageIdFromPath('/settings/general')).toBe('settings');
-    expect(resolvePageIdFromPath('/settings/models')).toBe('settings');
+    expect(resolvePageIdFromPath('/settings/advanced')).toBe('settings');
     expect(resolvePathFromPage('settings')).toBe('/settings/general');
   });
 });
@@ -56,28 +56,12 @@ function modelConfigPayload(): ModelConfigStateResponse {
     local_models: [],
     cloud_providers: [],
     local_catalog: { status: 'available', updated_at: null, message: null },
-    use_cloud_services: false,
-    llm_provider: 'openai',
-    cloud_model: null,
-    clinical_model: 'clinical-model',
-    text_extraction_model: 'text-model',
-    revision_model: 'revision-model',
-    timeline_model: 'timeline-model',
-    reasoning_level: 'medium',
-    ollama_seed: 42,
     rag_settings: {
       allow_local_filesystem_access: true,
       vector_collection_name: 'documents',
       chunk_size: 1024,
       chunk_overlap: 128,
       embedding_batch_size: 64,
-      use_hybrid_search: true,
-      use_reranking: true,
-      retrieval_candidate_count: 40,
-      retrieval_selected_count: 6,
-      reranker_model: 'balanced',
-      hybrid_vector_weight: 0.7,
-      hybrid_text_weight: 0.3,
       vector_index_metric: 'cosine',
       vector_index_type: 'IVF_FLAT',
       vector_stream_batch_size: 250,
@@ -114,7 +98,7 @@ describe('ModelConfigStateService', () => {
     TestBed.configureTestingModule({});
   });
 
-  it('hydrates exact backend roles and exposes the loaded resource', async () => {
+  it('hydrates the shared catalog and index state', async () => {
     const payload = modelConfigPayload();
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(payload));
     const resource = TestBed.inject(ModelConfigStateService);
@@ -126,15 +110,10 @@ describe('ModelConfigStateService', () => {
       expect.objectContaining({ method: 'GET', cache: 'no-store' }),
     );
     expect(resource.status()).toBe('ready');
-    expect(resource.settings()).toMatchObject({
-      clinicalModel: 'clinical-model',
-      textExtractionModel: 'text-model',
-      revisionModel: 'revision-model',
-      timelineModel: 'timeline-model',
-    });
+    expect(resource.data()?.rag_settings.chunk_size).toBe(1024);
   });
 
-  it('clears stale data and settings when a forced refresh fails', async () => {
+  it('clears stale data when a forced refresh fails', async () => {
     const payload = modelConfigPayload();
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse(payload))
@@ -147,7 +126,6 @@ describe('ModelConfigStateService', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(resource.status()).toBe('error');
     expect(resource.data()).toBeNull();
-    expect(resource.settings()).toBeNull();
     expect(resource.error()).toContain('backend unavailable');
   });
 });

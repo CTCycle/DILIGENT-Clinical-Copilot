@@ -3,11 +3,9 @@
 
 import { Injectable, computed, signal } from '@angular/core';
 
-import { buildRuntimeSettingsFromConfig } from '../model-config';
 import {
   ModelConfigPersistResponse,
   ModelConfigStateResponse,
-  RuntimeSettings,
 } from '../models/types';
 import { fetchModelConfigState } from '../services/model-config-api';
 
@@ -16,14 +14,12 @@ export type ModelConfigLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type ModelConfigResource = {
   status: ModelConfigLoadStatus;
   data: ModelConfigStateResponse | null;
-  settings: RuntimeSettings | null;
   error: string | null;
 };
 
 const INITIAL_RESOURCE: ModelConfigResource = {
   status: 'idle',
   data: null,
-  settings: null,
   error: null,
 };
 
@@ -35,7 +31,6 @@ export class ModelConfigStateService {
   readonly resource = this.resourceState.asReadonly();
   readonly status = computed(() => this.resourceState().status);
   readonly data = computed(() => this.resourceState().data);
-  readonly settings = computed(() => this.resourceState().settings);
   readonly error = computed(() => this.resourceState().error);
 
   async load(force = false): Promise<ModelConfigStateResponse> {
@@ -50,8 +45,7 @@ export class ModelConfigStateService {
     this.resourceState.set({
       status: 'loading',
       data: null,
-      settings: null,
-      error: null,
+          error: null,
     });
     this.loadRequest = fetchModelConfigState()
       .then((payload) => {
@@ -62,8 +56,7 @@ export class ModelConfigStateService {
         this.resourceState.set({
           status: 'error',
           data: null,
-          settings: null,
-          error: this.errorMessage(error),
+                  error: this.errorMessage(error),
         });
         throw error;
       })
@@ -77,7 +70,6 @@ export class ModelConfigStateService {
     this.resourceState.set({
       status: 'ready',
       data: payload,
-      settings: buildRuntimeSettingsFromConfig(payload),
       error: null,
     });
   }

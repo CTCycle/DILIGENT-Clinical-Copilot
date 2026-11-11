@@ -2,18 +2,18 @@
   <section class="timeline-generate" aria-label="Timeline generation">
     <div class="timeline-section-heading" data-guidance-target="timeline-generation-controls">
       <h4>Generate a patient timeline</h4>
-      <p>Uses the model assigned to the Timeline role in Settings.</p>
+      <p>Uses the Timeline model of the default DILI agent.</p>
     </div>
-    <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!modelConfigLoading()">Loading model options…</p>
-    @if (modelConfigError()) {
-      <p class="is-error" role="alert">{{ modelConfigError() }}</p>
-      <button type="button" class="btn btn-secondary" (click)="loadModelConfiguration()">Retry</button>
+    <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!agentLoading()">Loading default agent…</p>
+    @if (agentError()) {
+      <p class="is-error" role="alert">{{ agentError() }}</p>
+      <button type="button" class="btn btn-secondary" (click)="loadDefaultAgent()">Retry</button>
     }
     <div class="timeline-generate-row">
       <p class="timeline-configured-model">
         <span>Timeline model</span>
         <strong>{{ selectedConfigurationLabel() }}</strong>
-        <a class="timeline-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
+        <a class="timeline-config-link" [routerLink]="['/agents']">Manage agents</a>
       </p>
       <button type="button" class="btn btn-primary" (click)="generateTimeline()" [disabled]="!canGenerate()">{{ generationRunning() ? 'Generating timeline…' : 'Generate Timeline' }}</button>
     </div>

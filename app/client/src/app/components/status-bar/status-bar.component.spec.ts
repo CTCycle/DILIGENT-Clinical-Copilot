@@ -6,7 +6,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OllamaControl, SystemStatusResponse } from '../../core/services/system-status-api';
-import { ModelConfigStateService } from '../../core/state/model-config-state.service';
+import { AgentsStateService } from '../../core/state/agents-state.service';
 import { SystemStatusStateService } from '../../core/state/system-status-state.service';
 import { StatusBarComponent } from './status-bar.component';
 
@@ -33,7 +33,10 @@ describe('StatusBarComponent local Ollama popover', () => {
           provide: SystemStatusStateService,
           useValue: { status, connection: signal('connected'), start: vi.fn(), stop: vi.fn(), refresh: vi.fn() },
         },
-        { provide: ModelConfigStateService, useValue: { status: signal('ready'), settings: signal(null), load: vi.fn() } },
+        {
+          provide: AgentsStateService,
+          useValue: { status: signal('ready'), defaultDiliAgent: signal(null), defaultRevisionAgent: signal(null), load: vi.fn() },
+        },
       ],
     });
     fixture = TestBed.createComponent(StatusBarComponent);

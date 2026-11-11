@@ -10,17 +10,10 @@ import { ModelConfigStateResponse } from '../../../core/models/types';
 import {
   DraftRagSettings,
   RagBooleanKey,
-  RagFloatKey,
   RagNumberKey,
   RagSettingsSectionKey,
   RagTextKey,
 } from '../model-config.types';
-
-const RERANKER_PROFILE_OPTIONS = [
-  { value: 'lightweight-balanced-v1', label: 'Balanced' },
-  { value: 'lightweight-lexical-v1', label: 'Lexical' },
-  { value: 'lightweight-phrase-v1', label: 'Phrase' },
-] as const;
 
 const RAG_INDEX_METRIC_OPTIONS = [
   { value: 'cosine', label: 'Cosine' },
@@ -44,7 +37,7 @@ const RAG_INDEX_TYPE_OPTIONS = [
 export class RagResourcesPanelComponent {
   readonly draft = input.required<DraftRagSettings>();
   readonly modalOpen = input(false);
-  readonly activeSection = input<RagSettingsSectionKey>('general');
+  readonly activeSection = input<RagSettingsSectionKey>('chunking');
   readonly disabled = input(false);
   readonly status = input('');
   readonly statusIsError = input(false);
@@ -56,11 +49,9 @@ export class RagResourcesPanelComponent {
   readonly closeRequested = output<void>();
   readonly sectionChange = output<RagSettingsSectionKey>();
   readonly numberChange = output<{ key: RagNumberKey; value: string }>();
-  readonly floatChange = output<{ key: RagFloatKey; value: string }>();
   readonly textChange = output<{ key: RagTextKey; value: string }>();
   readonly booleanChange = output<{ key: RagBooleanKey; value: boolean }>();
 
-  readonly rerankerProfileOptions = RERANKER_PROFILE_OPTIONS;
   readonly ragIndexMetricOptions = RAG_INDEX_METRIC_OPTIONS;
   readonly ragIndexTypeOptions = RAG_INDEX_TYPE_OPTIONS;
 }

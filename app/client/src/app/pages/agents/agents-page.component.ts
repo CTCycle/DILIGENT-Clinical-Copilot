@@ -6,8 +6,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Agent, AgentKind } from '../../core/models/agent-types';
 import { summarizeAgent } from '../../core/models/agent-types';
 import { AgentsStateService } from '../../core/state/agents-state.service';
-import { ModelConfigPageComponent } from '../model-config/model-config-page.component';
 import { AgentEditorComponent } from './agent-editor.component';
+import { ProvidersResourcesComponent } from './providers-resources/providers-resources.component';
 
 type StudioTab = 'agents' | 'editor' | 'providers';
 const TABS: ReadonlyArray<{ id: StudioTab; label: string }> = [
@@ -20,7 +20,7 @@ const KIND_LABEL: Record<AgentKind, string> = { dili: 'DILI', revision: 'Revisio
 @Component({
   selector: 'app-agents-page',
   standalone: true,
-  imports: [AgentEditorComponent, ModelConfigPageComponent],
+  imports: [AgentEditorComponent, ProvidersResourcesComponent],
   templateUrl: './agents-page.component.html',
   styleUrl: './agents-page.component.scss',
 })
