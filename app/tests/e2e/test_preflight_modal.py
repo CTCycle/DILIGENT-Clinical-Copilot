@@ -125,7 +125,7 @@ def test_blocking_preflight_modal_prevents_job_submission(
             len(body["blocking_issues"]) + len(body["non_blocking_issues"])
         )
         expect(dialog.get_by_role("button", name="Next")).to_be_disabled()
-        expect(dialog.get_by_role("button", name="Evidence Sources")).to_be_disabled()
+        expect(dialog.get_by_role("button", name="Agent")).to_be_disabled()
         assert submission_count == 0
         assert (
             page.request.get(f"{base_url}/api/inspection/sessions").json()
@@ -193,7 +193,7 @@ def test_warning_acceptance_launches_one_session_and_opens_its_report(
         _fill_valid_fields(page)
         dialog = _open_wizard(page)
         expect(dialog.locator(".wizard-issue")).to_have_count(2)
-        for _ in range(3):
+        for _ in range(2):
             next_button = dialog.get_by_role("button", name="Next")
             expect(next_button).to_be_enabled()
             next_button.click()
@@ -338,7 +338,7 @@ def test_seeded_knowledge_base_lets_unmocked_preflight_reach_review(
     dialog = _open_wizard(page)
 
     expect(dialog.locator(".wizard-badge.is-blocking")).to_have_count(0)
-    for _ in range(3):
+    for _ in range(2):
         next_button = dialog.get_by_role("button", name="Next")
         expect(next_button).to_be_enabled()
         next_button.click()

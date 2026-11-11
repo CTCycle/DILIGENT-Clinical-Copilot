@@ -75,21 +75,22 @@ OPERATIONAL_FIELDS = {
 }
 
 RAG_FIELDS = [
-    ("Retrieval", "rag-candidate-count", "retrieval_candidate_count"),
-    ("Retrieval", "rag-selected-count", "retrieval_selected_count"),
-    ("Retrieval", "rag-vector-weight", "hybrid_vector_weight"),
-    ("Retrieval", "rag-text-weight", "hybrid_text_weight"),
     ("Chunking", "rag-chunk-size", "chunk_size"),
     ("Chunking", "rag-chunk-overlap", "chunk_overlap"),
     ("Embeddings", "rag-batch-size", "embedding_batch_size"),
     ("Embeddings", "rag-embedding-offline", "embedding_offline_mode"),
-    ("Ranking", "rag-reranker-model", "reranker_model"),
     ("Index", "rag-collection-name", "vector_collection_name"),
     ("Index", "rag-index-metric", "vector_index_metric"),
     ("Index", "rag-index-type", "vector_index_type"),
     ("Index", "rag-local-filesystem", "allow_local_filesystem_access"),
     ("Index", "rag-stream-batch", "vector_stream_batch_size"),
 ]
+
+
+###############################################################################
+def _open_shared_resources(page: Page, base_url: str) -> None:
+    page.goto(f"{base_url}/agents")
+    page.get_by_role("tab", name="Providers & Resources").click()
 
 
 ###############################################################################
@@ -354,50 +355,38 @@ def _save_rag_value(page: Page, api_base_url: str, control, key: str, value):
 
 
 ###############################################################################
-def test_model_and_rag_settings_autosave_without_a_save_button(
+def test_shared_index_settings_autosave_without_a_save_button(
     page: Page,
     base_url: str,
     api_base_url: str,
 ) -> None:
     page.set_default_timeout(15000)
-    page.goto(f"{base_url}/settings/models")
+    _open_shared_resources(page, base_url)
     expect(page.get_by_role("button", name="Configure RAG settings")).to_be_visible()
     assert page.get_by_role("button", name="Save Configuration").count() == 0
     assert page.get_by_role("button", name="Save settings").count() == 0
 
-    initial_model = _api_state(page, api_base_url, "/api/model-config")
-    original = dict(initial_model["rag_settings"])
+    original = dict(_api_state(page, api_base_url, "/api/model-config")["rag_settings"])
+    # Retrieval and reranking choices belong to agents, not to the shared index.
+    assert "use_reranking" not in original and "use_hybrid_search" not in original
     expected = dict(original)
     page.get_by_role("button", name="Configure RAG settings").click()
 
-    # Dependent numeric and text controls are exercised before switches that can disable them.
-    editable_fields = [
-        item for item in RAG_FIELDS if item[2] not in {"embedding_offline_mode", "allow_local_filesystem_access"}
-    ]
-    for tab, control_id, key in editable_fields:
+    # Dependent numeric and text controls first, then the switches that can disable them.
+    ordered = sorted(
+        RAG_FIELDS,
+        key=lambda item: item[2] in {"embedding_offline_mode", "allow_local_filesystem_access"},
+    )
+    for tab, control_id, key in ordered:
         page.get_by_role("button", name=tab).click()
         control = _rag_control(page, control_id)
         candidate = _rag_candidate(control, key, expected)
-        if isinstance(candidate, Decimal):
-            value = float(candidate)
-        else:
-            value = candidate
+        value = float(candidate) if isinstance(candidate, Decimal) else candidate
         _save_rag_value(page, api_base_url, control, key, value)
         expected[key] = value
 
-    # Exercise the remaining independent toggles after their dependent controls.
-    for tab, control_id, key in [
-        ("Retrieval", "rag-hybrid-toggle", "use_hybrid_search"),
-        ("Retrieval", "rag-rerank-toggle", "use_reranking"),
-        ("Embeddings", "rag-embedding-offline", "embedding_offline_mode"),
-        ("Index", "rag-local-filesystem", "allow_local_filesystem_access"),
-    ]:
-        page.get_by_role("button", name=tab).click()
-        candidate = not expected[key]
-        _save_rag_value(page, api_base_url, _rag_control(page, control_id), key, candidate)
-        expected[key] = candidate
-
     page.reload()
+    page.get_by_role("tab", name="Providers & Resources").click()
     page.get_by_role("button", name="Configure RAG settings").click()
     for tab, control_id, key in RAG_FIELDS:
         page.get_by_role("button", name=tab).click()
@@ -410,126 +399,49 @@ def test_model_and_rag_settings_autosave_without_a_save_button(
         else:
             assert actual == expected[key]
 
-    # Re-enable dependent controls, restore their values, then restore the switches.
-    page.get_by_role("button", name="Retrieval").click()
-    for control_id in ("rag-hybrid-toggle", "rag-rerank-toggle"):
-        toggle = _rag_control(page, control_id)
-        if not toggle.is_checked():
-            toggle.check()
-    with _expect_model_write(page) as response_info:
-        for key in ("retrieval_candidate_count", "retrieval_selected_count", "hybrid_vector_weight", "hybrid_text_weight"):
-            _set_rag_value(
-                _rag_control(page, next(control_id for _, control_id, field in RAG_FIELDS if field == key)),
-                key,
-                original[key],
-            )
-    response = response_info.value
-    assert response.status == 200, response.text()
-
-    for tab, keys in {
-        "Chunking": ["chunk_size", "chunk_overlap"],
-        "Embeddings": ["embedding_batch_size", "embedding_offline_mode"],
-        "Ranking": ["reranker_model"],
-        "Index": ["vector_collection_name", "vector_index_metric", "vector_index_type", "allow_local_filesystem_access", "vector_stream_batch_size"],
-    }.items():
+    # Restore the original shared settings, one write per changed field.
+    for tab, control_id, key in ordered[::-1]:
         page.get_by_role("button", name=tab).click()
+        control = _rag_control(page, control_id)
         with _expect_model_write(page) as response_info:
-            for key in keys:
-                control_id = next(control_id for _, control_id, field in RAG_FIELDS if field == key)
-                _set_rag_value(_rag_control(page, control_id), key, original[key])
-        response = response_info.value
-        assert response.status == 200, response.text()
-
-    page.get_by_role("button", name="Retrieval").click()
-    toggles_to_restore = [
-        ("rag-hybrid-toggle", "use_hybrid_search"),
-        ("rag-rerank-toggle", "use_reranking"),
-    ]
-    toggles_to_restore = [
-        (control_id, key)
-        for control_id, key in toggles_to_restore
-        if _rag_control(page, control_id).is_checked() is not original[key]
-    ]
-    if toggles_to_restore:
-        with _expect_model_write(page) as response_info:
-            for control_id, key in toggles_to_restore:
-                _set_rag_value(_rag_control(page, control_id), key, original[key])
-        response = response_info.value
-        assert response.status == 200, response.text()
-    # Multi-field restores save in sequence; wait for the last write before reading state.
-    expect(page.locator(".model-config-rag-modal-footer")).to_contain_text("All changes saved")
+            _set_rag_value(control, key, original[key])
+        assert response_info.value.status == 200, response_info.value.text()
+        expect(page.locator(".model-config-rag-modal-footer")).to_contain_text("All changes saved")
     assert _api_state(page, api_base_url, "/api/model-config")["rag_settings"] == original
     page.get_by_role("button", name="Done").click()
-    # The modal dialog keeps the page inert until it closes, so key presses would be lost.
     expect(page.get_by_role("dialog", name="RAG settings")).to_be_hidden()
-
-    # Reasoning is a continuous input; the latest value autosaves and is restored after reload.
-    original_level = initial_model["reasoning_level"]
-    slider = page.get_by_label("Enable reasoning")
-    original_slider = int(slider.input_value())
-    target_slider = original_slider + 1 if original_slider < 3 else original_slider - 1
-    with _expect_model_write(page) as response_info:
-        slider.press("ArrowRight" if target_slider > original_slider else "ArrowLeft")
-    response = response_info.value
-    assert response.status == 200, response.text()
-    expected_level = ["off", "low", "medium", "high"][target_slider]
-    assert _api_state(page, api_base_url, "/api/model-config")["reasoning_level"] == expected_level
-    page.reload()
-    slider = page.get_by_label("Enable reasoning")
-    assert int(slider.input_value()) == target_slider
-    with _expect_model_write(page) as response_info:
-        slider.press("ArrowLeft" if target_slider > original_slider else "ArrowRight")
-    restored = response_info.value
-    assert restored.status == 200, restored.text()
-    assert _api_state(page, api_base_url, "/api/model-config")["reasoning_level"] == original_level
 
 
 ###############################################################################
-def test_each_local_model_role_autosaves_and_survives_reload(
+def test_shared_model_config_writes_carry_only_shared_keys(
     page: Page,
     base_url: str,
     api_base_url: str,
 ) -> None:
     page.set_default_timeout(15000)
-    page.goto(f"{base_url}/settings/models")
+    _open_shared_resources(page, base_url)
     original = _api_state(page, api_base_url, "/api/model-config")
-    alternate_model = "qwen3.5:4b"
+    page.get_by_role("button", name="Configure RAG settings").click()
+    page.get_by_role("button", name="Index").click()
+    control = _rag_control(page, "rag-collection-name")
+    with _expect_model_write(page) as response_info:
+        control.fill(f"{original['rag_settings']['vector_collection_name']}-keys")
+    request_body = response_info.value.request.post_data_json
+    assert set(request_body) <= {"rag_settings"}
+    assert set(request_body["rag_settings"]) <= set(original["rag_settings"])
+    with _expect_model_write(page) as response_info:
+        control.fill(original["rag_settings"]["vector_collection_name"])
+    assert response_info.value.status == 200
+    page.get_by_role("button", name="Done").click()
+
     ollama_url = os.environ.get("OLLAMA_URL")
     assert ollama_url, "Full browser E2E supplies an isolated fake Ollama endpoint."
-
-    pulled = page.request.post(f"{ollama_url.rstrip('/')}/api/pull", data={"name": alternate_model})
-    assert pulled.status == 200, pulled.text()
     with page.expect_response(
         lambda response: response.request.method == "POST"
         and response.url.endswith("/api/model-config/catalogs/ollama/refresh")
     ) as refresh_info:
         page.get_by_role("button", name="Refresh model catalog").click()
-    refreshed = refresh_info.value
-    assert refreshed.status == 200, refreshed.text()
-    expect(page.get_by_role("button", name=f"Set {alternate_model} as clinical model")).to_be_visible()
-
-    roles = {
-        "clinical_model": "clinical model",
-        "text_extraction_model": "text extraction model",
-        "revision_model": "Revision model",
-        "timeline_model": "Timeline model",
-    }
-    for field, role_label in roles.items():
-        with _expect_model_write(page) as response_info:
-            page.get_by_role("button", name=f"Set {alternate_model} as {role_label}").click()
-        response = response_info.value
-        assert response.status == 200, response.text()
-        assert response.json()[field] == alternate_model
-        page.reload()
-        assert _api_state(page, api_base_url, "/api/model-config")[field] == alternate_model
-        expect(page.get_by_role("button", name=f"{role_label.capitalize()} selected")).to_be_visible()
-
-        original_model = original[field]
-        with _expect_model_write(page) as restore_info:
-            page.get_by_role("button", name=f"Set {original_model} as {role_label}").click()
-        restored = restore_info.value
-        assert restored.status == 200, restored.text()
-        assert _api_state(page, api_base_url, "/api/model-config")[field] == original_model
+    assert refresh_info.value.status == 200, refresh_info.value.text()
 
 
 ###############################################################################

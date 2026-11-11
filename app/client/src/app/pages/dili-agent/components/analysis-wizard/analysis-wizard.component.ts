@@ -271,11 +271,17 @@ export class AnalysisWizardComponent {
     } catch (error) {
       this.starting.set(false);
       if (error instanceof ApiHttpError && error.statusCode === 409) {
+        // A 409 is also returned for unrelated conflicts (e.g. another operation running):
+        // only treat it as an agent change when the selected agent really moved on.
         await this.agentsState.load({ force: true }).catch(() => undefined);
-        this.record.set(null);
-        this.startError.set(AGENT_CHANGED_MESSAGE);
-        this.step.set('preflight');
-        return;
+        const current = this.agent();
+        const launchedRevision = typeof checkedRevision === 'number' ? checkedRevision : checked.agentRevision;
+        if (!current || current.id !== checked.agentId || current.current_revision !== launchedRevision) {
+          this.record.set(null);
+          this.startError.set(AGENT_CHANGED_MESSAGE);
+          this.step.set('preflight');
+          return;
+        }
       }
       this.startError.set(error instanceof Error ? error.message : 'The analysis could not be started.');
       return;

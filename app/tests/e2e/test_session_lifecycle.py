@@ -61,7 +61,7 @@ def _start_from_wizard(page: Page) -> None:
     page.get_by_role("button", name="Run DILI analysis").click()
     dialog = page.get_by_role("dialog", name="Prepare analysis")
     expect(dialog).to_be_visible()
-    for _ in range(3):
+    for _ in range(2):
         next_button = dialog.get_by_role("button", name="Next")
         expect(next_button).to_be_enabled()
         next_button.click()

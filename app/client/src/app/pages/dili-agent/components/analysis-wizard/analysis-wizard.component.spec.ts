@@ -273,7 +273,10 @@ describe('AnalysisWizardComponent', () => {
     });
 
     it('returns to preflight and asks to re-run checks when the agent changed (409)', async () => {
-      launchResponse = () => jsonResponse({ detail: 'Agent revision changed.' }, 409);
+      launchResponse = () => {
+        agents = [agent('a1', { is_default: true, current_revision: 3 }), agents[1]];
+        return jsonResponse({ detail: 'Agent revision changed.' }, 409);
+      };
 
       await component.start();
       await settle();
@@ -281,6 +284,18 @@ describe('AnalysisWizardComponent', () => {
       expect(component.step()).toBe('preflight');
       expect(navigate).not.toHaveBeenCalled();
       expect(root().textContent).toContain(AGENT_CHANGED_MESSAGE);
+    });
+
+    it('reports an unrelated 409 conflict instead of claiming the agent changed', async () => {
+      launchResponse = () => jsonResponse({ detail: 'Another operation is running.' }, 409);
+
+      await component.start();
+      await settle();
+
+      expect(component.step()).toBe('review');
+      expect(navigate).not.toHaveBeenCalled();
+      expect(root().textContent).not.toContain(AGENT_CHANGED_MESSAGE);
+      expect(root().textContent).toContain('Another operation is already running');
     });
 
     it('launches a clean stored draft without rewriting it', async () => {

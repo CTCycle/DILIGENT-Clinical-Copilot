@@ -40,7 +40,6 @@ def _build_variant_heading_payload() -> dict:
             + "\n\n## Current medications\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
             + "## Laboratory tests\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
         ),
-        "selected_model_providers": ["openai"],
         "patient_image_base64": None,
         "evidence_sources": ["livertox", "dilirank"],
     }
@@ -68,7 +67,7 @@ def _mock_ready_preflight(page: Page) -> None:
 def _start_analysis_from_wizard(page: Page) -> None:
     page.get_by_role("button", name="Run DILI analysis").click()
     dialog = page.get_by_role("dialog", name="Prepare analysis")
-    for _ in range(3):
+    for _ in range(2):
         next_button = dialog.get_by_role("button", name="Next")
         expect(next_button).to_be_enabled(timeout=10000)
         next_button.click()
@@ -112,7 +111,7 @@ def test_home_initial_load_has_no_console_errors_or_failed_requests(
 
 
 ###############################################################################
-def test_model_config_initial_load_has_no_console_errors_or_failed_requests(
+def test_agent_studio_initial_load_has_no_console_errors_or_failed_requests(
     page: Page, base_url: str
 ):
     console_errors: list[str] = []
@@ -131,7 +130,7 @@ def test_model_config_initial_load_has_no_console_errors_or_failed_requests(
         ),
     )
 
-    page.goto(f"{base_url}/settings/models")
+    page.goto(f"{base_url}/agents")
     page.wait_for_timeout(1500)
 
     assert console_errors == []
@@ -350,21 +349,23 @@ def test_keyboard_tab_traversal_reaches_home_form_controls(page: Page, base_url:
 
 
 ###############################################################################
-def test_model_config_navigation(page: Page, base_url: str):
+def test_agent_studio_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
-    model_button = page.get_by_role("tab", name="Settings")
-    expect(model_button).to_be_visible()
-    model_button.click()
-    page.get_by_role("link", name="Models").click()
+    studio_tab = page.get_by_role("tab", name="Agent Studio")
+    expect(studio_tab).to_be_visible()
+    studio_tab.click()
 
-    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
-    expect(page.get_by_role("heading", name="Runtime Source")).to_be_visible()
+    expect(page).to_have_url(re.compile(r"/agents/?$"))
+    expect(page.get_by_role("heading", name="Agent Studio")).to_be_visible()
+    # The retired Settings → Models page no longer exists.
+    page.get_by_role("tab", name="Settings").click()
+    expect(page.get_by_role("link", name="Models")).to_have_count(0)
 
 
 ###############################################################################
 def test_primary_navigation_restores_scroll_position(page: Page, base_url: str):
-    page.goto(f"{base_url}/settings/models")
+    page.goto(f"{base_url}/agents")
     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
     page.get_by_role("tab", name="DILI Agent").click()
 
@@ -526,7 +527,7 @@ def test_dili_run_burst_click_submits_single_session(page: Page, base_url: str):
     try:
         run_button.click()
         dialog = page.get_by_role("dialog", name="Prepare analysis")
-        for _ in range(3):
+        for _ in range(2):
             next_button = dialog.get_by_role("button", name="Next")
             expect(next_button).to_be_enabled(timeout=10000)
             next_button.click()
@@ -839,8 +840,8 @@ def test_home_form_state_persists_across_back_forward_navigation(
     )
 
     page.get_by_role("tab", name="Settings").click()
-    page.get_by_role("link", name="Models").click()
-    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
+    page.get_by_role("link", name="Database").click()
+    expect(page).to_have_url(re.compile(r"/settings/database/?$"))
 
     page.go_back()
     expect(page).to_have_url(re.compile(r"/settings/general/?$"))
@@ -855,7 +856,7 @@ def test_home_form_state_persists_across_back_forward_navigation(
     page.go_forward()
     expect(page).to_have_url(re.compile(r"/settings/general/?$"))
     page.go_forward()
-    expect(page).to_have_url(re.compile(r"/settings/models/?$"))
+    expect(page).to_have_url(re.compile(r"/settings/database/?$"))
 
 
 ###############################################################################

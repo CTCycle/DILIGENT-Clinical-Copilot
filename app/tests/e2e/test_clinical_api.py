@@ -31,7 +31,6 @@ def build_minimal_payload() -> dict:
             f"{repeated_words(45)}"
         ),
         "evidence_sources": ["livertox", "dilirank"],
-        "selected_model_providers": ["openai"],
     }
 
 
@@ -95,15 +94,18 @@ def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
 
 
 ###############################################################################
-def test_clinical_rejects_empty_provider_selection(
+def test_clinical_rejects_unknown_agent(
     api_context: APIRequestContext, draft_session_id: int
 ):
     payload = build_minimal_payload()
-    payload["selected_model_providers"] = []
+    payload["agent_id"] = "agent-that-does-not-exist"
 
-    _assert_launch_rejected(
-        api_context, draft_session_id, payload, "At least one model provider must be selected."
+    response = api_context.post(
+        f"/api/clinical/sessions/{draft_session_id}/launch", data=payload
     )
+    assert 400 <= response.status < 500, response.text()
+    status = api_context.get(f"/api/clinical/sessions/{draft_session_id}/status").json()
+    assert status["status"] == "draft"
 
 
 ###############################################################################

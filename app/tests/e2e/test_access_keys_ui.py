@@ -1,7 +1,7 @@
 # Copyright © 2023–2025 Thomas Virdis
 # Licensed under the GNU General Public License, version 3 or later.
 
-"""Rendered access-key management coverage for the Settings → Models flow."""
+"""Rendered access-key management coverage for the Agent Studio → Providers & Resources flow."""
 
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ def test_access_key_modal_lifecycle_is_metadata_only_and_persistent(
 ) -> None:
     plaintext_key = "sk-proj-ui-lifecycle-20260929"
 
-    page.goto(f"{base_url}/settings/models")
+    page.goto(f"{base_url}/agents")
+    page.get_by_role("tab", name="Providers & Resources").click()
     provider_row = page.locator(".model-config-cloud-row").filter(has_text="OpenAI")
     manage_keys = provider_row.get_by_role("button", name="Manage keys")
     expect(manage_keys).to_be_visible()
@@ -46,6 +47,7 @@ def test_access_key_modal_lifecycle_is_metadata_only_and_persistent(
         expect(row.get_by_text("Active")).to_be_visible()
 
         page.reload()
+        page.get_by_role("tab", name="Providers & Resources").click()
         provider_row = page.locator(".model-config-cloud-row").filter(has_text="OpenAI")
         provider_row.get_by_role("button", name="Manage keys").click()
         dialog = page.locator("dialog.access-key-modal")

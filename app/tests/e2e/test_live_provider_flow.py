@@ -249,7 +249,7 @@ def _wait_for_browser_job_submission(
         page.get_by_role("button", name="Run DILI analysis").click()
         dialog = page.get_by_role("dialog", name="Prepare analysis")
         next_button = dialog.get_by_role("button", name="Next")
-        for _ in range(3):
+        for _ in range(2):
             try:
                 expect(next_button).to_be_enabled(timeout=timeout_seconds * 1000)
             except AssertionError:
