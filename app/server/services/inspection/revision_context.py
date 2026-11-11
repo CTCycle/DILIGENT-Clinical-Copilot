@@ -122,6 +122,7 @@ def build_revision_context(
     selected_text: str | None,
     instruction: str | None,
     input_budget: int | None = None,
+    agent_guidance: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     payload_value = session.get("result_payload")
     payload: dict[str, Any] = payload_value if isinstance(payload_value, dict) else {}
@@ -154,6 +155,9 @@ def build_revision_context(
     )
     selected = _bounded(selected_text, 6000)
     user_instruction = _bounded(instruction, 4000)
+    guidance = {
+        key: value for key, value in (agent_guidance or {}).items() if value.strip()
+    }
 
     values: dict[str, Any] = {
         "clinical.source_text": source_text,
@@ -161,6 +165,7 @@ def build_revision_context(
         "review.final_report": final_report,
         "user.selected_text": selected,
         "user.instruction": user_instruction,
+        "agent.guidance": guidance,
         "audit.manual_edits": manual_edits,
         "audit.version_lineage": lineage,
         "audit.metadata": session.get("metadata") or {},
@@ -171,6 +176,7 @@ def build_revision_context(
         "review.final_report": (90, False, "final_report"),
         "user.selected_text": (90, True, "user_steering"),
         "user.instruction": (110, True, "user_steering"),
+        "agent.guidance": (105, False, "user_steering"),
         "audit.manual_edits": (95, True, "audit"),
         "audit.version_lineage": (90, True, "audit"),
         "audit.metadata": (30, False, "audit"),
@@ -336,6 +342,9 @@ def build_revision_context(
             ),
             "instruction": _selected_context_value(
                 values, selected_keys, "user.instruction", {"omitted": True}
+            ),
+            "agent_guidance": _selected_context_value(
+                values, selected_keys, "agent.guidance", {}
             ),
         },
         "context_budget": {

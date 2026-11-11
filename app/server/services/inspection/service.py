@@ -15,6 +15,8 @@ from typing import Any, Literal
 
 from common.exceptions import ServiceConflictError
 from common.paths import VECTOR_DB_PATH
+from repositories.agent_repository import AgentRepository
+from services.agents import AgentService
 from common.embedding.manifest import read_active_collection_name
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.utils.logger import logger
@@ -133,6 +135,7 @@ class DataInspectionService(
         session_revision_repository: SessionRevisionRepository,
         timeline_extractor: PatientTimelineExtractor | None = None,
         jobs: JobManager,
+        agent_service: AgentService | None = None,
     ) -> None:
         self.clinical_session_repository = clinical_session_repository
         self.drug_catalog_repository = drug_catalog_repository
@@ -145,6 +148,9 @@ class DataInspectionService(
         )
         self.session_timeline_repository = session_timeline_repository
         self.session_revision_repository = session_revision_repository
+        self.agent_service = agent_service or AgentService(
+            AgentRepository(session_revision_repository.context)
+        )
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs
         self.timeline_generation_lock = Lock()

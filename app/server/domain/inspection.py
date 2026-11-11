@@ -137,6 +137,9 @@ class SessionRevisionRequest(BaseModel):
     selected_text: str | None = Field(default=None, max_length=100000)
     revision_instruction: str | None = Field(default=None, max_length=4000)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # None selects the default Revision agent.
+    agent_id: str | None = Field(default=None, min_length=1, max_length=64)
+    agent_revision: int | None = Field(default=None, ge=1)
 
     max_tasks: int = Field(default=8, ge=1, le=8)
     ###############################################################################

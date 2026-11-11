@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
+from domain.agents import AgentExecutionContext, RevisionAgentConfig
 from domain.inspection import SessionRevisionRequest
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.inspection.revision_agent import (
@@ -38,6 +39,7 @@ class SessionRevisionValidationError(ValueError):
 ###############################################################################
 class InspectionRevisionScaffoldMixin:
     session_revision_repository: Any
+    agent_service: Any
     jobs: Any
     revision_agent_runner: Any
     REVISION_JOB_TYPE: str
@@ -102,6 +104,33 @@ class InspectionRevisionScaffoldMixin:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _apply_agent_limits(
+        request: SessionRevisionRequest,
+        agent_context: AgentExecutionContext,
+    ) -> SessionRevisionRequest:
+        """Clamp request limits and tools to the agent's execution limits."""
+        limits = cast(RevisionAgentConfig, agent_context.configuration).limits
+        allowed = request.allowed_tools
+        if limits.allowed_tools is not None:
+            allowed = (
+                list(limits.allowed_tools)
+                if allowed is None
+                else [name for name in allowed if name in limits.allowed_tools]
+            )
+        return request.model_copy(
+            update={
+                "agent_id": agent_context.agent_id,
+                "agent_revision": agent_context.revision_number,
+                "max_tasks": min(request.max_tasks, limits.max_tasks),
+                "max_tool_iterations": min(
+                    request.max_tool_iterations, limits.max_tool_iterations
+                ),
+                "allowed_tools": allowed,
+            }
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _coerce_revision_request(
         request: SessionRevisionRequest | None,
     ) -> SessionRevisionRequest:
@@ -127,6 +156,8 @@ class InspectionRevisionScaffoldMixin:
         self,
         session_id: int,
         request: SessionRevisionRequest | None = None,
+        *,
+        agent_context: AgentExecutionContext | None = None,
     ) -> dict[str, Any]:
         revision_request = self._coerce_revision_request(request)
         session = self.get_session_detail(session_id)
@@ -156,10 +187,27 @@ class InspectionRevisionScaffoldMixin:
                 "A revision job is already running for this root session."
             )
 
+        if agent_context is None:
+            agent_context = self.agent_service.resolve_for_execution(
+                kind="revision",
+                agent_id=revision_request.agent_id,
+                expected_revision=revision_request.agent_revision,
+            )
+        readiness_issues = self.agent_service.collect_issues(
+            agent_context.configuration
+        )
+        if readiness_issues:
+            raise SessionRevisionValidationError(
+                " ".join(issue.message for issue in readiness_issues)
+            )
+        revision_request = self._apply_agent_limits(revision_request, agent_context)
+
         pipeline_run_id = uuid.uuid4().hex
         job_id = uuid.uuid4().hex[:8]
         runtime_snapshot, runtime_snapshot_hash = (
-            LLMRuntimeConfig.capture_run_snapshot(evidence_sources=[])
+            LLMRuntimeConfig.capture_run_snapshot(
+                evidence_sources=[], agent_context=agent_context
+            )
         )
         with LLMRuntimeConfig.override_for_run(runtime_snapshot):
             runtime = resolve_revision_agent_runtime()
@@ -178,6 +226,12 @@ class InspectionRevisionScaffoldMixin:
             "metadata": dict(revision_request.metadata or {}),
             "runtime_snapshot": runtime_snapshot,
             "runtime_snapshot_hash": runtime_snapshot_hash,
+            "agent": agent_context.provenance(),
+            "effective_limits": {
+                "max_tasks": revision_request.max_tasks,
+                "max_tool_iterations": revision_request.max_tool_iterations,
+                "allowed_tools": revision_request.allowed_tools,
+            },
         }
         shell = self.session_revision_repository.create_revision_version_shell(
             session_id,
@@ -212,6 +266,7 @@ class InspectionRevisionScaffoldMixin:
             initiated_by="revision_agent",
             actor_source="system",
             actor_confidence="system",
+            agent_revision_id=agent_context.agent_revision_id,
         )
         job_id = self.jobs.start_job(
             job_type=self.REVISION_JOB_TYPE,
@@ -251,7 +306,17 @@ class InspectionRevisionScaffoldMixin:
             revision_instruction=run.get("reviewer_note"),
             metadata=configuration.get("metadata") or {},
         )
-        return self.start_revision_job(int(run["session_id"]), request)
+        # A retry reruns the exact agent revision of the original run.
+        agent = configuration.get("agent")
+        revision_id = agent.get("agent_revision_id") if isinstance(agent, dict) else None
+        agent_context = (
+            self.agent_service.resolve_revision(int(revision_id))
+            if revision_id is not None
+            else None
+        )
+        return self.start_revision_job(
+            int(run["session_id"]), request, agent_context=agent_context
+        )
 
     # -------------------------------------------------------------------------
     def get_revision_job_status(self, job_id: str) -> dict[str, Any] | None:

@@ -77,6 +77,28 @@ class RevisionAgentRuntime:
     model: str
 
 
+REVISION_STAGE_BY_PURPOSE: dict[GenerationPurpose, str] = {
+    GenerationPurpose.REVISION_PLANNING: "planning",
+    GenerationPurpose.REVISION_TOOL_SELECTION: "tool_selection",
+    GenerationPurpose.REVISION_EDITING: "editing",
+    GenerationPurpose.REVISION_QA: "qa",
+}
+
+
+###############################################################################
+def stage_runtime(
+    runtime: RevisionAgentRuntime, purpose: GenerationPurpose
+) -> RevisionAgentRuntime:
+    """Apply a Revision agent's per-stage model override, if any."""
+    stage = REVISION_STAGE_BY_PURPOSE.get(purpose)
+    if stage is None or not LLMRuntimeConfig.has_role_routing():
+        return runtime
+    provider, model = LLMRuntimeConfig.resolve_provider_and_model(
+        "revision", stage=stage
+    )
+    return RevisionAgentRuntime(provider=provider, model=model)
+
+
 ###############################################################################
 def _sanitize_error_message(value: object) -> str:
     text = " ".join(str(value or "").split()).strip()
@@ -718,6 +740,7 @@ class RevisionAgentRunner:
             selected_text=request.selected_text,
             instruction=request.revision_instruction,
             input_budget=context_effective.input_budget,
+            agent_guidance=LLMRuntimeConfig.active_agent_instructions(),
         )
         source_report = str(
             session.get("official_report_text") or session.get("report") or ""
@@ -734,11 +757,14 @@ class RevisionAgentRunner:
         )
         manifest = registry.manifest(request.allowed_tools)
         native_tool_definitions = registry.tool_definitions(request.allowed_tools)
+        tool_runtime = stage_runtime(
+            runtime, GenerationPurpose.REVISION_TOOL_SELECTION
+        )
         capabilities = resolve_model_capabilities(
-            provider=runtime.provider,
-            model=runtime.model,
+            provider=tool_runtime.provider,
+            model=tool_runtime.model,
             descriptor=LLMRuntimeConfig.get_model_descriptor(
-                runtime.provider, runtime.model
+                tool_runtime.provider, tool_runtime.model
             ),
         )
         use_native_tools = (
@@ -1197,6 +1223,7 @@ class RevisionAgentRunner:
         max_tool_calls: int,
         stop_check: StopCheck | None,
     ) -> ToolLoopResult:
+        runtime = stage_runtime(runtime, GenerationPurpose.REVISION_TOOL_SELECTION)
         client = select_llm_provider(
             provider=runtime.provider,
             default_model=runtime.model,
@@ -1257,6 +1284,7 @@ class RevisionAgentRunner:
         *,
         purpose: GenerationPurpose,
     ) -> Any:
+        runtime = stage_runtime(runtime, purpose)
         if self.structured_call is not None:
             return schema.model_validate(
                 self.structured_call(

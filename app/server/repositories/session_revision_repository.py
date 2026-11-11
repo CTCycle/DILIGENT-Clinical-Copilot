@@ -461,6 +461,7 @@ class SessionRevisionRepository:
         error: dict[str, Any] | None = None,
         trace_id: str | None = None,
         latency_ms: int | None = None,
+        agent_revision_id: int | None = None,
     ) -> dict[str, Any]:
         with self.session_factory() as db_session:
             row = db_session.execute(
@@ -490,6 +491,7 @@ class SessionRevisionRepository:
                     error_json=serialize_json_payload(error),
                     latency_ms=latency_ms,
                     trace_id=repository_values.normalize_string(trace_id),
+                    agent_revision_id=agent_revision_id,
                 )
                 db_session.add(row)
             else:
@@ -518,6 +520,8 @@ class SessionRevisionRepository:
                 row.error_json = serialize_json_payload(error)
                 row.trace_id = repository_values.normalize_string(trace_id)
                 row.latency_ms = latency_ms
+                if agent_revision_id is not None:
+                    row.agent_revision_id = agent_revision_id
             db_session.commit()
             db_session.refresh(row)
             return serialize_revision_run_row(row)
