@@ -438,28 +438,37 @@
             <header class="clinical-session-revision-header">
               <div>
                 <h3>Revision draft</h3>
-                <p>Create an auditable draft with the model assigned to the Revision role. Human review is required before clinical reliance.</p>
+                <p>Create an auditable draft with the selected Revision agent. Human review is required before clinical reliance.</p>
               </div>
               <span class="clinical-session-revision-state">{{ revisionRunning() ? 'Running' : 'Ready' }}</span>
             </header>
             <div class="clinical-session-revision-form">
+              <label class="clinical-session-revision-agent">
+                <span class="clinical-session-revision-label">Agent</span>
+                <select aria-label="Revision agent" [disabled]="revisionRunning() || !revisionAgents().length" (change)="selectRevisionAgent($any($event.target).value)">
+                  @for (option of revisionAgents(); track option.id) {
+                    <option [value]="option.id" [selected]="option.id === revisionAgent()?.id">{{ option.name }}{{ option.is_default ? ' (default)' : '' }}</option>
+                  }
+                </select>
+                <small class="clinical-session-revision-agent-summary">{{ revisionAgentSummary() || 'No revision agent available' }}</small>
+              </label>
               <label class="clinical-session-revision-instruction">
                 <span class="clinical-session-revision-label">Instruction <small>Optional</small></span>
                 <textarea aria-label="Revision instruction (optional)" [ngModel]="revisionInstruction()" (ngModelChange)="updateRevisionInstruction($event)" [disabled]="revisionRunning()" placeholder="Describe a report issue or leave blank for a full review."></textarea>
               </label>
               <div class="clinical-session-revision-toolbar">
-                <p class="clinical-session-revision-model" aria-label="Configured Revision model">
-                  <span>Revision model</span>
-                  <strong>{{ revisionModelName() || 'None configured' }}</strong>
-                  <a class="clinical-session-config-link" [routerLink]="['/settings/models']" fragment="model-roles">Manage model roles</a>
+                <p class="clinical-session-revision-model" aria-label="Revision agent in use">
+                  <span>Revision agent</span>
+                  <strong>{{ revisionRunAgent() || (revisionAgent() ? revisionAgent()!.name + ' · revision ' + revisionAgent()!.current_revision : 'None available') }}</strong>
+                  <a class="clinical-session-config-link" [routerLink]="['/agents']">Manage agents</a>
                 </p>
                 <div class="clinical-session-actions">
                   @if (revisionRunning()) { <button type="button" class="btn" (click)="cancelRevision()">Cancel</button> }
-                  <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning() || !revisionModelName()">Start revision</button>
+                  <button type="button" class="btn btn-primary" (click)="startRevision()" [disabled]="revisionRunning() || !revisionAgent()">Start revision</button>
                 </div>
               </div>
-              @if (revisionModelLoading()) { <p class="clinical-session-panel-note">Loading configured role...</p> }
-              @if (revisionModelError()) { <p class="clinical-session-panel-note is-error">{{ revisionModelError() }}</p> }
+              @if (revisionAgentLoading()) { <p class="clinical-session-panel-note">Loading revision agents...</p> }
+              @if (revisionAgentError()) { <p class="clinical-session-panel-note is-error">{{ revisionAgentError() }}</p> }
             </div>
             @if (revisionStatus()) { <p class="clinical-session-panel-note" role="status">{{ revisionStatus() }}</p> }
             @if (revisionDraftReport()) {

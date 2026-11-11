@@ -55,7 +55,7 @@ import {
 } from '../../core/models/revision-types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
-import { ModelConfigStateService } from '../../core/state/model-config-state.service';
+import { AgentsStateService } from '../../core/state/agents-state.service';
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
 import {
   DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
@@ -66,6 +66,7 @@ import { ClinicalSessionRevisionAuditComponent } from './components/clinical-ses
 import { ClinicalSessionTimelineWorkspaceComponent } from './components/clinical-session-timeline-workspace.component';
 import { ClinicalSessionsFiltersComponent } from './components/clinical-sessions-filters.component';
 import { ClinicalSessionsStore } from './clinical-sessions-store';
+import { formatRevisionAgentProvenance } from './clinical-session-revision-display';
 import { applyMarkdownCommand } from './markdown-editor';
 import {
   ClinicalSessionSection,
@@ -161,7 +162,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly jobPolling = inject(JobPollingService);
-  private readonly modelConfigState = inject(ModelConfigStateService);
+  private readonly agentsState = inject(AgentsStateService);
 
   readonly store = inject(ClinicalSessionsStore);
   readonly sessions = this.store.visible;
@@ -220,12 +221,25 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     && !this.revisionRunning()
     && this.revisionVersionStatus() === 'llm_qa_passed'
   ));
-  readonly revisionModelLoading = computed(() => this.modelConfigState.status() === 'loading');
-  readonly revisionModelError = computed(() => {
-    const error = this.modelConfigState.error();
-    return error ? formatUnknownError(error, 'Unable to load revision model options.') : null;
+  readonly revisionAgentId = signal<string | null>(null);
+  readonly revisionAgents = this.agentsState.revisionAgents;
+  readonly revisionAgent = computed(() => {
+    const selected = this.revisionAgentId();
+    return (selected ? this.agentsState.byId(selected) : null) ?? this.agentsState.defaultRevisionAgent();
   });
-  readonly revisionModelName = computed(() => this.modelConfigState.settings()?.revisionModel ?? '');
+  readonly revisionAgentSummary = computed(() => {
+    const config = this.revisionAgent()?.revision.configuration;
+    if (!config || config.kind !== 'revision') return '';
+    const { planning } = config.models;
+    const { max_tasks: tasks, max_tool_iterations: iterations } = config.limits;
+    return `${planning.provider} / ${planning.model} · up to ${tasks} tasks, ${iterations} tool iterations`;
+  });
+  readonly revisionAgentLoading = computed(() => this.agentsState.status() === 'loading');
+  readonly revisionAgentError = computed(() => {
+    const error = this.agentsState.error();
+    return error ? formatUnknownError(error, 'Unable to load revision agents.') : null;
+  });
+  readonly revisionRunAgent = signal<string | null>(null);
   readonly revisionAuditVisible = computed(() => (
     this.revisionRunning()
     || this.revisionVersionId() !== null
@@ -243,7 +257,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.deepLinkPending = parseQueryId(this.route.snapshot.queryParamMap.get('session')) !== null;
     this.route.queryParamMap.subscribe((params) => this.applyQueryParams(params));
     void this.loadSessions();
-    void this.loadRevisionModelConfig();
+    void this.loadRevisionAgents();
   }
 
   ngOnDestroy(): void {
@@ -548,11 +562,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionInstruction.set(value);
   }
 
-  async loadRevisionModelConfig(): Promise<void> {
+  selectRevisionAgent(agentId: string): void {
+    this.revisionAgentId.set(agentId || null);
+  }
+
+  async loadRevisionAgents(): Promise<void> {
     try {
-      await this.modelConfigState.load();
+      await this.agentsState.load();
     } catch {
-      // The shared model-config resource exposes the visible error state.
+      // The shared agents resource exposes the visible error state.
     }
   }
 
@@ -569,11 +587,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionSteps.set([]);
     this.revisionArtifacts.set([]);
     this.revisionRunning.set(true);
+    const agent = this.revisionAgent();
+    this.revisionRunAgent.set(agent ? `${agent.name} · revision ${agent.current_revision}` : null);
     this.revisionStatus.set('Starting revision agent...');
     this.revisionPollCancelled = false;
     try {
       const started = await startSessionRevisionJob(detail.session_id, {
         revision_instruction: this.revisionInstruction().trim() || null,
+        agent_id: agent?.id ?? null,
       });
       if (!isCurrentLoad()) return;
       this.revisionJobId.set(started.job_id);
@@ -722,6 +743,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionVersionId.set(latest.version_id);
       this.revisionVersionStatus.set(latest.version_status);
       const configuration = latest.model_configuration || {};
+      this.revisionRunAgent.set(formatRevisionAgentProvenance(configuration));
       const pipelineRunId = latest.pipeline_run_id;
       if (pipelineRunId) {
         const steps = (await fetchRevisionPipelineSteps(pipelineRunId)).items;

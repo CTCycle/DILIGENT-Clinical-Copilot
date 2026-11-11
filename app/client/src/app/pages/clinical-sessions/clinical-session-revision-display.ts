@@ -178,3 +178,12 @@ export function revisionStatusTone(status: string | null | undefined): RevisionA
       return 'neutral';
   }
 }
+
+/** "Name · revision N" from a revision run's `configuration.agent` provenance, or null when absent. */
+export function formatRevisionAgentProvenance(configuration: Record<string, unknown> | null | undefined): string | null {
+  const agent = configuration?.['agent'];
+  if (agent === null || typeof agent !== 'object') return null;
+  const { agent_name: name, agent_revision: revision } = agent as Record<string, unknown>;
+  if (typeof name !== 'string' || !name.trim()) return null;
+  return typeof revision === 'number' ? `${name.trim()} · revision ${revision}` : name.trim();
+}

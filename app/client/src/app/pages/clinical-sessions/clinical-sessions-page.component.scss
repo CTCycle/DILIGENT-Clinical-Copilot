@@ -710,6 +710,7 @@
   max-width: 880px;
 }
 
+.clinical-session-revision-agent,
 .clinical-session-revision-instruction {
   display: grid;
   gap: var(--space-sm);
@@ -726,6 +727,11 @@
   color: var(--cs-faint);
   font-size: var(--font-xs);
   font-weight: 500;
+}
+
+.clinical-session-revision-agent-summary {
+  color: var(--cs-muted);
+  font-size: var(--font-xs);
 }
 
 .clinical-session-revision-instruction textarea {

@@ -10,6 +10,8 @@ import type {
 export type SessionRevisionRequest = {
   selected_text?: string | null;
   revision_instruction?: string | null;
+  agent_id?: string | null;
+  agent_revision?: number | null;
   metadata?: Record<string, unknown>;
   max_tasks?: number;
   max_tool_iterations?: number;

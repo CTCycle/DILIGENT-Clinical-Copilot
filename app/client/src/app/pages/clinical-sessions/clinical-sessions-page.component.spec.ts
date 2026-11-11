@@ -12,6 +12,7 @@ import {
 import { SessionVersionSummary } from '../../core/models/revision-types';
 import { jsonResponse as lifecycleJson } from '../../core/testing/clinical-session-fixtures';
 import { ClinicalSessionsPageComponent } from './clinical-sessions-page.component';
+import { formatRevisionAgentProvenance } from './clinical-session-revision-display';
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -501,5 +502,92 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
 
     await vi.waitFor(() => expect(router.url).toContain('tab=metadata'));
     expect(router.url).toContain('session=2');
+  });
+});
+
+describe('ClinicalSessionsPageComponent revision agent', () => {
+  let fixture: ComponentFixture<ClinicalSessionsPageComponent>;
+  let component: ClinicalSessionsPageComponent;
+  const ref = { provider: 'ollama', model: 'qwen3' };
+
+  function revisionAgent(id: string, isDefault: boolean) {
+    return {
+      id,
+      kind: 'revision',
+      name: `Reviser ${id}`,
+      description: '',
+      current_revision: 4,
+      is_default: isDefault,
+      is_archived: false,
+      created_at: null,
+      updated_at: null,
+      revision: {
+        revision_id: 1,
+        revision_number: 4,
+        schema_version: 1,
+        configuration_hash: 'h',
+        created_at: null,
+        configuration: {
+          kind: 'revision',
+          schema_version: 1,
+          instructions: { review_objectives: '', editing_style: '' },
+          models: { planning: ref, stage_overrides: {} },
+          reasoning_level: 'off',
+          ollama_seed: null,
+          limits: { max_tasks: 6, max_tool_iterations: 12, allowed_tools: null },
+        },
+      },
+    };
+  }
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ClinicalSessionsPageComponent],
+      providers: [provideRouter([])],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ClinicalSessionsPageComponent);
+    component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fixture.destroy();
+  });
+
+  it('preselects the default revision agent and sends the chosen agent_id when starting', async () => {
+    let body: Record<string, unknown> = {};
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/agents')) {
+        return jsonResponse({ agents: [revisionAgent('r1', true), revisionAgent('r2', false)] });
+      }
+      if (url.endsWith('/revision/jobs')) {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        throw new Error('stop after request');
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    component.selected.set(sessionDetail(9));
+    await component.loadRevisionAgents();
+
+    expect(component.revisionAgent()?.id).toBe('r1');
+    expect(component.revisionAgentSummary()).toContain('up to 6 tasks, 12 tool iterations');
+
+    component.selectRevisionAgent('r2');
+    component.updateRevisionInstruction('Check dates');
+    await component.startRevision();
+
+    expect(body).toEqual({ revision_instruction: 'Check dates', agent_id: 'r2' });
+  });
+
+  it('has no revision agent when none is available, and reads run provenance from the saved run', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ agents: [] }));
+    await component.loadRevisionAgents();
+    expect(component.revisionAgent()).toBeNull();
+
+    expect(formatRevisionAgentProvenance({ agent: { agent_name: 'Reviser', agent_revision: 3 } })).toBe(
+      'Reviser · revision 3',
+    );
+    expect(formatRevisionAgentProvenance({})).toBeNull();
   });
 });
