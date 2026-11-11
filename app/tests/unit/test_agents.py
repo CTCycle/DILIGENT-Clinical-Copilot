@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import threading
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -10,6 +12,7 @@ from typing import Any, cast
 import pytest
 from common.exceptions import ServiceConflictError, ServiceValidationError
 from domain.agents import (
+    AgentExecutionContext,
     AgentCreateRequest,
     AgentUpdateRequest,
     DiliAgentConfig,
@@ -17,12 +20,15 @@ from domain.agents import (
     agent_config_hash,
     parse_agent_config,
 )
-from domain.model_configs import ModelConfigSnapshot
+from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from pydantic import ValidationError
 from repositories.agent_seed import ensure_default_agents
 from repositories.schemas.base import Base
+from repositories.serialization.model_configs import ModelConfigSerializer
 from repository_fixtures import build_repository_graph
 from services.agents import AgentService
+from services.llm.runtime_config import LLMRuntimeConfig
+from services.retrieval.settings import build_effective_rag_settings
 from sqlalchemy import create_engine
 
 
@@ -221,3 +227,130 @@ def test_agent_validation_reports_models_tools_and_credentials(
     result = agent_service.validate_agent(created.id)
     assert result.valid is False
     assert [issue.code for issue in result.issues] == ["provider_key_missing"]
+
+
+###############################################################################
+def _context(config_payload: dict[str, Any], revision_id: int) -> AgentExecutionContext:
+    config = parse_agent_config(config_payload)
+    return AgentExecutionContext(
+        agent_id=f"agent-{revision_id}",
+        agent_name=f"Agent {revision_id}",
+        agent_revision_id=revision_id,
+        revision_number=1,
+        kind=config.kind,
+        config_hash=agent_config_hash(config),
+        configuration=config,
+    )
+
+
+###############################################################################
+@pytest.fixture
+def persisted_snapshot(monkeypatch: pytest.MonkeyPatch) -> ModelConfigSnapshot:
+    snapshot = ModelConfigSnapshot(
+        use_cloud_models=False,
+        cloud_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="qwen3:8b",
+        text_extraction_model="qwen3:8b",
+        revision_model="qwen3:8b",
+        timeline_model="qwen3:8b",
+        rag_settings={"chunk_size": 777, "retrieval_selected_count": 2},
+    )
+    monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
+    return snapshot
+
+
+###############################################################################
+def test_agent_context_routes_roles_stages_reasoning_and_rag(
+    persisted_snapshot: ModelConfigSnapshot,
+) -> None:
+    payload = dili_payload(
+        reasoning_level="low",
+        retrieval={"retrieval_selected_count": 5, "retrieval_candidate_count": 20},
+    )
+    payload["models"]["clinical"]["reasoning_level"] = "high"
+    payload["models"]["extraction_overrides"] = {
+        "laboratory": {"provider": "openai", "model": "gpt-4.1-mini"}
+    }
+    context = _context(payload, 1)
+
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(context)
+    ):
+        assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
+            "ollama",
+            "qwen3:8b",
+        )
+        assert LLMRuntimeConfig.resolve_provider_and_model(
+            "parser", stage="laboratory"
+        ) == ("openai", "gpt-4.1-mini")
+        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+            "openai",
+            "gpt-4.1",
+        )
+        assert (
+            LLMRuntimeConfig.get_reasoning_level_for("clinical") == ReasoningLevel.HIGH
+        )
+        assert LLMRuntimeConfig.get_reasoning_level_for("parser") == ReasoningLevel.LOW
+        rag = build_effective_rag_settings()
+        # Agent preference wins; the shared index setting is preserved.
+        assert rag.retrieval_selected_count == 5
+        assert rag.chunk_size == 777
+        assert LLMRuntimeConfig.active_agent()["agent_revision_id"] == 1
+
+
+###############################################################################
+def test_frozen_agent_snapshot_replays_after_live_settings_change(
+    persisted_snapshot: ModelConfigSnapshot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot, digest = LLMRuntimeConfig.capture_run_snapshot(
+        evidence_sources=["livertox"], agent_context=_context(dili_payload(), 7)
+    )
+    assert snapshot["agent"]["agent_revision_id"] == 7  # type: ignore[index]
+    assert len(digest) == 64
+    monkeypatch.setattr(
+        ModelConfigSerializer,
+        "load_snapshot",
+        lambda self: replace(persisted_snapshot, clinical_model="other:1b"),
+    )
+    with LLMRuntimeConfig.override_for_run(snapshot):
+        assert LLMRuntimeConfig.resolve_provider_and_model("clinical") == (
+            "openai",
+            "gpt-4.1",
+        )
+        assert LLMRuntimeConfig.get_clinical_model() == "gpt-4.1"
+
+
+###############################################################################
+def test_concurrent_agent_runs_do_not_share_configuration(
+    persisted_snapshot: ModelConfigSnapshot,
+) -> None:
+    first = dili_payload()
+    second = dili_payload()
+    second["models"]["clinical"] = {"provider": "anthropic", "model": "claude-x"}
+    barrier = threading.Barrier(2)
+    observed: dict[str, tuple[str, str]] = {}
+
+    def run(name: str, payload: dict[str, Any], revision_id: int) -> None:
+        context = _context(payload, revision_id)
+        with LLMRuntimeConfig.override_for_run(
+            LLMRuntimeConfig.agent_runtime_overrides(context)
+        ):
+            barrier.wait(timeout=5)
+            observed[name] = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+            barrier.wait(timeout=5)
+
+    threads = [
+        threading.Thread(target=run, args=("first", first, 1)),
+        threading.Thread(target=run, args=("second", second, 2)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert observed == {
+        "first": ("openai", "gpt-4.1"),
+        "second": ("anthropic", "claude-x"),
+    }
+    assert LLMRuntimeConfig.has_role_routing() is False

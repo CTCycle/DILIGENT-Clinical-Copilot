@@ -57,7 +57,7 @@ def initialize_llm_client(
 ) -> OllamaClient | CloudLLMClient:
     kwargs.setdefault("timeout_s", get_server_settings().runtime.default_llm_timeout)
     provider, default_model = LLMRuntimeConfig.resolve_provider_and_model(purpose)
-    if LLMRuntimeConfig.is_cloud_enabled():
+    if LLMRuntimeConfig.is_cloud_enabled() and not LLMRuntimeConfig.has_role_routing():
         forced_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip().lower()
         provider = forced_provider or provider
     selected_model = kwargs.pop("default_model", default_model)

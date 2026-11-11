@@ -16,6 +16,7 @@ from common.catalogs.model_choices import (
     get_clinical_model_choices,
     get_text_extraction_model_choices,
 )
+from domain.agents import AgentExecutionContext, AgentModelRef, DiliAgentConfig
 from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from domain.llm.providers import CloudModelDescriptor, CloudProviderId
 from repositories.serialization.model_configs import (
@@ -36,6 +37,21 @@ from services.llm.model_capabilities import (
     resolve_effective_inference_config as resolve_effective_config,
     resolve_model_capabilities,
 )
+
+
+RolePurpose = Literal["clinical", "parser", "revision", "timeline"]
+ROLE_PURPOSES: tuple[RolePurpose, ...] = ("parser", "clinical", "revision", "timeline")
+GENERATION_PURPOSE_ROLES: dict[GenerationPurpose, RolePurpose] = {
+    GenerationPurpose.STRUCTURED_EXTRACTION: "parser",
+    GenerationPurpose.CLINICAL_SYNTHESIS: "clinical",
+    GenerationPurpose.FAITHFUL_REWRITE: "clinical",
+    GenerationPurpose.REVISION_SCAN: "revision",
+    GenerationPurpose.REVISION_PLANNING: "revision",
+    GenerationPurpose.REVISION_TOOL_SELECTION: "revision",
+    GenerationPurpose.REVISION_EDITING: "revision",
+    GenerationPurpose.REVISION_QA: "revision",
+    GenerationPurpose.TIMELINE_EXTRACTION: "timeline",
+}
 
 
 ###############################################################################
@@ -94,6 +110,9 @@ class LLMRuntimeConfig:
         overrides = cls._active_overrides()
         if not overrides:
             return snapshot
+        role_models = cls._role_models(overrides)
+        if role_models:
+            return cls._snapshot_from_role_models(snapshot, overrides, role_models)
 
         use_cloud_models = cls._coerce_bool(
             overrides.get("use_cloud_models", snapshot.use_cloud_models)
@@ -160,6 +179,161 @@ class LLMRuntimeConfig:
                 else snapshot.rag_settings
             ),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _role_models(overrides: Mapping[str, object]) -> dict[str, dict[str, object]]:
+        value = overrides.get("role_models")
+        if not isinstance(value, Mapping):
+            return {}
+        return {
+            str(key): dict(cast(Mapping[str, object], item))
+            for key, item in value.items()
+            if isinstance(item, Mapping)
+        }
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _snapshot_from_role_models(
+        cls,
+        persisted: ModelConfigSnapshot,
+        overrides: Mapping[str, object],
+        role_models: dict[str, dict[str, object]],
+    ) -> ModelConfigSnapshot:
+        """Project agent per-role routing onto the legacy snapshot view.
+
+        Agent configurations are validated by the agent service, so the
+        legacy single-provider validation does not apply. ``use_cloud_models``
+        here means "at least one role uses a cloud provider".
+        """
+
+        def model_for(role: str) -> str | None:
+            item = role_models.get(role)
+            return cls._coerce_optional_text(item.get("model")) if item else None
+
+        cloud_roles = [
+            item
+            for role in ("clinical", *ROLE_PURPOSES)
+            if (item := role_models.get(role))
+            and str(item.get("provider") or "ollama") != "ollama"
+        ]
+        cloud = cloud_roles[0] if cloud_roles else None
+        return replace(
+            persisted,
+            clinical_model=model_for("clinical"),
+            text_extraction_model=model_for("parser"),
+            revision_model=model_for("revision"),
+            timeline_model=model_for("timeline"),
+            use_cloud_models=cloud is not None,
+            cloud_provider=(
+                str(cloud.get("provider")) if cloud else persisted.cloud_provider
+            ),
+            cloud_model=(
+                cls._coerce_optional_text(cloud.get("model"))
+                if cloud
+                else persisted.cloud_model
+            ),
+            reasoning_level=cls._resolve_reasoning_level(
+                overrides=dict(overrides),
+                persisted_level=persisted.reasoning_level,
+            ),
+            ollama_seed=(
+                cls._coerce_optional_int(overrides.get("ollama_seed"))
+                if "ollama_seed" in overrides
+                else persisted.ollama_seed
+            ),
+            rag_settings=(
+                dict(cast(Mapping[str, object], overrides["rag_settings"]))
+                if isinstance(overrides.get("rag_settings"), Mapping)
+                else persisted.rag_settings
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def has_role_routing(cls) -> bool:
+        """True when an agent run routes each role to its own provider."""
+        return bool(cls._role_models(cls._runtime_override.get() or {}))
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def agent_runtime_overrides(
+        cls, context: AgentExecutionContext
+    ) -> dict[str, object]:
+        """Build the runtime override that executes one agent revision.
+
+        Shared RAG index settings are read from the persisted configuration
+        at launch and frozen alongside the agent's retrieval preferences.
+        """
+
+        config = context.configuration
+
+        def entry(ref: AgentModelRef) -> dict[str, object]:
+            return {
+                "provider": ref.provider,
+                "model": ref.model,
+                "reasoning_level": (
+                    ref.reasoning_level.value if ref.reasoning_level else None
+                ),
+            }
+
+        role_models: dict[str, dict[str, object]] = {}
+        overrides: dict[str, object] = {
+            "reasoning_level": config.reasoning_level.value,
+            "ollama_seed": config.ollama_seed,
+            "agent": {
+                "agent_id": context.agent_id,
+                "agent_name": context.agent_name,
+                "agent_revision_id": context.agent_revision_id,
+                "agent_revision": context.revision_number,
+                "agent_kind": context.kind,
+                "agent_config_hash": context.config_hash,
+            },
+            "agent_instructions": config.instructions.model_dump(),
+        }
+        if isinstance(config, DiliAgentConfig):
+            models = config.models
+            role_models["parser"] = entry(models.extraction)
+            role_models["clinical"] = entry(models.clinical)
+            role_models["timeline"] = entry(models.timeline)
+            # A DILI run never revises; keep the legacy view complete.
+            role_models["revision"] = entry(models.clinical)
+            for stage, ref in models.extraction_overrides.items():
+                role_models[f"parser.{stage}"] = entry(ref)
+            if models.report_synthesis is not None:
+                role_models["clinical.report_synthesis"] = entry(
+                    models.report_synthesis
+                )
+            persisted = ModelConfigSerializer().load_snapshot().rag_settings or {}
+            overrides["rag_settings"] = {
+                **dict(persisted),
+                **config.retrieval.rag_settings(),
+            }
+        else:
+            planning = entry(config.models.planning)
+            for role in ROLE_PURPOSES:
+                role_models[role] = planning
+            for stage, ref in config.models.stage_overrides.items():
+                role_models[f"revision.{stage}"] = entry(ref)
+            overrides["revision_limits"] = config.limits.model_dump()
+        overrides["role_models"] = role_models
+        return overrides
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def active_agent(cls) -> dict[str, object]:
+        value = (cls._runtime_override.get() or {}).get("agent")
+        if not isinstance(value, Mapping):
+            return {}
+        return dict(cast(Mapping[str, object], value))
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def active_agent_instructions(cls) -> dict[str, str]:
+        value = (cls._runtime_override.get() or {}).get("agent_instructions")
+        if not isinstance(value, Mapping):
+            return {}
+        return {str(key): str(item or "") for key, item in value.items()}
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -325,18 +499,31 @@ class LLMRuntimeConfig:
         *,
         evidence_sources: list[str],
         model_overrides: dict[str, str] | None = None,
+        agent_context: AgentExecutionContext | None = None,
     ) -> tuple[dict[str, object], str]:
-        """Capture the complete resolved runtime once for a clinical job.
+        """Capture the complete resolved runtime once for a job.
 
-        Session-only model overrides are applied in this context only, so the
-        snapshot freezes the effective models without touching persisted
-        configuration or other runs.
+        With ``agent_context`` the agent revision's per-role routing,
+        reasoning, seed and retrieval policy are frozen; replaying the
+        snapshot through ``override_for_run`` restores them exactly.
         """
-        with cls.override_for_run(model_overrides):
-            return cls._capture_run_snapshot(
+        agent_overrides = (
+            cls.agent_runtime_overrides(agent_context) if agent_context else {}
+        )
+        with cls.override_for_run(agent_overrides), cls.override_for_run(
+            model_overrides
+        ):
+            snapshot, _ = cls._capture_run_snapshot(
                 evidence_sources=evidence_sources,
                 model_overrides=dict(model_overrides or {}),
             )
+        for key in ("role_models", "agent", "agent_instructions", "revision_limits"):
+            if key in agent_overrides:
+                snapshot[key] = agent_overrides[key]
+        canonical = json.dumps(
+            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        return snapshot, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -505,7 +692,7 @@ class LLMRuntimeConfig:
             user_reasoning_level=(
                 user_reasoning_level
                 if user_reasoning_level is not None
-                else LLMRuntimeConfig.get_reasoning_level()
+                else LLMRuntimeConfig._reasoning_level_for_generation(purpose)
             ),
             timeline_complexity=timeline_complexity,
         )
@@ -579,8 +766,19 @@ class LLMRuntimeConfig:
     @classmethod
     def resolve_provider_and_model(
         cls,
-        purpose: Literal["clinical", "parser", "revision", "timeline"],
+        purpose: RolePurpose,
+        *,
+        stage: str | None = None,
     ) -> tuple[str, str]:
+        role_models = cls._role_models(cls._runtime_override.get() or {})
+        if role_models:
+            item = (role_models.get(f"{purpose}.{stage}") if stage else None) or (
+                role_models.get(purpose)
+            )
+            model = cls._coerce_optional_text(item.get("model")) if item else None
+            if not item or not model:
+                raise ValueError(f"Agent configuration has no model for '{purpose}'.")
+            return str(item.get("provider") or "ollama"), model
         snapshot = cls._load_snapshot()
         role_models = {
             "parser": snapshot.text_extraction_model,
@@ -599,3 +797,25 @@ class LLMRuntimeConfig:
                 raise ValueError("Persisted model configuration has no cloud provider.")
             return provider, local_model
         return "ollama", local_model
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def is_cloud_purpose(cls, purpose: RolePurpose, *, stage: str | None = None) -> bool:
+        provider, _ = cls.resolve_provider_and_model(purpose, stage=stage)
+        return provider != "ollama"
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_reasoning_level_for(cls, purpose: RolePurpose) -> ReasoningLevel:
+        item = cls._role_models(cls._runtime_override.get() or {}).get(purpose)
+        if item and item.get("reasoning_level"):
+            return cls._coerce_reasoning_level(item["reasoning_level"])
+        return cls.get_reasoning_level()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _reasoning_level_for_generation(
+        cls, purpose: GenerationPurpose
+    ) -> ReasoningLevel:
+        role = GENERATION_PURPOSE_ROLES.get(purpose)
+        return cls.get_reasoning_level_for(role) if role else cls.get_reasoning_level()
