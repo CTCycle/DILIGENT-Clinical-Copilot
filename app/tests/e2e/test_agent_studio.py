@@ -57,6 +57,17 @@ def _create_agent(page: Page, name: str) -> None:
 
 
 ###############################################################################
+def _set_switch(page: Page, name: str, checked: bool) -> None:
+    """Toggle a custom switch through its visible track; the native input is visually hidden."""
+    switch = page.get_by_role("switch", name=name)
+    switch.locator("xpath=..").click()
+    if checked:
+        expect(switch).to_be_checked()
+    else:
+        expect(switch).not_to_be_checked()
+
+
+###############################################################################
 def _card(page: Page, name: str) -> Locator:
     return page.get_by_test_id("agent-card").filter(
         has=page.get_by_role("link", name=name, exact=True)
@@ -95,7 +106,7 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     assert persisted["revision"]["configuration"]["timeline"]["instructions"]["timeline_focus"] == focus
 
     # Disable one capability independently; its values stay stored.
-    page.get_by_role("switch", name="Disable Timeline").uncheck()
+    _set_switch(page, "Disable Timeline", False)
     page.get_by_role("button", name="Save agent").click()
     expect(page.get_by_text("Saved as revision 3")).to_be_visible()
     disabled = next(item for item in _agents(api_context) if item["name"] == name)
@@ -104,11 +115,11 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     assert timeline["enabled"] is False and timeline["instructions"]["timeline_focus"] == focus
 
     # Lock from the profile card: configuration becomes read-only, unlock stays reachable.
-    page.get_by_role("switch", name="Locked").check()
+    _set_switch(page, "Locked", True)
     expect(page.get_by_text("This agent is locked")).to_be_visible()
     expect(page.get_by_label("Name", exact=True)).to_be_disabled()
     expect(page.get_by_role("switch", name="Locked")).to_be_enabled()
-    page.get_by_role("switch", name="Locked").uncheck()
+    _set_switch(page, "Locked", False)
     expect(page.get_by_label("Name", exact=True)).to_be_enabled()
 
     # Back on the grid: the card shows its status, and delete needs confirmation.
