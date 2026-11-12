@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
 import { JobPollingService } from '../../../core/services/job-polling.service';
 import { AgentsStateService } from '../../../core/state/agents-state.service';
+import { makeAgent, makeAgentConfig } from '../../../core/testing/agent-fixtures';
 import { ClinicalSessionTimelineWorkspaceComponent } from './clinical-session-timeline-workspace.component';
 
 type Deferred<T> = {
@@ -72,6 +73,18 @@ function preview(sessionId: number, timelineId: number): InspectionSessionTimeli
   };
 }
 
+const timelineAgent = makeAgent(
+  't1',
+  { is_default: true },
+  makeAgentConfig({
+    ...makeAgentConfig(),
+    timeline: {
+      ...makeAgentConfig().timeline,
+      model: { provider: 'ollama', model: 'timeline-model' },
+    },
+  }),
+);
+
 describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => {
   let fixture: ComponentFixture<ClinicalSessionTimelineWorkspaceComponent>;
   let component: ClinicalSessionTimelineWorkspaceComponent;
@@ -117,19 +130,8 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
           useValue: {
             status: signal('ready'),
             error: signal(null),
-            defaultDiliAgent: signal({
-              revision: {
-                configuration: {
-                  kind: 'dili',
-                  models: {
-                    clinical: { provider: 'ollama', model: 'clinical' },
-                    extraction: { provider: 'ollama', model: 'parser' },
-                    timeline: { provider: 'ollama', model: 'timeline-model' },
-                  },
-                  retrieval: { evidence_sources: [] },
-                },
-              },
-            }),
+            selectableFor: () => [timelineAgent],
+            preferredFor: () => timelineAgent,
             load: vi.fn().mockResolvedValue([]),
           },
         },

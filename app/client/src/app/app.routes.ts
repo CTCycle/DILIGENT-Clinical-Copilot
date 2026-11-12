@@ -8,6 +8,12 @@ export const routes: Routes = [
   { path: 'report/:sessionId', loadComponent: () => import('./pages/dili-report/dili-report-page.component').then((m) => m.DiliReportPageComponent), title: 'DILI Report | DILIGENT' },
   { path: 'clinical-sessions', loadComponent: () => import('./pages/clinical-sessions/clinical-sessions-page.component').then((m) => m.ClinicalSessionsPageComponent), title: 'Clinical Sessions | DILIGENT' },
   { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then((m) => m.AgentsPageComponent), title: 'Agent Studio | DILIGENT' },
+  {
+    path: 'agents/:id',
+    loadComponent: () => import('./pages/agents/agent-editor.component').then((m) => m.AgentEditorComponent),
+    canDeactivate: [(component: { canLeave(): boolean | Promise<boolean> }) => component.canLeave()],
+    title: 'Agent Editor | DILIGENT',
+  },
   { path: 'data', loadComponent: () => import('./pages/data-inspection/data-inspection-page.component').then((m) => m.DataInspectionPageComponent), title: 'Knowledge | DILIGENT' },
   { path: 'sessions/:sessionId/timetable/:timelineId', loadComponent: () => import('./pages/patient-timetable/patient-timetable-page.component').then((m) => m.PatientTimetablePageComponent), title: 'Patient Timeline | DILIGENT' },
   { path: 'sessions/:sessionId/timetable', loadComponent: () => import('./pages/patient-timetable/patient-timetable-page.component').then((m) => m.PatientTimetablePageComponent), title: 'Patient Timeline | DILIGENT' },

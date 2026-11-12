@@ -200,6 +200,8 @@ export type InspectionSessionTimeline = {
 
 export type InspectionSessionTimelineRequest = {
   force_regenerate?: boolean;
+  agent_id?: string;
+  agent_revision?: number;
 };
 
 export type InspectionSessionTimelinePreview = {

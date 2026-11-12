@@ -30,7 +30,7 @@ export function normalizePathname(pathname: string): string {
 export function resolvePageIdFromPath(pathname: string): PageId {
   const normalized = normalizePathname(pathname.split(/[?#]/, 1)[0]);
   if (normalized === PAGE_PATHS['clinical-sessions'] || normalized.startsWith('/sessions/')) return 'clinical-sessions';
-  if (normalized === PAGE_PATHS['agent-studio']) return 'agent-studio';
+  if (normalized === PAGE_PATHS['agent-studio'] || normalized.startsWith('/agents/')) return 'agent-studio';
   if (normalized === PAGE_PATHS['data-inspection']) return 'data-inspection';
   if (normalized === '/settings' || normalized.startsWith('/settings/')) return 'settings';
   return DEFAULT_PAGE;

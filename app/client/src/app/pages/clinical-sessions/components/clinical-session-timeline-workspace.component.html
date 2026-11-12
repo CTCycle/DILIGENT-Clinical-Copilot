@@ -10,6 +10,17 @@
       <button type="button" class="btn btn-secondary" (click)="loadDefaultAgent()">Retry</button>
     }
     <div class="timeline-generate-row">
+      @if (selectableAgents().length > 1) {
+        <label class="timeline-agent-select">
+          <span>Agent</span>
+          <select aria-label="Timeline agent" [disabled]="generationRunning()"
+            (change)="timelineAgentId.set($any($event.target).value || null)">
+            @for (option of selectableAgents(); track option.id) {
+              <option [value]="option.id" [selected]="option.id === agent()?.id">{{ option.name }}{{ option.is_default ? ' (default)' : '' }}</option>
+            }
+          </select>
+        </label>
+      }
       <p class="timeline-configured-model">
         <span>Timeline model</span>
         <strong>{{ selectedConfigurationLabel() }}</strong>

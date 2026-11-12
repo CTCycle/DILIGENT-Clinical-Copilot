@@ -10,6 +10,7 @@ import {
   InspectionSessionItem,
 } from '../../core/models/inspection-types';
 import { SessionVersionSummary } from '../../core/models/revision-types';
+import { makeAgent, makeAgentConfig } from '../../core/testing/agent-fixtures';
 import { jsonResponse as lifecycleJson } from '../../core/testing/clinical-session-fixtures';
 import { ClinicalSessionsPageComponent } from './clinical-sessions-page.component';
 import { formatRevisionAgentProvenance } from './clinical-session-revision-display';
@@ -508,36 +509,11 @@ describe('ClinicalSessionsPageComponent lifecycle list', () => {
 describe('ClinicalSessionsPageComponent revision agent', () => {
   let fixture: ComponentFixture<ClinicalSessionsPageComponent>;
   let component: ClinicalSessionsPageComponent;
-  const ref = { provider: 'ollama', model: 'qwen3' };
-
   function revisionAgent(id: string, isDefault: boolean) {
-    return {
-      id,
-      kind: 'revision',
-      name: `Reviser ${id}`,
-      description: '',
-      current_revision: 4,
-      is_default: isDefault,
-      is_archived: false,
-      created_at: null,
-      updated_at: null,
-      revision: {
-        revision_id: 1,
-        revision_number: 4,
-        schema_version: 1,
-        configuration_hash: 'h',
-        created_at: null,
-        configuration: {
-          kind: 'revision',
-          schema_version: 1,
-          instructions: { review_objectives: '', editing_style: '' },
-          models: { planning: ref, stage_overrides: {} },
-          reasoning_level: 'off',
-          ollama_seed: null,
-          limits: { max_tasks: 6, max_tool_iterations: 12, allowed_tools: null },
-        },
-      },
-    };
+    const config = makeAgentConfig();
+    config.revision.limits = { max_tasks: 6, max_tool_iterations: 12, allowed_tools: null };
+    config.revision.ollama_seed = null;
+    return makeAgent(id, { name: `Reviser ${id}`, current_revision: 4, is_default: isDefault }, config);
   }
 
   beforeEach(async () => {
@@ -558,7 +534,7 @@ describe('ClinicalSessionsPageComponent revision agent', () => {
     let body: Record<string, unknown> = {};
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
-      if (url.endsWith('/agents')) {
+      if (url.includes('/agents')) {
         return jsonResponse({ agents: [revisionAgent('r1', true), revisionAgent('r2', false)] });
       }
       if (url.endsWith('/revision/jobs')) {

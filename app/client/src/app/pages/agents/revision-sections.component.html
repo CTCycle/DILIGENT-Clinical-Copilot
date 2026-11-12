@@ -1,6 +1,7 @@
+<fieldset class="plain" [disabled]="disabled()">
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
-<section class="agent-section" aria-labelledby="rev-instructions-heading">
+<section class="subsection" aria-labelledby="rev-instructions-heading">
   <h3 id="rev-instructions-heading">Instructions</h3>
   <p class="agent-section-note">
     Guidance is added to the agent's prompts. It cannot override clinical safety rules or the
@@ -18,7 +19,7 @@
   }
 </section>
 
-<section class="agent-section" aria-labelledby="rev-models-heading">
+<section class="subsection" aria-labelledby="rev-models-heading">
   <h3 id="rev-models-heading">Models</h3>
   <app-agent-model-field label="Planning model" [ref]="config().models.planning"
     [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setPlanning($event)" />
@@ -30,7 +31,7 @@
       [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setOverride(item.stage, $event)" />
   }
   <div class="field-grid">
-    <label class="field">Agent reasoning level
+    <label class="field">Reasoning level
       <select (change)="setReasoning($any($event.target).value)">
         @for (level of reasoningLevels; track level) {
           <option [value]="level" [selected]="config().reasoning_level === level">{{ level }}</option>
@@ -44,7 +45,7 @@
   </div>
 </section>
 
-<section class="agent-section" aria-labelledby="rev-limits-heading">
+<section class="subsection" aria-labelledby="rev-limits-heading">
   <h3 id="rev-limits-heading">Limits</h3>
   <div class="field-grid">
     <label class="field">Max tasks (1-8)
@@ -72,3 +73,4 @@
     }
   </fieldset>
 </section>
+</fieldset>

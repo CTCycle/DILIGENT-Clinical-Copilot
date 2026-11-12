@@ -113,7 +113,7 @@
       }
 
       @case ('agent') {
-        <p class="wizard-lede">Choose the DILI agent that runs this analysis. Its models, instructions and evidence sources are applied for the whole session.</p>
+        <p class="wizard-lede">Choose the agent that runs this analysis. Only active agents with the DILI Assessment capability enabled are listed. Its models, instructions and evidence sources are applied for the whole session.</p>
         @if (agents().length) {
           <div class="field">
             <label class="field-label" for="wizard-agent">Agent</label>
@@ -130,7 +130,7 @@
             </select>
           </div>
         } @else {
-          <p class="wizard-notice" role="status">No saved DILI agent is available. The default agent will be used.</p>
+          <p class="wizard-notice" role="status">No active agent has the DILI Assessment capability enabled. Enable it on an agent in Agent Studio.</p>
         }
         @if (agent(); as current) {
           <section class="wizard-agent-card" data-testid="agent-summary" [attr.aria-label]="current.name + ' summary'">
@@ -141,7 +141,6 @@
             <dl class="wizard-review">
               <div><dt>Clinical model</dt><dd>{{ agentSummary()?.clinicalModel }}</dd></div>
               <div><dt>Extraction model</dt><dd>{{ agentSummary()?.extractionModel }}</dd></div>
-              <div><dt>Timeline model</dt><dd>{{ agentSummary()?.timelineModel }}</dd></div>
               <div><dt>Evidence sources</dt><dd>{{ sourcesSummary() }}</dd></div>
               @for (row of instructionExcerpts(); track row.label) {
                 <div><dt>{{ row.label }}</dt><dd>{{ row.text }}</dd></div>

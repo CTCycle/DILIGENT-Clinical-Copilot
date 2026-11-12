@@ -3,7 +3,7 @@
 <main class="page-container studio">
   <header class="studio-header">
     <h1>Agent Studio</h1>
-    <p>Create and tune the DILI and Revision agents used by clinical sessions.</p>
+    <p>Each agent bundles DILI Assessment, DILI Revision and Timeline configurations.</p>
   </header>
 
   <div class="studio-tabs" role="tablist" aria-label="Agent Studio sections">
@@ -33,93 +33,96 @@
           (input)="search.set($any($event.target).value)" />
       </label>
       <label class="check">
-        <input type="checkbox" [checked]="showArchived()" [disabled]="busy()"
-          (change)="setShowArchived($any($event.target).checked)" />
+        <input type="checkbox" [checked]="state.showArchived()"
+          (change)="state.showArchived.set($any($event.target).checked)" />
         Show archived
       </label>
       <span class="toolbar-spacer"></span>
-      <button type="button" class="btn" (click)="startCreate('dili')" [disabled]="busy() || !seedFor().dili"
-        [title]="seedFor().dili ? '' : 'No DILI agent to seed from'">New DILI agent</button>
-      <button type="button" class="btn" (click)="startCreate('revision')" [disabled]="busy() || !seedFor().revision"
-        [title]="seedFor().revision ? '' : 'No Revision agent to seed from'">New Revision agent</button>
+      <a routerLink="/agents/new" class="btn is-primary new-agent">
+        <svg lucidePlus aria-hidden="true"></svg> New agent
+      </a>
     </div>
 
-    @if (creating(); as draft) {
-      <form class="inline-form" (submit)="$event.preventDefault(); create()">
-        <label class="field">
-          Name for the new {{ kindLabel(draft.kind) }} agent
-          <input type="text" maxlength="120" [value]="draft.name"
-            (input)="creating.set({ kind: draft.kind, name: $any($event.target).value })" />
-        </label>
-        <small>Starts as a copy of "{{ seedFor()[draft.kind]?.name }}" (current default configuration).</small>
-        <div class="row-actions">
-          <button type="submit" class="btn is-primary" [disabled]="busy() || !draft.name.trim()">Create agent</button>
-          <button type="button" class="btn" (click)="creating.set(null)">Cancel</button>
-        </div>
-      </form>
-    }
-
-    @if (pendingSelectId()) {
-      <div class="studio-message is-warning" role="alertdialog" aria-label="Discard unsaved changes">
-        The open agent has unsaved changes. Opening another agent will discard them.
-        <span class="row-actions">
-          <button type="button" class="btn" (click)="discardAndOpen()">Discard and open</button>
-          <button type="button" class="btn" (click)="pendingSelectId.set(null)">Keep editing</button>
-        </span>
-      </div>
-    }
-
-    @if (state.status() === 'loading' && !state.agents().length) {
+    @if (state.status() === 'loading' && !state.all().length) {
       <p class="empty" role="status">Loading agents...</p>
-    } @else if (state.status() === 'error' && !state.agents().length) {
+    } @else if (state.status() === 'error' && !state.all().length) {
       <p class="empty is-error" role="alert">{{ state.error() }}</p>
     } @else if (!visibleAgents().length) {
-      <p class="empty">No agents match.</p>
+      <p class="empty">
+        {{ search() ? 'No agents match your search.' : 'No agents yet. Create one to get started.' }}
+      </p>
     } @else {
-      <ul class="agent-list">
+      <ul class="agent-grid">
         @for (agent of visibleAgents(); track agent.id) {
-          <li class="agent-row" [class.is-selected]="agent.id === selectedId()">
-            <div class="agent-main">
-              <button type="button" class="agent-name" (click)="open(agent)">{{ agent.name }}</button>
-              <span class="chip">{{ kindLabel(agent.kind) }}</span>
+          <li class="agent-card" [class.is-muted]="!agent.is_active || agent.is_archived"
+            [attr.data-testid]="'agent-card'">
+            <div class="card-head">
+              <a class="agent-name" [routerLink]="['/agents', agent.id]">{{ agent.name }}</a>
+              <span class="version" title="Active configuration revision">r{{ agent.current_revision }}</span>
+            </div>
+            <p class="description">{{ agent.description || 'No description' }}</p>
+
+            <div class="chips">
               @if (agent.is_default) { <span class="chip is-default">Default</span> }
-              @if (agent.is_archived) { <span class="chip">Archived</span> }
-              <span class="meta">Revision {{ agent.current_revision }} · {{ modelLabel(agent) }}</span>
-              @if (agent.description) { <span class="meta description">{{ agent.description }}</span> }
+              <span class="chip" [class.is-off]="!agent.is_active">{{ agent.is_active ? 'Active' : 'Inactive' }}</span>
+              @if (agent.is_locked) {
+                <span class="chip is-locked"><svg lucideLock aria-hidden="true"></svg> Locked</span>
+              }
+              @if (agent.is_archived) { <span class="chip is-off">Archived</span> }
             </div>
-            <div class="row-actions">
-              <button type="button" class="btn" (click)="duplicate(agent)" [disabled]="busy()"
-                [attr.aria-label]="'Duplicate ' + agent.name">Duplicate</button>
-              <button type="button" class="btn" (click)="setDefault(agent)"
-                [disabled]="busy() || agent.is_default || agent.is_archived"
-                [attr.aria-label]="'Set ' + agent.name + ' as default'">Set default</button>
-              <button type="button" class="btn" (click)="confirmArchiveId.set(agent.id)"
-                [disabled]="busy() || agent.is_default || agent.is_archived"
-                [title]="agent.is_default ? 'Make another agent the default before archiving this one' : ''"
-                [attr.aria-label]="'Archive ' + agent.name">Archive</button>
-            </div>
-            @if (confirmArchiveId() === agent.id) {
-              <div class="confirm" role="alertdialog" [attr.aria-label]="'Confirm archive ' + agent.name">
-                Archive "{{ agent.name }}"? It will no longer be offered for new sessions; past sessions keep their recorded revision.
-                <span class="row-actions">
-                  <button type="button" class="btn is-danger" (click)="archive(agent)">Archive agent</button>
-                  <button type="button" class="btn" (click)="confirmArchiveId.set(null)">Cancel</button>
-                </span>
+
+            <ul class="capabilities" aria-label="Supported workflows">
+              @for (capability of capabilities; track capability) {
+                <li class="capability" [class.is-on]="hasCapability(agent, capability)"
+                  [attr.title]="capabilityLabels[capability] + (hasCapability(agent, capability) ? ' enabled' : ' disabled')">
+                  @switch (capability) {
+                    @case ('assessment') { <svg lucideClipboardCheck aria-hidden="true"></svg> }
+                    @case ('revision') { <svg lucideFileCheck aria-hidden="true"></svg> }
+                    @default { <svg lucideStethoscope aria-hidden="true"></svg> }
+                  }
+                  <span class="visually-hidden">
+                    {{ capabilityLabels[capability] }}: {{ hasCapability(agent, capability) ? 'enabled' : 'disabled' }}
+                  </span>
+                </li>
+              }
+            </ul>
+
+            <div class="card-foot">
+              <span class="modified">Modified {{ formatDate(agent.updated_at) }}</span>
+              <div class="actions">
+                <app-icon-button [label]="agent.editable ? 'Edit ' + agent.name : 'View ' + agent.name + ' (read-only)'"
+                  (activated)="edit(agent)">
+                  <svg lucidePencil aria-hidden="true"></svg>
+                </app-icon-button>
+                <app-icon-button [label]="'Duplicate ' + agent.name" [disabled]="busy()" (activated)="duplicate(agent)">
+                  <svg lucideCopy aria-hidden="true"></svg>
+                </app-icon-button>
+                <app-icon-button [label]="'Set ' + agent.name + ' as default'"
+                  [disabled]="busy() || defaultBlockedReason(agent) !== null" [reason]="defaultBlockedReason(agent)"
+                  (activated)="setDefault(agent)">
+                  <svg lucideStar aria-hidden="true"></svg>
+                </app-icon-button>
+                <app-icon-button [label]="(agent.is_locked ? 'Unlock ' : 'Lock ') + agent.name" [disabled]="busy()"
+                  [pressed]="agent.is_locked" (activated)="toggleLock(agent)">
+                  @if (agent.is_locked) { <svg lucideLock aria-hidden="true"></svg> }
+                  @else { <svg lucideLockOpen aria-hidden="true"></svg> }
+                </app-icon-button>
+                <app-icon-button [label]="(agent.is_archived ? 'Restore ' : 'Archive ') + agent.name"
+                  [disabled]="busy() || archiveBlockedReason(agent) !== null" [reason]="archiveBlockedReason(agent)"
+                  (activated)="toggleArchive(agent)">
+                  @if (agent.is_archived) { <svg lucideArchiveRestore aria-hidden="true"></svg> }
+                  @else { <svg lucideArchive aria-hidden="true"></svg> }
+                </app-icon-button>
+                <app-icon-button [label]="'Delete ' + agent.name" variant="danger"
+                  [disabled]="busy() || deleteBlockedReason(agent) !== null" [reason]="deleteBlockedReason(agent)"
+                  (activated)="pendingDelete.set(agent)">
+                  <svg lucideTrash2 aria-hidden="true"></svg>
+                </app-icon-button>
               </div>
-            }
+            </div>
           </li>
         }
       </ul>
-    }
-  </section>
-
-  <!-- Agent Editor -->
-  <section role="tabpanel" id="agent-studio-panel-editor" aria-labelledby="agent-studio-tab-editor"
-    [hidden]="tab() !== 'editor'">
-    @if (selected(); as agent) {
-      <app-agent-editor [agent]="agent" (dirtyChange)="editorDirty.set($event)" />
-    } @else {
-      <p class="empty">Select an agent in My Agents to edit it.</p>
     }
   </section>
 
@@ -128,8 +131,14 @@
     [hidden]="tab() !== 'providers'">
     <p class="shared-note">
       Providers, API keys and the knowledge index are shared by all agents. Changes here apply to every
-      agent, not just the one you are editing. Per-agent model choices live in the Agent Editor.
+      agent. Per-agent model and retrieval choices live in the Agent Editor.
     </p>
     @if (providersVisited()) { <app-providers-resources /> }
   </section>
+
+  <app-confirm-dialog [open]="pendingDelete() !== null"
+    [title]="'Delete ' + (pendingDelete()?.name ?? 'agent') + '?'"
+    message="This permanently deletes the agent and its revision history. It cannot be undone."
+    confirmLabel="Delete agent" [destructive]="true"
+    (confirmed)="confirmDelete()" (cancelled)="pendingDelete.set(null)" />
 </main>

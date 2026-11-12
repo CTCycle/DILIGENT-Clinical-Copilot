@@ -4,70 +4,9 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Agent, AgentConfig, AgentKind, summarizeAgent } from '../models/agent-types';
+import { summarizeAgent } from '../models/agent-types';
+import { makeAgent, makeAgentConfig, withDisabled } from '../testing/agent-fixtures';
 import { AgentsStateService } from './agents-state.service';
-
-const ref = { provider: 'ollama', model: 'qwen3' };
-
-function makeConfig(kind: AgentKind): AgentConfig {
-  if (kind === 'revision') {
-    return {
-      kind,
-      schema_version: 1,
-      instructions: { review_objectives: '', editing_style: '' },
-      models: { planning: ref, stage_overrides: {} },
-      reasoning_level: 'off',
-      ollama_seed: 42,
-      limits: { max_tasks: 8, max_tool_iterations: 24, allowed_tools: null },
-    };
-  }
-  return {
-    kind,
-    schema_version: 1,
-    instructions: { assessment_focus: '', report_style: '', extraction_guidance: '' },
-    models: {
-      extraction: ref,
-      clinical: { provider: 'openai', model: 'gpt-x' },
-      timeline: ref,
-      extraction_overrides: {},
-    },
-    reasoning_level: 'off',
-    ollama_seed: 42,
-    retrieval: {
-      evidence_sources: ['livertox', 'dilirank'],
-      use_hybrid_search: true,
-      use_reranking: true,
-      reranker_model: 'r',
-      retrieval_candidate_count: 40,
-      retrieval_selected_count: 6,
-      hybrid_vector_weight: 0.65,
-      hybrid_text_weight: 0.35,
-    },
-  };
-}
-
-function makeAgent(id: string, kind: AgentKind, overrides: Partial<Agent> = {}): Agent {
-  return {
-    id,
-    kind,
-    name: id,
-    description: '',
-    current_revision: 1,
-    is_default: false,
-    is_archived: false,
-    created_at: null,
-    updated_at: null,
-    revision: {
-      revision_id: 1,
-      revision_number: 1,
-      schema_version: 1,
-      configuration_hash: 'h',
-      configuration: makeConfig(kind),
-      created_at: null,
-    },
-    ...overrides,
-  };
-}
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -79,14 +18,23 @@ function jsonResponse(body: unknown): Response {
 describe('AgentsStateService', () => {
   let service: AgentsStateService;
   const fetchSpy = vi.fn();
-  const dili = makeAgent('d1', 'dili', { is_default: true });
-  const rev = makeAgent('r1', 'revision', { is_default: true });
-  const archived = makeAgent('d2', 'dili', { is_archived: true });
+  const full = makeAgent('a1', { is_default: true });
+  const assessmentOnly = makeAgent(
+    'a2',
+    {},
+    withDisabled(makeAgentConfig(), 'revision', 'timeline'),
+  );
+  const inactive = makeAgent('a3', { is_active: false });
+  const archived = makeAgent('a4', { is_archived: true });
 
   const listCalls = () => fetchSpy.mock.calls.filter(([, init]) => init?.method === 'GET');
 
   beforeEach(() => {
-    fetchSpy.mockReset().mockImplementation(async () => jsonResponse({ agents: [dili, rev, archived] }));
+    fetchSpy
+      .mockReset()
+      .mockImplementation(async () =>
+        jsonResponse({ agents: [full, assessmentOnly, inactive, archived] }),
+      );
     vi.stubGlobal('fetch', fetchSpy);
     service = TestBed.inject(AgentsStateService);
   });
@@ -95,53 +43,78 @@ describe('AgentsStateService', () => {
     vi.unstubAllGlobals();
   });
 
-  it('dedupes concurrent loads and skips refetch once ready', async () => {
+  it('dedupes concurrent loads, skips refetch once ready, and always loads archived agents', async () => {
     await Promise.all([service.load(), service.load()]);
     await service.load();
     expect(listCalls()).toHaveLength(1);
+    expect(String(listCalls()[0][0])).toContain('include_archived=true');
     expect(service.status()).toBe('ready');
   });
 
-  it('exposes default selectors and excludes archived agents by default', async () => {
+  it('hides archived agents from the list until requested, but still resolves them by id', async () => {
     await service.load();
-    expect(service.agents().map((a) => a.id)).toEqual(['d1', 'r1']);
-    expect(service.defaultDiliAgent()?.id).toBe('d1');
-    expect(service.defaultRevisionAgent()?.id).toBe('r1');
-    expect(service.byId('d2')).toBeNull();
+    expect(service.agents().map((a) => a.id)).toEqual(['a1', 'a2', 'a3']);
+    expect(service.byId('a4')?.is_archived).toBe(true);
+    service.showArchived.set(true);
+    expect(service.agents().map((a) => a.id)).toEqual(['a1', 'a2', 'a3', 'a4']);
   });
 
-  it('includes archived agents when loaded with includeArchived', async () => {
+  it('offers only active, non-archived agents whose capability is enabled', async () => {
     await service.load();
-    await service.load({ includeArchived: true });
-    expect(String(listCalls().at(-1)?.[0])).toContain('include_archived=true');
-    expect(service.byId('d2')?.is_archived).toBe(true);
+    expect(service.selectableFor('assessment').map((a) => a.id)).toEqual(['a1', 'a2']);
+    expect(service.selectableFor('revision').map((a) => a.id)).toEqual(['a1']);
+    expect(service.selectableFor('timeline').map((a) => a.id)).toEqual(['a1']);
+  });
+
+  it('prefers the default agent and falls back to the first compatible agent', async () => {
+    await service.load();
+    expect(service.preferredFor('assessment')?.id).toBe('a1');
+    service.showArchived.set(false);
+    fetchSpy.mockImplementationOnce(async () =>
+      jsonResponse({ agents: [makeAgent('x', { is_default: true, is_active: false }), assessmentOnly] }),
+    );
+    await service.load({ force: true });
+    expect(service.preferredFor('assessment')?.id).toBe('a2');
+    expect(service.preferredFor('timeline')).toBeNull();
   });
 
   it('replaces the cached agent with the server response on save', async () => {
     await service.load();
-    const saved = makeAgent('d1', 'dili', { is_default: true, current_revision: 2 });
+    const saved = makeAgent('a1', { is_default: true, current_revision: 2 });
     fetchSpy.mockImplementationOnce(async () => jsonResponse(saved));
-    await service.save('d1', 1, 'd1', '', saved.revision.configuration);
+    await service.save('a1', 1, 'a1', '', saved.revision.configuration);
     const [url, init] = fetchSpy.mock.calls.at(-1)!;
-    expect(String(url)).toMatch(/\/agents\/d1$/);
+    expect(String(url)).toMatch(/\/agents\/a1$/);
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body).expected_revision).toBe(1);
-    expect(service.byId('d1')?.current_revision).toBe(2);
-    expect(service.agents().map((a) => a.id)).toEqual(['d1', 'r1']);
+    expect(service.byId('a1')?.current_revision).toBe(2);
   });
 
-  it('moves the default flag when another agent of the same kind becomes default', async () => {
-    fetchSpy.mockImplementationOnce(async () =>
-      jsonResponse({ agents: [dili, makeAgent('d3', 'dili'), rev] }),
-    );
+  it('moves the single default flag when another agent becomes default', async () => {
     await service.load();
     fetchSpy.mockImplementationOnce(async () =>
-      jsonResponse(makeAgent('d3', 'dili', { is_default: true })),
+      jsonResponse(makeAgent('a2', { is_default: true })),
     );
-    await service.setDefault('d3');
-    expect(service.defaultDiliAgent()?.id).toBe('d3');
-    expect(service.byId('d1')?.is_default).toBe(false);
-    expect(service.defaultRevisionAgent()?.id).toBe('r1');
+    await service.setDefault('a2');
+    expect(service.defaultAgent()?.id).toBe('a2');
+    expect(service.byId('a1')?.is_default).toBe(false);
+  });
+
+  it('applies lifecycle changes from the server response and removes deleted agents', async () => {
+    await service.load();
+    fetchSpy.mockImplementationOnce(async () =>
+      jsonResponse(makeAgent('a2', { is_locked: true, editable: false })),
+    );
+    await service.setLifecycle('a2', { is_locked: true });
+    const [url, init] = fetchSpy.mock.calls.at(-1)!;
+    expect(String(url)).toMatch(/\/agents\/a2\/lifecycle$/);
+    expect(JSON.parse(init.body)).toEqual({ is_locked: true });
+    expect(service.byId('a2')?.editable).toBe(false);
+
+    fetchSpy.mockImplementationOnce(async () => new Response(null, { status: 204 }));
+    await service.remove('a2');
+    expect(fetchSpy.mock.calls.at(-1)![1].method).toBe('DELETE');
+    expect(service.byId('a2')).toBeNull();
   });
 
   it('records an error status when loading fails', async () => {
@@ -151,10 +124,11 @@ describe('AgentsStateService', () => {
     expect(service.error()).toBeTruthy();
   });
 
-  it('summarizes model and evidence display strings', () => {
-    expect(summarizeAgent(dili)).toEqual({
+  it('summarizes model and evidence display strings for every capability', () => {
+    expect(summarizeAgent(full)).toEqual({
       clinicalModel: 'openai / gpt-x',
       extractionModel: 'ollama / qwen3',
+      revisionModel: 'ollama / qwen3',
       timelineModel: 'ollama / qwen3',
       evidenceSources: ['livertox', 'dilirank'],
     });

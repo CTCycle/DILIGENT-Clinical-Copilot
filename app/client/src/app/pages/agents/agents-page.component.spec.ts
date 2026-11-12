@@ -2,75 +2,28 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Agent, AgentKind } from '../../core/models/agent-types';
+import { makeAgent, makeAgentConfig, withDisabled } from '../../core/testing/agent-fixtures';
 import { AgentsPageComponent } from './agents-page.component';
-
-const ref = { provider: 'ollama', model: 'qwen3' };
-
-function makeAgent(id: string, kind: AgentKind, overrides: Partial<Agent> = {}): Agent {
-  const configuration =
-    kind === 'dili'
-      ? {
-          kind,
-          schema_version: 1 as const,
-          instructions: { assessment_focus: '', report_style: '', extraction_guidance: '' },
-          models: { extraction: ref, clinical: ref, timeline: ref, extraction_overrides: {} },
-          reasoning_level: 'off' as const,
-          ollama_seed: 42,
-          retrieval: {
-            evidence_sources: ['livertox' as const],
-            use_hybrid_search: true,
-            use_reranking: true,
-            reranker_model: 'lightweight-balanced-v1',
-            retrieval_candidate_count: 40,
-            retrieval_selected_count: 6,
-            hybrid_vector_weight: 0.65,
-            hybrid_text_weight: 0.35,
-          },
-        }
-      : {
-          kind,
-          schema_version: 1 as const,
-          instructions: { review_objectives: '', editing_style: '' },
-          models: { planning: ref, stage_overrides: {} },
-          reasoning_level: 'off' as const,
-          ollama_seed: 42,
-          limits: { max_tasks: 8, max_tool_iterations: 24, allowed_tools: null },
-        };
-  return {
-    id,
-    kind,
-    name: `Agent ${id}`,
-    description: '',
-    current_revision: 1,
-    is_default: false,
-    is_archived: false,
-    created_at: null,
-    updated_at: null,
-    revision: {
-      revision_id: 1,
-      revision_number: 1,
-      schema_version: 1,
-      configuration_hash: 'abcdef123456',
-      configuration,
-      created_at: null,
-    },
-    ...overrides,
-  };
-}
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 describe('AgentsPageComponent', () => {
   let fixture: ComponentFixture<AgentsPageComponent>;
-  const defaultDili = makeAgent('d1', 'dili', { is_default: true });
-  const otherDili = makeAgent('d2', 'dili');
-  const revision = makeAgent('r1', 'revision', { is_default: true });
+  const base = makeAgent('d1', { is_default: true, name: 'Default agent', description: 'Main agent' });
+  const partial = makeAgent(
+    'p1',
+    { name: 'Assessment only' },
+    withDisabled(makeAgentConfig(), 'revision', 'timeline'),
+  );
+  const used = makeAgent('u1', { name: 'Used', reference_count: 3 });
+  const locked = makeAgent('l1', { name: 'Locked', is_locked: true, editable: false });
+  const archived = makeAgent('z1', { name: 'Archived one', is_archived: true, editable: false });
   const fetchSpy = vi.fn();
-  let putResponse: () => Response;
+  let lifecycleResponse: () => Response;
 
   const el = (): HTMLElement => fixture.nativeElement;
   const flush = async (): Promise<void> => {
@@ -79,26 +32,25 @@ describe('AgentsPageComponent', () => {
       fixture.detectChanges();
     }
   };
-  const click = async (selector: string, text?: string): Promise<void> => {
-    const nodes = Array.from(el().querySelectorAll<HTMLElement>(selector));
-    const target = text ? nodes.find((n) => n.textContent?.trim() === text) : nodes[0];
-    expect(target, `${selector} ${text ?? ''}`).toBeTruthy();
-    target!.click();
-    await flush();
-  };
+  const card = (name: string): HTMLElement =>
+    Array.from(el().querySelectorAll<HTMLElement>('[data-testid="agent-card"]')).find((node) =>
+      node.querySelector('.agent-name')?.textContent?.trim() === name,
+    )!;
+  const button = (name: string, label: string): HTMLButtonElement =>
+    card(name).querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
 
   beforeEach(async () => {
-    putResponse = () => json({ ...otherDili, current_revision: 2 });
+    lifecycleResponse = () => json({ ...partial, is_locked: true, editable: false });
     fetchSpy.mockReset().mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === 'PUT') return putResponse();
-      if (String(url).includes('/revisions')) return json({ revisions: [otherDili.revision] });
-      if (String(url).endsWith('/agents') || String(url).includes('/agents?')) {
-        return json({ agents: [defaultDili, otherDili, revision] });
-      }
-      return json({}, 404);
+      if (init?.method === 'PUT' && String(url).endsWith('/lifecycle')) return lifecycleResponse();
+      if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+      return json({ agents: [base, partial, used, locked, archived] });
     });
     vi.stubGlobal('fetch', fetchSpy);
-    await TestBed.configureTestingModule({ imports: [AgentsPageComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [AgentsPageComponent],
+      providers: [provideRouter([])],
+    }).compileComponents();
     fixture = TestBed.createComponent(AgentsPageComponent);
     fixture.detectChanges();
     await flush();
@@ -106,63 +58,77 @@ describe('AgentsPageComponent', () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it('lists agents with kind and default badges', () => {
-    const text = el().querySelector('#agent-studio-panel-agents')!.textContent!;
-    expect(text).toContain('Agent d1');
-    expect(text).toContain('Agent r1');
-    expect(text).toContain('Default');
-    expect(text).toContain('Revision');
+  it('renders compact cards with status, lock and capability indicators, hiding archived by default', () => {
+    const names = Array.from(el().querySelectorAll('.agent-name')).map((n) => n.textContent?.trim());
+    expect(names).toEqual(['Default agent', 'Assessment only', 'Locked', 'Used']);
+    expect(card('Default agent').textContent).toContain('Default');
+    expect(card('Default agent').textContent).toContain('Active');
+    expect(card('Default agent').textContent).toContain('r1');
+    expect(card('Locked').textContent).toContain('Locked');
+
+    const states = (name: string) =>
+      Array.from(card(name).querySelectorAll('.capability')).map((n) => n.classList.contains('is-on'));
+    expect(states('Default agent')).toEqual([true, true, true]);
+    expect(states('Assessment only')).toEqual([true, false, false]);
   });
 
-  it('disables archive for the default agent only', () => {
-    const archive = (name: string) =>
-      el().querySelector<HTMLButtonElement>(`button[aria-label="Archive ${name}"]`)!;
-    expect(archive('Agent d1').disabled).toBe(true);
-    expect(archive('Agent d2').disabled).toBe(false);
-  });
-
-  it('asks for in-page confirmation before archiving', async () => {
-    await click('button[aria-label="Archive Agent d2"]');
-    expect(el().textContent).toContain('Archive "Agent d2"?');
-    expect(fetchSpy.mock.calls.some(([u]) => String(u).includes('/archive'))).toBe(false);
-  });
-
-  it('tracks unsaved edits and saves with expected_revision', async () => {
-    await click('button.agent-name', 'Agent d2');
-    const saveButton = () =>
-      Array.from(el().querySelectorAll<HTMLButtonElement>('button')).find(
-        (b) => b.textContent?.trim() === 'Save agent',
-      )!;
-    expect(saveButton().disabled).toBe(true);
-
-    const nameInput = el().querySelector<HTMLInputElement>('#identity-heading + label input')!;
-    nameInput.value = 'Renamed';
-    nameInput.dispatchEvent(new Event('input'));
+  it('shows archived agents when requested', async () => {
+    const toggle = el().querySelector<HTMLInputElement>('.toolbar input[type="checkbox"]')!;
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
     await flush();
-    expect(el().textContent).toContain('Unsaved changes');
-    expect(saveButton().disabled).toBe(false);
-
-    saveButton().click();
-    await flush();
-    const put = fetchSpy.mock.calls.find(([, init]) => init?.method === 'PUT')!;
-    const body = JSON.parse(put[1].body);
-    expect(body.expected_revision).toBe(1);
-    expect(body.name).toBe('Renamed');
-    expect(el().textContent).toContain('Saved as revision 2');
-    expect(el().textContent).not.toContain('Unsaved changes');
+    expect(card('Archived one').textContent).toContain('Archived');
+    expect(button('Archived one', 'Restore Archived one').disabled).toBe(false);
   });
 
-  it('surfaces a reload prompt when the server reports a conflict', async () => {
-    putResponse = () => json({ detail: 'stale' }, 409);
-    await click('button.agent-name', 'Agent d2');
-    const nameInput = el().querySelector<HTMLInputElement>('#identity-heading + label input')!;
-    nameInput.value = 'Renamed';
-    nameInput.dispatchEvent(new Event('input'));
+  it('explains every disabled action through the tooltip', () => {
+    const tip = (name: string, label: string) =>
+      button(name, label).closest('.icon-button-host')!.getAttribute('data-tooltip');
+    expect(button('Default agent', 'Archive Default agent').disabled).toBe(true);
+    expect(tip('Default agent', 'Archive Default agent')).toContain('another agent the default');
+    expect(tip('Default agent', 'Delete Default agent')).toBe('The default agent cannot be deleted');
+    expect(tip('Default agent', 'Set Default agent as default')).toBe('Already the default agent');
+    expect(tip('Used', 'Delete Used')).toContain('Used by 3 saved runs');
+    expect(tip('Locked', 'Delete Locked')).toBe('Unlock this agent before deleting it');
+    // Enabled actions show their name.
+    expect(button('Assessment only', 'Delete Assessment only').disabled).toBe(false);
+    expect(tip('Assessment only', 'Delete Assessment only')).toBe('Delete Assessment only');
+  });
+
+  it('marks locked agents as read-only on the edit action', () => {
+    expect(button('Locked', 'View Locked (read-only)')).toBeTruthy();
+    expect(button('Assessment only', 'Edit Assessment only')).toBeTruthy();
+  });
+
+  it('locks an agent through the lifecycle endpoint without creating a revision', async () => {
+    button('Assessment only', 'Lock Assessment only').click();
     await flush();
-    await click('button.is-primary', 'Save agent');
-    expect(el().textContent).toContain('changed elsewhere');
-    expect(
-      Array.from(el().querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Reload'),
-    ).toBe(true);
+    const put = fetchSpy.mock.calls.find(([url, init]) => init?.method === 'PUT' && String(url).endsWith('/lifecycle'))!;
+    expect(JSON.parse(put[1].body)).toEqual({ is_locked: true });
+    expect(el().textContent).toContain('Locked "Assessment only".');
+  });
+
+  it('requires confirmation before permanently deleting an agent', async () => {
+    button('Assessment only', 'Delete Assessment only').click();
+    await flush();
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
+    const confirm = Array.from(document.querySelectorAll<HTMLButtonElement>('app-confirm-dialog button'))
+      .find((b) => b.textContent?.trim() === 'Delete agent')!;
+    confirm.click();
+    await flush();
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true);
+    expect(el().textContent).toContain('Deleted "Assessment only".');
+    expect(el().querySelector('[data-testid="agent-card"] .agent-name')?.textContent).toContain('Default agent');
+    expect(Array.from(el().querySelectorAll('.agent-name')).some((n) => n.textContent?.trim() === 'Assessment only')).toBe(false);
+  });
+
+  it('filters agents by name', async () => {
+    const search = el().querySelector<HTMLInputElement>('input[type="search"]')!;
+    search.value = 'assess';
+    search.dispatchEvent(new Event('input'));
+    await flush();
+    expect(Array.from(el().querySelectorAll('.agent-name')).map((n) => n.textContent?.trim())).toEqual([
+      'Assessment only',
+    ]);
   });
 });

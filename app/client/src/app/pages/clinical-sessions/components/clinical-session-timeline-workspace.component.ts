@@ -9,7 +9,6 @@ import { ModalShellComponent } from '../../../components/modal-shell/modal-shell
 import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../../core/models/inspection-types';
 import { cancelInspectionSessionTimelineJob, deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
-import { summarizeAgent } from '../../../core/models/agent-types';
 import { AgentsStateService } from '../../../core/state/agents-state.service';
 import { formatUnknownError } from '../../../core/utils';
 
@@ -34,9 +33,18 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     const error = this.agents.error();
     return error ? formatUnknownError(error, 'Unable to load the default agent.') : null;
   });
+  readonly timelineAgentId = signal<string | null>(null);
+  readonly selectableAgents = computed(() => this.agents.selectableFor('timeline'));
+  readonly agent = computed(() => {
+    const selected = this.timelineAgentId();
+    return (
+      this.selectableAgents().find((item) => item.id === selected)
+      ?? this.agents.preferredFor('timeline')
+    );
+  });
   readonly modelName = computed(() => {
-    const agent = this.agents.defaultDiliAgent();
-    return agent ? summarizeAgent(agent).timelineModel ?? '' : '';
+    const ref = this.agent()?.revision.configuration.timeline.model;
+    return ref?.model ? `${ref.provider} / ${ref.model}` : '';
   });
   readonly generationRunning = signal(false);
   readonly generationStatus = signal<string | null>(null);
@@ -109,7 +117,12 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
     );
     this.generationRunning.set(true); this.generationError.set(null); this.generationStatus.set('Starting timeline generation…'); this.generationProgress.set(0); this.generationProgressMessage.set('Preparing timeline generation');
     try {
-      const response = await startInspectionSessionTimelineJob(sessionId, { force_regenerate: true });
+      const agent = this.agent();
+      const response = await startInspectionSessionTimelineJob(sessionId, {
+        force_regenerate: true,
+        agent_id: agent?.id,
+        agent_revision: agent?.current_revision,
+      });
       if (isCurrentGeneration()) {
         this.attachToTimelineJob(response.job_id, response.poll_interval, sessionId, loadGeneration);
       }

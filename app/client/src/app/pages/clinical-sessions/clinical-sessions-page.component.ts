@@ -222,14 +222,17 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     && this.revisionVersionStatus() === 'llm_qa_passed'
   ));
   readonly revisionAgentId = signal<string | null>(null);
-  readonly revisionAgents = this.agentsState.revisionAgents;
+  readonly revisionAgents = computed(() => this.agentsState.selectableFor('revision'));
   readonly revisionAgent = computed(() => {
     const selected = this.revisionAgentId();
-    return (selected ? this.agentsState.byId(selected) : null) ?? this.agentsState.defaultRevisionAgent();
+    return (
+      this.revisionAgents().find((item) => item.id === selected)
+      ?? this.agentsState.preferredFor('revision')
+    );
   });
   readonly revisionAgentSummary = computed(() => {
-    const config = this.revisionAgent()?.revision.configuration;
-    if (!config || config.kind !== 'revision') return '';
+    const config = this.revisionAgent()?.revision.configuration.revision;
+    if (!config) return '';
     const { planning } = config.models;
     const { max_tasks: tasks, max_tool_iterations: iterations } = config.limits;
     return `${planning.provider} / ${planning.model} · up to ${tasks} tasks, ${iterations} tool iterations`;

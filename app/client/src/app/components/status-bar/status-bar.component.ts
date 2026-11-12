@@ -106,16 +106,17 @@ export class StatusBarComponent implements OnDestroy {
 
   readonly modelsOpen = signal(false);
 
-  /** Models of the default DILI agent plus the default Revision agent's planning model. */
+  /** Models configured on the default agent, one per workflow role. */
   readonly modelRoles = computed<{ role: string; model: string | null }[]>(() => {
-    const dili = this.agents.defaultDiliAgent();
-    const revision = this.agents.defaultRevisionAgent();
-    const diliModels = dili ? summarizeAgent(dili) : null;
+    const agent = this.agents.defaultAgent();
+    const models = agent ? summarizeAgent(agent) : null;
+    const enabled = (capability: 'assessment' | 'revision' | 'timeline'): boolean =>
+      !!agent && agent.capabilities.includes(capability);
     return [
-      { role: 'Clinical', model: diliModels?.clinicalModel ?? null },
-      { role: 'Text extraction', model: diliModels?.extractionModel ?? null },
-      { role: 'Timeline', model: diliModels?.timelineModel ?? null },
-      { role: 'Revision', model: revision ? summarizeAgent(revision).clinicalModel : null },
+      { role: 'Clinical', model: enabled('assessment') ? (models?.clinicalModel ?? null) : null },
+      { role: 'Text extraction', model: enabled('assessment') ? (models?.extractionModel ?? null) : null },
+      { role: 'Timeline', model: enabled('timeline') ? (models?.timelineModel ?? null) : null },
+      { role: 'Revision', model: enabled('revision') ? (models?.revisionModel ?? null) : null },
     ];
   });
 

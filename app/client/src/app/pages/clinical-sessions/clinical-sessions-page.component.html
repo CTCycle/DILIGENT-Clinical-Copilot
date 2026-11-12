@@ -438,7 +438,7 @@
             <header class="clinical-session-revision-header">
               <div>
                 <h3>Revision draft</h3>
-                <p>Create an auditable draft with the selected Revision agent. Human review is required before clinical reliance.</p>
+                <p>Create an auditable draft with an agent that has the DILI Revision capability enabled. Human review is required before clinical reliance.</p>
               </div>
               <span class="clinical-session-revision-state">{{ revisionRunning() ? 'Running' : 'Ready' }}</span>
             </header>
@@ -450,7 +450,7 @@
                     <option [value]="option.id" [selected]="option.id === revisionAgent()?.id">{{ option.name }}{{ option.is_default ? ' (default)' : '' }}</option>
                   }
                 </select>
-                <small class="clinical-session-revision-agent-summary">{{ revisionAgentSummary() || 'No revision agent available' }}</small>
+                <small class="clinical-session-revision-agent-summary">{{ revisionAgentSummary() || 'No agent with the DILI Revision capability is available' }}</small>
               </label>
               <label class="clinical-session-revision-instruction">
                 <span class="clinical-session-revision-label">Instruction <small>Optional</small></span>

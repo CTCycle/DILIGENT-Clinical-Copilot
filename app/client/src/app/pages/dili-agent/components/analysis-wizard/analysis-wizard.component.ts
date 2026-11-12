@@ -108,7 +108,10 @@ export class AnalysisWizardComponent {
   readonly formKey = computed(() => JSON.stringify(this.form()));
   readonly agent = computed(() => {
     const selected = this.selectedAgentId();
-    return (selected ? this.agentsState.byId(selected) : null) ?? this.agentsState.defaultDiliAgent();
+    return (
+      this.agentsState.selectableFor('assessment').find((item) => item.id === selected)
+      ?? this.agentsState.preferredFor('assessment')
+    );
   });
   readonly configKey = computed(() => JSON.stringify([this.agent()?.id ?? null, this.agent()?.current_revision ?? null]));
 
@@ -139,8 +142,8 @@ export class AnalysisWizardComponent {
     return agent ? summarizeAgent(agent) : null;
   });
   readonly instructionExcerpts = computed(() => {
-    const config = this.agent()?.revision.configuration;
-    if (!config || config.kind !== 'dili') return [];
+    const config = this.agent()?.revision.configuration.assessment;
+    if (!config) return [];
     const { instructions } = config;
     return [
       { label: 'Assessment focus', text: excerpt(instructions.assessment_focus) },
@@ -153,7 +156,7 @@ export class AnalysisWizardComponent {
     return summary !== null && !summary.evidenceSources.includes('livertox');
   });
   readonly sourcesSummary = computed(() => describeEvidenceSources(this.agentSummary()?.evidenceSources ?? []));
-  readonly agents = this.agentsState.diliAgents;
+  readonly agents = computed(() => this.agentsState.selectableFor('assessment'));
 
   constructor() {
     effect(() => {

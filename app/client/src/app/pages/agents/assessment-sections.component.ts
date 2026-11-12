@@ -5,15 +5,15 @@ import { Component, input, output } from '@angular/core';
 
 import {
   AgentModelRef,
-  DiliAgentConfig,
-  DiliAgentInstructions,
+  AssessmentConfig,
+  AssessmentInstructions,
   ExtractionStage,
 } from '../../core/models/agent-types';
 import { EvidenceSourceId, ReasoningLevel } from '../../core/models/types';
 import { AgentModelFieldComponent } from './agent-model-field.component';
-import { INSTRUCTION_MAX_LENGTH, ModelCatalog, ProviderOption, cloneConfig } from './agent-form';
+import { INSTRUCTION_MAX_LENGTH, ModelCatalog, ProviderOption } from './agent-form';
 
-const INSTRUCTION_FIELDS: ReadonlyArray<{ key: keyof DiliAgentInstructions; label: string }> = [
+const INSTRUCTION_FIELDS: ReadonlyArray<{ key: keyof AssessmentInstructions; label: string }> = [
   { key: 'assessment_focus', label: 'Assessment focus' },
   { key: 'report_style', label: 'Report style' },
   { key: 'extraction_guidance', label: 'Extraction guidance' },
@@ -37,19 +37,20 @@ type NumericRetrievalKey =
   | 'hybrid_vector_weight'
   | 'hybrid_text_weight';
 
-/** Instructions, models and retrieval sections for a DILI agent. */
+/** Instructions, models, retrieval and parameters of the DILI Assessment capability. */
 @Component({
-  selector: 'app-dili-agent-sections',
+  selector: 'app-assessment-sections',
   standalone: true,
   imports: [AgentModelFieldComponent],
   styleUrl: './agent-sections.scss',
-  templateUrl: './dili-agent-sections.component.html',
+  templateUrl: './assessment-sections.component.html',
 })
-export class DiliAgentSectionsComponent {
-  readonly config = input.required<DiliAgentConfig>();
+export class AssessmentSectionsComponent {
+  readonly config = input.required<AssessmentConfig>();
   readonly providerOptions = input<readonly ProviderOption[]>([]);
   readonly catalog = input<ModelCatalog>({});
-  readonly configChange = output<DiliAgentConfig>();
+  readonly disabled = input(false);
+  readonly configChange = output<AssessmentConfig>();
 
   readonly instructionFields = INSTRUCTION_FIELDS;
   readonly extractionStages = EXTRACTION_STAGES;
@@ -57,17 +58,17 @@ export class DiliAgentSectionsComponent {
   readonly reasoningLevels = REASONING;
   readonly limit = INSTRUCTION_MAX_LENGTH;
 
-  private update(change: (draft: DiliAgentConfig) => void): void {
-    const draft = cloneConfig(this.config());
+  private update(change: (draft: AssessmentConfig) => void): void {
+    const draft = structuredClone(this.config());
     change(draft);
     this.configChange.emit(draft);
   }
 
-  setInstruction(key: keyof DiliAgentInstructions, value: string): void {
+  setInstruction(key: keyof AssessmentInstructions, value: string): void {
     this.update((d) => (d.instructions[key] = value));
   }
 
-  setModel(role: 'extraction' | 'clinical' | 'timeline', ref: AgentModelRef | null): void {
+  setModel(role: 'extraction' | 'clinical', ref: AgentModelRef | null): void {
     if (ref) this.update((d) => (d.models[role] = ref));
   }
 

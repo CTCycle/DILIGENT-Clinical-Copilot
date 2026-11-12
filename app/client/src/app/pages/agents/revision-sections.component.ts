@@ -5,8 +5,8 @@ import { Component, input, output } from '@angular/core';
 
 import {
   AgentModelRef,
-  RevisionAgentConfig,
-  RevisionAgentInstructions,
+  RevisionConfig,
+  RevisionInstructions,
   RevisionStage,
 } from '../../core/models/agent-types';
 import { ReasoningLevel } from '../../core/models/types';
@@ -16,10 +16,9 @@ import {
   ModelCatalog,
   ProviderOption,
   REVISION_TOOL_NAMES,
-  cloneConfig,
 } from './agent-form';
 
-const INSTRUCTION_FIELDS: ReadonlyArray<{ key: keyof RevisionAgentInstructions; label: string }> = [
+const INSTRUCTION_FIELDS: ReadonlyArray<{ key: keyof RevisionInstructions; label: string }> = [
   { key: 'review_objectives', label: 'Review objectives' },
   { key: 'editing_style', label: 'Editing style' },
 ];
@@ -31,19 +30,20 @@ const STAGES: ReadonlyArray<{ stage: RevisionStage; label: string }> = [
 ];
 const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
 
-/** Instructions, models and execution limits for a Revision agent. */
+/** Instructions, models and execution limits of the DILI Revision capability. */
 @Component({
-  selector: 'app-revision-agent-sections',
+  selector: 'app-revision-sections',
   standalone: true,
   imports: [AgentModelFieldComponent],
   styleUrl: './agent-sections.scss',
-  templateUrl: './revision-agent-sections.component.html',
+  templateUrl: './revision-sections.component.html',
 })
-export class RevisionAgentSectionsComponent {
-  readonly config = input.required<RevisionAgentConfig>();
+export class RevisionSectionsComponent {
+  readonly config = input.required<RevisionConfig>();
   readonly providerOptions = input<readonly ProviderOption[]>([]);
   readonly catalog = input<ModelCatalog>({});
-  readonly configChange = output<RevisionAgentConfig>();
+  readonly disabled = input(false);
+  readonly configChange = output<RevisionConfig>();
 
   readonly instructionFields = INSTRUCTION_FIELDS;
   readonly overrideStages = STAGES.filter((item) => item.stage !== 'planning');
@@ -51,13 +51,13 @@ export class RevisionAgentSectionsComponent {
   readonly toolNames = REVISION_TOOL_NAMES;
   readonly limit = INSTRUCTION_MAX_LENGTH;
 
-  private update(change: (draft: RevisionAgentConfig) => void): void {
-    const draft = cloneConfig(this.config());
+  private update(change: (draft: RevisionConfig) => void): void {
+    const draft = structuredClone(this.config());
     change(draft);
     this.configChange.emit(draft);
   }
 
-  setInstruction(key: keyof RevisionAgentInstructions, value: string): void {
+  setInstruction(key: keyof RevisionInstructions, value: string): void {
     this.update((d) => (d.instructions[key] = value));
   }
 

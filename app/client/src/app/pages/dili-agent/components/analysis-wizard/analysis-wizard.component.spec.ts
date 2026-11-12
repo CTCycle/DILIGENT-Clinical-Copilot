@@ -6,6 +6,7 @@ import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Agent } from '../../../../core/models/agent-types';
+import { makeAgent, makeAgentConfig } from '../../../../core/testing/agent-fixtures';
 import {
   ClinicalInputPreflightIssue,
   ClinicalInputPreflightResponse,
@@ -41,46 +42,18 @@ function preflight(blocking: ClinicalInputPreflightIssue[] = [], warnings: Clini
   } satisfies ClinicalInputPreflightResponse;
 }
 
-const ref = { provider: 'ollama', model: 'qwen3' };
-
 function agent(id: string, overrides: Partial<Agent> = {}, sources: string[] = ['livertox']): Agent {
-  return {
-    id,
-    kind: 'dili',
-    name: `Agent ${id}`,
-    description: '',
-    current_revision: 2,
-    is_default: false,
-    is_archived: false,
-    created_at: null,
-    updated_at: null,
-    revision: {
-      revision_id: 1,
-      revision_number: 2,
-      schema_version: 1,
-      configuration_hash: 'h',
-      created_at: null,
-      configuration: {
-        kind: 'dili',
-        schema_version: 1,
-        instructions: { assessment_focus: 'Focus on RUCAM', report_style: 'Concise', extraction_guidance: '' },
-        models: { extraction: ref, clinical: { provider: 'openai', model: 'gpt-x' }, timeline: ref, extraction_overrides: {} },
-        reasoning_level: 'off',
-        ollama_seed: null,
-        retrieval: {
-          evidence_sources: sources as never,
-          use_hybrid_search: true,
-          use_reranking: true,
-          reranker_model: 'r',
-          retrieval_candidate_count: 40,
-          retrieval_selected_count: 6,
-          hybrid_vector_weight: 0.65,
-          hybrid_text_weight: 0.35,
-        },
-      },
-    },
-    ...overrides,
+  const config = makeAgentConfig();
+  config.assessment.instructions = {
+    assessment_focus: 'Focus on RUCAM',
+    report_style: 'Concise',
+    extraction_guidance: '',
   };
+  config.assessment.ollama_seed = null;
+  config.assessment.retrieval.evidence_sources = sources as never;
+  const result = makeAgent(id, { name: `Agent ${id}`, current_revision: 2, ...overrides }, config);
+  result.revision.revision_number = 2;
+  return result;
 }
 
 describe('AnalysisWizardComponent', () => {
@@ -127,7 +100,7 @@ describe('AnalysisWizardComponent', () => {
         }
         return jsonResponse(sessionState(), init?.method === 'POST' ? 201 : 200);
       }
-      if (target.endsWith('/agents')) {
+      if (target.includes('/agents')) {
         return jsonResponse({ agents });
       }
       payloads.push(JSON.parse(String(init?.body)) as ClinicalRequestPayload);

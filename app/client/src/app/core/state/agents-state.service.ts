@@ -6,15 +6,19 @@ import { Injectable, computed, signal } from '@angular/core';
 import {
   Agent,
   AgentConfig,
+  AgentLifecycleRequest,
   AgentRevision,
   AgentValidationResponse,
+  Capability,
+  isSelectableFor,
 } from '../models/agent-types';
 import {
-  archiveAgent,
   createAgent,
+  deleteAgent,
   duplicateAgent,
   fetchAgentRevisions,
   fetchAgents,
+  setAgentLifecycle,
   setDefaultAgent,
   updateAgent,
   validateAgent,
@@ -24,15 +28,14 @@ export type AgentsLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export type AgentsResource = {
   status: AgentsLoadStatus;
+  /** Every persisted agent, archived ones included. */
   items: Agent[];
-  includeArchived: boolean;
   error: string | null;
 };
 
 const INITIAL_RESOURCE: AgentsResource = {
   status: 'idle',
   items: [],
-  includeArchived: false,
   error: null,
 };
 
@@ -41,32 +44,36 @@ export class AgentsStateService {
   private readonly resourceState = signal<AgentsResource>(INITIAL_RESOURCE);
   private loadRequest: Promise<Agent[]> | null = null;
 
+  /** Whether archived agents appear in `agents()`; they are always loaded. */
+  readonly showArchived = signal(false);
+
   readonly resource = this.resourceState.asReadonly();
   readonly status = computed(() => this.resourceState().status);
   readonly error = computed(() => this.resourceState().error);
-  readonly agents = computed(() => {
-    const { items, includeArchived } = this.resourceState();
-    return includeArchived ? items : items.filter((agent) => !agent.is_archived);
-  });
-  readonly diliAgents = computed(() => this.agents().filter((agent) => agent.kind === 'dili'));
-  readonly revisionAgents = computed(() =>
-    this.agents().filter((agent) => agent.kind === 'revision'),
+  readonly all = computed(() => this.resourceState().items);
+  readonly agents = computed(() =>
+    this.showArchived() ? this.all() : this.all().filter((agent) => !agent.is_archived),
   );
-  readonly defaultDiliAgent = computed(() => this.defaultOf(this.diliAgents()));
-  readonly defaultRevisionAgent = computed(() => this.defaultOf(this.revisionAgents()));
+  readonly defaultAgent = computed(() => this.all().find((agent) => agent.is_default) ?? null);
 
-  byId(id: string): Agent | null {
-    return this.agents().find((agent) => agent.id === id) ?? null;
+  /** Agents that can run new operations of the capability (active, not archived, enabled). */
+  selectableFor(capability: Capability): Agent[] {
+    return this.all().filter((agent) => isSelectableFor(agent, capability));
   }
 
-  async load(options: { includeArchived?: boolean; force?: boolean } = {}): Promise<Agent[]> {
-    const includeArchived = options.includeArchived ?? false;
+  /** The default agent when it supports the capability, else the first selectable agent. */
+  preferredFor(capability: Capability): Agent | null {
+    const selectable = this.selectableFor(capability);
+    return selectable.find((agent) => agent.is_default) ?? selectable[0] ?? null;
+  }
+
+  byId(id: string): Agent | null {
+    return this.all().find((agent) => agent.id === id) ?? null;
+  }
+
+  async load(options: { force?: boolean } = {}): Promise<Agent[]> {
     const current = this.resourceState();
-    if (
-      !options.force &&
-      current.status === 'ready' &&
-      (current.includeArchived || !includeArchived)
-    ) {
+    if (!options.force && current.status === 'ready') {
       return current.items;
     }
     if (this.loadRequest) {
@@ -74,14 +81,9 @@ export class AgentsStateService {
     }
 
     this.resourceState.update((state) => ({ ...state, status: 'loading', error: null }));
-    this.loadRequest = fetchAgents({ includeArchived })
+    this.loadRequest = fetchAgents({ includeArchived: true })
       .then((response) => {
-        this.resourceState.set({
-          status: 'ready',
-          items: response.agents,
-          includeArchived,
-          error: null,
-        });
+        this.resourceState.set({ status: 'ready', items: response.agents, error: null });
         return response.agents;
       })
       .catch((error: unknown) => {
@@ -133,10 +135,18 @@ export class AgentsStateService {
     return agent;
   }
 
-  async archive(id: string): Promise<Agent> {
-    const agent = await archiveAgent(id);
+  async setLifecycle(id: string, change: AgentLifecycleRequest): Promise<Agent> {
+    const agent = await setAgentLifecycle(id, change);
     this.upsert(agent);
     return agent;
+  }
+
+  async remove(id: string): Promise<void> {
+    await deleteAgent(id);
+    this.resourceState.update((state) => ({
+      ...state,
+      items: state.items.filter((item) => item.id !== id),
+    }));
   }
 
   validate(id: string): Promise<AgentValidationResponse> {
@@ -148,11 +158,11 @@ export class AgentsStateService {
   }
 
   // Replace the cached agent with the server response. A new default displaces
-  // the previous default of the same kind, as the server keeps one per kind.
+  // the previous default, as the server keeps exactly one.
   private upsert(agent: Agent): void {
     this.resourceState.update((state) => {
       const normalized = state.items.map((item) =>
-        agent.is_default && item.kind === agent.kind && item.id !== agent.id && item.is_default
+        agent.is_default && item.id !== agent.id && item.is_default
           ? { ...item, is_default: false }
           : item,
       );
@@ -163,10 +173,6 @@ export class AgentsStateService {
           : [...normalized, agent];
       return { ...state, items };
     });
-  }
-
-  private defaultOf(agents: Agent[]): Agent | null {
-    return agents.find((agent) => agent.is_default) ?? null;
   }
 
   private errorMessage(error: unknown): string {

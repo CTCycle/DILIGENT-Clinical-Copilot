@@ -35,7 +35,7 @@ describe('StatusBarComponent local Ollama popover', () => {
         },
         {
           provide: AgentsStateService,
-          useValue: { status: signal('ready'), defaultDiliAgent: signal(null), defaultRevisionAgent: signal(null), load: vi.fn() },
+          useValue: { status: signal('ready'), defaultAgent: signal(null), load: vi.fn() },
         },
       ],
     });

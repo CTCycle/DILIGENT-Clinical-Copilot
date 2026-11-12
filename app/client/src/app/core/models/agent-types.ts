@@ -3,7 +3,14 @@
 
 import { CatalogProvider, EvidenceSourceId, ReasoningLevel } from "./types";
 
-export type AgentKind = "dili" | "revision";
+export type Capability = "assessment" | "revision" | "timeline";
+export const CAPABILITIES: readonly Capability[] = ["assessment", "revision", "timeline"];
+export const CAPABILITY_LABELS: Record<Capability, string> = {
+  assessment: "DILI Assessment",
+  revision: "DILI Revision",
+  timeline: "Timeline",
+};
+
 export type ExtractionStage = "therapy_drugs" | "anamnesis_drugs" | "diseases" | "laboratory";
 export type RevisionStage = "planning" | "tool_selection" | "editing" | "qa";
 
@@ -13,16 +20,15 @@ export type AgentModelRef = {
   reasoning_level?: ReasoningLevel | null;
 };
 
-export type DiliAgentInstructions = {
+export type AssessmentInstructions = {
   assessment_focus: string;
   report_style: string;
   extraction_guidance: string;
 };
 
-export type DiliAgentModels = {
+export type AssessmentModels = {
   extraction: AgentModelRef;
   clinical: AgentModelRef;
-  timeline: AgentModelRef;
   extraction_overrides: Partial<Record<ExtractionStage, AgentModelRef>>;
 };
 
@@ -37,22 +43,21 @@ export type AgentRetrievalPolicy = {
   hybrid_text_weight: number;
 };
 
-export type DiliAgentConfig = {
-  kind: "dili";
-  schema_version: 1;
-  instructions: DiliAgentInstructions;
-  models: DiliAgentModels;
+export type AssessmentConfig = {
+  enabled: boolean;
+  instructions: AssessmentInstructions;
+  models: AssessmentModels;
   reasoning_level: ReasoningLevel;
   ollama_seed: number | null;
   retrieval: AgentRetrievalPolicy;
 };
 
-export type RevisionAgentInstructions = {
+export type RevisionInstructions = {
   review_objectives: string;
   editing_style: string;
 };
 
-export type RevisionAgentModels = {
+export type RevisionModels = {
   planning: AgentModelRef;
   stage_overrides: Partial<Record<RevisionStage, AgentModelRef>>;
 };
@@ -63,17 +68,31 @@ export type RevisionExecutionLimits = {
   allowed_tools: string[] | null;
 };
 
-export type RevisionAgentConfig = {
-  kind: "revision";
-  schema_version: 1;
-  instructions: RevisionAgentInstructions;
-  models: RevisionAgentModels;
+export type RevisionConfig = {
+  enabled: boolean;
+  instructions: RevisionInstructions;
+  models: RevisionModels;
   reasoning_level: ReasoningLevel;
   ollama_seed: number | null;
   limits: RevisionExecutionLimits;
 };
 
-export type AgentConfig = DiliAgentConfig | RevisionAgentConfig;
+export type TimelineInstructions = { timeline_focus: string };
+
+export type TimelineConfig = {
+  enabled: boolean;
+  instructions: TimelineInstructions;
+  model: AgentModelRef;
+  reasoning_level: ReasoningLevel;
+  ollama_seed: number | null;
+};
+
+export type AgentConfig = {
+  schema_version: 2;
+  assessment: AssessmentConfig;
+  revision: RevisionConfig;
+  timeline: TimelineConfig;
+};
 
 export type AgentRevision = {
   revision_id: number;
@@ -86,15 +105,25 @@ export type AgentRevision = {
 
 export type Agent = {
   id: string;
-  kind: AgentKind;
   name: string;
   description: string;
   current_revision: number;
   is_default: boolean;
+  is_active: boolean;
+  is_locked: boolean;
   is_archived: boolean;
+  editable: boolean;
+  capabilities: Capability[];
+  reference_count: number;
   created_at: string | null;
   updated_at: string | null;
   revision: AgentRevision;
+};
+
+export type AgentLifecycleRequest = {
+  is_active?: boolean;
+  is_locked?: boolean;
+  is_archived?: boolean;
 };
 
 export type AgentListResponse = { agents: Agent[] };
@@ -126,10 +155,19 @@ export type AgentValidationResponse = {
   issues: AgentValidationIssue[];
 };
 
+/** True when the agent can run new operations of the given capability. */
+export function isSelectableFor(
+  agent: Pick<Agent, "is_active" | "is_archived" | "capabilities">,
+  capability: Capability,
+): boolean {
+  return agent.is_active && !agent.is_archived && agent.capabilities.includes(capability);
+}
+
 export type AgentSummary = {
-  clinicalModel: string | null;
-  extractionModel: string | null;
-  timelineModel: string | null;
+  clinicalModel: string;
+  extractionModel: string;
+  revisionModel: string;
+  timelineModel: string;
   evidenceSources: EvidenceSourceId[];
 };
 
@@ -137,21 +175,14 @@ function formatModelRef(ref: AgentModelRef): string {
   return `${ref.provider} / ${ref.model}`;
 }
 
-/** Display strings for wizard and summary cards. Revision agents expose only their planning model. */
+/** Display strings for selector summary cards. */
 export function summarizeAgent(agent: Pick<Agent, "revision">): AgentSummary {
   const config = agent.revision.configuration;
-  if (config.kind === "dili") {
-    return {
-      clinicalModel: formatModelRef(config.models.clinical),
-      extractionModel: formatModelRef(config.models.extraction),
-      timelineModel: formatModelRef(config.models.timeline),
-      evidenceSources: [...config.retrieval.evidence_sources],
-    };
-  }
   return {
-    clinicalModel: formatModelRef(config.models.planning),
-    extractionModel: null,
-    timelineModel: null,
-    evidenceSources: [],
+    clinicalModel: formatModelRef(config.assessment.models.clinical),
+    extractionModel: formatModelRef(config.assessment.models.extraction),
+    revisionModel: formatModelRef(config.revision.models.planning),
+    timelineModel: formatModelRef(config.timeline.model),
+    evidenceSources: [...config.assessment.retrieval.evidence_sources],
   };
 }

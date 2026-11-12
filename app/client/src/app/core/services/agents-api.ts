@@ -6,13 +6,20 @@ import {
   Agent,
   AgentCreateRequest,
   AgentDuplicateRequest,
-  AgentKind,
+  AgentLifecycleRequest,
   AgentListResponse,
   AgentRevisionListResponse,
   AgentUpdateRequest,
   AgentValidationResponse,
+  Capability,
 } from "../models/agent-types";
-import { buildQueryString, requestJson } from "./http-api";
+import {
+  ApiHttpError,
+  buildQueryString,
+  fetchWithTimeout,
+  parseApiResponse,
+  requestJson,
+} from "./http-api";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -21,10 +28,10 @@ function agentUrl(agentId: string, suffix = ""): string {
 }
 
 export async function fetchAgents(
-  options: { kind?: AgentKind; includeArchived?: boolean } = {},
+  options: { selectableFor?: Capability; includeArchived?: boolean } = {},
 ): Promise<AgentListResponse> {
   const query = buildQueryString({
-    kind: options.kind,
+    selectable_for: options.selectableFor,
     include_archived: options.includeArchived ? "true" : undefined,
   });
   return requestJson<AgentListResponse>(`${API_BASE_URL}/agents${query}`, { method: "GET" });
@@ -69,8 +76,23 @@ export async function setDefaultAgent(agentId: string): Promise<Agent> {
   return requestJson<Agent>(agentUrl(agentId, "/default"), { method: "PUT" });
 }
 
-export async function archiveAgent(agentId: string): Promise<Agent> {
-  return requestJson<Agent>(agentUrl(agentId, "/archive"), { method: "POST" });
+export async function setAgentLifecycle(
+  agentId: string,
+  payload: AgentLifecycleRequest,
+): Promise<Agent> {
+  return requestJson<Agent>(agentUrl(agentId, "/lifecycle"), {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAgent(agentId: string): Promise<void> {
+  const response = await fetchWithTimeout(agentUrl(agentId), { method: "DELETE" }, 30);
+  if (!response.ok) {
+    const result = await parseApiResponse(response);
+    throw new ApiHttpError(result.message, response.status);
+  }
 }
 
 export async function fetchAgentRevisions(agentId: string): Promise<AgentRevisionListResponse> {
