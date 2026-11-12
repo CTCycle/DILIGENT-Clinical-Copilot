@@ -63,20 +63,23 @@ def test_completed_assessment_on_local_ollama(
 ) -> None:
     refresh = api_context.post("/api/model-config/catalogs/ollama/refresh")
     assert refresh.status == 200, refresh.text()
-    listing = api_context.get("/api/agents?kind=dili")
+    listing = api_context.get("/api/agents")
     assert listing.status == 200, listing.text()
     agent = next(item for item in listing.json()["agents"] if item["is_default"])
     original = agent["revision"]["configuration"]
     local = {"provider": "ollama", "model": MODEL}
     configuration = {
         **original,
-        "models": {
-            **original["models"],
-            "extraction": local,
-            "clinical": local,
-            "timeline": local,
+        "assessment": {
+            **original["assessment"],
+            "models": {
+                **original["assessment"]["models"],
+                "extraction": local,
+                "clinical": local,
+            },
+            "reasoning_level": "off",
         },
-        "reasoning_level": "off",
+        "timeline": {**original["timeline"], "model": local, "reasoning_level": "off"},
     }
     updated = _save_agent(api_context, agent, configuration)
     try:

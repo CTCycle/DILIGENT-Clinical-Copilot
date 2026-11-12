@@ -309,19 +309,21 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
         )
 
         # The seeded default agents run every role on the live provider model.
-        for kind in ("dili", "revision"):
-            listing = api_context.get(f"/api/agents?kind={kind}")
-            assert listing.status == 200, listing.text()
-            default_agent = next(
-                item for item in listing.json()["agents"] if item["is_default"]
-            )
-            models = default_agent["revision"]["configuration"]["models"]
-            roles = ("extraction", "clinical", "timeline") if kind == "dili" else (
-                "planning",
-            )
-            for role in roles:
-                assert models[role]["provider"] == PROVIDER
-                assert models[role]["model"] == MODEL
+        listing = api_context.get("/api/agents")
+        assert listing.status == 200, listing.text()
+        default_agent = next(
+            item for item in listing.json()["agents"] if item["is_default"]
+        )
+        configuration = default_agent["revision"]["configuration"]
+        refs = (
+            configuration["assessment"]["models"]["extraction"],
+            configuration["assessment"]["models"]["clinical"],
+            configuration["revision"]["models"]["planning"],
+            configuration["timeline"]["model"],
+        )
+        for ref in refs:
+            assert ref["provider"] == PROVIDER
+            assert ref["model"] == MODEL
 
         connectivity = api_context.post(
             "/api/model-config/connectivity-check",

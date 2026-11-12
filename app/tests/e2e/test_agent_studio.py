@@ -1,7 +1,7 @@
 # Copyright © 2023–2025 Thomas Virdis
 # Licensed under the GNU General Public License, version 3 or later.
 
-"""Agent Studio browser flows: lifecycle management and launching with a non-default agent."""
+"""Agent Studio browser flows: card management, the shared editor and non-default agent launches."""
 
 from __future__ import annotations
 
@@ -10,29 +10,29 @@ import uuid
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import APIRequestContext, Page, expect
+from playwright.sync_api import APIRequestContext, Locator, Page, expect
 
 AGENT_NAME_PREFIX = "E2E agent "
 
 
 ###############################################################################
-def _agents(api_context: APIRequestContext, kind: str = "dili") -> list[dict]:
+def _agents(api_context: APIRequestContext) -> list[dict]:
     response = api_context.get("/api/agents", params={"include_archived": "true"})
     assert response.status == 200, response.text()
-    return [item for item in response.json()["agents"] if item["kind"] == kind]
+    return response.json()["agents"]
 
 
 ###############################################################################
-def _default_agent(api_context: APIRequestContext, kind: str = "dili") -> dict:
+def _default_agent(api_context: APIRequestContext) -> dict:
     return next(
-        item for item in _agents(api_context, kind) if item["is_default"] and not item["is_archived"]
+        item for item in _agents(api_context) if item["is_default"] and not item["is_archived"]
     )
 
 
 ###############################################################################
 @pytest.fixture
 def studio_cleanup(api_context: APIRequestContext) -> Iterator[str]:
-    """Restore the original default DILI agent and archive agents the test created."""
+    """Restore the original default agent and delete agents the test created."""
     original_default = _default_agent(api_context)["id"]
     suffix = uuid.uuid4().hex[:6]
     yield suffix
@@ -40,25 +40,31 @@ def studio_cleanup(api_context: APIRequestContext) -> Iterator[str]:
     assert restored.status == 200, restored.text()
     for item in _agents(api_context):
         if item["name"].startswith(AGENT_NAME_PREFIX) and suffix in item["name"]:
-            if not item["is_archived"]:
-                api_context.post(f"/api/agents/{item['id']}/archive")
+            api_context.put(
+                f"/api/agents/{item['id']}/lifecycle",
+                data={"is_locked": False, "is_archived": True},
+            )
+            api_context.delete(f"/api/agents/{item['id']}")
 
 
 ###############################################################################
 def _create_agent(page: Page, name: str) -> None:
-    page.get_by_role("button", name="New DILI agent").click()
-    page.get_by_label("Name for the new DILI agent").fill(name)
+    page.get_by_role("link", name="New agent").click()
+    expect(page.get_by_role("heading", name="New agent", level=1)).to_be_visible()
+    page.get_by_label("Name", exact=True).fill(name)
     page.get_by_role("button", name="Create agent").click()
-    expect(page.get_by_role("heading", name=name)).to_be_visible()
+    expect(page.get_by_role("heading", name=name, level=1)).to_be_visible()
 
 
 ###############################################################################
-def _agent_row(page: Page, name: str):
-    return page.locator(".agent-row").filter(has=page.get_by_role("button", name=name, exact=True))
+def _card(page: Page, name: str) -> Locator:
+    return page.get_by_test_id("agent-card").filter(
+        has=page.get_by_role("link", name=name, exact=True)
+    )
 
 
 ###############################################################################
-def test_agent_lifecycle_create_edit_duplicate_default_archive_and_reload(
+def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     page: Page,
     base_url: str,
     api_context: APIRequestContext,
@@ -69,49 +75,67 @@ def test_agent_lifecycle_create_edit_duplicate_default_archive_and_reload(
     page.goto(f"{base_url}/agents")
     expect(page.get_by_role("tab", name="My Agents")).to_have_attribute("aria-selected", "true")
 
-    # Create: the new agent opens in the editor at revision 1.
+    # Create: one agent with all three capabilities, active and unlocked.
     _create_agent(page, name)
-    expect(page.get_by_text("Active revision 1")).to_be_visible()
+    created = next(item for item in _agents(api_context) if item["name"] == name)
+    assert created["capabilities"] == ["assessment", "revision", "timeline"]
+    assert created["is_active"] and not created["is_locked"] and not created["is_default"]
 
-    # Edit: saving produces a new immutable revision.
-    focus = f"Prioritise hepatocellular pattern {studio_cleanup}"
-    page.get_by_label("Assessment focus").fill(focus)
+    # Edit one capability: saving produces a new immutable revision.
+    focus = f"Dates first {studio_cleanup}"
+    page.get_by_label("Timeline focus").fill(focus)
     expect(page.get_by_text("Unsaved changes")).to_be_visible()
     with page.expect_response(
-        lambda r: r.request.method == "PUT" and "/api/agents/" in r.url and not r.url.endswith("/default")
+        lambda r: r.request.method == "PUT" and r.url.endswith(f"/api/agents/{created['id']}")
     ) as saved:
         page.get_by_role("button", name="Save agent").click()
     assert saved.value.status == 200, saved.value.text()
-    expect(page.get_by_text("Active revision 2")).to_be_visible()
-    created = next(item for item in _agents(api_context) if item["name"] == name)
-    assert created["current_revision"] == 2
-    assert created["revision"]["configuration"]["instructions"]["assessment_focus"] == focus
+    persisted = next(item for item in _agents(api_context) if item["name"] == name)
+    assert persisted["current_revision"] == 2
+    assert persisted["revision"]["configuration"]["timeline"]["instructions"]["timeline_focus"] == focus
 
-    # Duplicate, then make the duplicate the default.
-    page.get_by_role("tab", name="My Agents").click()
-    page.get_by_role("button", name=f"Duplicate {name}", exact=True).click()
-    duplicate_name = next(
-        item["name"]
-        for item in _agents(api_context)
-        if item["name"].startswith(name) and item["name"] != name
-    )
-    page.get_by_role("tab", name="My Agents").click()
-    page.get_by_role("button", name=f"Set {duplicate_name} as default", exact=True).click()
-    expect(_agent_row(page, duplicate_name).locator(".chip.is-default")).to_be_visible()
+    # Disable one capability independently; its values stay stored.
+    page.get_by_role("switch", name="Disable Timeline").uncheck()
+    page.get_by_role("button", name="Save agent").click()
+    expect(page.get_by_text("Saved as revision 3")).to_be_visible()
+    disabled = next(item for item in _agents(api_context) if item["name"] == name)
+    timeline = disabled["revision"]["configuration"]["timeline"]
+    assert disabled["capabilities"] == ["assessment", "revision"]
+    assert timeline["enabled"] is False and timeline["instructions"]["timeline_focus"] == focus
 
-    # The previous default is no longer archive-protected; the current default is.
-    expect(page.get_by_role("button", name=f"Archive {duplicate_name}", exact=True)).to_be_disabled()
-    page.get_by_role("button", name=f"Archive {name}", exact=True).click()
-    page.get_by_role("button", name="Archive agent").click()
-    expect(page.get_by_role("button", name=name, exact=True)).to_have_count(0)
+    # Lock from the profile card: configuration becomes read-only, unlock stays reachable.
+    page.get_by_role("switch", name="Locked").check()
+    expect(page.get_by_text("This agent is locked")).to_be_visible()
+    expect(page.get_by_label("Name", exact=True)).to_be_disabled()
+    expect(page.get_by_role("switch", name="Locked")).to_be_enabled()
+    page.get_by_role("switch", name="Locked").uncheck()
+    expect(page.get_by_label("Name", exact=True)).to_be_enabled()
 
-    # Reload: state persists (archived agent hidden, duplicate still default).
+    # Back on the grid: the card shows its status, and delete needs confirmation.
+    page.get_by_role("link", name="Back to My Agents").click()
+    card = _card(page, name)
+    expect(card).to_contain_text("Active")
+    card.get_by_role("button", name=f"Lock {name}").click()
+    expect(card).to_contain_text("Locked")
+    delete = card.get_by_role("button", name=f"Delete {name}")
+    expect(delete).to_be_disabled()
+    card.get_by_role("button", name=f"Unlock {name}").click()
+    card.get_by_role("button", name=f"Archive {name}").click()
+    expect(_card(page, name)).to_have_count(0)
+
+    # Reload: the archived agent stays hidden until requested, then can be restored.
     page.reload()
-    expect(page.get_by_role("button", name=duplicate_name, exact=True)).to_be_visible()
-    expect(page.get_by_role("button", name=name, exact=True)).to_have_count(0)
+    expect(_card(page, name)).to_have_count(0)
     page.get_by_label("Show archived").check()
-    expect(_agent_row(page, name).get_by_text("Archived", exact=True)).to_be_visible()
-    assert _default_agent(api_context)["name"] == duplicate_name
+    expect(_card(page, name)).to_contain_text("Archived")
+    _card(page, name).get_by_role("button", name=f"Restore {name}").click()
+    expect(_card(page, name)).not_to_contain_text("Archived")
+
+    # Permanent delete asks for confirmation first.
+    _card(page, name).get_by_role("button", name=f"Delete {name}").click()
+    page.get_by_role("dialog").get_by_role("button", name="Delete agent").click()
+    expect(_card(page, name)).to_have_count(0)
+    assert all(item["name"] != name for item in _agents(api_context))
 
 
 ###############################################################################
@@ -170,6 +194,7 @@ def test_launch_with_non_default_agent_records_its_runtime_provenance(
         assert provenance["agent_id"] == agent["id"]
         assert provenance["agent_revision"] == 1
         assert provenance["agent_name"] == agent_name
+        assert provenance["agent_capability"] == "assessment"
     finally:
         if session_id is not None:
             api_context.post(f"/api/clinical/sessions/{session_id}/cancel")
