@@ -785,9 +785,6 @@ class ClinicalLabExtractor:
             validation_feedback=validation_feedback,
             previous_output=previous_wrong_output,
         )
-        user_prompt = LLMRuntimeConfig.with_agent_guidance(
-            user_prompt, "extraction_guidance"
-        )
         parsed: LabExtractionPayload | None = None
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for lab extraction")

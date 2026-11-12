@@ -13,7 +13,7 @@ Last updated: 2026-10-27
 1. Start DILIGENT with the packaged desktop app, or run `setup_and_maintenance.ps1` for source/development mode.
 2. Confirm the UI opens.
 3. In source mode, confirm backend health at `http://127.0.0.1:7690/api/health`; in packaged mode, use the port recorded in `desktop-backend-ready.json`.
-4. Open **Agent Studio → Providers & Resources**.
+4. Open **Settings → Providers & Models**.
 5. Select provider and model.
 6. Add and activate any required access key.
 7. Open **DILI Agent**.

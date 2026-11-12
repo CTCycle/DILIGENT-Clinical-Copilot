@@ -10,7 +10,6 @@ import {
   AgentListResponse,
   AgentRevisionListResponse,
   AgentUpdateRequest,
-  AgentValidationResponse,
   Capability,
 } from "../models/agent-types";
 import {
@@ -66,10 +65,6 @@ export async function duplicateAgent(
     headers: JSON_HEADERS,
     body: JSON.stringify(payload),
   });
-}
-
-export async function validateAgent(agentId: string): Promise<AgentValidationResponse> {
-  return requestJson<AgentValidationResponse>(agentUrl(agentId, "/validate"), { method: "POST" });
 }
 
 export async function setDefaultAgent(agentId: string): Promise<Agent> {

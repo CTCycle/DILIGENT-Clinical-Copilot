@@ -30,12 +30,14 @@ from domain.model_configs import CatalogProviderId, ReasoningLevel
 
 Capability = Literal["assessment", "revision", "timeline"]
 CAPABILITIES: tuple[Capability, ...] = ("assessment", "revision", "timeline")
-AGENT_CONFIG_SCHEMA_VERSION = 2
+AGENT_CONFIG_SCHEMA_VERSION = 3
 
 ExtractionStage = Literal["therapy_drugs", "anamnesis_drugs", "diseases", "laboratory"]
 RevisionStage = Literal["planning", "tool_selection", "editing", "qa"]
+ReportTemplateFormat = Literal["md", "json", "xml", "txt"]
 
 INSTRUCTION_MAX_LENGTH = 4000
+REPORT_TEMPLATE_MAX_LENGTH = 20000
 
 
 ###############################################################################
@@ -98,9 +100,22 @@ AGENT_RAG_SETTING_KEYS: frozenset[str] = frozenset(
 
 ###############################################################################
 class AssessmentInstructions(_StrictModel):
-    assessment_focus: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
-    report_style: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
-    extraction_guidance: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
+    custom_instructions: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
+
+
+###############################################################################
+class ReportTemplate(_StrictModel):
+    """A user-supplied text template governing the report's presentation."""
+
+    file_name: str = Field(min_length=1, max_length=255)
+    format: ReportTemplateFormat
+    content: str = Field(min_length=1, max_length=REPORT_TEMPLATE_MAX_LENGTH)
+
+    @model_validator(mode="after")
+    def _validate_content(self) -> ReportTemplate:
+        if not self.content.strip():
+            raise ValueError("Report template content must not be blank.")
+        return self
 
 
 ###############################################################################
@@ -117,6 +132,8 @@ class AssessmentModels(_StrictModel):
 class AssessmentConfig(_StrictModel):
     enabled: bool = True
     instructions: AssessmentInstructions = Field(default_factory=AssessmentInstructions)
+    # None keeps the default report formatting instructions.
+    report_template: ReportTemplate | None = None
     models: AssessmentModels
     reasoning_level: ReasoningLevel = ReasoningLevel.OFF
     ollama_seed: int | None = Field(default=42, ge=0)
@@ -183,7 +200,7 @@ CapabilityConfig = AssessmentConfig | RevisionConfig | TimelineConfig
 class AgentConfig(_StrictModel):
     """The complete persisted configuration of one agent revision."""
 
-    schema_version: Literal[2] = AGENT_CONFIG_SCHEMA_VERSION
+    schema_version: Literal[3] = AGENT_CONFIG_SCHEMA_VERSION
     assessment: AssessmentConfig
     revision: RevisionConfig
     timeline: TimelineConfig
@@ -317,10 +334,6 @@ class AgentValidationIssue(_StrictModel):
     message: str
 
 
-###############################################################################
-class AgentValidationResponse(_StrictModel):
-    valid: bool
-    issues: list[AgentValidationIssue] = Field(default_factory=list)
 
 
 ###############################################################################

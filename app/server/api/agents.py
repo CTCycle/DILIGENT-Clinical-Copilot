@@ -15,7 +15,6 @@ from domain.agents import (
     AgentResponse,
     AgentRevisionListResponse,
     AgentUpdateRequest,
-    AgentValidationResponse,
     Capability,
 )
 from services.agents import AgentService
@@ -76,10 +75,6 @@ class AgentsEndpoint:
         return self.service.duplicate_agent(agent_id, payload or AgentDuplicateRequest())
 
     # -------------------------------------------------------------------------
-    def validate_agent(self, agent_id: AgentId) -> AgentValidationResponse:
-        return self.service.validate_agent(agent_id)
-
-    # -------------------------------------------------------------------------
     def set_default(self, agent_id: AgentId) -> AgentResponse:
         return self.service.set_default(agent_id)
 
@@ -135,13 +130,6 @@ class AgentsEndpoint:
             methods=["POST"],
             response_model=AgentResponse,
             status_code=status.HTTP_201_CREATED,
-        )
-        self.router.add_api_route(
-            "/{agent_id}/validate",
-            self.validate_agent,
-            methods=["POST"],
-            response_model=AgentValidationResponse,
-            status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
             "/{agent_id}/default",

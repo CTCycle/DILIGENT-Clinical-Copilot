@@ -23,7 +23,6 @@ API_OPERATION_MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/agents/{agent_id}"): "agents.lifecycle-and-errors",
     ("PUT", "/api/agents/{agent_id}"): "agents.lifecycle-and-errors",
     ("POST", "/api/agents/{agent_id}/duplicate"): "agents.lifecycle-and-errors",
-    ("POST", "/api/agents/{agent_id}/validate"): "agents.lifecycle-and-errors",
     ("PUT", "/api/agents/{agent_id}/default"): "agents.lifecycle-and-errors",
     ("PUT", "/api/agents/{agent_id}/lifecycle"): "agents.lifecycle-and-errors",
     ("DELETE", "/api/agents/{agent_id}"): "agents.lifecycle-and-errors",

@@ -16,6 +16,7 @@ export class SettingsPageComponent {
     { path: '/settings/general', label: 'General' },
     { path: '/settings/data', label: 'Data Processing' },
     { path: '/settings/integrations', label: 'Integrations' },
+    { path: '/settings/providers', label: 'Providers & Models' },
     { path: '/settings/matching', label: 'Drug Matching' },
     { path: '/settings/advanced', label: 'Advanced' },
     { path: '/settings/database', label: 'Database' },

@@ -130,7 +130,7 @@
             </select>
           </div>
         } @else {
-          <p class="wizard-notice" role="status">No active agent has the DILI Assessment capability enabled. Enable it on an agent in Agent Studio.</p>
+          <p class="wizard-notice" role="status">No active agent has the DILI Assessment capability enabled. Enable it on an agent in Agents.</p>
         }
         @if (agent(); as current) {
           <section class="wizard-agent-card" data-testid="agent-summary" [attr.aria-label]="current.name + ' summary'">
@@ -152,7 +152,7 @@
           </section>
         }
         <div class="wizard-inline-actions">
-          <a class="btn btn-secondary" routerLink="/agents">Open Agent Studio</a>
+          <a class="btn btn-secondary" routerLink="/agents">Open Agents</a>
         </div>
       }
 

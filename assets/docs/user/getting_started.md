@@ -56,7 +56,7 @@ Main navigation sections:
 Typical journey:
 1. Start the application.
 2. Confirm backend health.
-3. Open **Agent Studio**, check the default agent and its three workflows, and install or refresh models under **Providers & Resources**.
+3. Open **Agents**, check the default agent and its three workflows, and install or refresh models under **Settings → Providers & Models**.
 4. Add and activate any required access key.
 5. Open the DILI Agent.
 6. Enter patient and clinical context.

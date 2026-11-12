@@ -89,8 +89,7 @@ RAG_FIELDS = [
 
 ###############################################################################
 def _open_shared_resources(page: Page, base_url: str) -> None:
-    page.goto(f"{base_url}/agents")
-    page.get_by_role("tab", name="Providers & Resources").click()
+    page.goto(f"{base_url}/settings/providers")
 
 
 ###############################################################################
@@ -386,7 +385,6 @@ def test_shared_index_settings_autosave_without_a_save_button(
         expected[key] = value
 
     page.reload()
-    page.get_by_role("tab", name="Providers & Resources").click()
     page.get_by_role("button", name="Configure RAG settings").click()
     for tab, control_id, key in RAG_FIELDS:
         page.get_by_role("button", name=tab).click()

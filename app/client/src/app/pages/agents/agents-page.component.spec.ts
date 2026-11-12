@@ -38,6 +38,15 @@ describe('AgentsPageComponent', () => {
     )!;
   const button = (name: string, label: string): HTMLButtonElement =>
     card(name).querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+  /** Opens the card's overflow menu and returns the item with the given text. */
+  const menuItem = async (name: string, text: string): Promise<HTMLButtonElement> => {
+    const trigger = button(name, `More actions for ${name}`);
+    if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click();
+    await flush();
+    return Array.from(card(name).querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(
+      (item) => item.textContent?.trim() === text,
+    )!;
+  };
 
   beforeEach(async () => {
     lifecycleResponse = () => json({ ...partial, is_locked: true, editable: false });
@@ -58,11 +67,10 @@ describe('AgentsPageComponent', () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it('renders compact cards with status, lock and capability indicators, hiding archived by default', () => {
+  it('renders compact cards with status and capability indicators, hiding archived by default', () => {
     const names = Array.from(el().querySelectorAll('.agent-name')).map((n) => n.textContent?.trim());
     expect(names).toEqual(['Default agent', 'Assessment only', 'Locked', 'Used']);
     expect(card('Default agent').textContent).toContain('Default');
-    expect(card('Default agent').textContent).toContain('Active');
     expect(card('Default agent').textContent).toContain('r1');
     expect(card('Locked').textContent).toContain('Locked');
 
@@ -78,21 +86,21 @@ describe('AgentsPageComponent', () => {
     toggle.dispatchEvent(new Event('change'));
     await flush();
     expect(card('Archived one').textContent).toContain('Archived');
-    expect(button('Archived one', 'Restore Archived one').disabled).toBe(false);
+    expect((await menuItem('Archived one', 'Restore')).disabled).toBe(false);
   });
 
-  it('explains every disabled action through the tooltip', () => {
-    const tip = (name: string, label: string) =>
-      button(name, label).closest('.icon-button-host')!.getAttribute('data-tooltip');
-    expect(button('Default agent', 'Archive Default agent').disabled).toBe(true);
-    expect(tip('Default agent', 'Archive Default agent')).toContain('another agent the default');
-    expect(tip('Default agent', 'Delete Default agent')).toBe('The default agent cannot be deleted');
-    expect(tip('Default agent', 'Set Default agent as default')).toBe('Already the default agent');
-    expect(tip('Used', 'Delete Used')).toContain('Used by 3 saved runs');
-    expect(tip('Locked', 'Delete Locked')).toBe('Unlock this agent before deleting it');
-    // Enabled actions show their name.
-    expect(button('Assessment only', 'Delete Assessment only').disabled).toBe(false);
-    expect(tip('Assessment only', 'Delete Assessment only')).toBe('Delete Assessment only');
+  it('keeps secondary actions in the overflow menu and explains the unavailable ones', async () => {
+    expect(card('Default agent').querySelectorAll('.card-foot button').length).toBe(1);
+    const reason = async (name: string, text: string) => (await menuItem(name, text)).getAttribute('title');
+    expect((await menuItem('Default agent', 'Archive')).disabled).toBe(true);
+    expect(await reason('Default agent', 'Archive')).toContain('another agent the default');
+    expect(await reason('Default agent', 'Delete')).toBe('The default agent cannot be deleted');
+    expect(await reason('Default agent', 'Set as default')).toBe('Already the default agent');
+    expect(await reason('Used', 'Delete')).toContain('Used by 3 saved runs');
+    expect(await reason('Locked', 'Delete')).toBe('Unlock this agent before deleting it');
+    const enabled = await menuItem('Assessment only', 'Delete');
+    expect(enabled.disabled).toBe(false);
+    expect(enabled.getAttribute('title')).toBeNull();
   });
 
   it('marks locked agents as read-only on the edit action', () => {
@@ -101,7 +109,7 @@ describe('AgentsPageComponent', () => {
   });
 
   it('locks an agent through the lifecycle endpoint without creating a revision', async () => {
-    button('Assessment only', 'Lock Assessment only').click();
+    (await menuItem('Assessment only', 'Lock')).click();
     await flush();
     const put = fetchSpy.mock.calls.find(([url, init]) => init?.method === 'PUT' && String(url).endsWith('/lifecycle'))!;
     expect(JSON.parse(put[1].body)).toEqual({ is_locked: true });
@@ -109,7 +117,7 @@ describe('AgentsPageComponent', () => {
   });
 
   it('requires confirmation before permanently deleting an agent', async () => {
-    button('Assessment only', 'Delete Assessment only').click();
+    (await menuItem('Assessment only', 'Delete')).click();
     await flush();
     expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
     const confirm = Array.from(document.querySelectorAll<HTMLButtonElement>('app-confirm-dialog button'))

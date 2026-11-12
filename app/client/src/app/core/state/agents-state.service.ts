@@ -8,7 +8,6 @@ import {
   AgentConfig,
   AgentLifecycleRequest,
   AgentRevision,
-  AgentValidationResponse,
   Capability,
   isSelectableFor,
 } from '../models/agent-types';
@@ -21,7 +20,6 @@ import {
   setAgentLifecycle,
   setDefaultAgent,
   updateAgent,
-  validateAgent,
 } from '../services/agents-api';
 
 export type AgentsLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -147,10 +145,6 @@ export class AgentsStateService {
       ...state,
       items: state.items.filter((item) => item.id !== id),
     }));
-  }
-
-  validate(id: string): Promise<AgentValidationResponse> {
-    return validateAgent(id);
   }
 
   async listRevisions(id: string): Promise<AgentRevision[]> {

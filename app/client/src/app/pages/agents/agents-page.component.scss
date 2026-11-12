@@ -4,28 +4,12 @@
 :host { display: block; min-width: 0; }
 
 .studio { display: grid; gap: var(--space-lg); min-width: 0; }
+.studio-header { padding-bottom: var(--space-md); border-bottom: 1px solid var(--color-divider); }
 .studio-header h1 { margin: 0 0 var(--space-xs); font-size: var(--font-xl); }
 .studio-header p { margin: 0; color: var(--color-text-secondary); font-size: var(--font-sm); }
 
-.studio-tabs { display: flex; flex-wrap: wrap; gap: var(--space-xs); border-bottom: 1px solid var(--color-divider); }
-.studio-tab {
-  min-height: var(--control-height-lg);
-  padding: 0 var(--space-lg);
-  border: 0;
-  border-bottom: 3px solid transparent;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.studio-tab.active { color: var(--color-brand); border-bottom-color: var(--color-brand); }
-.studio-tab:focus-visible { outline: var(--focus-ring); outline-offset: calc(var(--focus-ring-offset) * -1); }
-
 .studio-message,
-.confirm,
-.inline-form,
-.shared-note {
+.confirm {
   display: grid;
   gap: var(--space-sm);
   justify-items: start;
@@ -36,15 +20,17 @@
   color: var(--color-status-info-text);
   font-size: var(--font-sm);
 }
-.shared-note { margin: 0 0 var(--space-lg); }
 .studio-message.is-error { background: var(--color-status-error-bg); border-color: var(--color-status-error-border); color: var(--color-status-error-text); }
 .studio-message.is-warning,
 .confirm { background: var(--color-status-warning-bg); border-color: var(--color-status-warning-border); color: var(--color-status-warning-text); }
-.inline-form { background: var(--color-surface); border-color: var(--color-border-subtle); color: var(--color-text-primary); margin-bottom: var(--space-md); }
-.inline-form .field { width: min(420px, 100%); }
-.inline-form input { width: 100%; box-sizing: border-box; min-height: var(--control-height-md); padding: 0 var(--space-sm); font: inherit; }
 
-.toolbar { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; margin-bottom: var(--space-md); }
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
 .toolbar-spacer { flex: 1 1 auto; }
 .search input {
   min-height: var(--control-height-md);
@@ -92,8 +78,8 @@ a.btn { display: inline-flex; align-items: center; }
 }
 .agent-card {
   display: grid;
-  grid-template-rows: auto auto auto auto 1fr;
   gap: var(--space-sm);
+  align-content: start;
   min-width: 0;
   padding: var(--space-md);
   border: 1px solid var(--color-border-subtle);
@@ -102,7 +88,7 @@ a.btn { display: inline-flex; align-items: center; }
 }
 .agent-card:hover { border-color: var(--color-brand); }
 .agent-card.is-muted { background: var(--color-surface-alt); }
-.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); min-width: 0; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); min-width: 0; }
 .agent-name {
   color: var(--color-text-primary);
   font-size: var(--font-md);
@@ -111,8 +97,6 @@ a.btn { display: inline-flex; align-items: center; }
   overflow-wrap: anywhere;
 }
 .agent-name:hover { color: var(--color-brand); text-decoration: underline; }
-.agent-name:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
-.version { color: var(--color-text-muted); font-size: var(--font-xs); font-variant-numeric: tabular-nums; }
 .description {
   margin: 0;
   color: var(--color-text-secondary);
@@ -125,43 +109,18 @@ a.btn { display: inline-flex; align-items: center; }
   min-height: calc(2 * 1.4em);
   line-height: 1.4;
 }
-.chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
-.chip { display: inline-flex; align-items: center; gap: 4px; }
-.chip svg { width: 0.8rem; height: 0.8rem; }
-.chip.is-off { color: var(--color-text-muted); }
-.chip.is-locked {
-  color: var(--color-status-warning-text);
-  background: var(--color-status-warning-bg);
-  border-color: var(--color-status-warning-border);
-}
+.statuses { display: flex; flex-wrap: wrap; gap: var(--space-md); margin: 0; padding: 0; list-style: none; min-height: 1.25rem; }
+.status { display: inline-flex; align-items: center; gap: 4px; color: var(--color-text-muted); font-size: var(--font-xs); font-weight: 600; }
+.status svg { width: 0.85rem; height: 0.85rem; }
+.status.is-default { color: var(--color-brand); }
 .capabilities { display: flex; gap: var(--space-sm); margin: 0; padding: 0; list-style: none; }
-.capability {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  opacity: 0.5;
-}
-.capability.is-on { color: var(--color-brand); background: var(--color-brand-bg); border-color: var(--color-brand); opacity: 1; }
-.capability svg { width: 1.1rem; height: 1.1rem; }
-.card-foot { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--space-sm); }
-.modified { color: var(--color-text-muted); font-size: var(--font-xs); }
-.actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
-
-.chip {
-  padding: 2px var(--space-sm);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 999px;
-  font-size: var(--font-xs);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-surface-alt);
-}
-.chip.is-default { color: var(--color-brand); background: var(--color-brand-bg); border-color: var(--color-brand); }
+.capability { display: inline-flex; color: var(--color-text-muted); opacity: 0.4; }
+.capability.is-on { color: var(--color-brand); opacity: 1; }
+.capability svg { width: 1.15rem; height: 1.15rem; }
+.card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+.edit-btn { display: inline-flex; align-items: center; gap: var(--space-xs); }
+.edit-btn svg { width: 0.95rem; height: 0.95rem; }
+.meta { margin: 0; color: var(--color-text-muted); font-size: var(--font-xs); font-variant-numeric: tabular-nums; }
 
 .empty { color: var(--color-text-muted); }
 .empty.is-error { color: var(--color-status-error-text); }

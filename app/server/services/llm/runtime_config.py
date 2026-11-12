@@ -166,6 +166,11 @@ class LLMRuntimeConfig:
                 **dict(persisted),
                 **config.retrieval.rag_settings(),
             }
+            overrides["report_template"] = (
+                config.report_template.model_dump(mode="json")
+                if config.report_template
+                else None
+            )
         elif isinstance(config, RevisionConfig):
             planning = entry(config.models.planning)
             for role in ROLE_PURPOSES:
@@ -194,6 +199,18 @@ class LLMRuntimeConfig:
         if not isinstance(value, Mapping):
             return {}
         return {str(key): str(item or "") for key, item in value.items()}
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def active_report_template(cls) -> tuple[str, str] | None:
+        """Return the active agent's ``(format, content)`` template, if any."""
+        value = (cls._runtime_override.get() or {}).get("report_template")
+        if not isinstance(value, Mapping):
+            return None
+        content = str(value.get("content") or "").strip()
+        if not content:
+            return None
+        return str(value.get("format") or "txt"), content
 
     # -------------------------------------------------------------------------
     @classmethod

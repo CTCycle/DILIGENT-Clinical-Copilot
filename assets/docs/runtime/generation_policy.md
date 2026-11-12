@@ -4,7 +4,7 @@ Last updated: 2026-11-12
 
 DILIGENT resolves an effective inference configuration immediately before each
 LLM request. Operators choose the provider, model, and reasoning
-level (`off`, `low`, `medium`, or `high`) per agent in Agent Studio: each capability
+level (`off`, `low`, `medium`, or `high`) per agent in Agents: each capability
 (Assessment, Revision, Timeline) of an agent revision stores a capability-wide `reasoning_level` and optional
 per-model-reference overrides, and a run uses the revision frozen into its
 snapshot. The level is persisted as `reasoning_level`; no boolean reasoning

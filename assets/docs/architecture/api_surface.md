@@ -95,7 +95,6 @@ poll only `/status`; there are no clinical job ids on the frontend.
 - `GET /api/agents/{agent_id}`
 - `PUT /api/agents/{agent_id}` (requires `expected_revision`; appends a new revision, `409` on a stale revision)
 - `POST /api/agents/{agent_id}/duplicate`
-- `POST /api/agents/{agent_id}/validate`
 - `PUT /api/agents/{agent_id}/default`
 - `PUT /api/agents/{agent_id}/lifecycle` (any of `is_active`, `is_locked`, `is_archived`; never blocked by lock, inactivity or archive, but the default agent cannot become inactive or archived; lifecycle changes do not create revisions)
 - `DELETE /api/agents/{agent_id}` (`204`; `409` for the default agent, a locked agent, or an agent referenced by sessions, revision runs or timelines)
@@ -232,7 +231,7 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
   `force_regenerate` and returns a job for polling. The job resolves the
   timeline configuration of the selected agent (`agent_id`/`agent_revision`,
   default agent when omitted) at start and stores the agent revision with the
-  timeline; models are managed in Agent Studio. Timeline previews include source-evidence,
+  timeline; models are managed in Agents. Timeline previews include source-evidence,
   missing-evidence, uncertain, and undated counts, plus `is_stale` when the
   session input changed after generation. Drafts can generate timelines from
   the deterministic section split of their input; this never changes the

@@ -27,7 +27,6 @@ from domain.agents import (
     AgentRevisionResponse,
     AgentUpdateRequest,
     AgentValidationIssue,
-    AgentValidationResponse,
     Capability,
     agent_config_hash,
     agent_is_editable,
@@ -266,36 +265,6 @@ class AgentService:
             raise ServiceNotFoundError("Agent not found.") from exc
         except AgentDeleteBlockedError as exc:
             raise ServiceConflictError(exc.reason) from exc
-
-    # -------------------------------------------------------------------------
-    def validate_agent(self, agent_id: str) -> AgentValidationResponse:
-        record = self._require(agent_id)
-        config = parse_agent_config(record["revision"]["configuration"])
-        issues = self.collect_config_issues(config)
-        if record["is_archived"]:
-            issues.append(
-                AgentValidationIssue(
-                    code="agent_archived", message="This agent is archived."
-                )
-            )
-        elif not record["is_active"]:
-            issues.append(
-                AgentValidationIssue(
-                    code="agent_inactive", message="This agent is inactive."
-                )
-            )
-        return AgentValidationResponse(valid=not issues, issues=issues)
-
-    # -------------------------------------------------------------------------
-    def collect_config_issues(self, config: AgentConfig) -> list[AgentValidationIssue]:
-        """Readiness issues of every enabled capability of a full config."""
-
-        issues: list[AgentValidationIssue] = []
-        for capability in config.enabled_capabilities():
-            issues.extend(
-                self.collect_issues(capability, config.capability(capability))
-            )
-        return issues
 
     # -------------------------------------------------------------------------
     def collect_context_issues(

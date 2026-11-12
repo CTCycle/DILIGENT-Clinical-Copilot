@@ -2,21 +2,29 @@
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
 <section class="subsection" aria-labelledby="dili-instructions-heading">
-  <h3 id="dili-instructions-heading">Instructions</h3>
+  <h3 id="dili-instructions-heading">Custom instructions</h3>
   <p class="agent-section-note">
-    Guidance is added to the agent's prompts. It cannot override clinical safety rules, required report
-    structure or evidence handling.
+    Optional. Supplements the standard DILI assessment workflow; it cannot override clinical safety rules,
+    deterministic calculations or evidence handling. Leave empty for the default behavior.
   </p>
-  @for (field of instructionFields; track field.key) {
-    <label class="field">
-      {{ field.label }}
-      <textarea rows="4" [value]="config().instructions[field.key]"
-        (input)="setInstruction(field.key, $any($event.target).value)"></textarea>
-      <span class="field-counter" [class.is-over]="config().instructions[field.key].length > limit">
-        {{ config().instructions[field.key].length }} / {{ limit }}
-      </span>
-    </label>
-  }
+  <label class="field">
+    Custom instructions
+    <textarea rows="5" [value]="config().instructions.custom_instructions"
+      (input)="setInstructions($any($event.target).value)"></textarea>
+    <span class="field-counter" [class.is-over]="config().instructions.custom_instructions.length > limit">
+      {{ config().instructions.custom_instructions.length }} / {{ limit }}
+    </span>
+  </label>
+</section>
+
+<section class="subsection" aria-labelledby="dili-template-heading">
+  <h3 id="dili-template-heading">Report template</h3>
+  <p class="agent-section-note">
+    Optional. Upload a Markdown, JSON, XML or text file that defines how the narrative parts of the report are
+    structured. It replaces the default formatting rules; clinical content and safety rules still apply.
+  </p>
+  <app-report-template-field [template]="config().report_template" [disabled]="disabled()"
+    (templateChange)="setTemplate($event)" />
 </section>
 
 <section class="subsection" aria-labelledby="dili-models-heading">
@@ -51,7 +59,7 @@
 
 <section class="subsection" aria-labelledby="dili-rag-heading">
   <h3 id="dili-rag-heading">Evidence and retrieval</h3>
-  <p class="agent-section-note">Index, chunking and embedding settings are shared; see Providers &amp; Resources.</p>
+  <p class="agent-section-note">Index, chunking and embedding settings are shared; see Settings → Providers & Models.</p>
   <fieldset class="check-row">
     <legend class="field-hint">Evidence sources</legend>
     @for (source of evidenceSources; track source.id) {

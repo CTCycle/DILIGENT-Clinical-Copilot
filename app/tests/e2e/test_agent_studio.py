@@ -1,7 +1,7 @@
 # Copyright © 2023–2025 Thomas Virdis
 # Licensed under the GNU General Public License, version 3 or later.
 
-"""Agent Studio browser flows: card management, the shared editor and non-default agent launches."""
+"""Agents browser flows: card management, the shared editor and non-default agent launches."""
 
 from __future__ import annotations
 
@@ -75,6 +75,18 @@ def _card(page: Page, name: str) -> Locator:
 
 
 ###############################################################################
+def _menu_action(card: Locator, name: str, action: str) -> None:
+    card.get_by_role("button", name=f"More actions for {name}").click()
+    card.get_by_role("menuitem", name=action, exact=True).click()
+
+
+###############################################################################
+def _open_tab(page: Page, name: str) -> None:
+    page.get_by_role("tab", name=name).click()
+    expect(page.get_by_role("tab", name=name)).to_have_attribute("aria-selected", "true")
+
+
+###############################################################################
 def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     page: Page,
     base_url: str,
@@ -84,7 +96,8 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     page.set_default_timeout(15000)
     name = f"{AGENT_NAME_PREFIX}{studio_cleanup}"
     page.goto(f"{base_url}/agents")
-    expect(page.get_by_role("tab", name="My Agents")).to_have_attribute("aria-selected", "true")
+    expect(page.get_by_role("heading", name="Agents", level=1)).to_be_visible()
+    expect(page.get_by_role("tab", name="Providers & Resources")).to_have_count(0)
 
     # Create: one agent with all three capabilities, active and unlocked.
     _create_agent(page, name)
@@ -94,12 +107,13 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
 
     # Edit one capability: saving produces a new immutable revision.
     focus = f"Dates first {studio_cleanup}"
+    _open_tab(page, "Timeline")
     page.get_by_label("Timeline focus").fill(focus)
     expect(page.get_by_text("Unsaved changes")).to_be_visible()
     with page.expect_response(
         lambda r: r.request.method == "PUT" and r.url.endswith(f"/api/agents/{created['id']}")
     ) as saved:
-        page.get_by_role("button", name="Save agent").click()
+        page.get_by_role("button", name="Save", exact=True).click()
     assert saved.value.status == 200, saved.value.text()
     persisted = next(item for item in _agents(api_context) if item["name"] == name)
     assert persisted["current_revision"] == 2
@@ -107,14 +121,15 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
 
     # Disable one capability independently; its values stay stored.
     _set_switch(page, "Disable Timeline", False)
-    page.get_by_role("button", name="Save agent").click()
+    page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_text("Saved as revision 3")).to_be_visible()
     disabled = next(item for item in _agents(api_context) if item["name"] == name)
     timeline = disabled["revision"]["configuration"]["timeline"]
     assert disabled["capabilities"] == ["assessment", "revision"]
     assert timeline["enabled"] is False and timeline["instructions"]["timeline_focus"] == focus
 
-    # Lock from the profile card: configuration becomes read-only, unlock stays reachable.
+    # Lock from the Overview tab: configuration becomes read-only, unlock stays reachable.
+    _open_tab(page, "Overview")
     _set_switch(page, "Locked", True)
     expect(page.get_by_text("This agent is locked")).to_be_visible()
     expect(page.get_by_label("Name", exact=True)).to_be_disabled()
@@ -123,15 +138,15 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     expect(page.get_by_label("Name", exact=True)).to_be_enabled()
 
     # Back on the grid: the card shows its status, and delete needs confirmation.
-    page.get_by_role("link", name="Back to My Agents").click()
+    page.get_by_role("link", name="Back to Agents").click()
     card = _card(page, name)
-    expect(card).to_contain_text("Active")
-    card.get_by_role("button", name=f"Lock {name}").click()
+    _menu_action(card, name, "Lock")
     expect(card).to_contain_text("Locked")
-    delete = card.get_by_role("button", name=f"Delete {name}")
-    expect(delete).to_be_disabled()
-    card.get_by_role("button", name=f"Unlock {name}").click()
-    card.get_by_role("button", name=f"Archive {name}").click()
+    card.get_by_role("button", name=f"More actions for {name}").click()
+    expect(card.get_by_role("menuitem", name="Delete", exact=True)).to_be_disabled()
+    card.get_by_role("menuitem", name="Unlock", exact=True).click()
+    expect(card).not_to_contain_text("Locked")
+    _menu_action(card, name, "Archive")
     expect(_card(page, name)).to_have_count(0)
 
     # Reload: the archived agent stays hidden until requested, then can be restored.
@@ -139,11 +154,11 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     expect(_card(page, name)).to_have_count(0)
     page.get_by_label("Show archived").check()
     expect(_card(page, name)).to_contain_text("Archived")
-    _card(page, name).get_by_role("button", name=f"Restore {name}").click()
+    _menu_action(_card(page, name), name, "Restore")
     expect(_card(page, name)).not_to_contain_text("Archived")
 
     # Permanent delete asks for confirmation first.
-    _card(page, name).get_by_role("button", name=f"Delete {name}").click()
+    _menu_action(_card(page, name), name, "Delete")
     page.get_by_role("dialog").get_by_role("button", name="Delete agent").click()
     expect(_card(page, name)).to_have_count(0)
     assert all(item["name"] != name for item in _agents(api_context))

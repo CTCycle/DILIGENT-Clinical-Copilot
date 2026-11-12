@@ -1,23 +1,16 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, HostListener, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
-import {
-  LucideArrowLeft,
-  LucideClipboardCheck,
-  LucideFileCheck,
-  LucideShieldCheck,
-  LucideStethoscope,
-} from '@lucide/angular';
+import { LucideArrowLeft } from '@lucide/angular';
 
 import {
   Agent,
   AgentConfig,
   AgentLifecycleRequest,
   AgentRevision,
-  AgentValidationIssue,
   CAPABILITY_LABELS,
   Capability,
 } from '../../core/models/agent-types';
@@ -25,7 +18,6 @@ import { ApiHttpError } from '../../core/services/http-api';
 import { AgentsStateService } from '../../core/state/agents-state.service';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { formatAppDateTime } from '../../core/utils/date-formatting';
-import { CapabilitySectionComponent } from '../../components/capability-section/capability-section.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -39,13 +31,19 @@ import { AssessmentSectionsComponent } from './assessment-sections.component';
 import { RevisionSectionsComponent } from './revision-sections.component';
 import { TimelineSectionsComponent } from './timeline-sections.component';
 
-type ValidationState = { issues: AgentValidationIssue[]; valid: boolean } | null;
+type EditorTab = 'overview' | Capability;
+const TABS: ReadonlyArray<{ id: EditorTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'assessment', label: CAPABILITY_LABELS.assessment },
+  { id: 'revision', label: CAPABILITY_LABELS.revision },
+  { id: 'timeline', label: CAPABILITY_LABELS.timeline },
+];
 
 const stripPrefix = (message: string): string => message.replace(/^\[ERROR\]\s*/, '');
 
 /**
- * Shared create/edit page for one agent: profile, validation placeholder and three
- * independently enabled capability sections. Explicit save; lifecycle changes apply
+ * Shared create/edit page for one agent: an Overview tab and one tab per independently
+ * enabled capability. All tabs edit the same draft; explicit save; lifecycle changes apply
  * immediately and are never blocked by the lock they may be lifting.
  */
 @Component({
@@ -53,16 +51,11 @@ const stripPrefix = (message: string): string => message.replace(/^\[ERROR\]\s*/
   standalone: true,
   imports: [
     RouterLink,
-    CapabilitySectionComponent,
     ConfirmDialogComponent,
     AssessmentSectionsComponent,
     RevisionSectionsComponent,
     TimelineSectionsComponent,
     LucideArrowLeft,
-    LucideClipboardCheck,
-    LucideFileCheck,
-    LucideShieldCheck,
-    LucideStethoscope,
   ],
   styleUrls: ['./agent-sections.scss', './agent-editor.component.scss'],
   templateUrl: './agent-editor.component.html',
@@ -74,6 +67,8 @@ export class AgentEditorComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly labels = CAPABILITY_LABELS;
+  readonly tabs = TABS;
+  readonly activeTab = signal<EditorTab>('overview');
   readonly routeId = signal<string | null>(null);
   /** True for `/agents/new`: nothing is persisted until the first save. */
   readonly creating = computed(() => this.routeId() === 'new');
@@ -102,9 +97,6 @@ export class AgentEditorComponent implements OnInit {
   readonly savedNotice = signal('');
   readonly lifecycleBusy = signal(false);
   readonly lifecycleError = signal('');
-  readonly validating = signal(false);
-  readonly validation = signal<ValidationState>(null);
-  readonly validationError = signal('');
   readonly revisions = signal<AgentRevision[]>([]);
   readonly leavePrompt = signal<((leave: boolean) => void) | null>(null);
 
@@ -120,6 +112,19 @@ export class AgentEditorComponent implements OnInit {
     if (!agent.is_active) return 'This agent is inactive. Reactivate it to edit its configuration.';
     return 'This agent is locked. Unlock it to edit its configuration.';
   });
+  /** Short editing-context label shown in the header next to the active tab. */
+  readonly stateLabel = computed(() => {
+    const agent = this.agent();
+    if (this.creating() || agent?.editable) return 'Editable';
+    if (agent?.is_archived) return 'Read-only · archived';
+    if (agent && !agent.is_active) return 'Read-only · inactive';
+    return 'Read-only · locked';
+  });
+  readonly capability = computed<Capability | null>(() => {
+    const tab = this.activeTab();
+    return tab === 'overview' ? null : tab;
+  });
+  readonly activeTabLabel = computed(() => TABS.find((tab) => tab.id === this.activeTab())?.label ?? '');
   readonly canSave = computed(
     () => !!this.config() && (this.creating() || this.dirty()) && this.errors().length === 0 && this.editable(),
   );
@@ -138,7 +143,7 @@ export class AgentEditorComponent implements OnInit {
   readonly catalog = computed<ModelCatalog>(() => {
     const data = this.modelConfig.data();
     const entries: Array<[string, string[]]> = [
-      ['ollama', (data?.local_models ?? []).map((model) => model.name)],
+      ['ollama', (data?.local_models ?? []).filter((model) => model.available_in_ollama).map((model) => model.name)],
       ...(data?.cloud_providers ?? []).map((p): [string, string[]] => [p.id, p.models.map((m) => m.id)]),
     ];
     return Object.fromEntries(entries);
@@ -170,11 +175,6 @@ export class AgentEditorComponent implements OnInit {
 
   formatDate(value: string | null | undefined): string {
     return value ? formatAppDateTime(value, 'Unknown date') : 'Not saved yet';
-  }
-
-  enabledCapabilities(): number {
-    const config = this.config();
-    return config ? [config.assessment, config.revision, config.timeline].filter((c) => c.enabled).length : 0;
   }
 
   summary(capability: Capability): string {
@@ -274,19 +274,33 @@ export class AgentEditorComponent implements OnInit {
     }
   }
 
-  async validate(): Promise<void> {
-    const agent = this.agent();
-    if (!agent || this.validating()) return;
-    this.validating.set(true);
-    this.validationError.set('');
-    try {
-      this.validation.set(await this.agents.validate(agent.id));
-    } catch (error) {
-      this.validation.set(null);
-      this.validationError.set(stripPrefix(error instanceof Error ? error.message : String(error)));
-    } finally {
-      this.validating.set(false);
-    }
+  selectTab(id: EditorTab): void {
+    this.activeTab.set(id);
+  }
+
+  onTabKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.tabs.length - 1;
+    const next =
+      event.key === 'ArrowRight' ? (index + 1) % this.tabs.length
+        : event.key === 'ArrowLeft' ? (index - 1 + this.tabs.length) % this.tabs.length
+        : event.key === 'Home' ? 0
+        : event.key === 'End' ? last
+        : null;
+    if (next === null) return;
+    event.preventDefault();
+    this.selectTab(this.tabs[next].id);
+    queueMicrotask(() => document.getElementById(`agent-tab-${this.tabs[next].id}`)?.focus());
+  }
+
+  isCapabilityEnabled(id: EditorTab): boolean {
+    const config = this.config();
+    return id === 'overview' || !config ? true : config[id].enabled;
+  }
+
+  /** Browser-level guard: closing or reloading the tab with unsaved edits asks first. */
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.dirty() && !this.saving()) event.preventDefault();
   }
 
   /** Route guard hook: unsaved edits require an explicit confirmation to leave. */
@@ -337,8 +351,6 @@ export class AgentEditorComponent implements OnInit {
     this.conflict.set(false);
     this.saveError.set('');
     this.lifecycleError.set('');
-    this.validation.set(null);
-    this.validationError.set('');
   }
 
   private async loadRevisions(id: string): Promise<void> {

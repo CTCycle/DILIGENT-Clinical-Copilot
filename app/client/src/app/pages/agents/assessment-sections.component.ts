@@ -6,18 +6,14 @@ import { Component, input, output } from '@angular/core';
 import {
   AgentModelRef,
   AssessmentConfig,
-  AssessmentInstructions,
   ExtractionStage,
+  ReportTemplate,
 } from '../../core/models/agent-types';
 import { EvidenceSourceId, ReasoningLevel } from '../../core/models/types';
 import { AgentModelFieldComponent } from './agent-model-field.component';
 import { INSTRUCTION_MAX_LENGTH, ModelCatalog, ProviderOption } from './agent-form';
+import { ReportTemplateFieldComponent } from './report-template-field.component';
 
-const INSTRUCTION_FIELDS: ReadonlyArray<{ key: keyof AssessmentInstructions; label: string }> = [
-  { key: 'assessment_focus', label: 'Assessment focus' },
-  { key: 'report_style', label: 'Report style' },
-  { key: 'extraction_guidance', label: 'Extraction guidance' },
-];
 const EXTRACTION_STAGES: ReadonlyArray<{ stage: ExtractionStage; label: string }> = [
   { stage: 'therapy_drugs', label: 'Therapy drugs' },
   { stage: 'anamnesis_drugs', label: 'Anamnesis drugs' },
@@ -41,7 +37,7 @@ type NumericRetrievalKey =
 @Component({
   selector: 'app-assessment-sections',
   standalone: true,
-  imports: [AgentModelFieldComponent],
+  imports: [AgentModelFieldComponent, ReportTemplateFieldComponent],
   styleUrl: './agent-sections.scss',
   templateUrl: './assessment-sections.component.html',
 })
@@ -52,7 +48,6 @@ export class AssessmentSectionsComponent {
   readonly disabled = input(false);
   readonly configChange = output<AssessmentConfig>();
 
-  readonly instructionFields = INSTRUCTION_FIELDS;
   readonly extractionStages = EXTRACTION_STAGES;
   readonly evidenceSources = EVIDENCE_SOURCES;
   readonly reasoningLevels = REASONING;
@@ -64,8 +59,12 @@ export class AssessmentSectionsComponent {
     this.configChange.emit(draft);
   }
 
-  setInstruction(key: keyof AssessmentInstructions, value: string): void {
-    this.update((d) => (d.instructions[key] = value));
+  setInstructions(value: string): void {
+    this.update((d) => (d.instructions.custom_instructions = value));
+  }
+
+  setTemplate(template: ReportTemplate | null): void {
+    this.update((d) => (d.report_template = template));
   }
 
   setModel(role: 'extraction' | 'clinical', ref: AgentModelRef | null): void {

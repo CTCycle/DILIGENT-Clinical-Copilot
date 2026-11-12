@@ -27,6 +27,11 @@ from common.prompts.clinical_assessment_builders import (
     build_livertox_conclusion_user_prompt,
     build_livertox_drug_assessment_user_prompt,
 )
+from common.prompts.report_template import (
+    apply_template_to_conclusion_system_prompt,
+    apply_template_to_drug_system_prompt,
+    apply_template_to_drug_user_prompt,
+)
 from common.prompts.language import (
     CLINICAL_LANGUAGE_REWRITE_SYSTEM_PROMPT,
     build_clinical_language_rewrite_user_prompt,
@@ -92,6 +97,16 @@ class DrugAnalysisService:
         system_template: str,
         user_template: str,
     ) -> str:
+        report_template = LLMRuntimeConfig.active_report_template()
+        if report_template:
+            # One coherent formatting rule set: the template replaces the
+            # default formatting lines instead of being appended to them.
+            system_template = apply_template_to_drug_system_prompt(
+                system_template,
+                template_format=report_template[0],
+                content=report_template[1],
+            )
+            user_template = apply_template_to_drug_user_prompt(user_template)
         start_details = self.exposure_timeline.format_start_prompt(suspension)
         suspension_details = self.exposure_timeline.format_suspension_prompt(suspension)
         timeline_note = (
@@ -137,7 +152,7 @@ class DrugAnalysisService:
             livertox_score=self.escape_braces(score),
         )
         user_prompt = LLMRuntimeConfig.with_agent_guidance(
-            user_prompt, "assessment_focus", "report_style"
+            user_prompt, "custom_instructions"
         )
         messages = [
             {"role": "system", "content": system_template},
@@ -390,8 +405,15 @@ class DrugAnalysisService:
             multi_drug_report=self.escape_braces(report_body),
         )
         user_prompt = LLMRuntimeConfig.with_agent_guidance(
-            user_prompt, "assessment_focus", "report_style"
+            user_prompt, "custom_instructions"
         )
+        report_template = LLMRuntimeConfig.active_report_template()
+        if report_template:
+            system_template = apply_template_to_conclusion_system_prompt(
+                system_template,
+                template_format=report_template[0],
+                content=report_template[1],
+            )
         messages = [
             {"role": "system", "content": system_template},
             {"role": "user", "content": user_prompt},

@@ -5,10 +5,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { ModelConfigStateResponse } from '../../../core/models/types';
-import { ProviderCatalogPanelComponent } from '../../model-config/components/provider-catalog-panel.component';
-import { ProviderCredentialsPanelComponent } from '../../model-config/components/provider-credentials-panel.component';
-import { RagResourcesPanelComponent } from '../../model-config/components/rag-resources-panel.component';
+import { ModelConfigStateResponse } from '../../../../core/models/types';
+import { ProviderCatalogPanelComponent } from '../../../model-config/components/provider-catalog-panel.component';
+import { ProviderCredentialsPanelComponent } from '../../../model-config/components/provider-credentials-panel.component';
+import { RagResourcesPanelComponent } from '../../../model-config/components/rag-resources-panel.component';
 import { ProvidersResourcesComponent } from './providers-resources.component';
 
 const SHARED_RAG_KEYS = [

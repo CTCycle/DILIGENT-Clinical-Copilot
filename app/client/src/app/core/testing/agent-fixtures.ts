@@ -8,10 +8,11 @@ const OLLAMA = { provider: 'ollama', model: 'qwen3' } as const;
 /** A complete three-capability configuration; override any capability slice. */
 export function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
-    schema_version: 2,
+    schema_version: 3,
     assessment: {
       enabled: true,
-      instructions: { assessment_focus: '', report_style: '', extraction_guidance: '' },
+      instructions: { custom_instructions: '' },
+      report_template: null,
       models: {
         extraction: { ...OLLAMA },
         clinical: { provider: 'openai', model: 'gpt-x' },

@@ -45,7 +45,7 @@ export const GUIDANCE_DEFINITIONS = {
     id: 'model-rag-settings',
     version: GUIDANCE_CONTENT_VERSION,
     title: 'RAG settings',
-    description: 'These settings control the shared index: chunking, embeddings and storage. Retrieval and reranking are set per agent in Agent Studio.',
+    description: 'These settings control the shared index: chunking, embeddings and storage. Retrieval and reranking are set per agent in Agents.',
   },
   clinicalSessionSections: {
     id: 'clinical-session-sections',
@@ -72,8 +72,8 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
   {
     id: 'model-roles',
     title: 'Choose agent models',
-    body: 'Each DILI agent picks its own clinical, extraction and timeline models. Edit an agent in Agent Studio, then save a new revision.',
-    actionLabel: 'Open Agent Studio',
+    body: 'Each DILI agent picks its own clinical, extraction and timeline models. Edit an agent in Agents, then save a new revision.',
+    actionLabel: 'Open Agents',
     action: 'configurations',
   },
   {

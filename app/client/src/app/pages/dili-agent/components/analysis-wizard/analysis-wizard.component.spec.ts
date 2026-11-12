@@ -45,9 +45,7 @@ function preflight(blocking: ClinicalInputPreflightIssue[] = [], warnings: Clini
 function agent(id: string, overrides: Partial<Agent> = {}, sources: string[] = ['livertox']): Agent {
   const config = makeAgentConfig();
   config.assessment.instructions = {
-    assessment_focus: 'Focus on RUCAM',
-    report_style: 'Concise',
-    extraction_guidance: '',
+    custom_instructions: 'Focus on RUCAM',
   };
   config.assessment.ollama_seed = null;
   config.assessment.retrieval.evidence_sources = sources as never;

@@ -146,9 +146,8 @@ export class AnalysisWizardComponent {
     if (!config) return [];
     const { instructions } = config;
     return [
-      { label: 'Assessment focus', text: excerpt(instructions.assessment_focus) },
-      { label: 'Report style', text: excerpt(instructions.report_style) },
-      { label: 'Extraction guidance', text: excerpt(instructions.extraction_guidance) },
+      { label: 'Custom instructions', text: excerpt(instructions.custom_instructions) },
+      { label: 'Report template', text: config.report_template?.file_name ?? '' },
     ].filter((row) => row.text);
   });
   readonly livertoxExcluded = computed(() => {

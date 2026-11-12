@@ -7,7 +7,7 @@ export type Capability = "assessment" | "revision" | "timeline";
 export const CAPABILITIES: readonly Capability[] = ["assessment", "revision", "timeline"];
 export const CAPABILITY_LABELS: Record<Capability, string> = {
   assessment: "DILI Assessment",
-  revision: "DILI Revision",
+  revision: "DILI Report Review",
   timeline: "Timeline",
 };
 
@@ -21,9 +21,15 @@ export type AgentModelRef = {
 };
 
 export type AssessmentInstructions = {
-  assessment_focus: string;
-  report_style: string;
-  extraction_guidance: string;
+  custom_instructions: string;
+};
+
+export type ReportTemplateFormat = "md" | "json" | "xml" | "txt";
+
+export type ReportTemplate = {
+  file_name: string;
+  format: ReportTemplateFormat;
+  content: string;
 };
 
 export type AssessmentModels = {
@@ -46,6 +52,7 @@ export type AgentRetrievalPolicy = {
 export type AssessmentConfig = {
   enabled: boolean;
   instructions: AssessmentInstructions;
+  report_template: ReportTemplate | null;
   models: AssessmentModels;
   reasoning_level: ReasoningLevel;
   ollama_seed: number | null;
@@ -88,7 +95,7 @@ export type TimelineConfig = {
 };
 
 export type AgentConfig = {
-  schema_version: 2;
+  schema_version: 3;
   assessment: AssessmentConfig;
   revision: RevisionConfig;
   timeline: TimelineConfig;
@@ -143,17 +150,6 @@ export type AgentUpdateRequest = {
 };
 
 export type AgentDuplicateRequest = { name?: string | null };
-
-export type AgentValidationIssue = {
-  code: string;
-  field: string | null;
-  message: string;
-};
-
-export type AgentValidationResponse = {
-  valid: boolean;
-  issues: AgentValidationIssue[];
-};
 
 /** True when the agent can run new operations of the given capability. */
 export function isSelectableFor(

@@ -23,11 +23,12 @@ describe('SettingsPageComponent', () => {
     const links = Array.from(
       fixture.nativeElement.querySelectorAll('.settings-navigation-link') as NodeListOf<HTMLAnchorElement>,
     );
-    expect(links).toHaveLength(6);
+    expect(links).toHaveLength(7);
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       expect.stringContaining('General'),
       expect.stringContaining('Data Processing'),
       expect.stringContaining('Integrations'),
+      expect.stringContaining('Providers & Models'),
       expect.stringContaining('Drug Matching'),
       expect.stringContaining('Advanced'),
       expect.stringContaining('Database'),

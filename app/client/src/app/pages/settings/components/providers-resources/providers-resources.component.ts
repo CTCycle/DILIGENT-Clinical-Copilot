@@ -6,33 +6,33 @@ import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } 
 import {
   StatusMessageComponent,
   resolveStatusTone,
-} from '../../../components/status-message/status-message.component';
+} from '../../../../components/status-message/status-message.component';
 import {
   AccessKeyProvider,
   CatalogProvider,
   CloudModelDescriptor,
   ModelConfigStateResponse,
   RagSettings,
-} from '../../../core/models/types';
+} from '../../../../core/models/types';
 import {
   loadModelCatalog,
   refreshModelCatalog,
   updateModelConfigState,
-} from '../../../core/services/model-config-api';
+} from '../../../../core/services/model-config-api';
 import {
   ModelPullJobService,
   ModelPullProgressState,
-} from '../../../core/services/model-pull-job.service';
-import { AppStateService } from '../../../core/state/app-state.service';
-import { ModelConfigStateService } from '../../../core/state/model-config-state.service';
-import { formatUnknownError } from '../../../core/utils';
-import { ProviderCatalogPanelComponent } from '../../model-config/components/provider-catalog-panel.component';
+} from '../../../../core/services/model-pull-job.service';
+import { AppStateService } from '../../../../core/state/app-state.service';
+import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
+import { formatUnknownError } from '../../../../core/utils';
+import { ProviderCatalogPanelComponent } from '../../../model-config/components/provider-catalog-panel.component';
 import {
   CredentialProviderOption,
   ProviderCredentialsPanelComponent,
-} from '../../model-config/components/provider-credentials-panel.component';
-import { RagResourcesPanelComponent } from '../../model-config/components/rag-resources-panel.component';
-import { modelMatchesFilters } from '../../model-config/model-catalog';
+} from '../../../model-config/components/provider-credentials-panel.component';
+import { RagResourcesPanelComponent } from '../../../model-config/components/rag-resources-panel.component';
+import { modelMatchesFilters } from '../../../model-config/model-catalog';
 import {
   DraftRagSettings,
   ModelFilterKey,
@@ -40,7 +40,7 @@ import {
   RagNumberKey,
   RagSettingsSectionKey,
   RagTextKey,
-} from '../../model-config/model-config.types';
+} from '../../../model-config/model-config.types';
 
 const MODEL_BATCH_SIZE = 12;
 const RAG_AUTOSAVE_DELAY_MS = 400;
@@ -109,7 +109,7 @@ function formatTokenCount(tokens: number): string {
 }
 
 /**
- * Shared Agent Studio resources: the model catalog (read-only), provider credentials and the
+ * Shared Providers & Models resources: the model catalog (read-only), provider credentials and the
  * shared document index settings. Per-agent model and retrieval choices live in the Agent Editor.
  */
 @Component({

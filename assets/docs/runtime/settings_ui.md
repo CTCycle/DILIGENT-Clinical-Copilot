@@ -97,7 +97,7 @@ Valid edits in operational Settings categories are persisted automatically
 400 ms after the latest change. Cross-field or field-level validation errors
 keep the current draft unsaved until corrected. The UI reflects the draft
 immediately and shows inline save status; a failed write leaves the unsaved
-draft visible with an error. The shared index settings in Agent Studio → Providers & Resources also
+draft visible with an error. The shared index settings in Settings → Providers & Models also
 autosave (`PUT /api/model-config`, shared RAG keys only); per-agent models,
 reasoning and instructions are saved explicitly with **Save agent**, which
 creates a new revision. Reset
@@ -108,7 +108,7 @@ and shared index updates merge into the latest singleton payload so concurrent
 changes preserve unrelated settings. Successful writes refresh the in-process
 configuration used for newly created runtime work; in-flight jobs keep their
 captured configuration. Pending input debounce is flushed when leaving a
-settings section or closing Agent Studio.
+settings section or closing Agents.
 
 The Integrations category includes `ncbi_contact_email`. The value is trimmed
 and validated as a basic email address, then persisted in the

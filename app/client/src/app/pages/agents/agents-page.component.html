@@ -2,20 +2,9 @@
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
 <main class="page-container studio">
   <header class="studio-header">
-    <h1>Agent Studio</h1>
-    <p>Each agent bundles DILI Assessment, DILI Revision and Timeline configurations.</p>
+    <h1>Agents</h1>
+    <p>Each agent bundles DILI Assessment, DILI Report Review and Timeline configurations.</p>
   </header>
-
-  <div class="studio-tabs" role="tablist" aria-label="Agent Studio sections">
-    @for (item of tabs; track item.id; let i = $index) {
-      <button type="button" role="tab" class="studio-tab" [id]="'agent-studio-tab-' + item.id"
-        [class.active]="tab() === item.id" [attr.aria-selected]="tab() === item.id"
-        [attr.aria-controls]="'agent-studio-panel-' + item.id" [attr.tabindex]="tab() === item.id ? 0 : -1"
-        (click)="selectTab(item.id)" (keydown)="onTabKeydown($event, i)">
-        {{ item.label }}
-      </button>
-    }
-  </div>
 
   @if (message()) {
     <div class="studio-message" [class.is-error]="messageIsError()" [attr.role]="messageIsError() ? 'alert' : 'status'">
@@ -23,54 +12,55 @@
     </div>
   }
 
-  <!-- My Agents -->
-  <section role="tabpanel" id="agent-studio-panel-agents" aria-labelledby="agent-studio-tab-agents"
-    [hidden]="tab() !== 'agents'">
-    <div class="toolbar">
-      <label class="search">
-        <span class="visually-hidden">Search agents by name</span>
-        <input type="search" placeholder="Search agents" [value]="search()"
-          (input)="search.set($any($event.target).value)" />
-      </label>
-      <label class="check">
-        <input type="checkbox" [checked]="state.showArchived()"
-          (change)="state.showArchived.set($any($event.target).checked)" />
-        Show archived
-      </label>
-      <span class="toolbar-spacer"></span>
-      <a routerLink="/agents/new" class="btn is-primary new-agent">
-        <svg lucidePlus aria-hidden="true"></svg> New agent
-      </a>
-    </div>
+  <div class="toolbar">
+    <label class="search">
+      <span class="visually-hidden">Search agents by name</span>
+      <input type="search" placeholder="Search agents" [value]="search()"
+        (input)="search.set($any($event.target).value)" />
+    </label>
+    <label class="check">
+      <input type="checkbox" [checked]="state.showArchived()"
+        (change)="state.showArchived.set($any($event.target).checked)" />
+      Show archived
+    </label>
+    <span class="toolbar-spacer"></span>
+    <a routerLink="/agents/new" class="btn is-primary new-agent">
+      <svg lucidePlus aria-hidden="true"></svg> New agent
+    </a>
+  </div>
 
-    @if (state.status() === 'loading' && !state.all().length) {
-      <p class="empty" role="status">Loading agents...</p>
-    } @else if (state.status() === 'error' && !state.all().length) {
-      <p class="empty is-error" role="alert">{{ state.error() }}</p>
-    } @else if (!visibleAgents().length) {
-      <p class="empty">
-        {{ search() ? 'No agents match your search.' : 'No agents yet. Create one to get started.' }}
-      </p>
-    } @else {
-      <ul class="agent-grid">
-        @for (agent of visibleAgents(); track agent.id) {
-          <li class="agent-card" [class.is-muted]="!agent.is_active || agent.is_archived"
-            [attr.data-testid]="'agent-card'">
-            <div class="card-head">
-              <a class="agent-name" [routerLink]="['/agents', agent.id]">{{ agent.name }}</a>
-              <span class="version" title="Active configuration revision">r{{ agent.current_revision }}</span>
-            </div>
-            <p class="description">{{ agent.description || 'No description' }}</p>
+  @if (state.status() === 'loading' && !state.all().length) {
+    <p class="empty" role="status">Loading agents...</p>
+  } @else if (state.status() === 'error' && !state.all().length) {
+    <p class="empty is-error" role="alert">{{ state.error() }}</p>
+  } @else if (!visibleAgents().length) {
+    <p class="empty">
+      {{ search() ? 'No agents match your search.' : 'No agents yet. Create one to get started.' }}
+    </p>
+  } @else {
+    <ul class="agent-grid">
+      @for (agent of visibleAgents(); track agent.id) {
+        <li class="agent-card" [class.is-muted]="!agent.is_active || agent.is_archived"
+          [attr.data-testid]="'agent-card'">
+          <div class="card-head">
+            <a class="agent-name" [routerLink]="['/agents', agent.id]">{{ agent.name }}</a>
+            <app-overflow-menu [label]="'More actions for ' + agent.name" [items]="menuItems(agent)"
+              [disabled]="busy()" (selected)="onMenu(agent, $event)" />
+          </div>
+          <p class="description">{{ agent.description || 'No description' }}</p>
 
-            <div class="chips">
-              @if (agent.is_default) { <span class="chip is-default">Default</span> }
-              <span class="chip" [class.is-off]="!agent.is_active">{{ agent.is_active ? 'Active' : 'Inactive' }}</span>
-              @if (agent.is_locked) {
-                <span class="chip is-locked"><svg lucideLock aria-hidden="true"></svg> Locked</span>
-              }
-              @if (agent.is_archived) { <span class="chip is-off">Archived</span> }
-            </div>
+          <ul class="statuses" aria-label="Status">
+            @if (agent.is_default) {
+              <li class="status is-default" title="Used when no agent is chosen"><svg lucideStar aria-hidden="true"></svg> Default</li>
+            }
+            @if (agent.is_locked) {
+              <li class="status" title="Configuration cannot change"><svg lucideLock aria-hidden="true"></svg> Locked</li>
+            }
+            @if (!agent.is_active) { <li class="status" title="Cannot be chosen for new runs">Inactive</li> }
+            @if (agent.is_archived) { <li class="status" title="Hidden from selection">Archived</li> }
+          </ul>
 
+          <div class="card-foot">
             <ul class="capabilities" aria-label="Supported workflows">
               @for (capability of capabilities; track capability) {
                 <li class="capability" [class.is-on]="hasCapability(agent, capability)"
@@ -86,55 +76,16 @@
                 </li>
               }
             </ul>
-
-            <div class="card-foot">
-              <span class="modified">Modified {{ formatDate(agent.updated_at) }}</span>
-              <div class="actions">
-                <app-icon-button [label]="agent.editable ? 'Edit ' + agent.name : 'View ' + agent.name + ' (read-only)'"
-                  (activated)="edit(agent)">
-                  <svg lucidePencil aria-hidden="true"></svg>
-                </app-icon-button>
-                <app-icon-button [label]="'Duplicate ' + agent.name" [disabled]="busy()" (activated)="duplicate(agent)">
-                  <svg lucideCopy aria-hidden="true"></svg>
-                </app-icon-button>
-                <app-icon-button [label]="'Set ' + agent.name + ' as default'"
-                  [disabled]="busy() || defaultBlockedReason(agent) !== null" [reason]="defaultBlockedReason(agent)"
-                  (activated)="setDefault(agent)">
-                  <svg lucideStar aria-hidden="true"></svg>
-                </app-icon-button>
-                <app-icon-button [label]="(agent.is_locked ? 'Unlock ' : 'Lock ') + agent.name" [disabled]="busy()"
-                  [pressed]="agent.is_locked" (activated)="toggleLock(agent)">
-                  @if (agent.is_locked) { <svg lucideLock aria-hidden="true"></svg> }
-                  @else { <svg lucideLockOpen aria-hidden="true"></svg> }
-                </app-icon-button>
-                <app-icon-button [label]="(agent.is_archived ? 'Restore ' : 'Archive ') + agent.name"
-                  [disabled]="busy() || archiveBlockedReason(agent) !== null" [reason]="archiveBlockedReason(agent)"
-                  (activated)="toggleArchive(agent)">
-                  @if (agent.is_archived) { <svg lucideArchiveRestore aria-hidden="true"></svg> }
-                  @else { <svg lucideArchive aria-hidden="true"></svg> }
-                </app-icon-button>
-                <app-icon-button [label]="'Delete ' + agent.name" variant="danger"
-                  [disabled]="busy() || deleteBlockedReason(agent) !== null" [reason]="deleteBlockedReason(agent)"
-                  (activated)="pendingDelete.set(agent)">
-                  <svg lucideTrash2 aria-hidden="true"></svg>
-                </app-icon-button>
-              </div>
-            </div>
-          </li>
-        }
-      </ul>
-    }
-  </section>
-
-  <!-- Providers & Resources -->
-  <section role="tabpanel" id="agent-studio-panel-providers" aria-labelledby="agent-studio-tab-providers"
-    [hidden]="tab() !== 'providers'">
-    <p class="shared-note">
-      Providers, API keys and the knowledge index are shared by all agents. Changes here apply to every
-      agent. Per-agent model and retrieval choices live in the Agent Editor.
-    </p>
-    @if (providersVisited()) { <app-providers-resources /> }
-  </section>
+            <button type="button" class="btn edit-btn" (click)="edit(agent)"
+              [attr.aria-label]="agent.editable ? 'Edit ' + agent.name : 'View ' + agent.name + ' (read-only)'">
+              <svg lucidePencil aria-hidden="true"></svg> {{ agent.editable ? 'Edit' : 'View' }}
+            </button>
+          </div>
+          <p class="meta">r{{ agent.current_revision }} · Modified {{ formatDate(agent.updated_at) }}</p>
+        </li>
+      }
+    </ul>
+  }
 
   <app-confirm-dialog [open]="pendingDelete() !== null"
     [title]="'Delete ' + (pendingDelete()?.name ?? 'agent') + '?'"

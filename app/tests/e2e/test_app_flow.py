@@ -349,15 +349,15 @@ def test_keyboard_tab_traversal_reaches_home_form_controls(page: Page, base_url:
 
 
 ###############################################################################
-def test_agent_studio_navigation(page: Page, base_url: str):
+def test_agents_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
-    studio_tab = page.get_by_role("tab", name="Agent Studio")
+    studio_tab = page.get_by_role("tab", name="Agents")
     expect(studio_tab).to_be_visible()
     studio_tab.click()
 
     expect(page).to_have_url(re.compile(r"/agents/?$"))
-    expect(page.get_by_role("heading", name="Agent Studio")).to_be_visible()
+    expect(page.get_by_role("heading", name="Agents")).to_be_visible()
     # The retired Settings → Models page no longer exists.
     page.get_by_role("tab", name="Settings").click()
     expect(page.get_by_role("link", name="Models")).to_have_count(0)

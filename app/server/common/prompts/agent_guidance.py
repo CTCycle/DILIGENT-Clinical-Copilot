@@ -8,9 +8,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 AGENT_GUIDANCE_LABELS = {
-    "assessment_focus": "Assessment focus",
-    "report_style": "Report style",
-    "extraction_guidance": "Extraction guidance",
+    "custom_instructions": "Custom instructions",
     "timeline_focus": "Timeline focus",
 }
 

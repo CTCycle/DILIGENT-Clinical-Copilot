@@ -5,32 +5,20 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import {
-  LucideArchive,
-  LucideArchiveRestore,
   LucideClipboardCheck,
-  LucideCopy,
   LucideFileCheck,
   LucideLock,
-  LucideLockOpen,
   LucidePencil,
   LucidePlus,
   LucideStar,
   LucideStethoscope,
-  LucideTrash2,
 } from '@lucide/angular';
 
 import { Agent, CAPABILITIES, CAPABILITY_LABELS, Capability } from '../../core/models/agent-types';
 import { AgentsStateService } from '../../core/state/agents-state.service';
 import { formatAppDateTime } from '../../core/utils/date-formatting';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
-import { IconButtonComponent } from '../../components/icon-button/icon-button.component';
-import { ProvidersResourcesComponent } from './providers-resources/providers-resources.component';
-
-type StudioTab = 'agents' | 'providers';
-const TABS: ReadonlyArray<{ id: StudioTab; label: string }> = [
-  { id: 'agents', label: 'My Agents' },
-  { id: 'providers', label: 'Providers & Resources' },
-];
+import { OverflowMenuComponent, OverflowMenuItem } from '../../components/overflow-menu/overflow-menu.component';
 
 @Component({
   selector: 'app-agents-page',
@@ -38,20 +26,14 @@ const TABS: ReadonlyArray<{ id: StudioTab; label: string }> = [
   imports: [
     RouterLink,
     ConfirmDialogComponent,
-    IconButtonComponent,
-    ProvidersResourcesComponent,
-    LucideArchive,
-    LucideArchiveRestore,
+    OverflowMenuComponent,
     LucideClipboardCheck,
-    LucideCopy,
     LucideFileCheck,
     LucideLock,
-    LucideLockOpen,
     LucidePencil,
     LucidePlus,
     LucideStar,
     LucideStethoscope,
-    LucideTrash2,
   ],
   templateUrl: './agents-page.component.html',
   styleUrl: './agents-page.component.scss',
@@ -60,11 +42,8 @@ export class AgentsPageComponent implements OnInit {
   readonly state = inject(AgentsStateService);
   private readonly router = inject(Router);
 
-  readonly tabs = TABS;
   readonly capabilities = CAPABILITIES;
   readonly capabilityLabels = CAPABILITY_LABELS;
-  readonly tab = signal<StudioTab>('agents');
-  readonly providersVisited = signal(false);
   readonly search = signal('');
   readonly pendingDelete = signal<Agent | null>(null);
   readonly busy = signal(false);
@@ -114,23 +93,24 @@ export class AgentsPageComponent implements OnInit {
     return null;
   }
 
-  selectTab(id: StudioTab): void {
-    this.tab.set(id);
-    if (id === 'providers') this.providersVisited.set(true);
+  menuItems(agent: Agent): OverflowMenuItem[] {
+    return [
+      { id: 'duplicate', label: 'Duplicate' },
+      { id: 'default', label: 'Set as default', reason: this.defaultBlockedReason(agent) },
+      { id: 'lock', label: agent.is_locked ? 'Unlock' : 'Lock' },
+      { id: 'archive', label: agent.is_archived ? 'Restore' : 'Archive', reason: this.archiveBlockedReason(agent) },
+      { id: 'delete', label: 'Delete', danger: true, reason: this.deleteBlockedReason(agent) },
+    ];
   }
 
-  onTabKeydown(event: KeyboardEvent, index: number): void {
-    const last = this.tabs.length - 1;
-    const next =
-      event.key === 'ArrowRight' ? (index + 1) % this.tabs.length
-        : event.key === 'ArrowLeft' ? (index - 1 + this.tabs.length) % this.tabs.length
-        : event.key === 'Home' ? 0
-        : event.key === 'End' ? last
-        : null;
-    if (next === null) return;
-    event.preventDefault();
-    this.selectTab(this.tabs[next].id);
-    queueMicrotask(() => document.getElementById(`agent-studio-tab-${this.tabs[next].id}`)?.focus());
+  onMenu(agent: Agent, action: string): void {
+    switch (action) {
+      case 'duplicate': void this.duplicate(agent); break;
+      case 'default': void this.setDefault(agent); break;
+      case 'lock': void this.toggleLock(agent); break;
+      case 'archive': void this.toggleArchive(agent); break;
+      case 'delete': this.pendingDelete.set(agent); break;
+    }
   }
 
   edit(agent: Agent): void {

@@ -1,9 +1,9 @@
 # Model Setup
 
 ## Agents And Shared Resources
-Models are chosen per **agent**, not globally. Open **Agent Studio** (**My Agents**) to see your agents as cards: each shows its status (active, locked, archived, default), version and which workflows it supports (DILI Assessment, DILI Revision, Timeline). Icon buttons (hover or focus for the tooltip) edit, duplicate, set as default, lock or unlock, archive or restore, and delete an agent; a disabled button's tooltip explains why. **New agent** and **Edit** open the same page: the **Agent profile** card (name, description, lifecycle) beside a placeholder **Agent validation** card, then one collapsible section per workflow, each with its own on/off switch, models, instructions and settings. Turning a workflow off keeps its settings but makes the agent unavailable for that workflow. **Save agent** creates a new numbered revision; earlier sessions keep the revision they ran with. Locked, inactive and archived agents are read-only until unlocked, reactivated or restored from the profile card. The default agent cannot be deactivated, archived or deleted, and an agent used by saved runs can only be archived, not deleted.
+Models are chosen per **agent**, not globally. Open **Agents** to see your agents as cards: each shows its status (active, locked, archived, default), version and which workflows it supports (DILI Assessment, DILI Revision, Timeline). Icon buttons (hover or focus for the tooltip) edit, duplicate, set as default, lock or unlock, archive or restore, and delete an agent; a disabled button's tooltip explains why. **New agent** and **Edit** open the same page: the **Agent profile** card (name, description, lifecycle) beside a placeholder **Agent validation** card, then one collapsible section per workflow, each with its own on/off switch, models, instructions and settings. Turning a workflow off keeps its settings but makes the agent unavailable for that workflow. **Save agent** creates a new numbered revision; earlier sessions keep the revision they ran with. Locked, inactive and archived agents are read-only until unlocked, reactivated or restored from the profile card. The default agent cannot be deactivated, archived or deleted, and an agent used by saved runs can only be archived, not deleted.
 
-**Providers & Resources** is shared by every agent: access keys, provider model catalogs (install or refresh), and the knowledge-index (RAG) settings, which autosave. Per-agent model pickers use these catalogs.
+**Settings → Providers & Models** is shared by every agent: access keys, provider model catalogs (install or refresh), and the knowledge-index (RAG) settings, which autosave. Per-agent model pickers use these catalogs.
 
 Last updated: 2026-11-12
 
@@ -47,14 +47,14 @@ Expected behavior:
 - Cloud and Ollama catalogs are saved in the application database. Opening the page reuses the saved catalog and does not contact a provider again. Use **Refresh** when you explicitly want a new provider listing. If a refresh fails, the last valid catalog remains visible; an empty Ollama installation is saved as an empty catalog. Catalog state is scoped by provider endpoint and active credential fingerprint, so changing credentials or endpoints starts a new cache scope without exposing secrets.
 
 Recommended workflow:
-1. Open **Agent Studio → Providers & Resources**.
+1. Open **Settings → Providers & Models**.
 2. Choose the provider.
 3. Open the access-key dialog or management control.
 4. Paste the provider key.
 5. Save it. New keys remain inactive, so a rejected key cannot replace the current active key.
 6. Explicitly activate the key that should be used.
 7. Confirm the active-key indicator is shown.
-8. Return to **Agent Studio → Providers & Resources** and use **Refresh** for the selected provider when its catalog needs updating.
+8. Return to **Settings → Providers & Models** and use **Refresh** for the selected provider when its catalog needs updating.
 
 Do not paste keys into screenshots, chat messages, issue reports, or shared logs.
 

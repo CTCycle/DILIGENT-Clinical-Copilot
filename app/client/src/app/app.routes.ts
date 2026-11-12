@@ -7,7 +7,7 @@ export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/dili-agent/dili-agent-page.component').then((m) => m.DiliAgentPageComponent), title: 'DILI Agent | DILIGENT' },
   { path: 'report/:sessionId', loadComponent: () => import('./pages/dili-report/dili-report-page.component').then((m) => m.DiliReportPageComponent), title: 'DILI Report | DILIGENT' },
   { path: 'clinical-sessions', loadComponent: () => import('./pages/clinical-sessions/clinical-sessions-page.component').then((m) => m.ClinicalSessionsPageComponent), title: 'Clinical Sessions | DILIGENT' },
-  { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then((m) => m.AgentsPageComponent), title: 'Agent Studio | DILIGENT' },
+  { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then((m) => m.AgentsPageComponent), title: 'Agents | DILIGENT' },
   {
     path: 'agents/:id',
     loadComponent: () => import('./pages/agents/agent-editor.component').then((m) => m.AgentEditorComponent),
@@ -39,6 +39,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/settings/components/operational-settings-page.component').then((m) => m.OperationalSettingsPageComponent),
         data: { settingsSection: 'integrations' },
         title: 'Integration Settings | DILIGENT',
+      },
+      {
+        path: 'providers',
+        loadComponent: () => import('./pages/settings/components/providers-resources/providers-resources.component').then((m) => m.ProvidersResourcesComponent),
+        title: 'Providers & Models Settings | DILIGENT',
       },
       {
         path: 'matching',

@@ -91,7 +91,7 @@ def test_update_creates_revisions_and_rejects_stale_or_non_editable_saves(
 ) -> None:
     created = _create(client)
     url = f"/api/agents/{created['id']}"
-    edited = assessment_payload(instructions={"assessment_focus": "Chronology first."})
+    edited = assessment_payload(instructions={"custom_instructions": "Chronology first."})
     body = {"expected_revision": 1, "name": "Precise", "configuration": edited}
 
     updated = client.put(url, json=body)
@@ -144,7 +144,7 @@ def test_invalid_request_bodies_are_rejected(client: TestClient) -> None:
 
 
 ###############################################################################
-def test_default_lifecycle_duplicate_validate_and_delete(client: TestClient) -> None:
+def test_default_lifecycle_duplicate_and_delete(client: TestClient) -> None:
     default = _create(client)
     url = f"/api/agents/{default['id']}"
     assert client.put(f"{url}/lifecycle", json={"is_archived": True}).status_code == 409
@@ -157,9 +157,6 @@ def test_default_lifecycle_duplicate_validate_and_delete(client: TestClient) -> 
     assert copy["is_default"] is False and copy["id"] != default["id"]
     named = client.post(f"{url}/duplicate", json={"name": "Mine"})
     assert named.json()["name"] == "Mine"
-
-    validation = client.post(f"/api/agents/{copy['id']}/validate")
-    assert validation.status_code == 200 and "valid" in validation.json()
 
     promoted = client.put(f"/api/agents/{copy['id']}/default").json()
     assert promoted["is_default"] is True

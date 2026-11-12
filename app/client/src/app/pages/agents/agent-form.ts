@@ -4,6 +4,7 @@
 import { Agent, AgentConfig, AgentModelRef } from '../../core/models/agent-types';
 
 export const INSTRUCTION_MAX_LENGTH = 4000;
+export const REPORT_TEMPLATE_MAX_LENGTH = 20000;
 export const NAME_MAX_LENGTH = 120;
 export const DESCRIPTION_MAX_LENGTH = 2000;
 

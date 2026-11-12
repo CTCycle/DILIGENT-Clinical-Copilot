@@ -4969,49 +4969,6 @@
         }
       }
     },
-    "/api/agents/{agent_id}/validate": {
-      "post": {
-        "tags": [
-          "agents"
-        ],
-        "summary": "Validate Agent",
-        "operationId": "validate_agent_api_agents__agent_id__validate_post",
-        "parameters": [
-          {
-            "name": "agent_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "title": "Agent Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentValidationResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/agents/{agent_id}/default": {
       "put": {
         "tags": [
@@ -5632,9 +5589,9 @@
         "properties": {
           "schema_version": {
             "type": "integer",
-            "const": 2,
+            "const": 3,
             "title": "Schema Version",
-            "default": 2
+            "default": 3
           },
           "assessment": {
             "$ref": "#/components/schemas/AssessmentConfig"
@@ -6060,57 +6017,6 @@
         ],
         "title": "AgentUpdateRequest"
       },
-      "AgentValidationIssue": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "field": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Field"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "code",
-          "message"
-        ],
-        "title": "AgentValidationIssue"
-      },
-      "AgentValidationResponse": {
-        "properties": {
-          "valid": {
-            "type": "boolean",
-            "title": "Valid"
-          },
-          "issues": {
-            "items": {
-              "$ref": "#/components/schemas/AgentValidationIssue"
-            },
-            "type": "array",
-            "title": "Issues"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "valid"
-        ],
-        "title": "AgentValidationResponse"
-      },
       "AssessmentConfig": {
         "properties": {
           "enabled": {
@@ -6120,6 +6026,16 @@
           },
           "instructions": {
             "$ref": "#/components/schemas/AssessmentInstructions"
+          },
+          "report_template": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportTemplate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "models": {
             "$ref": "#/components/schemas/AssessmentModels"
@@ -6154,22 +6070,10 @@
       },
       "AssessmentInstructions": {
         "properties": {
-          "assessment_focus": {
+          "custom_instructions": {
             "type": "string",
             "maxLength": 4000,
-            "title": "Assessment Focus",
-            "default": ""
-          },
-          "report_style": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Report Style",
-            "default": ""
-          },
-          "extraction_guidance": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Extraction Guidance",
+            "title": "Custom Instructions",
             "default": ""
           }
         },
@@ -11125,6 +11029,41 @@
           "term"
         ],
         "title": "ReferenceCatalogRuntimeObservationUpsertRequest"
+      },
+      "ReportTemplate": {
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "File Name"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "md",
+              "json",
+              "xml",
+              "txt"
+            ],
+            "title": "Format"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file_name",
+          "format",
+          "content"
+        ],
+        "title": "ReportTemplate",
+        "description": "A user-supplied text template governing the report's presentation."
       },
       "RevisionArtifactListResponse": {
         "properties": {

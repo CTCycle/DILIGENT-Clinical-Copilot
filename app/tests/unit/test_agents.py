@@ -76,7 +76,7 @@ def test_agent_config_hash_is_canonical_and_content_sensitive() -> None:
     first = parse_agent_config(agent_payload())
     reordered = parse_agent_config(dict(reversed(list(agent_payload().items()))))
     changed = parse_agent_config(
-        agent_payload(assessment={"instructions": {"assessment_focus": "Chronology."}})
+        agent_payload(assessment={"instructions": {"custom_instructions": "Chronology."}})
     )
     assert agent_config_hash(first) == agent_config_hash(reordered)
     assert agent_config_hash(first) != agent_config_hash(changed)
@@ -177,7 +177,7 @@ def test_agent_saves_are_versioned_and_execution_is_guarded(
     )
     assert created.is_default is True and created.current_revision == 1
     assert created.capabilities == ["assessment", "revision", "timeline"]
-    edited = assessment_payload(instructions={"assessment_focus": "Chronology first."})
+    edited = assessment_payload(instructions={"custom_instructions": "Chronology first."})
     updated = agent_service.update_agent(
         created.id,
         AgentUpdateRequest(
@@ -348,7 +348,7 @@ def test_lifecycle_gates_editing_and_selection_without_dead_ends(
 
 
 ###############################################################################
-def test_agent_validation_reports_models_tools_and_credentials(
+def test_create_rejects_invalid_tools_but_skips_disabled_capabilities(
     agent_service: AgentService,
 ) -> None:
     with pytest.raises(ServiceValidationError):
@@ -372,18 +372,6 @@ def test_agent_validation_reports_models_tools_and_credentials(
             ),
         )
     )
-    created = agent_service.create_agent(
-        AgentCreateRequest(
-            name="Cloud", configuration=parse_agent_config(agent_payload())
-        )
-    )
-    result = agent_service.validate_agent(created.id)
-    assert result.valid is False
-    assert {issue.code for issue in result.issues} == {"provider_key_missing"}
-    assert {issue.field for issue in result.issues} == {
-        "assessment.models.clinical",
-        "revision.models.planning",
-    }
 
 
 ###############################################################################
@@ -563,35 +551,49 @@ def test_role_resolution_requires_an_active_agent_runtime() -> None:
 def test_agent_guidance_is_bounded_and_absent_by_default(
     persisted_snapshot: ModelConfigSnapshot,
 ) -> None:
-    prompt = "Extract medications. Return JSON."
+    prompt = "Assess the drug. Return narrative."
     default_context = _context(agent_payload(), 1)
     with LLMRuntimeConfig.override_for_run(
         LLMRuntimeConfig.agent_runtime_overrides(default_context)
     ):
         # Empty instructions reproduce the pre-agent prompt exactly.
-        assert LLMRuntimeConfig.with_agent_guidance(prompt, "extraction_guidance") == prompt
+        assert LLMRuntimeConfig.with_agent_guidance(prompt, "custom_instructions") == prompt
+        assert LLMRuntimeConfig.active_report_template() is None
 
     guided = _context(
-        assessment_payload(
-            instructions={
-                "assessment_focus": "Weigh   chronology.",
-                "extraction_guidance": "Brand names are common.",
-            }
-        ),
+        assessment_payload(instructions={"custom_instructions": "Weigh   chronology."}),
         2,
     )
     with LLMRuntimeConfig.override_for_run(
         LLMRuntimeConfig.agent_runtime_overrides(guided)
     ):
-        extraction = LLMRuntimeConfig.with_agent_guidance(prompt, "extraction_guidance")
-        assessment = LLMRuntimeConfig.with_agent_guidance(
-            prompt, "assessment_focus", "report_style"
-        )
-    assert extraction.startswith(prompt)
-    assert "Brand names are common." in extraction
-    assert "never overrides" in extraction
+        assessment = LLMRuntimeConfig.with_agent_guidance(prompt, "custom_instructions")
+    assert assessment.startswith(prompt)
     assert "Weigh chronology." in assessment
-    assert "Brand names" not in assessment
+    assert "never overrides" in assessment
+
+
+###############################################################################
+def test_report_template_is_frozen_into_the_run_snapshot(
+    persisted_snapshot: ModelConfigSnapshot,
+) -> None:
+    templated = _context(
+        assessment_payload(
+            report_template={
+                "file_name": "layout.md",
+                "format": "md",
+                "content": "# Title\\n## Findings {x}",
+            }
+        ),
+        2,
+    )
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(templated)
+    ):
+        assert LLMRuntimeConfig.active_report_template() == (
+            "md",
+            "# Title\\n## Findings {x}",
+        )
 
 
 ###############################################################################
