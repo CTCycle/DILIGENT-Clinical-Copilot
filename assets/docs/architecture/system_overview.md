@@ -1,5 +1,5 @@
 # System Overview
-Last updated: 2026-10-21
+Last updated: 2026-11-12
 
 ## System Summary
 DILIGENT is a local-first clinical application with:
@@ -122,7 +122,7 @@ Maintained source-level structure, with build and cache artifacts omitted:
 - Frontend app: `app/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
-- Current routes: `/`, `/clinical-sessions`, `/agents` (Agent Studio: My Agents, Agent Editor, Providers & Resources), `/data`, `/settings` (General, Data Processing, Integrations, Drug Matching, Advanced), `/sessions/:sessionId/timetable`, and `/sessions/:sessionId/timetable/:timelineId`. Per-agent model, instruction and retrieval choices live in Agent Studio; shared provider catalogs, access keys and RAG index settings are its Providers & Resources tab. There is no Settings → Models page and no `/model-config` UI route alias. The backend exposes `/api/agents` and `/api/model-config`.
+- Current routes: `/`, `/clinical-sessions`, `/agents` (Agent Studio: My Agents grid and Providers & Resources), `/agents/new` and `/agents/:id` (shared agent create/edit page), `/data`, `/settings` (General, Data Processing, Integrations, Drug Matching, Advanced), `/sessions/:sessionId/timetable`, and `/sessions/:sessionId/timetable/:timelineId`. Per-agent model, instruction and retrieval choices live in Agent Studio; shared provider catalogs, access keys and RAG index settings are its Providers & Resources tab. There is no Settings → Models page and no `/model-config` UI route alias. The backend exposes `/api/agents` and `/api/model-config`.
 - Windows launch wrapper: start_on_windows.bat; setup and maintenance entry point: setup_and_maintenance.ps1.
 
 ### Runtime entry points

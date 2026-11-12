@@ -1,11 +1,11 @@
 # Model Setup
 
 ## Agents And Shared Resources
-Models are chosen per **agent**, not globally. Open **Agent Studio** (**My Agents**) to see the default DILI agent and default Revision agent, create a new agent from the current default, duplicate, set a default, or archive one. The **Agent Editor** tab edits an agent's name, instructions, models per role, reasoning, seed and retrieval policy (DILI) or planning model and limits (Revision). **Save agent** creates a new numbered revision; earlier sessions keep the revision they ran with. The default agent cannot be archived until another is made default.
+Models are chosen per **agent**, not globally. Open **Agent Studio** (**My Agents**) to see your agents as cards: each shows its status (active, locked, archived, default), version and which workflows it supports (DILI Assessment, DILI Revision, Timeline). Icon buttons (hover or focus for the tooltip) edit, duplicate, set as default, lock or unlock, archive or restore, and delete an agent; a disabled button's tooltip explains why. **New agent** and **Edit** open the same page: the **Agent profile** card (name, description, lifecycle) beside a placeholder **Agent validation** card, then one collapsible section per workflow, each with its own on/off switch, models, instructions and settings. Turning a workflow off keeps its settings but makes the agent unavailable for that workflow. **Save agent** creates a new numbered revision; earlier sessions keep the revision they ran with. Locked, inactive and archived agents are read-only until unlocked, reactivated or restored from the profile card. The default agent cannot be deactivated, archived or deleted, and an agent used by saved runs can only be archived, not deleted.
 
 **Providers & Resources** is shared by every agent: access keys, provider model catalogs (install or refresh), and the knowledge-index (RAG) settings, which autosave. Per-agent model pickers use these catalogs.
 
-Last updated: 2026-10-19
+Last updated: 2026-11-12
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.

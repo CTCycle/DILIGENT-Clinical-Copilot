@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-11-02
+Last updated: 2026-11-12
 
 ## Relational Database
 
@@ -371,10 +371,10 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 
 ## Agent Persistence
 
-- `agent_definitions` holds one row per agent (kind `dili` or `revision`, name, description, default and archived flags); `agent_revisions` holds its immutable, numbered configuration snapshots with a configuration hash. Saving an agent appends a revision (optimistic concurrency via `expected_revision`); nothing is edited in place.
+- `agent_definitions` holds one row per agent (name, description, and the lifecycle flags `is_default`, `is_active`, `is_locked`, `is_archived`); `agent_revisions` holds its immutable, numbered configuration snapshots with a configuration hash. Saving an agent appends a revision (optimistic concurrency via `expected_revision`); nothing is edited in place.
 - `clinical_sessions.agent_revision_id` and the revision-run records link each execution to the exact revision that produced it. The run snapshot also freezes the resolved agent configuration, so replays and queued work never pick up later edits.
-- Exactly one non-archived default agent exists per kind. The default cannot be archived; archived agents are hidden from selection but keep their revisions for past sessions.
-- Alembic `202611110001` creates the tables. At database initialization the legacy singleton model settings are migrated into a default DILI agent and a default Revision agent (models, reasoning, seed, retrieval policy), then the legacy rows are pruned (`repositories/agent_seed.py`). Sessions and timelines created before agents resolve to the default DILI agent.
+- Exactly one default agent exists (enforced by a partial unique index). The default cannot become inactive or archived. Configuration is editable only while an agent is active, unlocked and not archived; lifecycle changes never create revisions. A permanent delete is refused for the default agent, locked agents, and agents referenced by `clinical_sessions`, revision runs or `clinical_session_timelines` (`agent_revision_id`); archive those instead.
+- Alembic `202611110001` creates the tables; `202611120001` unifies agents: it drops the per-kind columns, adds the lifecycle flags and a timeline agent-revision link, discards the earlier kind-specific agents and clears their run links (runs keep their frozen runtime snapshot). At database initialization with no agents, one "Default agent" with all three capabilities enabled is seeded from the legacy singleton model settings (`repositories/agent_seed.py`).
 
 ## Model Configuration Persistence
 

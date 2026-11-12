@@ -1,5 +1,5 @@
 # DILI Assessment Workflow
-Last updated: 2026-11-02
+Last updated: 2026-11-12
 
 ## Open The DILI Agent
 Open **DILI Agent** from the sidebar.
@@ -56,9 +56,9 @@ until you select **Start analysis**.
    are expanded. **Edit in clinical input** closes the dialog and selects that
    passage in the original text. This is a preliminary section assignment, not
    the final clinical extraction.
-2. **Agent** chooses the DILI agent for this session (the default is
-   preselected). It shows the agent's revision, clinical, extraction and
-   timeline models, instructions and evidence sources. The agent's retrieval
+2. **Agent** chooses the agent for this session (the default is
+   preselected; only active agents with DILI Assessment enabled are listed).
+   It shows the agent's revision, clinical and extraction models, instructions and evidence sources. The agent's retrieval
    policy decides the sources: **LiverTox**, **FDA DILIrank 2.0**, and
    **Indexed documents**; none means LLM knowledge only. If the agent excludes
    LiverTox, an accuracy warning is shown: its drug-level hepatotoxicity

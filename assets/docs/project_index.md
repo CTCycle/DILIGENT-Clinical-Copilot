@@ -1,5 +1,5 @@
 # Project Overview
-Last updated: 2026-11-03
+Last updated: 2026-11-12
 
 ## Purpose
 This file is the root index for `assets/docs`. Read it first, then open the smallest topic file that matches the task.
@@ -14,7 +14,7 @@ branch-status record.
 - Backend, frontend, and desktop source manifests report synchronized version `3.6.1`.
 - Release versions use strict `major.minor.patch` SemVer and must remain synchronized across the frontend, backend, and desktop manifests; the backend exposes the frontend package version unless `DILIGENT_RELEASE_VERSION` is explicitly set for packaging.
 - The latest published desktop release is `v3.6.0` (2026-11-03). Release identities, artifact digests, hosted gates, native acceptance, waivers, and historical v3.4.0–v3.5.1 notes are consolidated in the [desktop release record](runtime/desktop_release.md).
-- Execution settings (models per role, reasoning, seed, instructions, retrieval policy, revision limits) live in reusable, versioned **agents** (`agent_definitions`/`agent_revisions`, managed through `/api/agents` and the Agent Studio workspace). Every clinical session, revision job and timeline runs an immutable agent revision that is frozen into its run snapshot; sessions started before agents existed use the default DILI agent. Legacy singleton model settings are migrated into the default DILI and Revision agents at database initialization (`repositories/agent_seed.py`).
+- Execution settings (models per role, reasoning, seed, instructions, retrieval policy, revision limits) live in reusable, versioned **agents** (`agent_definitions`/`agent_revisions`, managed through `/api/agents` and the Agent Studio workspace). One agent bundles three independently enabled capabilities (DILI Assessment, DILI Revision, Timeline) with its own lifecycle (active, locked, archived). Every clinical session, revision job and timeline runs one capability of an immutable agent revision that is frozen into its run snapshot; only active, non-archived agents with the capability enabled can be selected. Legacy singleton model settings seed the default agent at database initialization (`repositories/agent_seed.py`). Batch/concurrency and LLM timeout settings remain global Settings.
 - Model configuration (`/api/model-config`) now carries only the shared provider catalogs and the shared RAG index settings; its reads are cache-only and non-cacheable. Provider contact is limited to explicit catalog load/refresh operations, and catalog attempts persist in `provider_model_catalog_cache`.
 - Runtime-managed application settings are persisted in the active database's
   `application_configuration` singleton. The selected backend and its

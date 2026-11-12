@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-11-02
+Last updated: 2026-11-12
 
 ## Inspect Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -76,7 +76,7 @@ marked as out of date with a **Regenerate** action.
 7. Compare exposure dates against lab abnormalities and symptoms.
 8. Use the timeline to refine DILI Agent input if needed.
 
-In the **Timeline** tab, the generation action uses the Timeline model of the DILI agent that ran the session (the default DILI agent for sessions that predate agents). Use **Manage agents** when that
+In the **Timeline** tab, the generation action uses the Timeline configuration of the selected agent (the default agent unless another active agent with Timeline enabled is chosen). Use **Manage agents** when that
 assignment needs to change. Saved timelines appear as compact rows that record
 the run's provider, model, date range, event count, and evidence-quality
 warnings. Use **Open** to reopen a specific saved timeline or **Delete** to
