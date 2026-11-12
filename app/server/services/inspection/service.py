@@ -21,6 +21,7 @@ from common.embedding.manifest import read_active_collection_name
 from common.embedding.config import CANONICAL_EMBEDDING_CONFIG
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
+from domain.agents import AgentExecutionContext
 from domain.inspection import InspectionJobPhase
 from repositories.clinical_session_repository import (
     ClinicalSessionRepository,
@@ -943,12 +944,14 @@ class DataInspectionService(
         *,
         force_regenerate: bool,
         source: dict[str, Any],
+        agent_context: AgentExecutionContext,
         job_id: str,
     ) -> dict[str, Any]:
         timeline = self.generate_session_timeline(
             session_id,
             force_regenerate=force_regenerate,
             source=source,
+            agent_context=agent_context,
             stop_check=lambda: self.jobs.should_stop(job_id),
             progress_callback=lambda p, m: self._report_timeline_progress(
                 job_id, session_id, p, m
@@ -968,6 +971,8 @@ class DataInspectionService(
         session_id: int,
         *,
         force_regenerate: bool = False,
+        agent_id: str | None = None,
+        agent_revision: int | None = None,
     ) -> dict[str, Any]:
         safe_session_id = int(session_id)
         source = self.session_timeline_repository.get_session_timeline_source(
@@ -975,6 +980,14 @@ class DataInspectionService(
         )
         if source is None:
             raise KeyError(safe_session_id)
+        agent_context = self.agent_service.resolve_for_execution(
+            capability="timeline",
+            agent_id=agent_id,
+            expected_revision=agent_revision,
+        )
+        readiness_issues = self.agent_service.collect_context_issues(agent_context)
+        if readiness_issues:
+            raise ValueError(" ".join(issue.message for issue in readiness_issues))
         scope_key = f"session_timeline:{safe_session_id}"
         if self.jobs.is_job_running(
             self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key
@@ -987,6 +1000,7 @@ class DataInspectionService(
             safe_session_id,
             force_regenerate=force_regenerate,
             source=source,
+            agent_context=agent_context,
         )
         job_id = self.jobs.start_job(
             job_type=self.SESSION_TIMELINE_JOB_TYPE,

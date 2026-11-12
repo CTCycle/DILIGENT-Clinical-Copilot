@@ -17,10 +17,12 @@ if str(SERVER_ROOT) not in sys.path:
 from configurations.startup import get_server_settings  # noqa: E402
 from domain.agents import (  # noqa: E402
     AGENT_CONFIG_SCHEMA_VERSION,
-    AGENT_KINDS,
+    CAPABILITIES,
+    AgentModelRef,
     agent_config_hash,
     parse_agent_config,
 )
+from domain.model_configs import ReasoningLevel  # noqa: E402
 from repositories.agent_repository import AgentRepository  # noqa: E402
 from repositories.context import RepositoryContext  # noqa: E402
 from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
@@ -43,27 +45,30 @@ def _route_default_agents(context: RepositoryContext) -> None:
     """Run every role of the default agents on the live provider model."""
     agents = AgentRepository(context)
     ref = {"provider": LIVE_PROVIDER, "model": LIVE_MODEL}
-    for kind in AGENT_KINDS:
-        record = agents.get_default(kind)
-        if record is None:
-            raise RuntimeError(f"Database initialization did not seed a {kind} agent.")
-        configuration = dict(record["revision"]["configuration"])
-        models = dict(configuration["models"])
-        roles = ("extraction", "clinical", "timeline") if kind == "dili" else ("planning",)
-        models.update({role: dict(ref) for role in roles})
-        configuration.update(models=models, reasoning_level="off")
-        config = parse_agent_config(configuration)
-        if agent_config_hash(config) == record["revision"]["configuration_hash"]:
-            continue
-        agents.create_revision(
-            agent_id=record["id"],
-            expected_revision=int(record["current_revision"]),
-            name=record["name"],
-            description=record["description"],
-            configuration=config.model_dump(mode="json"),
-            configuration_hash=agent_config_hash(config),
-            schema_version=AGENT_CONFIG_SCHEMA_VERSION,
-        )
+    record = agents.get_default()
+    if record is None:
+        raise RuntimeError("Database initialization did not seed a default agent.")
+    config = parse_agent_config(record["revision"]["configuration"])
+    for name in CAPABILITIES:
+        part = config.capability(name)
+        part.reasoning_level = ReasoningLevel.OFF
+    config.assessment.models.extraction = AgentModelRef(**ref)
+    config.assessment.models.clinical = AgentModelRef(**ref)
+    config.assessment.models.extraction_overrides = {}
+    config.revision.models.planning = AgentModelRef(**ref)
+    config.revision.models.stage_overrides = {}
+    config.timeline.model = AgentModelRef(**ref)
+    if agent_config_hash(config) == record["revision"]["configuration_hash"]:
+        return
+    agents.create_revision(
+        agent_id=record["id"],
+        expected_revision=int(record["current_revision"]),
+        name=record["name"],
+        description=record["description"],
+        configuration=config.model_dump(mode="json"),
+        configuration_hash=agent_config_hash(config),
+        schema_version=AGENT_CONFIG_SCHEMA_VERSION,
+    )
 
 
 ###############################################################################

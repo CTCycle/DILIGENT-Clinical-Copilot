@@ -10,12 +10,13 @@ from fastapi import APIRouter, Body, Path, Query, status
 from domain.agents import (
     AgentCreateRequest,
     AgentDuplicateRequest,
-    AgentKind,
+    AgentLifecycleRequest,
     AgentListResponse,
     AgentResponse,
     AgentRevisionListResponse,
     AgentUpdateRequest,
     AgentValidationResponse,
+    Capability,
 )
 from services.agents import AgentService
 
@@ -40,10 +41,12 @@ class AgentsEndpoint:
     # -------------------------------------------------------------------------
     def list_agents(
         self,
-        kind: Annotated[AgentKind | None, Query()] = None,
         include_archived: Annotated[bool, Query()] = False,
+        selectable_for: Annotated[Capability | None, Query()] = None,
     ) -> AgentListResponse:
-        return self.service.list_agents(kind, include_archived=include_archived)
+        return self.service.list_agents(
+            include_archived=include_archived, selectable_for=selectable_for
+        )
 
     # -------------------------------------------------------------------------
     def create_agent(
@@ -81,8 +84,16 @@ class AgentsEndpoint:
         return self.service.set_default(agent_id)
 
     # -------------------------------------------------------------------------
-    def archive_agent(self, agent_id: AgentId) -> AgentResponse:
-        return self.service.archive_agent(agent_id)
+    def set_lifecycle(
+        self,
+        agent_id: AgentId,
+        payload: AgentLifecycleRequest = Body(...),
+    ) -> AgentResponse:
+        return self.service.set_lifecycle(agent_id, payload)
+
+    # -------------------------------------------------------------------------
+    def delete_agent(self, agent_id: AgentId) -> None:
+        self.service.delete_agent(agent_id)
 
     # -------------------------------------------------------------------------
     def list_revisions(self, agent_id: AgentId) -> AgentRevisionListResponse:
@@ -140,11 +151,17 @@ class AgentsEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/{agent_id}/archive",
-            self.archive_agent,
-            methods=["POST"],
+            "/{agent_id}/lifecycle",
+            self.set_lifecycle,
+            methods=["PUT"],
             response_model=AgentResponse,
             status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/{agent_id}",
+            self.delete_agent,
+            methods=["DELETE"],
+            status_code=status.HTTP_204_NO_CONTENT,
         )
         self.router.add_api_route(
             "/{agent_id}/revisions",

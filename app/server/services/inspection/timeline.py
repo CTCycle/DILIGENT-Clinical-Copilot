@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any, TypeVar, cast
 
 from common.utils.logger import logger
+from domain.agents import AgentExecutionContext
 from services.llm.runtime_config import LLMRuntimeConfig
 from domain.patient_timeline import (
     PatientTimeline,
@@ -305,24 +306,6 @@ class InspectionTimelineMixin:
         )
 
     # -------------------------------------------------------------------------
-    def _timeline_agent_overrides(self, session_id: int) -> dict[str, Any]:
-        """Runtime override for a session's timeline.
-
-        Timelines use the DILI agent revision that produced the session, so a
-        timeline is generated with the same models, reasoning and seed as the
-        analysis. Sessions created before agents use the default DILI agent.
-        """
-        revision_id = self.clinical_session_repository.get_session_agent_revision_id(
-            session_id
-        )
-        context = (
-            self.agent_service.resolve_revision(revision_id)
-            if revision_id is not None
-            else self.agent_service.resolve_for_execution(kind="dili")
-        )
-        return LLMRuntimeConfig.agent_runtime_overrides(context)
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def _build_timeline_runtime_settings() -> dict[str, Any]:
         """Describe the active timeline runtime (call under the agent override)."""
@@ -433,6 +416,7 @@ class InspectionTimelineMixin:
         *,
         force_regenerate: bool = False,
         source: dict[str, Any] | None = None,
+        agent_context: AgentExecutionContext | None = None,
         progress_callback: Callable[[float, str], None] | None = None,
         stop_check: Callable[[], bool] | None = None,
     ) -> PatientTimeline | None:
@@ -486,7 +470,10 @@ class InspectionTimelineMixin:
             timeline_timeout_s = max(
                 20.0, min(330.0, attempt_timeout_s * max(1, attempts) + 15.0)
             )
-            agent_overrides = self._timeline_agent_overrides(safe_session_id)
+            agent_context = agent_context or self.agent_service.resolve_for_execution(
+                capability="timeline"
+            )
+            agent_overrides = LLMRuntimeConfig.agent_runtime_overrides(agent_context)
             with LLMRuntimeConfig.override_for_run(agent_overrides):
                 requested_runtime_settings = self._build_timeline_runtime_settings()
             _report_progress(progress_callback, 15, "Configuring timeline model")
@@ -587,6 +574,7 @@ class InspectionTimelineMixin:
                 session_id,
                 timeline.model_dump(mode="json"),
                 source_text_hash=source.get("source_text_hash"),
+                agent_revision_id=agent_context.agent_revision_id,
             )
             with self.timeline_generation_lock:
                 self.timeline_generation_cooldown_until.pop(safe_session_id, None)

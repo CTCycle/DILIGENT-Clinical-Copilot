@@ -3,10 +3,16 @@
 
 """Typed contracts for reusable, versioned DILIGENT agents.
 
-An agent is a versioned configuration of an existing execution workflow
-(DILI assessment or report revision). Agent records never hold provider
+An agent is one persistent entity that bundles three independently enabled
+capabilities: DILI assessment, report revision and patient timeline. Each
+capability owns its configuration; disabling one keeps its values but makes
+the agent incompatible with that workflow. Agent records never hold provider
 credentials, and nothing here can disable clinical validation: instructions
 are bounded guidance layered beneath the authoritative prompt templates.
+
+Lifecycle (flags on the agent, independent from configuration revisions):
+``editable`` = active and unlocked and not archived;
+``selectable(capability)`` = active and not archived and capability enabled.
 """
 
 from __future__ import annotations
@@ -15,16 +21,16 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from domain.clinical.entities import DEFAULT_EVIDENCE_SOURCES, EvidenceSource
 from domain.model_configs import CatalogProviderId, ReasoningLevel
 
-AgentKind = Literal["dili", "revision"]
-AGENT_KINDS: tuple[AgentKind, ...] = ("dili", "revision")
-AGENT_CONFIG_SCHEMA_VERSION = 1
+Capability = Literal["assessment", "revision", "timeline"]
+CAPABILITIES: tuple[Capability, ...] = ("assessment", "revision", "timeline")
+AGENT_CONFIG_SCHEMA_VERSION = 2
 
 ExtractionStage = Literal["therapy_drugs", "anamnesis_drugs", "diseases", "laboratory"]
 RevisionStage = Literal["planning", "tool_selection", "editing", "qa"]
@@ -43,31 +49,13 @@ class AgentModelRef(_StrictModel):
 
     provider: CatalogProviderId
     model: str = Field(min_length=1, max_length=255)
-    # None inherits the agent-level reasoning preference.
+    # None inherits the capability-level reasoning preference.
     reasoning_level: ReasoningLevel | None = None
 
 
 ###############################################################################
-class DiliAgentInstructions(_StrictModel):
-    assessment_focus: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
-    report_style: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
-    extraction_guidance: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
-
-
-###############################################################################
-class DiliAgentModels(_StrictModel):
-    extraction: AgentModelRef
-    clinical: AgentModelRef
-    timeline: AgentModelRef
-    # Optional per-stage overrides; absent stages use ``extraction``.
-    extraction_overrides: dict[ExtractionStage, AgentModelRef] = Field(
-        default_factory=dict
-    )
-
-
-###############################################################################
 class AgentRetrievalPolicy(_StrictModel):
-    """Per-agent retrieval preferences.
+    """Per-capability retrieval preferences.
 
     Physical index settings (chunking, embedding batch size, vector index
     type/metric, collection name) are shared infrastructure, not agent
@@ -109,24 +97,40 @@ AGENT_RAG_SETTING_KEYS: frozenset[str] = frozenset(
 
 
 ###############################################################################
-class DiliAgentConfig(_StrictModel):
-    kind: Literal["dili"] = "dili"
-    schema_version: Literal[1] = AGENT_CONFIG_SCHEMA_VERSION
-    instructions: DiliAgentInstructions = Field(default_factory=DiliAgentInstructions)
-    models: DiliAgentModels
+class AssessmentInstructions(_StrictModel):
+    assessment_focus: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
+    report_style: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
+    extraction_guidance: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
+
+
+###############################################################################
+class AssessmentModels(_StrictModel):
+    extraction: AgentModelRef
+    clinical: AgentModelRef
+    # Optional per-stage overrides; absent stages use ``extraction``.
+    extraction_overrides: dict[ExtractionStage, AgentModelRef] = Field(
+        default_factory=dict
+    )
+
+
+###############################################################################
+class AssessmentConfig(_StrictModel):
+    enabled: bool = True
+    instructions: AssessmentInstructions = Field(default_factory=AssessmentInstructions)
+    models: AssessmentModels
     reasoning_level: ReasoningLevel = ReasoningLevel.OFF
     ollama_seed: int | None = Field(default=42, ge=0)
     retrieval: AgentRetrievalPolicy = Field(default_factory=AgentRetrievalPolicy)
 
 
 ###############################################################################
-class RevisionAgentInstructions(_StrictModel):
+class RevisionInstructions(_StrictModel):
     review_objectives: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
     editing_style: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
 
 
 ###############################################################################
-class RevisionAgentModels(_StrictModel):
+class RevisionModels(_StrictModel):
     planning: AgentModelRef
     # Optional per-stage overrides; absent stages use ``planning``.
     stage_overrides: dict[RevisionStage, AgentModelRef] = Field(default_factory=dict)
@@ -149,35 +153,55 @@ class RevisionExecutionLimits(_StrictModel):
 
 
 ###############################################################################
-class RevisionAgentConfig(_StrictModel):
-    kind: Literal["revision"] = "revision"
-    schema_version: Literal[1] = AGENT_CONFIG_SCHEMA_VERSION
-    instructions: RevisionAgentInstructions = Field(
-        default_factory=RevisionAgentInstructions
-    )
-    models: RevisionAgentModels
+class RevisionConfig(_StrictModel):
+    enabled: bool = True
+    instructions: RevisionInstructions = Field(default_factory=RevisionInstructions)
+    models: RevisionModels
     reasoning_level: ReasoningLevel = ReasoningLevel.OFF
     ollama_seed: int | None = Field(default=42, ge=0)
     limits: RevisionExecutionLimits = Field(default_factory=RevisionExecutionLimits)
 
 
-AgentConfig = Annotated[
-    DiliAgentConfig | RevisionAgentConfig, Field(discriminator="kind")
-]
-AGENT_CONFIG_ADAPTER: TypeAdapter[DiliAgentConfig | RevisionAgentConfig] = TypeAdapter(
-    AgentConfig
-)
+###############################################################################
+class TimelineInstructions(_StrictModel):
+    timeline_focus: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
 
 
 ###############################################################################
-def parse_agent_config(payload: object) -> DiliAgentConfig | RevisionAgentConfig:
-    return AGENT_CONFIG_ADAPTER.validate_python(payload)
+class TimelineConfig(_StrictModel):
+    enabled: bool = True
+    instructions: TimelineInstructions = Field(default_factory=TimelineInstructions)
+    model: AgentModelRef
+    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
+    ollama_seed: int | None = Field(default=42, ge=0)
+
+
+CapabilityConfig = AssessmentConfig | RevisionConfig | TimelineConfig
 
 
 ###############################################################################
-def canonical_agent_config_json(
-    config: DiliAgentConfig | RevisionAgentConfig,
-) -> str:
+class AgentConfig(_StrictModel):
+    """The complete persisted configuration of one agent revision."""
+
+    schema_version: Literal[2] = AGENT_CONFIG_SCHEMA_VERSION
+    assessment: AssessmentConfig
+    revision: RevisionConfig
+    timeline: TimelineConfig
+
+    def capability(self, name: Capability) -> CapabilityConfig:
+        return getattr(self, name)
+
+    def enabled_capabilities(self) -> list[Capability]:
+        return [name for name in CAPABILITIES if self.capability(name).enabled]
+
+
+###############################################################################
+def parse_agent_config(payload: object) -> AgentConfig:
+    return AgentConfig.model_validate(payload)
+
+
+###############################################################################
+def canonical_agent_config_json(config: AgentConfig) -> str:
     return json.dumps(
         config.model_dump(mode="json"),
         ensure_ascii=False,
@@ -187,10 +211,26 @@ def canonical_agent_config_json(
 
 
 ###############################################################################
-def agent_config_hash(config: DiliAgentConfig | RevisionAgentConfig) -> str:
+def agent_config_hash(config: AgentConfig) -> str:
     return hashlib.sha256(
         canonical_agent_config_json(config).encode("utf-8")
     ).hexdigest()
+
+
+###############################################################################
+def agent_is_editable(*, is_active: bool, is_locked: bool, is_archived: bool) -> bool:
+    return is_active and not is_locked and not is_archived
+
+
+###############################################################################
+def agent_is_selectable(
+    config: AgentConfig,
+    capability: Capability,
+    *,
+    is_active: bool,
+    is_archived: bool,
+) -> bool:
+    return is_active and not is_archived and config.capability(capability).enabled
 
 
 ###############################################################################
@@ -206,12 +246,16 @@ class AgentRevisionResponse(_StrictModel):
 ###############################################################################
 class AgentResponse(_StrictModel):
     id: str
-    kind: AgentKind
     name: str
     description: str
     current_revision: int
     is_default: bool
+    is_active: bool
+    is_locked: bool
     is_archived: bool
+    editable: bool
+    capabilities: list[Capability]
+    reference_count: int = 0
     created_at: datetime | None = None
     updated_at: datetime | None = None
     revision: AgentRevisionResponse
@@ -248,6 +292,25 @@ class AgentDuplicateRequest(_StrictModel):
 
 
 ###############################################################################
+class AgentLifecycleRequest(_StrictModel):
+    """Partial lifecycle change; omitted flags are left untouched."""
+
+    is_active: bool | None = None
+    is_locked: bool | None = None
+    is_archived: bool | None = None
+
+    @model_validator(mode="after")
+    def _require_change(self) -> AgentLifecycleRequest:
+        if (
+            self.is_active is None
+            and self.is_locked is None
+            and self.is_archived is None
+        ):
+            raise ValueError("At least one lifecycle flag is required.")
+        return self
+
+
+###############################################################################
 class AgentValidationIssue(_StrictModel):
     code: str
     field: str | None = None
@@ -263,15 +326,15 @@ class AgentValidationResponse(_StrictModel):
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionContext:
-    """Immutable agent configuration resolved once per execution launch."""
+    """Immutable agent capability configuration resolved once per launch."""
 
     agent_id: str
     agent_name: str
     agent_revision_id: int
     revision_number: int
-    kind: AgentKind
+    capability: Capability
     config_hash: str
-    configuration: DiliAgentConfig | RevisionAgentConfig
+    configuration: CapabilityConfig
 
     def provenance(self) -> dict[str, object]:
         return {
@@ -279,7 +342,7 @@ class AgentExecutionContext:
             "agent_name": self.agent_name,
             "agent_revision_id": self.agent_revision_id,
             "agent_revision": self.revision_number,
-            "agent_kind": self.kind,
+            "agent_capability": self.capability,
             "agent_config_hash": self.config_hash,
             "agent_configuration": self.configuration.model_dump(mode="json"),
         }

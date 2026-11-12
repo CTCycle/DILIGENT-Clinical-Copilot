@@ -1014,7 +1014,7 @@ def validate_clinical_launch_workflow(
 ) -> dict[str, Any]:
     """Run every launch-time check and freeze the selected agent revision."""
     agent_context, request_payload = resolve_dili_agent(service, request_payload)
-    readiness_issues = service.agent_service.collect_issues(agent_context.configuration)
+    readiness_issues = service.agent_service.collect_context_issues(agent_context)
     if readiness_issues:
         raise ServiceValidationError(
             [

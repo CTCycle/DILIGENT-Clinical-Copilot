@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from repository_fixtures import build_dili_agent_service
+from repository_fixtures import build_agent_service
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
@@ -55,7 +55,7 @@ def test_visit_date_blocker_is_unique_and_other_validation_survives(
     visit_date: date | None,
 ) -> None:
     service = SimpleNamespace(
-        agent_service=build_dili_agent_service(tmp_path / "agents.db"),
+        agent_service=build_agent_service(tmp_path / "agents.db"),
         prepare_structured_clinical_input=_reject_incomplete_patient,
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(
@@ -155,7 +155,7 @@ def test_missing_sections_do_not_add_a_generic_preflight_failure(
     monkeypatch, tmp_path
 ) -> None:
     service = SimpleNamespace(
-        agent_service=build_dili_agent_service(tmp_path / "agents.db"),
+        agent_service=build_agent_service(tmp_path / "agents.db"),
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(
                 SimpleNamespace(connection=lambda: None)
@@ -204,7 +204,7 @@ def test_unavailable_requested_rag_is_returned_as_non_blocking_issue(
     tmp_path,
 ) -> None:
     service = SimpleNamespace(
-        agent_service=build_dili_agent_service(tmp_path / "agents.db", evidence_sources=["documents"]),
+        agent_service=build_agent_service(tmp_path / "agents.db", evidence_sources=["documents"]),
         session_repository=SimpleNamespace(
             session_factory=lambda: nullcontext(
                 SimpleNamespace(connection=lambda: None)

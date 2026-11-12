@@ -12,7 +12,13 @@ import json
 from typing import Literal, cast
 
 from common.prompts.agent_guidance import append_agent_guidance
-from domain.agents import AgentExecutionContext, AgentModelRef, DiliAgentConfig
+from domain.agents import (
+    AgentExecutionContext,
+    AgentModelRef,
+    AssessmentConfig,
+    RevisionConfig,
+    TimelineConfig,
+)
 from domain.model_configs import ReasoningLevel
 from domain.llm.providers import CloudModelDescriptor
 from domain.settings.configuration import SHARED_RAG_SETTING_KEYS
@@ -140,18 +146,19 @@ class LLMRuntimeConfig:
                 "agent_name": context.agent_name,
                 "agent_revision_id": context.agent_revision_id,
                 "agent_revision": context.revision_number,
-                "agent_kind": context.kind,
+                "agent_capability": context.capability,
                 "agent_config_hash": context.config_hash,
             },
             "agent_instructions": config.instructions.model_dump(),
         }
-        if isinstance(config, DiliAgentConfig):
+        if isinstance(config, AssessmentConfig):
             models = config.models
             role_models["parser"] = entry(models.extraction)
             role_models["clinical"] = entry(models.clinical)
-            role_models["timeline"] = entry(models.timeline)
-            # A DILI run never revises; keep the legacy view complete.
+            # An assessment run neither revises nor builds timelines; keep
+            # the role view complete with the clinical model.
             role_models["revision"] = entry(models.clinical)
+            role_models["timeline"] = entry(models.clinical)
             for stage, ref in models.extraction_overrides.items():
                 role_models[f"parser.{stage}"] = entry(ref)
             persisted = ModelConfigSerializer().load_snapshot().rag_settings or {}
@@ -159,13 +166,16 @@ class LLMRuntimeConfig:
                 **dict(persisted),
                 **config.retrieval.rag_settings(),
             }
-        else:
+        elif isinstance(config, RevisionConfig):
             planning = entry(config.models.planning)
             for role in ROLE_PURPOSES:
                 role_models[role] = planning
             for stage, ref in config.models.stage_overrides.items():
                 role_models[f"revision.{stage}"] = entry(ref)
-            overrides["revision_limits"] = config.limits.model_dump()
+        elif isinstance(config, TimelineConfig):
+            single = entry(config.model)
+            for role in ROLE_PURPOSES:
+                role_models[role] = single
         overrides["role_models"] = role_models
         return overrides
 
@@ -315,7 +325,7 @@ class LLMRuntimeConfig:
         )
         with cls.override_for_run(agent_overrides):
             snapshot, _ = cls._capture_run_snapshot(evidence_sources=evidence_sources)
-        for key in ("role_models", "agent", "agent_instructions", "revision_limits"):
+        for key in ("role_models", "agent", "agent_instructions"):
             if key in agent_overrides:
                 snapshot[key] = agent_overrides[key]
         canonical = json.dumps(

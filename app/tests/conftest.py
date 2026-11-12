@@ -274,5 +274,5 @@ def dili_agent_runtime():
     """Run the test under the configured default DILI agent's runtime."""
     from repository_fixtures import agent_runtime
 
-    with agent_runtime("dili"):
+    with agent_runtime("assessment"):
         yield

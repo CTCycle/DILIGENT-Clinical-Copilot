@@ -11,6 +11,7 @@ AGENT_GUIDANCE_LABELS = {
     "assessment_focus": "Assessment focus",
     "report_style": "Report style",
     "extraction_guidance": "Extraction guidance",
+    "timeline_focus": "Timeline focus",
 }
 
 AGENT_GUIDANCE_PRECEDENCE = (

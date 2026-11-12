@@ -173,3 +173,5 @@ class SessionTimelineListResponse(BaseModel):
 class SessionTimelineRegenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     force_regenerate: bool = False
+    agent_id: str | None = Field(default=None, min_length=1, max_length=36)
+    agent_revision: int | None = Field(default=None, ge=1)

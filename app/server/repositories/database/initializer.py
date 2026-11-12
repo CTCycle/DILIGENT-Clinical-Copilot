@@ -204,7 +204,7 @@ def _seed_default_agents(
 ) -> None:
     from repositories.agent_repository import AgentRepository
     from repositories.context import RepositoryContext
-    from repositories.agent_seed import ensure_default_agents
+    from repositories.agent_seed import ensure_default_agent
 
     agent_repository = AgentRepository(
         RepositoryContext.create(
@@ -212,7 +212,7 @@ def _seed_default_agents(
             session_factory=repository.session_factory,
         )
     )
-    ensure_default_agents(agent_repository, _agent_seed_payload(stored_payload))
+    ensure_default_agent(agent_repository, _agent_seed_payload(stored_payload))
 
 
 ###############################################################################

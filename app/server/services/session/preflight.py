@@ -604,7 +604,7 @@ def _validate_agent_readiness(
     agent_context: AgentExecutionContext,
     blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
-    for issue in service.agent_service.collect_issues(agent_context.configuration):
+    for issue in service.agent_service.collect_context_issues(agent_context):
         blocking.append(
             ClinicalInputPreflightIssue(
                 severity="blocking",

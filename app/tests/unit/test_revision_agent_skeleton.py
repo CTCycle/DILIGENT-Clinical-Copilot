@@ -22,7 +22,7 @@ from domain.inspection import (
 )
 from pydantic import ValidationError
 from repositories.schemas.base import Base
-from repositories.agent_seed import ensure_default_agents
+from repositories.agent_seed import ensure_default_agent
 from repository_fixtures import build_repository_graph, legacy_model_payload
 from services.inspection.revision_agent import (
     REVISION_PROVIDER_MAX_RETRIES,
@@ -51,7 +51,7 @@ def build_file_serializer(tmp_path: Path, **legacy_values: Any) -> Any:
     graph = build_repository_graph(engine=engine)
     # Revision jobs run the default Revision agent, seeded from a model
     # configuration exactly as database initialization does.
-    ensure_default_agents(
+    ensure_default_agent(
         graph.agent_repository, legacy_model_payload(**legacy_values)
     )
     return graph
@@ -1979,11 +1979,14 @@ def test_revision_job_keeps_runtime_frozen_at_creation(
 
     def recording_call(**kwargs: Any) -> dict[str, Any]:
         # Simulate an agent edit while the job is running.
-        record = agents.get_default("revision")
+        record = agents.get_default()
         if record["current_revision"] == 1:
             config = dict(record["revision"]["configuration"])
-            config["models"] = {
-                "planning": {"provider": "openai", "model": "gpt-4.1-mini"}
+            config["revision"] = {
+                **config["revision"],
+                "models": {
+                    "planning": {"provider": "openai", "model": "gpt-4.1-mini"}
+                },
             }
             parsed = parse_agent_config(config)
             agents.create_revision(
@@ -2045,14 +2048,15 @@ def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
     service.revision_agent_runner = build_runner(
         serializer, structured_call=fake_issue_scan_call
     )
-    agent = service.agent_service.resolve_for_execution(kind="revision")
-    limited = agent.configuration.model_dump(mode="json")
-    limited["limits"] = {
+    agent = service.agent_service.resolve_for_execution(capability="revision")
+    limited = service.agent_service.get_agent(agent.agent_id)
+    limited = limited.revision.configuration.model_dump(mode="json")
+    limited["revision"]["limits"] = {
         "max_tasks": 2,
         "max_tool_iterations": 5,
         "allowed_tools": ["read_session_context", "search_rag"],
     }
-    limited["instructions"] = {"review_objectives": "Check chronology."}
+    limited["revision"]["instructions"] = {"review_objectives": "Check chronology."}
     service.agent_service.update_agent(
         agent.agent_id,
         AgentUpdateRequest(
@@ -2088,7 +2092,7 @@ def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
         AgentUpdateRequest(
             expected_revision=2,
             name=agent.agent_name,
-            configuration=agent.configuration,
+            configuration=parse_agent_config(limited),
         ),
     )
     retried = service.retry_revision_job(started["result"]["pipeline_run_id"])
@@ -2106,13 +2110,21 @@ def test_revision_stage_overrides_route_only_their_stage() -> None:
 
     config = parse_agent_config(
         {
-            "kind": "revision",
-            "models": {
-                "planning": {"provider": "openai", "model": "gpt-4.1"},
-                "stage_overrides": {
-                    "editing": {"provider": "ollama", "model": "qwen3:8b"}
-                },
+            "assessment": {
+                "models": {
+                    "extraction": {"provider": "openai", "model": "gpt-4.1"},
+                    "clinical": {"provider": "openai", "model": "gpt-4.1"},
+                }
             },
+            "revision": {
+                "models": {
+                    "planning": {"provider": "openai", "model": "gpt-4.1"},
+                    "stage_overrides": {
+                        "editing": {"provider": "ollama", "model": "qwen3:8b"}
+                    },
+                }
+            },
+            "timeline": {"model": {"provider": "openai", "model": "gpt-4.1"}},
         }
     )
     context = AgentExecutionContext(
@@ -2120,9 +2132,9 @@ def test_revision_stage_overrides_route_only_their_stage() -> None:
         agent_name="Reviewer",
         agent_revision_id=1,
         revision_number=1,
-        kind="revision",
+        capability="revision",
         config_hash="h",
-        configuration=config,
+        configuration=config.revision,
     )
     base = RevisionAgentRuntime(provider="openai", model="gpt-4.1")
     with LLMRuntimeConfig.override_for_run(

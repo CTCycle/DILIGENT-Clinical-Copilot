@@ -26,7 +26,7 @@ from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
 from services.session.session_workflow import validate_clinical_launch_workflow
 
-from repository_fixtures import build_dili_agent_service
+from repository_fixtures import build_agent_service
 
 pytestmark = pytest.mark.usefixtures("dili_agent_runtime")
 
@@ -118,7 +118,7 @@ def test_launch_requires_active_cloud_key_before_extraction(
 ) -> None:
     service = _build_service()
     requested_scopes: list[str] = []
-    service.agent_service = build_dili_agent_service(
+    service.agent_service = build_agent_service(
         tmp_path / "agents.db",
         provider="gemini",
         model="gemini-2.5-flash",

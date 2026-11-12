@@ -162,7 +162,6 @@ class AgentDefinition(Base):
     __tablename__ = "agent_definitions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    kind: Mapped[str] = mapped_column(String(16), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=text("''")
@@ -171,9 +170,12 @@ class AgentDefinition(Base):
     is_default: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
-    # Equals ``kind`` while this agent is the default, else NULL; the unique
-    # constraint then allows at most one default per kind on every backend.
-    default_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    is_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     is_archived: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
@@ -185,11 +187,14 @@ class AgentDefinition(Base):
     )
 
     __table_args__ = (
-        CheckConstraint(
-            "kind IN ('dili', 'revision')", name="ck_agent_definitions_kind"
+        # At most one default agent on every backend.
+        Index(
+            "uq_agent_definitions_single_default",
+            "is_default",
+            unique=True,
+            sqlite_where=text("is_default"),
+            postgresql_where=text("is_default"),
         ),
-        UniqueConstraint("default_kind", name="uq_agent_definitions_default_kind"),
-        Index("ix_agent_definitions_kind", "kind"),
     )
 
 

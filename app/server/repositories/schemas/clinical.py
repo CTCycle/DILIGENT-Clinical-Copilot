@@ -156,6 +156,9 @@ class ClinicalSessionTimeline(Base):
     model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
     source_text_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     timeline_payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    agent_revision_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(AGENT_REVISIONS_ID_FK), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
@@ -178,6 +181,7 @@ class ClinicalSessionTimeline(Base):
         ),
         Index("ix_clinical_session_timelines_session_id", "session_id"),
         Index("ix_clinical_session_timelines_generated_at", "generated_at"),
+        Index("ix_clinical_session_timelines_agent_revision_id", "agent_revision_id"),
     )
 
 

@@ -61,6 +61,8 @@ class InspectionTimelineEndpoint(InspectionJobEndpointMixin):
             payload = self.service.start_session_timeline_job(
                 session_id,
                 force_regenerate=bool(request.force_regenerate),
+                agent_id=request.agent_id,
+                agent_revision=request.agent_revision,
             )
         except KeyError as exc:
             raise HTTPException(

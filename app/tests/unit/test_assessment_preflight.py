@@ -9,7 +9,7 @@ import pytest
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.clinical.robustness import RagReadiness
-from repository_fixtures import build_dili_agent_service
+from repository_fixtures import build_agent_service
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.preflight import validate_clinical_input_preflight
@@ -19,7 +19,7 @@ from services.session.session_workflow import validate_clinical_launch_workflow
 ###############################################################################
 def _build_service(tmp_path, **agent_options):
     service = build_clinical_session_service(get_job_manager())
-    service.agent_service = build_dili_agent_service(
+    service.agent_service = build_agent_service(
         tmp_path / "agents.db", **agent_options
     )
     return service
@@ -201,7 +201,7 @@ def test_job_start_does_not_repeat_deep_preflight_after_ui_validation(
 
     result = validate_clinical_launch_workflow(service, request)
 
-    assert result["agent_context"].kind == "dili"
+    assert result["agent_context"].capability == "assessment"
     assert result["runtime_snapshot"]["agent"]["agent_id"] == result["agent_context"].agent_id
     assert len(result["runtime_snapshot_hash"]) == 64
 

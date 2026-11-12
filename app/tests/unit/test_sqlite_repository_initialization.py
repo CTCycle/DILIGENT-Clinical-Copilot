@@ -194,18 +194,15 @@ def _read_configuration_and_agents(
                 engine=repository.engine, session_factory=repository.session_factory
             )
         )
-        defaults = {
-            kind: dict(record["revision"]["configuration"])
-            for kind in ("dili", "revision")
-            if (record := agents.get_default(kind)) is not None
-        }
-        return payload, defaults, agents.count_agents()
+        record = agents.get_default()
+        default = dict(record["revision"]["configuration"]) if record else {}
+        return payload, default, agents.count_agents()
     finally:
         repository.engine.dispose()
 
 
 ###############################################################################
-def test_legacy_model_configuration_migrates_into_default_agents_once(
+def test_legacy_model_configuration_migrates_into_one_default_agent_once(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     database_path = tmp_path / "legacy-config.db"
@@ -250,14 +247,19 @@ def test_legacy_model_configuration_migrates_into_default_agents_once(
     initialize_sqlite_database(settings, seed_catalogs=False)
     payload, agents, agent_count = _read_configuration_and_agents(settings)
 
-    dili, revision = agents["dili"], agents["revision"]
+    dili, revision, timeline = (
+        agents["assessment"],
+        agents["revision"],
+        agents["timeline"],
+    )
+    assert all(part["enabled"] for part in (dili, revision, timeline))
     assert dili["models"]["clinical"] == {
         "provider": "openai",
         "model": "gpt-clinical",
         "reasoning_level": None,
     }
     assert dili["models"]["extraction"]["model"] == "gpt-parser"
-    assert dili["models"]["timeline"]["model"] == "gpt-timeline"
+    assert timeline["model"]["model"] == "gpt-timeline"
     assert dili["reasoning_level"] == "high"
     assert dili["ollama_seed"] == 7
     assert dili["retrieval"]["use_reranking"] is False
@@ -278,4 +280,4 @@ def test_legacy_model_configuration_migrates_into_default_agents_once(
     )
     assert second_payload == payload
     assert second_agents == agents
-    assert second_count == agent_count == 2
+    assert second_count == agent_count == 1

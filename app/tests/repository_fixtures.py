@@ -17,15 +17,19 @@ from configurations.management import (
 from domain.agents import (
     AGENT_CONFIG_SCHEMA_VERSION,
     AgentExecutionContext,
-    AgentKind,
+    AgentConfig,
     AgentModelRef,
     AgentRetrievalPolicy,
-    DiliAgentConfig,
-    DiliAgentModels,
+    AssessmentConfig,
+    AssessmentModels,
+    Capability,
+    RevisionConfig,
+    RevisionModels,
+    TimelineConfig,
     agent_config_hash,
 )
 from repositories.agent_repository import AgentRepository
-from repositories.agent_seed import agent_configs_from_legacy_payload
+from repositories.agent_seed import agent_config_from_legacy_payload
 from repositories.schemas.base import Base
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
@@ -72,7 +76,7 @@ def build_repository_graph(
 
 
 ###############################################################################
-def build_dili_agent_service(
+def build_agent_service(
     db_path: Path,
     *,
     provider: str = "ollama",
@@ -81,21 +85,24 @@ def build_dili_agent_service(
     active_key: bool = True,
     requested_scopes: list[str] | None = None,
 ) -> AgentService:
-    """Agent service on a throwaway DB whose default DILI agent runs one model."""
+    """Agent service on a throwaway DB whose default agent runs one model."""
 
     engine = create_engine(f"sqlite+pysqlite:///{db_path}", future=True)
     Base.metadata.create_all(engine)
     repository = AgentRepository(RepositoryContext.create(engine=engine))
     ref = AgentModelRef(provider=cast(Any, provider), model=model)
-    config = DiliAgentConfig(
-        models=DiliAgentModels(extraction=ref, clinical=ref, timeline=ref),
-        retrieval=AgentRetrievalPolicy(
-            evidence_sources=cast(Any, evidence_sources or ["livertox"])
+    config = AgentConfig(
+        assessment=AssessmentConfig(
+            models=AssessmentModels(extraction=ref, clinical=ref),
+            retrieval=AgentRetrievalPolicy(
+                evidence_sources=cast(Any, evidence_sources or ["livertox"])
+            ),
         ),
+        revision=RevisionConfig(models=RevisionModels(planning=ref)),
+        timeline=TimelineConfig(model=ref),
     )
     repository.create_agent(
-        kind="dili",
-        name="Test DILI agent",
+        name="Test agent",
         description="",
         configuration=config.model_dump(mode="json"),
         configuration_hash=agent_config_hash(config),
@@ -129,25 +136,27 @@ def legacy_model_payload(**values: Any) -> dict[str, Any]:
 
 ###############################################################################
 def agent_context_from_legacy(
-    kind: AgentKind = "dili", **values: Any
+    capability: Capability = "assessment", **values: Any
 ) -> AgentExecutionContext:
-    config = agent_configs_from_legacy_payload(legacy_model_payload(**values))[kind]
+    config = agent_config_from_legacy_payload(legacy_model_payload(**values))
     return AgentExecutionContext(
-        agent_id=f"test-{kind}",
-        agent_name=f"Test {kind} agent",
+        agent_id=f"test-{capability}",
+        agent_name=f"Test {capability} agent",
         agent_revision_id=1,
         revision_number=1,
-        kind=kind,
+        capability=capability,
         config_hash=agent_config_hash(config),
-        configuration=config,
+        configuration=config.capability(capability),
     )
 
 
 ###############################################################################
 @contextmanager
-def agent_runtime(kind: AgentKind = "dili", **values: Any) -> Iterator[None]:
+def agent_runtime(
+    capability: Capability = "assessment", **values: Any
+) -> Iterator[None]:
     """Execute under an agent run override built from legacy-style values."""
-    context = agent_context_from_legacy(kind, **values)
+    context = agent_context_from_legacy(capability, **values)
     with LLMRuntimeConfig.override_for_run(
         LLMRuntimeConfig.agent_runtime_overrides(context)
     ):

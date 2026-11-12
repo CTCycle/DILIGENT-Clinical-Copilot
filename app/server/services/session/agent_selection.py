@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from domain.agents import AgentExecutionContext, DiliAgentConfig
+from domain.agents import AgentExecutionContext, AssessmentConfig
 from domain.clinical.entities import ClinicalSessionRequest
 
 
@@ -22,11 +22,11 @@ def resolve_dili_agent(
     """
 
     context: AgentExecutionContext = service.agent_service.resolve_for_execution(
-        kind="dili",
+        capability="assessment",
         agent_id=request_payload.agent_id,
         expected_revision=request_payload.agent_revision,
     )
-    config = cast(DiliAgentConfig, context.configuration)
+    config = cast(AssessmentConfig, context.configuration)
     bound = request_payload.model_copy(
         update={
             "agent_id": context.agent_id,

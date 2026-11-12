@@ -19,7 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from common.utils.logger import logger
 
-HEAD_REVISION = "202611110001"
+HEAD_REVISION = "202611120001"
 MIGRATION_LOCK_KEY = 7362381
 
 

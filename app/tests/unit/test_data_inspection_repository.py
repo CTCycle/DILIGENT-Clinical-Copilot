@@ -19,7 +19,7 @@ from domain.patient_timeline import (
     PatientTimelineExtraction,
 )
 from domain.timeline_dates import extract_single_explicit_timeline_date
-from repositories.agent_seed import ensure_default_agents
+from repositories.agent_seed import ensure_default_agent
 from repositories.schemas.base import Base
 from repositories.schemas.clinical import ClinicalDrugMention, ClinicalSession
 from repositories.schemas.knowledge import (
@@ -50,7 +50,7 @@ def build_repository_graph_for_test(
     Base.metadata.create_all(engine)
     graph = build_repository_graph(engine=engine)
     # Timelines run the session's DILI agent (default for pre-agent sessions).
-    ensure_default_agents(
+    ensure_default_agent(
         graph.agent_repository,
         agent_snapshot or legacy_model_payload(),
     )
@@ -1175,7 +1175,7 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     )
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
-    ensure_default_agents(
+    ensure_default_agent(
         repository_graph.agent_repository, legacy_model_payload()
     )
     save_session(
@@ -1226,7 +1226,7 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
     )
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
-    ensure_default_agents(
+    ensure_default_agent(
         repository_graph.agent_repository, legacy_model_payload()
     )
     save_session(
@@ -1340,7 +1340,7 @@ def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() ->
     )
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
-    ensure_default_agents(
+    ensure_default_agent(
         repository_graph.agent_repository, legacy_model_payload()
     )
     save_session(

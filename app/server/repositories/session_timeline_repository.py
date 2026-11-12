@@ -136,6 +136,7 @@ class SessionTimelineRepository:
         payload: dict[str, Any],
         *,
         source_text_hash: str | None = None,
+        agent_revision_id: int | None = None,
     ) -> dict[str, Any] | None:
         safe_session_id = int(session_id)
         timeline = validate_timeline_payload(payload)
@@ -159,6 +160,7 @@ class SessionTimelineRepository:
                 model_provider=timeline.model_provider,
                 source_text_hash=source_text_hash,
                 timeline_payload_json=serialized_payload,
+                agent_revision_id=agent_revision_id,
             )
             db_session.add(record)
             db_session.commit()

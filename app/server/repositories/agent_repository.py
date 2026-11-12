@@ -7,11 +7,16 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from repositories.context import RepositoryContext
 from repositories.database.session import unit_of_work
+from repositories.schemas.clinical import (
+    ClinicalSession,
+    ClinicalSessionRevisionRun,
+    ClinicalSessionTimeline,
+)
 from repositories.schemas.configuration import AgentDefinition, AgentRevision
 
 
@@ -21,8 +26,13 @@ class AgentNotFoundError(LookupError):
 
 
 ###############################################################################
-class AgentArchivedError(RuntimeError):
-    """The operation is not allowed on an archived agent."""
+class AgentNotEditableError(RuntimeError):
+    """The agent is inactive, locked or archived, so its configuration is frozen."""
+
+
+###############################################################################
+class AgentInactiveError(RuntimeError):
+    """The operation requires an active, non-archived agent."""
 
 
 ###############################################################################
@@ -31,8 +41,17 @@ class AgentRevisionConflictError(RuntimeError):
 
 
 ###############################################################################
-class AgentDefaultArchiveError(RuntimeError):
-    """A default agent cannot be archived until another becomes the default."""
+class AgentDefaultRetireError(RuntimeError):
+    """A default agent cannot be deactivated or archived while it is the default."""
+
+
+###############################################################################
+class AgentDeleteBlockedError(RuntimeError):
+    """The agent is the default, locked or referenced by persisted runs."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 ###############################################################################
@@ -59,16 +78,21 @@ class AgentRepository:
 
     # -------------------------------------------------------------------------
     def _agent_dict(
-        self, definition: AgentDefinition, revision: AgentRevision
+        self,
+        definition: AgentDefinition,
+        revision: AgentRevision,
+        reference_count: int = 0,
     ) -> dict[str, Any]:
         return {
             "id": definition.id,
-            "kind": definition.kind,
             "name": definition.name,
             "description": definition.description,
             "current_revision": int(definition.current_revision),
             "is_default": bool(definition.is_default),
+            "is_active": bool(definition.is_active),
+            "is_locked": bool(definition.is_locked),
             "is_archived": bool(definition.is_archived),
+            "reference_count": reference_count,
             "created_at": definition.created_at,
             "updated_at": definition.updated_at,
             "revision": self._revision_dict(revision),
@@ -88,27 +112,46 @@ class AgentRepository:
             .where(*conditions)
             .order_by(AgentDefinition.created_at.asc(), AgentDefinition.id.asc())
         ).all()
-        return [self._agent_dict(definition, revision) for definition, revision in rows]
+        return [
+            self._agent_dict(
+                definition,
+                revision,
+                self._reference_count(db_session, definition.id),
+            )
+            for definition, revision in rows
+        ]
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _clear_default(db_session: Session, kind: str, *, keep_id: str) -> None:
+    def _reference_count(db_session: Session, agent_id: str) -> int:
+        """Count persisted runs that point at any revision of the agent."""
+
+        revision_ids = select(AgentRevision.id).where(
+            AgentRevision.agent_id == agent_id
+        )
+        total = 0
+        for model in (ClinicalSession, ClinicalSessionRevisionRun, ClinicalSessionTimeline):
+            total += int(
+                db_session.execute(
+                    select(func.count())
+                    .select_from(model)
+                    .where(model.agent_revision_id.in_(revision_ids))
+                ).scalar_one()
+            )
+        return total
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _clear_default(db_session: Session, *, keep_id: str) -> None:
         db_session.execute(
             update(AgentDefinition)
-            .where(
-                AgentDefinition.default_kind == kind,
-                AgentDefinition.id != keep_id,
-            )
-            .values(is_default=False, default_kind=None)
+            .where(AgentDefinition.id != keep_id, AgentDefinition.is_default.is_(True))
+            .values(is_default=False)
         )
 
     # -------------------------------------------------------------------------
-    def list_agents(
-        self, kind: str | None = None, include_archived: bool = False
-    ) -> list[dict[str, Any]]:
+    def list_agents(self, include_archived: bool = False) -> list[dict[str, Any]]:
         conditions: list[Any] = []
-        if kind is not None:
-            conditions.append(AgentDefinition.kind == kind)
         if not include_archived:
             conditions.append(AgentDefinition.is_archived.is_(False))
         with self.session_factory() as db_session:
@@ -121,11 +164,11 @@ class AgentRepository:
             return agents[0] if agents else None
 
     # -------------------------------------------------------------------------
-    def get_default(self, kind: str) -> dict[str, Any] | None:
+    def get_default(self) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             agents = self._load_agents(
                 db_session,
-                AgentDefinition.default_kind == kind,
+                AgentDefinition.is_default.is_(True),
                 AgentDefinition.is_archived.is_(False),
             )
             return agents[0] if agents else None
@@ -143,7 +186,6 @@ class AgentRepository:
     def create_agent(
         self,
         *,
-        kind: str,
         name: str,
         description: str,
         configuration: dict[str, Any],
@@ -155,15 +197,15 @@ class AgentRepository:
         agent_id = uuid4().hex
         with unit_of_work(session_factory=self.session_factory, immediate=True) as db:
             if is_default:
-                self._clear_default(db, kind, keep_id=agent_id)
+                self._clear_default(db, keep_id=agent_id)
             definition = AgentDefinition(
                 id=agent_id,
-                kind=kind,
                 name=name,
                 description=description,
                 current_revision=1,
                 is_default=is_default,
-                default_kind=kind if is_default else None,
+                is_active=True,
+                is_locked=False,
                 is_archived=False,
                 created_at=now,
                 updated_at=now,
@@ -199,8 +241,12 @@ class AgentRepository:
             definition = db.get(AgentDefinition, agent_id)
             if definition is None:
                 raise AgentNotFoundError(agent_id)
-            if definition.is_archived:
-                raise AgentArchivedError(agent_id)
+            if (
+                not definition.is_active
+                or definition.is_locked
+                or definition.is_archived
+            ):
+                raise AgentNotEditableError(agent_id)
             if int(definition.current_revision) != int(expected_revision):
                 raise AgentRevisionConflictError(agent_id)
             next_number = int(expected_revision) + 1
@@ -211,6 +257,8 @@ class AgentRepository:
                 .where(
                     AgentDefinition.id == agent_id,
                     AgentDefinition.current_revision == int(expected_revision),
+                    AgentDefinition.is_active.is_(True),
+                    AgentDefinition.is_locked.is_(False),
                     AgentDefinition.is_archived.is_(False),
                 )
                 .values(
@@ -241,27 +289,64 @@ class AgentRepository:
             definition = db.get(AgentDefinition, agent_id)
             if definition is None:
                 raise AgentNotFoundError(agent_id)
-            if definition.is_archived:
-                raise AgentArchivedError(agent_id)
-            self._clear_default(db, definition.kind, keep_id=agent_id)
+            if not definition.is_active or definition.is_archived:
+                raise AgentInactiveError(agent_id)
+            self._clear_default(db, keep_id=agent_id)
             definition.is_default = True
-            definition.default_kind = definition.kind
             db.flush()
-            agents = self._load_agents(db, AgentDefinition.id == agent_id)
-            return agents[0]
+            return self._load_agents(db, AgentDefinition.id == agent_id)[0]
 
     # -------------------------------------------------------------------------
-    def archive_agent(self, agent_id: str) -> dict[str, Any]:
+    def set_lifecycle(
+        self,
+        agent_id: str,
+        *,
+        is_active: bool | None = None,
+        is_locked: bool | None = None,
+        is_archived: bool | None = None,
+    ) -> dict[str, Any]:
+        """Change lifecycle flags.
+
+        Never blocked by lock, inactivity or archive, so a restrictive state
+        can always be left. Only the default agent is protected from becoming
+        inactive or archived.
+        """
+
+        with unit_of_work(session_factory=self.session_factory, immediate=True) as db:
+            definition = db.get(AgentDefinition, agent_id)
+            if definition is None:
+                raise AgentNotFoundError(agent_id)
+            next_active = definition.is_active if is_active is None else is_active
+            next_archived = (
+                definition.is_archived if is_archived is None else is_archived
+            )
+            if definition.is_default and (not next_active or next_archived):
+                raise AgentDefaultRetireError(agent_id)
+            definition.is_active = next_active
+            definition.is_archived = next_archived
+            if is_locked is not None:
+                definition.is_locked = is_locked
+            definition.updated_at = datetime.now(UTC)
+            db.flush()
+            return self._load_agents(db, AgentDefinition.id == agent_id)[0]
+
+    # -------------------------------------------------------------------------
+    def delete_agent(self, agent_id: str) -> None:
         with unit_of_work(session_factory=self.session_factory, immediate=True) as db:
             definition = db.get(AgentDefinition, agent_id)
             if definition is None:
                 raise AgentNotFoundError(agent_id)
             if definition.is_default:
-                raise AgentDefaultArchiveError(agent_id)
-            definition.is_archived = True
-            db.flush()
-            agents = self._load_agents(db, AgentDefinition.id == agent_id)
-            return agents[0]
+                raise AgentDeleteBlockedError("The default agent cannot be deleted.")
+            if definition.is_locked:
+                raise AgentDeleteBlockedError("Unlock the agent before deleting it.")
+            count = self._reference_count(db, agent_id)
+            if count:
+                raise AgentDeleteBlockedError(
+                    f"The agent is referenced by {count} saved run(s); archive it instead."
+                )
+            db.execute(delete(AgentRevision).where(AgentRevision.agent_id == agent_id))
+            db.delete(definition)
 
     # -------------------------------------------------------------------------
     def list_revisions(self, agent_id: str) -> list[dict[str, Any]]:
@@ -281,11 +366,11 @@ class AgentRepository:
     def get_revision(self, revision_id: int) -> dict[str, Any] | None:
         with self.session_factory() as db_session:
             row = db_session.execute(
-                select(AgentRevision, AgentDefinition.kind, AgentDefinition.name)
+                select(AgentRevision, AgentDefinition.name)
                 .join(AgentDefinition, AgentDefinition.id == AgentRevision.agent_id)
                 .where(AgentRevision.id == int(revision_id))
             ).first()
             if row is None:
                 return None
-            revision, kind, name = row
-            return {**self._revision_dict(revision), "kind": kind, "agent_name": name}
+            revision, name = row
+            return {**self._revision_dict(revision), "agent_name": name}

@@ -490,6 +490,9 @@ class PatientTimelineExtractor:
             source_payload_hash=source_payload_hash,
             date_order=date_order,
         )
+        user_prompt = LLMRuntimeConfig.with_agent_guidance(
+            user_prompt, "timeline_focus"
+        )
         parsed: PatientTimelineExtraction | None = None
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:

@@ -6,7 +6,8 @@ from __future__ import annotations
 import uuid
 from typing import Any, cast
 
-from domain.agents import AgentExecutionContext, RevisionAgentConfig
+from common.exceptions import ServiceNotFoundError
+from domain.agents import AgentExecutionContext, RevisionConfig
 from domain.inspection import SessionRevisionRequest
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.inspection.revision_agent import (
@@ -109,7 +110,7 @@ class InspectionRevisionScaffoldMixin:
         agent_context: AgentExecutionContext,
     ) -> SessionRevisionRequest:
         """Clamp request limits and tools to the agent's execution limits."""
-        limits = cast(RevisionAgentConfig, agent_context.configuration).limits
+        limits = cast(RevisionConfig, agent_context.configuration).limits
         allowed = request.allowed_tools
         if limits.allowed_tools is not None:
             allowed = (
@@ -189,13 +190,11 @@ class InspectionRevisionScaffoldMixin:
 
         if agent_context is None:
             agent_context = self.agent_service.resolve_for_execution(
-                kind="revision",
+                capability="revision",
                 agent_id=revision_request.agent_id,
                 expected_revision=revision_request.agent_revision,
             )
-        readiness_issues = self.agent_service.collect_issues(
-            agent_context.configuration
-        )
+        readiness_issues = self.agent_service.collect_context_issues(agent_context)
         if readiness_issues:
             raise SessionRevisionValidationError(
                 " ".join(issue.message for issue in readiness_issues)
@@ -309,11 +308,15 @@ class InspectionRevisionScaffoldMixin:
         # A retry reruns the exact agent revision of the original run.
         agent = configuration.get("agent")
         revision_id = agent.get("agent_revision_id") if isinstance(agent, dict) else None
-        agent_context = (
-            self.agent_service.resolve_revision(int(revision_id))
-            if revision_id is not None
-            else None
-        )
+        agent_context = None
+        if revision_id is not None:
+            try:
+                agent_context = self.agent_service.resolve_revision(
+                    int(revision_id), "revision"
+                )
+            except ServiceNotFoundError:
+                # The original agent no longer exists; use the selected default.
+                agent_context = None
         return self.start_revision_job(
             int(run["session_id"]), request, agent_context=agent_context
         )
