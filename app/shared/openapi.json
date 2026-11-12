@@ -4687,26 +4687,6 @@
         "operationId": "list_agents_api_agents_get",
         "parameters": [
           {
-            "name": "kind",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "dili",
-                    "revision"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Kind"
-            }
-          },
-          {
             "name": "include_archived",
             "in": "query",
             "required": false,
@@ -4714,6 +4694,27 @@
               "type": "boolean",
               "default": false,
               "title": "Include Archived"
+            }
+          },
+          {
+            "name": "selectable_for",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "assessment",
+                    "revision",
+                    "timeline"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selectable For"
             }
           }
         ],
@@ -4860,6 +4861,40 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Delete Agent",
+        "operationId": "delete_agent_api_agents__agent_id__delete",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -5020,13 +5055,13 @@
         }
       }
     },
-    "/api/agents/{agent_id}/archive": {
-      "post": {
+    "/api/agents/{agent_id}/lifecycle": {
+      "put": {
         "tags": [
           "agents"
         ],
-        "summary": "Archive Agent",
-        "operationId": "archive_agent_api_agents__agent_id__archive_post",
+        "summary": "Set Lifecycle",
+        "operationId": "set_lifecycle_api_agents__agent_id__lifecycle_put",
         "parameters": [
           {
             "name": "agent_id",
@@ -5039,6 +5074,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentLifecycleRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5583,6 +5628,34 @@
         "type": "object",
         "title": "AdvancedRuntimeSettingsPatch"
       },
+      "AgentConfig": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 2,
+            "title": "Schema Version",
+            "default": 2
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/AssessmentConfig"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/RevisionConfig"
+          },
+          "timeline": {
+            "$ref": "#/components/schemas/TimelineConfig"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assessment",
+          "revision",
+          "timeline"
+        ],
+        "title": "AgentConfig",
+        "description": "The complete persisted configuration of one agent revision."
+      },
       "AgentCreateRequest": {
         "properties": {
           "name": {
@@ -5598,22 +5671,7 @@
             "default": ""
           },
           "configuration": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DiliAgentConfig"
-              },
-              {
-                "$ref": "#/components/schemas/RevisionAgentConfig"
-              }
-            ],
-            "title": "Configuration",
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "dili": "#/components/schemas/DiliAgentConfig",
-                "revision": "#/components/schemas/RevisionAgentConfig"
-              }
-            }
+            "$ref": "#/components/schemas/AgentConfig"
           }
         },
         "additionalProperties": false,
@@ -5643,6 +5701,47 @@
         "additionalProperties": false,
         "type": "object",
         "title": "AgentDuplicateRequest"
+      },
+      "AgentLifecycleRequest": {
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "is_locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Locked"
+          },
+          "is_archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Archived"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentLifecycleRequest",
+        "description": "Partial lifecycle change; omitted flags are left untouched."
       },
       "AgentListResponse": {
         "properties": {
@@ -5708,14 +5807,6 @@
             "type": "string",
             "title": "Id"
           },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "dili",
-              "revision"
-            ],
-            "title": "Kind"
-          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -5732,9 +5823,38 @@
             "type": "boolean",
             "title": "Is Default"
           },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_locked": {
+            "type": "boolean",
+            "title": "Is Locked"
+          },
           "is_archived": {
             "type": "boolean",
             "title": "Is Archived"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "assessment",
+                "revision",
+                "timeline"
+              ]
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "reference_count": {
+            "type": "integer",
+            "title": "Reference Count",
+            "default": 0
           },
           "created_at": {
             "anyOf": [
@@ -5768,12 +5888,15 @@
         "type": "object",
         "required": [
           "id",
-          "kind",
           "name",
           "description",
           "current_revision",
           "is_default",
+          "is_active",
+          "is_locked",
           "is_archived",
+          "editable",
+          "capabilities",
           "revision"
         ],
         "title": "AgentResponse"
@@ -5841,7 +5964,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "AgentRetrievalPolicy",
-        "description": "Per-agent retrieval preferences.\n\nPhysical index settings (chunking, embedding batch size, vector index\ntype/metric, collection name) are shared infrastructure, not agent\nconfiguration: changing an agent must never rebuild a shared index."
+        "description": "Per-capability retrieval preferences.\n\nPhysical index settings (chunking, embedding batch size, vector index\ntype/metric, collection name) are shared infrastructure, not agent\nconfiguration: changing an agent must never rebuild a shared index."
       },
       "AgentRevisionListResponse": {
         "properties": {
@@ -5879,22 +6002,7 @@
             "title": "Configuration Hash"
           },
           "configuration": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DiliAgentConfig"
-              },
-              {
-                "$ref": "#/components/schemas/RevisionAgentConfig"
-              }
-            ],
-            "title": "Configuration",
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "dili": "#/components/schemas/DiliAgentConfig",
-                "revision": "#/components/schemas/RevisionAgentConfig"
-              }
-            }
+            "$ref": "#/components/schemas/AgentConfig"
           },
           "created_at": {
             "anyOf": [
@@ -5940,22 +6048,7 @@
             "default": ""
           },
           "configuration": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DiliAgentConfig"
-              },
-              {
-                "$ref": "#/components/schemas/RevisionAgentConfig"
-              }
-            ],
-            "title": "Configuration",
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "dili": "#/components/schemas/DiliAgentConfig",
-                "revision": "#/components/schemas/RevisionAgentConfig"
-              }
-            }
+            "$ref": "#/components/schemas/AgentConfig"
           }
         },
         "additionalProperties": false,
@@ -6017,6 +6110,104 @@
           "valid"
         ],
         "title": "AgentValidationResponse"
+      },
+      "AssessmentConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "instructions": {
+            "$ref": "#/components/schemas/AssessmentInstructions"
+          },
+          "models": {
+            "$ref": "#/components/schemas/AssessmentModels"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel",
+            "default": "off"
+          },
+          "ollama_seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Seed",
+            "default": 42
+          },
+          "retrieval": {
+            "$ref": "#/components/schemas/AgentRetrievalPolicy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "AssessmentConfig"
+      },
+      "AssessmentInstructions": {
+        "properties": {
+          "assessment_focus": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Assessment Focus",
+            "default": ""
+          },
+          "report_style": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Report Style",
+            "default": ""
+          },
+          "extraction_guidance": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Extraction Guidance",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AssessmentInstructions"
+      },
+      "AssessmentModels": {
+        "properties": {
+          "extraction": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "clinical": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "extraction_overrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AgentModelRef"
+            },
+            "propertyNames": {
+              "enum": [
+                "therapy_drugs",
+                "anamnesis_drugs",
+                "diseases",
+                "laboratory"
+              ]
+            },
+            "type": "object",
+            "title": "Extraction Overrides"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "extraction",
+          "clinical"
+        ],
+        "title": "AssessmentModels"
       },
       "ClinicalInputPreflightIssue": {
         "properties": {
@@ -7577,115 +7768,6 @@
           "status"
         ],
         "title": "DesktopShutdownResponse"
-      },
-      "DiliAgentConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "dili",
-            "title": "Kind",
-            "default": "dili"
-          },
-          "schema_version": {
-            "type": "integer",
-            "const": 1,
-            "title": "Schema Version",
-            "default": 1
-          },
-          "instructions": {
-            "$ref": "#/components/schemas/DiliAgentInstructions"
-          },
-          "models": {
-            "$ref": "#/components/schemas/DiliAgentModels"
-          },
-          "reasoning_level": {
-            "$ref": "#/components/schemas/ReasoningLevel",
-            "default": "off"
-          },
-          "ollama_seed": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ollama Seed",
-            "default": 42
-          },
-          "retrieval": {
-            "$ref": "#/components/schemas/AgentRetrievalPolicy"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "models"
-        ],
-        "title": "DiliAgentConfig"
-      },
-      "DiliAgentInstructions": {
-        "properties": {
-          "assessment_focus": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Assessment Focus",
-            "default": ""
-          },
-          "report_style": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Report Style",
-            "default": ""
-          },
-          "extraction_guidance": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Extraction Guidance",
-            "default": ""
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "DiliAgentInstructions"
-      },
-      "DiliAgentModels": {
-        "properties": {
-          "extraction": {
-            "$ref": "#/components/schemas/AgentModelRef"
-          },
-          "clinical": {
-            "$ref": "#/components/schemas/AgentModelRef"
-          },
-          "timeline": {
-            "$ref": "#/components/schemas/AgentModelRef"
-          },
-          "extraction_overrides": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/AgentModelRef"
-            },
-            "propertyNames": {
-              "enum": [
-                "therapy_drugs",
-                "anamnesis_drugs",
-                "diseases",
-                "laboratory"
-              ]
-            },
-            "type": "object",
-            "title": "Extraction Overrides"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "extraction",
-          "clinical",
-          "timeline"
-        ],
-        "title": "DiliAgentModels"
       },
       "DiliRankCatalogItem": {
         "properties": {
@@ -11044,101 +11126,6 @@
         ],
         "title": "ReferenceCatalogRuntimeObservationUpsertRequest"
       },
-      "RevisionAgentConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "revision",
-            "title": "Kind",
-            "default": "revision"
-          },
-          "schema_version": {
-            "type": "integer",
-            "const": 1,
-            "title": "Schema Version",
-            "default": 1
-          },
-          "instructions": {
-            "$ref": "#/components/schemas/RevisionAgentInstructions"
-          },
-          "models": {
-            "$ref": "#/components/schemas/RevisionAgentModels"
-          },
-          "reasoning_level": {
-            "$ref": "#/components/schemas/ReasoningLevel",
-            "default": "off"
-          },
-          "ollama_seed": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ollama Seed",
-            "default": 42
-          },
-          "limits": {
-            "$ref": "#/components/schemas/RevisionExecutionLimits"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "models"
-        ],
-        "title": "RevisionAgentConfig"
-      },
-      "RevisionAgentInstructions": {
-        "properties": {
-          "review_objectives": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Review Objectives",
-            "default": ""
-          },
-          "editing_style": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Editing Style",
-            "default": ""
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "RevisionAgentInstructions"
-      },
-      "RevisionAgentModels": {
-        "properties": {
-          "planning": {
-            "$ref": "#/components/schemas/AgentModelRef"
-          },
-          "stage_overrides": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/AgentModelRef"
-            },
-            "propertyNames": {
-              "enum": [
-                "planning",
-                "tool_selection",
-                "editing",
-                "qa"
-              ]
-            },
-            "type": "object",
-            "title": "Stage Overrides"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "planning"
-        ],
-        "title": "RevisionAgentModels"
-      },
       "RevisionArtifactListResponse": {
         "properties": {
           "items": {
@@ -11465,6 +11452,47 @@
         ],
         "title": "RevisionClinicalReviewUpdateResponse"
       },
+      "RevisionConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "instructions": {
+            "$ref": "#/components/schemas/RevisionInstructions"
+          },
+          "models": {
+            "$ref": "#/components/schemas/RevisionModels"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel",
+            "default": "off"
+          },
+          "ollama_seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Seed",
+            "default": 42
+          },
+          "limits": {
+            "$ref": "#/components/schemas/RevisionExecutionLimits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "RevisionConfig"
+      },
       "RevisionEntityListResponse": {
         "properties": {
           "items": {
@@ -11755,6 +11783,53 @@
         "additionalProperties": false,
         "type": "object",
         "title": "RevisionExecutionLimits"
+      },
+      "RevisionInstructions": {
+        "properties": {
+          "review_objectives": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Review Objectives",
+            "default": ""
+          },
+          "editing_style": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Editing Style",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RevisionInstructions"
+      },
+      "RevisionModels": {
+        "properties": {
+          "planning": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "stage_overrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AgentModelRef"
+            },
+            "propertyNames": {
+              "enum": [
+                "planning",
+                "tool_selection",
+                "editing",
+                "qa"
+              ]
+            },
+            "type": "object",
+            "title": "Stage Overrides"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "planning"
+        ],
+        "title": "RevisionModels"
       },
       "RevisionPipelineRunResponse": {
         "properties": {
@@ -13214,6 +13289,31 @@
             "type": "boolean",
             "title": "Force Regenerate",
             "default": false
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "agent_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Revision"
           }
         },
         "additionalProperties": false,
@@ -14522,6 +14622,57 @@
           "open_conflicts"
         ],
         "title": "TerminologySummaryResponse"
+      },
+      "TimelineConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "instructions": {
+            "$ref": "#/components/schemas/TimelineInstructions"
+          },
+          "model": {
+            "$ref": "#/components/schemas/AgentModelRef"
+          },
+          "reasoning_level": {
+            "$ref": "#/components/schemas/ReasoningLevel",
+            "default": "off"
+          },
+          "ollama_seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Seed",
+            "default": 42
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "TimelineConfig"
+      },
+      "TimelineInstructions": {
+        "properties": {
+          "timeline_focus": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Timeline Focus",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimelineInstructions"
       },
       "ValidationError": {
         "properties": {
