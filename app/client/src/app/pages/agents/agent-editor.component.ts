@@ -76,6 +76,10 @@ export class AgentEditorComponent implements OnInit {
     const id = this.routeId();
     return id && id !== 'new' ? this.agents.byId(id) : null;
   });
+  readonly displayName = computed(() => {
+    const agent = this.agent();
+    return agent && this.name() === agent.name ? this.agents.displayName(agent) : this.name();
+  });
   readonly loadState = computed<'loading' | 'ready' | 'missing' | 'no-seed'>(() => {
     if (this.agents.status() === 'idle' || this.agents.status() === 'loading') {
       return this.agents.all().length ? 'ready' : 'loading';

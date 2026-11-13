@@ -53,6 +53,28 @@ export class AgentsStateService {
     this.showArchived() ? this.all() : this.all().filter((agent) => !agent.is_archived),
   );
   readonly defaultAgent = computed(() => this.all().find((agent) => agent.is_default) ?? null);
+  private readonly agentsByName = computed(() => {
+    const groups = new Map<string, Agent[]>();
+    for (const agent of this.all()) {
+      const name = agent.name.trim().toLowerCase();
+      const group = groups.get(name) ?? [];
+      group.push(agent);
+      groups.set(name, group);
+    }
+    return groups;
+  });
+
+  displayName(agent: Agent): string {
+    const matches = this.agentsByName().get(agent.name.trim().toLowerCase()) ?? [];
+    if (matches.length < 2) return agent.name;
+    let prefixLength = 8;
+    while (matches.some((match) =>
+      match.id !== agent.id && match.id.startsWith(agent.id.slice(0, prefixLength)),
+    ) && prefixLength < agent.id.length) {
+      prefixLength++;
+    }
+    return `${agent.name} · ${agent.id.slice(0, prefixLength)}`;
+  }
 
   /** Agents that can run new operations of the capability (active, not archived, enabled). */
   selectableFor(capability: Capability): Agent[] {

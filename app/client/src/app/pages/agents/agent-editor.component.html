@@ -17,7 +17,7 @@
           <svg lucideArrowLeft aria-hidden="true"></svg>
         </a>
         <div class="editor-title">
-          <h1>{{ creating() ? 'New agent' : name() || 'Agent' }}</h1>
+          <h1>{{ creating() ? 'New agent' : displayName() || 'Agent' }}</h1>
           <p class="editor-context">
             {{ activeTabLabel() }} · <span [class.is-readonly]="!editable()">{{ stateLabel() }}</span>
           </p>
@@ -164,7 +164,7 @@
                 <label class="toggle-switch capability-switch" [attr.title]="editable() ? null : readOnlyReason()">
                   <span class="capability-state">{{ cfg[cap].enabled ? 'Enabled' : 'Disabled' }}</span>
                   <input type="checkbox" role="switch" [checked]="cfg[cap].enabled" [disabled]="!editable()"
-                    [attr.aria-label]="(cfg[cap].enabled ? 'Disable ' : 'Enable ') + labels[cap]"
+                    [attr.aria-label]="labels[cap]"
                     (change)="setCapabilityEnabled(cap, $any($event.target).checked)" />
                   <span class="toggle-track"><span class="toggle-thumb"></span></span>
                 </label>

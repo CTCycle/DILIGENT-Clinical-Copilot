@@ -40,18 +40,22 @@
   } @else {
     <ul class="agent-grid">
       @for (agent of visibleAgents(); track agent.id) {
+        @let displayName = state.displayName(agent);
         <li class="agent-card" [class.is-muted]="!agent.is_active || agent.is_archived"
           [attr.data-testid]="'agent-card'">
           <div class="card-head">
-            <a class="agent-name" [routerLink]="['/agents', agent.id]">{{ agent.name }}</a>
-            <app-overflow-menu [label]="'More actions for ' + agent.name" [items]="menuItems(agent)"
+            <a class="agent-name" [routerLink]="['/agents', agent.id]">{{ displayName }}</a>
+            <app-overflow-menu [label]="'More actions for ' + displayName" [items]="menuItems(agent)"
               [disabled]="busy()" (selected)="onMenu(agent, $event)" />
           </div>
           <p class="description">{{ agent.description || 'No description' }}</p>
 
           <ul class="statuses" aria-label="Status">
             @if (agent.is_default) {
-              <li class="status is-default" title="Used when no agent is chosen"><svg lucideStar aria-hidden="true"></svg> Default</li>
+              <li class="status is-default" [attr.title]="defaultDescription(agent)">
+                <svg lucideStar aria-hidden="true"></svg>
+                {{ agent.capabilities.length ? 'Default' : 'Default · no workflows enabled' }}
+              </li>
             }
             @if (agent.is_locked) {
               <li class="status" title="Configuration cannot change"><svg lucideLock aria-hidden="true"></svg> Locked</li>
@@ -77,7 +81,7 @@
               }
             </ul>
             <button type="button" class="btn edit-btn" (click)="edit(agent)"
-              [attr.aria-label]="agent.editable ? 'Edit ' + agent.name : 'View ' + agent.name + ' (read-only)'">
+              [attr.aria-label]="agent.editable ? 'Edit ' + displayName : 'View ' + displayName + ' (read-only)'">
               <svg lucidePencil aria-hidden="true"></svg> {{ agent.editable ? 'Edit' : 'View' }}
             </button>
           </div>
@@ -88,7 +92,7 @@
   }
 
   <app-confirm-dialog [open]="pendingDelete() !== null"
-    [title]="'Delete ' + (pendingDelete()?.name ?? 'agent') + '?'"
+    [title]="'Delete ' + (pendingDelete() ? state.displayName(pendingDelete()!) : 'agent') + '?'"
     message="This permanently deletes the agent and its revision history. It cannot be undone."
     confirmLabel="Delete agent" [destructive]="true"
     (confirmed)="confirmDelete()" (cancelled)="pendingDelete.set(null)" />

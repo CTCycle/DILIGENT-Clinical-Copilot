@@ -66,7 +66,7 @@ import { ClinicalSessionRevisionAuditComponent } from './components/clinical-ses
 import { ClinicalSessionTimelineWorkspaceComponent } from './components/clinical-session-timeline-workspace.component';
 import { ClinicalSessionsFiltersComponent } from './components/clinical-sessions-filters.component';
 import { ClinicalSessionsStore } from './clinical-sessions-store';
-import { formatRevisionAgentProvenance } from './clinical-session-revision-display';
+import { formatRevisionAgentProvenance, formatRevisionFailure } from './clinical-session-revision-display';
 import { applyMarkdownCommand } from './markdown-editor';
 import {
   ClinicalSessionSection,
@@ -162,7 +162,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly markdownRenderer = inject(MarkdownRendererService);
   private readonly jobPolling = inject(JobPollingService);
-  private readonly agentsState = inject(AgentsStateService);
+  protected readonly agentsState = inject(AgentsStateService);
 
   readonly store = inject(ClinicalSessionsStore);
   readonly sessions = this.store.visible;
@@ -589,9 +589,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionVersionStatus.set(null);
     this.revisionSteps.set([]);
     this.revisionArtifacts.set([]);
+    this.revisionDraftReport.set('');
     this.revisionRunning.set(true);
     const agent = this.revisionAgent();
-    this.revisionRunAgent.set(agent ? `${agent.name} · revision ${agent.current_revision}` : null);
+    this.revisionRunAgent.set(agent ? `${this.agentsState.displayName(agent)} · revision ${agent.current_revision}` : null);
     this.revisionStatus.set('Starting revision agent...');
     this.revisionPollCancelled = false;
     try {
@@ -674,12 +675,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         const status = await fetchSessionRevisionJobStatus(jobId);
         if (this.revisionPollCancelled || !isCurrentLoad()) return false;
         const result = status.result;
-        this.revisionStatus.set(this.revisionJobStatusLabel(status.status, result));
+        const failed = status.status === 'failed';
+        this.revisionStatus.set(failed
+          ? formatRevisionFailure(this.revisionSteps(), status.error)
+          : this.revisionJobStatusLabel(status.status, result));
         if (typeof result?.revision_version_id === 'number') this.revisionVersionId.set(result.revision_version_id);
         if (this.isRevisionVersionStatus(result?.revision_status)) {
           this.revisionVersionStatus.set(result.revision_status);
         }
-        if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+        if (status.status === 'completed' || failed || status.status === 'cancelled') {
           this.revisionRunning.set(false);
           this.revisionJobId.set(null);
           if (status.status === 'cancelled') {
@@ -687,16 +691,21 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
           }
           const pipelineRunId = typeof result?.pipeline_run_id === 'string' ? result.pipeline_run_id : null;
           const versionId = this.revisionVersionId();
-          if (pipelineRunId) {
-            const steps = (await fetchRevisionPipelineSteps(pipelineRunId)).items;
-            if (!isCurrentLoad()) return false;
-            this.revisionSteps.set(steps);
-          }
-          if (versionId) {
-            const artifacts = (await fetchRevisionArtifacts(sessionId, versionId)).items;
-            if (!isCurrentLoad()) return false;
-            this.revisionArtifacts.set(artifacts);
-            this.applyRevisionDraftArtifact(artifacts);
+          try {
+            if (pipelineRunId) {
+              const steps = (await fetchRevisionPipelineSteps(pipelineRunId)).items;
+              if (!isCurrentLoad()) return false;
+              this.revisionSteps.set(steps);
+              if (failed) this.revisionStatus.set(formatRevisionFailure(steps, status.error));
+            }
+            if (versionId) {
+              const artifacts = (await fetchRevisionArtifacts(sessionId, versionId)).items;
+              if (!isCurrentLoad()) return false;
+              this.revisionArtifacts.set(artifacts);
+              this.applyRevisionDraftArtifact(artifacts);
+            }
+          } catch (error) {
+            if (!failed) throw error;
           }
           return false;
         }
@@ -712,7 +721,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (result?.revision_status === 'qa_failed') return 'Revision completed with QA issues.';
     if (result?.revision_status === 'requires_human_review') return 'Revision requires human review.';
     if (jobStatus === 'cancelled') return 'Revision cancelled.';
-    if (jobStatus !== 'running') return jobStatus;
+    if (jobStatus === 'pending') return 'Revision queued.';
+    if (jobStatus === 'completed') return 'Revision completed.';
     switch (result?.revision_phase) {
       case 'planning':
         return 'Planning revision...';
@@ -773,6 +783,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       );
     } catch (error) {
       if (isCurrentLoad()) {
+        this.revisionRunning.set(false);
         this.revisionStatus.set(formatUnknownError(error, 'Unable to restore the saved revision draft.'));
       }
     }

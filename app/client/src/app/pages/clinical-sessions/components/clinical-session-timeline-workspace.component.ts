@@ -22,7 +22,7 @@ import { formatUnknownError } from '../../../core/utils';
 export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChanges, OnDestroy {
   private readonly router = inject(Router);
   private readonly jobPolling = inject(JobPollingService);
-  private readonly agents = inject(AgentsStateService);
+  protected readonly agents = inject(AgentsStateService);
   @Input({ required: true }) session!: ClinicalSessionDetail;
 
   readonly timelinePreviews = signal<InspectionSessionTimelinePreview[]>([]);

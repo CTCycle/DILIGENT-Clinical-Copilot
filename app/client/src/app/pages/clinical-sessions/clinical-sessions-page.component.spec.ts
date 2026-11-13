@@ -297,6 +297,46 @@ describe('ClinicalSessionsPageComponent request generations', () => {
     expect(fetchSpy.mock.calls.some(([input]) => String(input).endsWith('/versions/146/artifacts'))).toBe(false);
   });
 
+  it('restores the failed planning step and retry guidance when reopening a revision', async () => {
+    component.selected.set(sessionDetail(12));
+    const failure = 'The provider response did not match the required structure after repair.';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/12/versions')) {
+        return jsonResponse({ items: [revisionVersion(12, 'draft_revision', {
+          pipeline_run_id: 'run-1',
+          model_configuration: { job_id: 'job-1' },
+        })] });
+      }
+      if (url.endsWith('/pipeline-runs/run-1/steps')) {
+        return jsonResponse({ items: [{
+          step_name: 'revision_agent_planner',
+          step_index: 1,
+          step_count: 4,
+          status: 'failed',
+          error: { message: failure },
+        }] });
+      }
+      if (url.endsWith('/versions/112/artifacts')) return jsonResponse({ items: [] });
+      if (url.endsWith('/revision/jobs/job-1')) {
+        return jsonResponse({ status: 'failed', error: 'Operation failed.', result: {
+          pipeline_run_id: 'run-1',
+          revision_version_id: 112,
+        } });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await (component as unknown as {
+      loadPersistedRevision: (sessionId: number, generation: number) => Promise<void>;
+    }).loadPersistedRevision(12, 0);
+
+    expect(component.revisionStatus()).toContain(`Revision failed during revision planning. ${failure}`);
+    expect(component.revisionStatus()).toContain('then choose Start revision.');
+    expect(component.revisionRunning()).toBe(false);
+    expect(component.revisionReviewAvailable()).toBe(false);
+  });
+
   it('clears a stale revision draft after saving a manual report edit', async () => {
     component.selected.set(sessionDetail(19));
     component.editorText.set('Edited report');

@@ -120,7 +120,7 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     assert persisted["revision"]["configuration"]["timeline"]["instructions"]["timeline_focus"] == focus
 
     # Disable one capability independently; its values stay stored.
-    _set_switch(page, "Disable Timeline", False)
+    _set_switch(page, "Timeline", False)
     page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_text("Saved as revision 3")).to_be_visible()
     disabled = next(item for item in _agents(api_context) if item["name"] == name)
@@ -179,6 +179,17 @@ def test_launch_with_non_default_agent_records_its_runtime_provenance(
     _create_agent(page, agent_name)
     agent = next(item for item in _agents(api_context) if item["name"] == agent_name)
     assert agent["id"] != default_agent["id"] and not agent["is_default"]
+    duplicated = api_context.post(
+        f"/api/agents/{agent['id']}/duplicate", data={"name": agent_name}
+    )
+    assert duplicated.status == 201, duplicated.text()
+    copy = duplicated.json()
+    page.get_by_role("link", name="Back to Agents").click()
+    for item in (agent, copy):
+        label = f"{agent_name} · {item['id'][:8]}"
+        expect(
+            _card(page, label).get_by_role("button", name=f"Edit {label}", exact=True)
+        ).to_be_visible()
 
     session_id = None
     try:
@@ -199,6 +210,10 @@ def test_launch_with_non_default_agent_records_its_runtime_provenance(
 
         # Agent step: the default is preselected; choose the new agent and re-check.
         expect(dialog.locator("#wizard-agent")).to_have_value(default_agent["id"])
+        for item in (agent, copy):
+            expect(dialog.locator(f"option[value='{item['id']}']")).to_have_text(
+                f"{agent_name} · {item['id'][:8]}"
+            )
         dialog.locator("#wizard-agent").select_option(agent["id"])
         expect(dialog.get_by_test_id("agent-summary")).to_contain_text(agent_name)
         expect(dialog.get_by_test_id("agent-summary")).to_contain_text("Revision 1")
@@ -231,3 +246,31 @@ def test_launch_with_non_default_agent_records_its_runtime_provenance(
                     break
                 time.sleep(1)
             api_context.delete(f"/api/inspection/sessions/{session_id}")
+
+
+###############################################################################
+def test_report_review_shows_planning_failure_and_recovery_after_reload(
+    page: Page, base_url: str, api_context: APIRequestContext
+) -> None:
+    sessions = api_context.get(
+        "/api/inspection/sessions", params={"search": "CI Browser Regression Subject"}
+    )
+    assert sessions.ok, sessions.text()
+    session_id = sessions.json()["items"][0]["session_id"]
+    page.goto(f"{base_url}/clinical-sessions?session={session_id}&tab=revision")
+    start = page.get_by_role("button", name="Start revision", exact=True)
+    start.click()
+
+    feedback = page.get_by_role("status").filter(has_text="Last attempt")
+    for reload in (False, True):
+        if reload:
+            page.reload()
+        expect(feedback).to_contain_text(
+            "Revision failed during revision planning.", timeout=90000
+        )
+        expect(feedback).to_contain_text(
+            "The provider response did not match the required structure"
+        )
+        expect(feedback).to_contain_text("then choose Start revision.")
+        expect(page.get_by_text("Form ready", exact=True)).to_be_visible()
+        expect(start).to_be_enabled()

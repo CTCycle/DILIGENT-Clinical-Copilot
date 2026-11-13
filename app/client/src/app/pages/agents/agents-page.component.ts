@@ -54,7 +54,7 @@ export class AgentsPageComponent implements OnInit {
     const query = this.search().trim().toLowerCase();
     return this.state
       .agents()
-      .filter((agent) => !query || agent.name.toLowerCase().includes(query))
+      .filter((agent) => !query || this.state.displayName(agent).toLowerCase().includes(query))
       .sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.name.localeCompare(b.name));
   });
 
@@ -78,6 +78,14 @@ export class AgentsPageComponent implements OnInit {
     return null;
   }
 
+  defaultDescription(agent: Agent): string {
+    if (!agent.capabilities.length) {
+      return 'Each workflow selects an eligible fallback when one is available.';
+    }
+    const workflows = agent.capabilities.map((capability) => this.capabilityLabels[capability]);
+    return `Preferred for ${workflows.join(', ')}. Other workflows select an eligible fallback when available.`;
+  }
+
   archiveBlockedReason(agent: Agent): string | null {
     return agent.is_default && !agent.is_archived
       ? 'Make another agent the default before archiving this one'
@@ -96,7 +104,11 @@ export class AgentsPageComponent implements OnInit {
   menuItems(agent: Agent): OverflowMenuItem[] {
     return [
       { id: 'duplicate', label: 'Duplicate' },
-      { id: 'default', label: 'Set as default', reason: this.defaultBlockedReason(agent) },
+      {
+        id: 'default',
+        label: agent.capabilities.length ? 'Set as default' : 'Set as default (workflows need a fallback)',
+        reason: this.defaultBlockedReason(agent),
+      },
       { id: 'lock', label: agent.is_locked ? 'Unlock' : 'Lock' },
       { id: 'archive', label: agent.is_archived ? 'Restore' : 'Archive', reason: this.archiveBlockedReason(agent) },
       { id: 'delete', label: 'Delete', danger: true, reason: this.deleteBlockedReason(agent) },
@@ -118,31 +130,35 @@ export class AgentsPageComponent implements OnInit {
   }
 
   async duplicate(agent: Agent): Promise<void> {
-    await this.run(() => this.state.duplicate(agent.id), `Duplicated "${agent.name}".`);
+    await this.run(() => this.state.duplicate(agent.id), `Duplicated "${this.state.displayName(agent)}".`);
   }
 
   async setDefault(agent: Agent): Promise<void> {
-    await this.run(() => this.state.setDefault(agent.id), `"${agent.name}" is now the default agent.`);
+    const message = `"${this.state.displayName(agent)}" is now the default agent.`;
+    await this.run(
+      () => this.state.setDefault(agent.id),
+      agent.capabilities.length ? message : `${message} ${this.defaultDescription(agent)}`,
+    );
   }
 
   async toggleLock(agent: Agent): Promise<void> {
     await this.run(
       () => this.state.setLifecycle(agent.id, { is_locked: !agent.is_locked }),
-      agent.is_locked ? `Unlocked "${agent.name}".` : `Locked "${agent.name}".`,
+      `${agent.is_locked ? 'Unlocked' : 'Locked'} "${this.state.displayName(agent)}".`,
     );
   }
 
   async toggleArchive(agent: Agent): Promise<void> {
     await this.run(
       () => this.state.setLifecycle(agent.id, { is_archived: !agent.is_archived }),
-      agent.is_archived ? `Restored "${agent.name}".` : `Archived "${agent.name}".`,
+      `${agent.is_archived ? 'Restored' : 'Archived'} "${this.state.displayName(agent)}".`,
     );
   }
 
   async confirmDelete(): Promise<void> {
     const agent = this.pendingDelete();
     this.pendingDelete.set(null);
-    if (agent) await this.run(() => this.state.remove(agent.id), `Deleted "${agent.name}".`);
+    if (agent) await this.run(() => this.state.remove(agent.id), `Deleted "${this.state.displayName(agent)}".`);
   }
 
   private async run<T>(action: () => Promise<T>, success: string): Promise<T | null> {

@@ -16,7 +16,7 @@
           <select aria-label="Timeline agent" [disabled]="generationRunning()"
             (change)="timelineAgentId.set($any($event.target).value || null)">
             @for (option of selectableAgents(); track option.id) {
-              <option [value]="option.id" [selected]="option.id === agent()?.id">{{ option.name }}{{ option.is_default ? ' (default)' : '' }}</option>
+              <option [value]="option.id" [selected]="option.id === agent()?.id">{{ agents.displayName(option) }}{{ option.is_default ? ' (default)' : '' }}</option>
             }
           </select>
         </label>

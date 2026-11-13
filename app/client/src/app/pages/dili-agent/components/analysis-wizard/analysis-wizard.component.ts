@@ -87,7 +87,7 @@ export class AnalysisWizardComponent {
   readonly editSource = output<SourceSelection | null>();
 
   private readonly stateService = inject(AppStateService);
-  private readonly agentsState = inject(AgentsStateService);
+  protected readonly agentsState = inject(AgentsStateService);
   private readonly drafts = inject(ClinicalSessionDraftService);
   private readonly router = inject(Router);
 

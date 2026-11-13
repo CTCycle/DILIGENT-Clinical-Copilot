@@ -20,6 +20,8 @@ from configurations.startup import get_server_settings  # noqa: E402
 from repositories.clinical_session_repository import ClinicalSessionRepository  # noqa: E402
 from repositories.context import RepositoryContext  # noqa: E402
 from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
+from repositories.database.session import unit_of_work  # noqa: E402
+from repositories.session_revision_repository import SessionRevisionRepository  # noqa: E402
 from repositories.session_timeline_repository import SessionTimelineRepository  # noqa: E402
 
 KNOWLEDGE_FIXTURE = (
@@ -69,6 +71,7 @@ def seed_browser_regression_database() -> tuple[int, int]:
     context = RepositoryContext.create()
     seed_knowledge_base(context)
     sessions = ClinicalSessionRepository(context)
+    revisions = SessionRevisionRepository(context)
     timelines = SessionTimelineRepository(context)
 
     existing_rows, _ = sessions.list_sessions(
@@ -79,7 +82,9 @@ def seed_browser_regression_database() -> tuple[int, int]:
     for row in existing_rows:
         session_id = row.get("session_id")
         if isinstance(session_id, int):
-            sessions.delete_session(session_id)
+            with unit_of_work(session_factory=context.session_factory, immediate=True) as db:
+                revisions.delete_session_revisions(db, session_id)
+                sessions.delete_session(session_id, db_session=db)
 
     session_id = sessions.save_clinical_session(
         {

@@ -124,7 +124,7 @@
             >
               @for (option of agents(); track option.id) {
                 <option [value]="option.id" [selected]="option.id === agent()?.id">
-                  {{ option.name }}{{ option.is_default ? ' (default)' : '' }}
+                  {{ agentsState.displayName(option) }}{{ option.is_default ? ' (default)' : '' }}
                 </option>
               }
             </select>
@@ -133,8 +133,8 @@
           <p class="wizard-notice" role="status">No active agent has the DILI Assessment capability enabled. Enable it on an agent in Agents.</p>
         }
         @if (agent(); as current) {
-          <section class="wizard-agent-card" data-testid="agent-summary" [attr.aria-label]="current.name + ' summary'">
-            <h3>{{ current.name }} <span class="wizard-tag">Revision {{ current.current_revision }}</span></h3>
+          <section class="wizard-agent-card" data-testid="agent-summary" [attr.aria-label]="agentsState.displayName(current) + ' summary'">
+            <h3>{{ agentsState.displayName(current) }} <span class="wizard-tag">Revision {{ current.current_revision }}</span></h3>
             @if (current.description) {
               <p>{{ current.description }}</p>
             }
@@ -179,7 +179,7 @@
           <div>
             <dt>Agent</dt>
             <dd>
-              {{ agent()?.name ?? 'Default DILI agent' }}
+              {{ agent() ? agentsState.displayName(agent()!) : 'Default DILI agent' }}
               @if (agent(); as current) {
                 <span class="wizard-tag">Revision {{ current.current_revision }}</span>
               }

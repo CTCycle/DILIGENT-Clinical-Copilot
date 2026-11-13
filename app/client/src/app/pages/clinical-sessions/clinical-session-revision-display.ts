@@ -58,6 +58,17 @@ export function formatRevisionStepLabel(step: RevisionPipelineStep): string {
   return humanize(stepName, 'Revision step');
 }
 
+export function formatRevisionFailure(steps: RevisionPipelineStep[], jobError?: string | null): string {
+  const failedStep = steps.filter((step) => normalizedStatus(step.status) === 'failed').at(-1);
+  const stage = failedStep
+    ? `Revision failed during ${formatRevisionStepLabel(failedStep).toLowerCase()}.`
+    : 'Revision failed.';
+  const stepError = failedStep?.error?.['message'];
+  const reason = typeof stepError === 'string' && stepError.trim() ? stepError.trim() : jobError?.trim();
+  const recovery = 'Check the review agent’s model settings or select another agent, then choose Start revision.';
+  return [stage, reason, recovery].filter(Boolean).join(' ');
+}
+
 export function formatRevisionStepMeta(step: RevisionPipelineStep): string {
   const parts: string[] = [];
   const stepIndex = Number(step.step_index);

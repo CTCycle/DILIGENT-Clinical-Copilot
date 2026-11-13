@@ -108,6 +108,39 @@ describe('AgentsPageComponent', () => {
     expect(button('Assessment only', 'Edit Assessment only')).toBeTruthy();
   });
 
+  it('distinguishes agents with the same name on their cards and actions', async () => {
+    const first = { ...used, id: '12345678a' };
+    const second = { ...first, id: '12345678b' };
+    fetchSpy.mockResolvedValueOnce(json({ agents: [first, second] }));
+    await fixture.componentInstance.state.load({ force: true });
+    await flush();
+
+    for (const agent of [first, second]) {
+      const label = `Used · ${agent.id}`;
+      expect(button(label, `Edit ${label}`)).toBeTruthy();
+      expect(button(label, `More actions for ${label}`)).toBeTruthy();
+    }
+  });
+
+  it('explains fallback behavior when assigning and displaying an all-disabled default', async () => {
+    const disabled = makeAgent(
+      'off',
+      { name: 'All disabled' },
+      withDisabled(makeAgentConfig(), 'assessment', 'revision', 'timeline'),
+    );
+    fetchSpy.mockResolvedValueOnce(json({ agents: [base, disabled] }));
+    await fixture.componentInstance.state.load({ force: true });
+    await flush();
+    const setDefault = await menuItem('All disabled', 'Set as default (workflows need a fallback)');
+    fetchSpy.mockResolvedValueOnce(json({ ...disabled, is_default: true }));
+    setDefault.click();
+    await flush();
+
+    expect(card('All disabled').textContent).toContain('Default · no workflows enabled');
+    expect(el().textContent).toContain('Each workflow selects an eligible fallback when one is available.');
+    expect(fixture.componentInstance.state.preferredFor('timeline')?.id).toBe(base.id);
+  });
+
   it('locks an agent through the lifecycle endpoint without creating a revision', async () => {
     (await menuItem('Assessment only', 'Lock')).click();
     await flush();
