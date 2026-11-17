@@ -94,9 +94,12 @@ export class ModelConfigStateService {
   catalogInfo(provider: string): { status: CatalogStatus; message: string | null } | null {
     const data = this.data();
     if (!data) return null;
-    if (provider === 'ollama') return { status: data.local_catalog.status, message: data.local_catalog.message };
-    const found = data.cloud_providers.find((item) => item.id === provider);
-    return found ? { status: found.catalog_status, message: found.catalog_message ?? null } : null;
+    if (provider === 'ollama') {
+      const local = data.local_catalog;
+      return local ? { status: local.status, message: local.message } : null;
+    }
+    const found = data.cloud_providers?.find((item) => item.id === provider);
+    return found?.catalog_status ? { status: found.catalog_status, message: found.catalog_message ?? null } : null;
   }
 
   /** Loads the catalog of every listed provider that was never loaded; reads stay cache-only otherwise. */

@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Component, input, output } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 
 import {
   AgentModelRef,
@@ -10,6 +10,7 @@ import {
   ReportTemplate,
 } from '../../core/models/agent-types';
 import { EvidenceSourceId, ReasoningLevel } from '../../core/models/types';
+import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { AgentModelFieldComponent } from './agent-model-field.component';
 import { INSTRUCTION_MAX_LENGTH, ModelCatalog, ProviderOption } from './agent-form';
 import { ReportTemplateFieldComponent } from './report-template-field.component';
@@ -42,6 +43,8 @@ type NumericRetrievalKey =
   templateUrl: './assessment-sections.component.html',
 })
 export class AssessmentSectionsComponent {
+  private readonly modelConfig = inject(ModelConfigStateService);
+
   readonly config = input.required<AssessmentConfig>();
   readonly providerOptions = input<readonly ProviderOption[]>([]);
   readonly catalog = input<ModelCatalog>({});
@@ -52,6 +55,29 @@ export class AssessmentSectionsComponent {
   readonly evidenceSources = EVIDENCE_SOURCES;
   readonly reasoningLevels = REASONING;
   readonly limit = INSTRUCTION_MAX_LENGTH;
+
+  readonly busy = this.modelConfig.catalogBusy;
+  readonly refreshMessage = signal('');
+  readonly refreshFailed = signal(false);
+  readonly weightSum = computed(() => {
+    const { hybrid_vector_weight: vector, hybrid_text_weight: text } = this.config().retrieval;
+    return (Number(vector) + Number(text)).toFixed(2);
+  });
+
+  /** One refresh for every provider this tab's models use. */
+  async refreshModels(): Promise<void> {
+    const { models } = this.config();
+    const providers = [models.clinical, models.extraction, ...Object.values(models.extraction_overrides)]
+      .map((ref) => ref?.provider)
+      .filter((provider): provider is string => !!provider);
+    this.refreshMessage.set('');
+    const failures = await this.modelConfig.refreshCatalogs(providers);
+    const failed = Object.entries(failures);
+    this.refreshFailed.set(failed.length > 0);
+    this.refreshMessage.set(
+      failed.length ? failed.map(([provider, error]) => `${provider}: ${error}`).join(' · ') : 'Models updated.',
+    );
+  }
 
   private update(change: (draft: AssessmentConfig) => void): void {
     const draft = structuredClone(this.config());

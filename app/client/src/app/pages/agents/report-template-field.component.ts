@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 
 import { ReportTemplate, ReportTemplateFormat } from '../../core/models/agent-types';
 import { REPORT_TEMPLATE_MAX_LENGTH } from './agent-form';
@@ -9,7 +9,10 @@ import { REPORT_TEMPLATE_MAX_LENGTH } from './agent-form';
 const FORMATS: readonly ReportTemplateFormat[] = ['md', 'json', 'xml', 'txt'];
 const ACCEPT = FORMATS.map((format) => `.${format}`).join(',');
 
-/** Upload, preview, replace and remove the report template of an agent. */
+/**
+ * Report template of an agent. A single value, supplied either by typing in the editor or by uploading a
+ * file; an uploaded file lands in the same editor so it can be inspected and changed.
+ */
 @Component({
   selector: 'app-report-template-field',
   standalone: true,
@@ -18,32 +21,48 @@ const ACCEPT = FORMATS.map((format) => `.${format}`).join(',');
     <div class="template-field">
       <input #picker class="visually-hidden" type="file" [accept]="accept" [disabled]="disabled()"
         (change)="onFile($event)" />
-      @if (template(); as current) {
-        <div class="template-summary">
-          <div>
-            <strong>{{ current.file_name }}</strong>
-            <span class="field-hint">
-              {{ current.format.toUpperCase() }} · {{ current.content.length }} characters
-            </span>
-          </div>
-          <div class="template-actions">
-            <button type="button" class="btn" (click)="previewOpen.set(!previewOpen())"
-              [attr.aria-expanded]="previewOpen()">
-              {{ previewOpen() ? 'Hide preview' : 'Preview' }}
-            </button>
-            <button type="button" class="btn" [disabled]="disabled()" (click)="picker.click()">Replace</button>
-            <button type="button" class="btn" [disabled]="disabled()" (click)="remove()">Remove</button>
-          </div>
-        </div>
-        @if (previewOpen()) {
-          <pre class="template-preview" aria-label="Report template preview">{{ current.content }}</pre>
+      <div class="template-bar">
+        @if (template(); as current) {
+          <span class="template-state is-set">Configured</span>
+          <span class="template-name">{{ current.file_name }}</span>
+          <span class="field-hint">{{ current.format.toUpperCase() }} · {{ current.content.length }} characters</span>
+        } @else {
+          <span class="template-state">Not configured</span>
+          <span class="field-hint">The default report format is used.</span>
         }
-      } @else {
-        <p class="agent-section-note">Using the default report format.</p>
-        <div>
+        <span class="template-actions">
+          @if (template() || editing()) {
+            <button type="button" class="btn" (click)="editing.set(!editing())" [attr.aria-expanded]="editing()">
+              {{ editing() ? 'Hide editor' : 'Edit' }}
+            </button>
+          } @else {
+            <button type="button" class="btn" [disabled]="disabled()" (click)="editing.set(true)">Write</button>
+          }
           <button type="button" class="btn" [disabled]="disabled()" (click)="picker.click()">
-            Upload template
+            {{ template() ? 'Replace file' : 'Upload file' }}
           </button>
+          @if (template()) {
+            <button type="button" class="btn" [disabled]="disabled()" (click)="clear()">Clear</button>
+          }
+        </span>
+      </div>
+      @if (editing()) {
+        <div class="template-editor">
+          <label class="field template-format">Format
+            <select [disabled]="disabled()" (change)="setFormat($any($event.target).value)">
+              @for (format of formats; track format) {
+                <option [value]="format" [selected]="format === activeFormat()">{{ format.toUpperCase() }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
+            <span class="visually-hidden">Report template content</span>
+            <textarea class="template-text" rows="10" spellcheck="false" [disabled]="disabled()"
+              [attr.maxlength]="maxLength" [value]="content()"
+              placeholder="Write or paste the report structure, e.g. Markdown headings, a JSON schema or XML skeleton."
+              (input)="setContent($any($event.target).value)"></textarea>
+            <span class="field-counter">{{ content().length }} / {{ maxLength }}</span>
+          </label>
         </div>
       }
       @if (error()) {
@@ -58,8 +77,32 @@ export class ReportTemplateFieldComponent {
   readonly templateChange = output<ReportTemplate | null>();
 
   readonly accept = ACCEPT;
-  readonly previewOpen = signal(false);
+  readonly formats = FORMATS;
+  readonly maxLength = REPORT_TEMPLATE_MAX_LENGTH;
+  readonly editing = signal(false);
   readonly error = signal('');
+  private readonly draftFormat = signal<ReportTemplateFormat>('md');
+  readonly content = computed(() => this.template()?.content ?? '');
+  readonly activeFormat = computed(() => this.template()?.format ?? this.draftFormat());
+
+  setContent(content: string): void {
+    this.error.set('');
+    if (!content.trim()) {
+      this.templateChange.emit(null);
+      return;
+    }
+    const format = this.activeFormat();
+    this.templateChange.emit({ file_name: this.template()?.file_name ?? `template.${format}`, format, content });
+  }
+
+  setFormat(value: string): void {
+    const format = FORMATS.find((candidate) => candidate === value) ?? 'md';
+    this.draftFormat.set(format);
+    const current = this.template();
+    if (!current) return;
+    const stem = current.file_name.replace(/\.[^.]+$/, '') || 'template';
+    this.templateChange.emit({ ...current, format, file_name: `${stem}.${format}` });
+  }
 
   async onFile(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -82,12 +125,13 @@ export class ReportTemplateFieldComponent {
       return;
     }
     this.error.set('');
+    this.editing.set(true);
     this.templateChange.emit({ file_name: file.name, format, content });
   }
 
-  remove(): void {
+  clear(): void {
     this.error.set('');
-    this.previewOpen.set(false);
+    this.editing.set(false);
     this.templateChange.emit(null);
   }
 }

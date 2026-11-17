@@ -18,6 +18,9 @@ describe('AgentEditorComponent', () => {
   let agents: Agent[];
   let putResponse: () => Response;
   let modelConfig: unknown;
+  let nextConfig: unknown;
+  let catalogOutcome: 'refreshed' | 'failed';
+  let catalogCalls: string[];
   const fetchSpy = vi.fn();
 
   const el = (): HTMLElement => fixture.nativeElement;
@@ -63,6 +66,9 @@ describe('AgentEditorComponent', () => {
 
   beforeEach(() => {
     modelConfig = { local_models: [], cloud_providers: [] };
+    nextConfig = undefined;
+    catalogOutcome = 'refreshed';
+    catalogCalls = [];
     agents = [makeAgent('a1', { is_default: true, name: 'Main', current_revision: 3 }), makeAgent('a2', { name: 'Spare' })];
     putResponse = () => json({ ...agents[1], current_revision: 2, name: 'Renamed' });
     fetchSpy.mockReset().mockImplementation(async (url: string, init?: RequestInit) => {
@@ -74,6 +80,16 @@ describe('AgentEditorComponent', () => {
       if (init?.method === 'PUT') return putResponse();
       if (init?.method === 'POST' && target.endsWith('/agents')) {
         return json(makeAgent('new1', { name: JSON.parse(String(init.body)).name }), 201);
+      }
+      if (target.includes('/catalogs/')) {
+        const provider = target.split('/catalogs/')[1].split('/')[0];
+        catalogCalls.push(`${init?.method} ${provider}`);
+        return json({
+          catalog_provider: provider,
+          outcome: catalogOutcome,
+          error: catalogOutcome === 'failed' ? 'boom' : null,
+          state: nextConfig ?? modelConfig,
+        });
       }
       if (target.includes('/revisions')) return json({ revisions: [agents[1].revision] });
       if (target.includes('/agents')) return json({ agents });
@@ -230,35 +246,41 @@ describe('AgentEditorComponent', () => {
     expect(section.querySelectorAll('textarea').length).toBe(1);
     expect(section.textContent).toContain('Custom instructions');
     expect(section.textContent).not.toContain('Extraction guidance');
-    expect(section.textContent).toContain('Using the default report format.');
+    expect(section.textContent).toContain('Not configured');
   });
 
-  it('uploads, previews and removes a report template and saves it with the agent', async () => {
+  it('uploads a template into the editor, lets it be edited, clears it and saves typed text', async () => {
     await open('a2');
     await goTo('DILI Assessment');
-    const picker = el().querySelector<HTMLInputElement>('app-report-template-field input[type="file"]')!;
+    const field = el().querySelector('app-report-template-field')!;
+    const picker = field.querySelector<HTMLInputElement>('input[type="file"]')!;
     const file = new File(['# Report\n## Findings'], 'layout.md', { type: 'text/markdown' });
     Object.defineProperty(picker, 'files', { value: [file], configurable: true });
     picker.dispatchEvent(new Event('change'));
     await flush();
-    const field = el().querySelector('app-report-template-field')!;
+    expect(field.textContent).toContain('Configured');
     expect(field.textContent).toContain('layout.md');
-    expect(button('Preview')).toBeTruthy();
-    button('Preview').click();
+    const editor = (): HTMLTextAreaElement => field.querySelector<HTMLTextAreaElement>('textarea')!;
+    expect(editor().value).toContain('## Findings');
+    editor().value = '# Report\n## Findings\n## Plan';
+    editor().dispatchEvent(new Event('input'));
     await flush();
-    expect(field.querySelector('pre')!.textContent).toContain('## Findings');
-    button('Remove').click();
+    expect(field.textContent).toContain('layout.md');
+    button('Clear').click();
     await flush();
-    expect(field.textContent).toContain('Using the default report format.');
-    picker.dispatchEvent(new Event('change'));
+    expect(field.textContent).toContain('Not configured');
+    button('Write').click();
+    await flush();
+    editor().value = '# Typed';
+    editor().dispatchEvent(new Event('input'));
     await flush();
     button('Save').click();
     await flush();
     const put = fetchSpy.mock.calls.find(([, init]) => init?.method === 'PUT')!;
     expect(JSON.parse(put[1].body).configuration.assessment.report_template).toEqual({
-      file_name: 'layout.md',
+      file_name: 'template.md',
       format: 'md',
-      content: '# Report\n## Findings',
+      content: '# Typed',
     });
   });
 
@@ -272,25 +294,94 @@ describe('AgentEditorComponent', () => {
     expect(el().querySelector('app-report-template-field')!.textContent).toContain('Unsupported file type');
   });
 
-  it('populates model dropdowns from the selected provider and installed Ollama models', async () => {
-    modelConfig = {
-      local_models: [
-        { name: 'qwen3', available_in_ollama: true },
-        { name: 'not-installed', available_in_ollama: false },
-      ],
-      cloud_providers: [{ id: 'openai', display_name: 'OpenAI', models: [{ id: 'gpt-x' }, { id: 'gpt-y' }] }],
-    };
+  const sampleConfig = (extra: object = {}) => ({
+    local_models: [
+      { name: 'qwen3', available_in_ollama: true },
+      { name: 'not-installed', available_in_ollama: false },
+    ],
+    local_catalog: { status: 'available', message: null },
+    cloud_providers: [
+      { id: 'openai', display_name: 'OpenAI', catalog_status: 'available', models: [{ id: 'gpt-x' }, { id: 'gpt-y' }] },
+      { id: 'gemini', display_name: 'Gemini', catalog_status: 'authentication_required', catalog_message: 'Add a Gemini key.', models: [] },
+    ],
+    ...extra,
+  });
+  const modelSelects = (card: number): HTMLSelectElement[] =>
+    Array.from(el().querySelectorAll('.model-card')[card].querySelectorAll<HTMLSelectElement>('select'));
+  const optionTexts = (select: HTMLSelectElement) => Array.from(select.options).map((o) => o.textContent?.trim());
+
+  it('populates model dropdowns per provider and never substitutes a model on provider switch', async () => {
+    modelConfig = sampleConfig();
     await open('a2');
     await goTo('DILI Assessment');
-    const row = el().querySelector('app-agent-model-field .model-row')!;
-    const [provider, model] = Array.from(row.querySelectorAll<HTMLSelectElement>('select'));
-    const options = (select: HTMLSelectElement) => Array.from(select.options).map((o) => o.textContent?.trim());
-    expect(options(model)).toEqual(['qwen3']);
-    provider.value = 'openai';
+    expect(optionTexts(modelSelects(0)[1])).toEqual(['gpt-x', 'gpt-y']);
+    expect(modelSelects(1)[1].value).toBe('qwen3');
+    const provider = modelSelects(0)[0];
+    provider.value = 'ollama';
     provider.dispatchEvent(new Event('change'));
     await flush();
-    const updated = el().querySelector('app-agent-model-field .model-row')!.querySelectorAll<HTMLSelectElement>('select')[1];
-    expect(options(updated)).toEqual(['gpt-x', 'gpt-y']);
-    expect(updated.value).toBe('gpt-x');
+    const switched = modelSelects(0)[1];
+    expect(optionTexts(switched)).toEqual(['Select a model', 'qwen3']);
+    expect(el().textContent).toContain('Clinical model: choose a provider and a model.');
+  });
+
+  it('keeps a saved model that is not in the catalog selected and explains why', async () => {
+    modelConfig = sampleConfig({
+      cloud_providers: [{ id: 'openai', display_name: 'OpenAI', catalog_status: 'available', models: [{ id: 'gpt-z' }] }],
+    });
+    await open('a2');
+    await goTo('DILI Assessment');
+    const model = modelSelects(0)[1];
+    expect(optionTexts(model)).toEqual(['gpt-z', 'gpt-x (not in catalog)']);
+    expect(model.value).toBe('gpt-x');
+    expect(el().querySelectorAll('.model-card')[0].textContent).toContain('not in the provider');
+  });
+
+  it('loads a never-loaded provider catalog on open and refreshes all used providers once', async () => {
+    modelConfig = sampleConfig({
+      cloud_providers: [{ id: 'openai', display_name: 'OpenAI', catalog_status: 'not_loaded', models: [] }],
+    });
+    nextConfig = sampleConfig();
+    await open('a2');
+    await goTo('DILI Assessment');
+    expect(catalogCalls).toEqual(['POST openai']);
+    expect(optionTexts(modelSelects(0)[1])).toEqual(['gpt-x', 'gpt-y']);
+    catalogCalls.length = 0;
+    button('Refresh models').click();
+    await flush();
+    expect(catalogCalls.sort()).toEqual(['POST ollama', 'POST openai']);
+    expect(el().textContent).toContain('Models updated.');
+  });
+
+  it('reports a refresh failure and distinguishes providers that need credentials', async () => {
+    modelConfig = sampleConfig();
+    catalogOutcome = 'failed';
+    await open('a2');
+    await goTo('DILI Assessment');
+    button('Refresh models').click();
+    await flush();
+    expect(el().querySelector('.section-head')!.textContent).toContain('boom');
+    const provider = modelSelects(0)[0];
+    provider.value = 'gemini';
+    provider.dispatchEvent(new Event('change'));
+    await flush();
+    expect(el().querySelectorAll('.model-card')[0].textContent).toContain('Add a Gemini key.');
+  });
+
+  it('shows stage override fields only when enabled and hides weights when hybrid search is off', async () => {
+    modelConfig = sampleConfig();
+    await open('a2');
+    await goTo('DILI Assessment');
+    const tile = (): Element => el().querySelectorAll('.stage-tile')[0];
+    expect(tile().querySelectorAll('select').length).toBe(0);
+    tile().querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+    await flush();
+    expect(tile().querySelectorAll('select').length).toBe(3);
+    const labels = (): string[] =>
+      Array.from(el().querySelectorAll('.advanced .field')).map((f) => f.textContent!.trim());
+    expect(labels().some((l) => l.startsWith('Vector weight'))).toBe(true);
+    el().querySelectorAll<HTMLInputElement>('.option input')[0].click();
+    await flush();
+    expect(labels().some((l) => l.startsWith('Vector weight'))).toBe(false);
   });
 });
