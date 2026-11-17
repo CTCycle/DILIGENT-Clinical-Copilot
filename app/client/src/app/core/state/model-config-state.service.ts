@@ -61,7 +61,7 @@ export class ModelConfigStateService {
       .catch((error: unknown) => {
         this.resourceState.set({
           status: 'error',
-          data: this.resourceState().data,
+          data: null,
           error: this.errorMessage(error),
         });
         throw error;
