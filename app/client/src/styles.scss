@@ -81,7 +81,6 @@
   --shadow-brand: 0 8px 18px -10px rgba(3, 108, 85, 0.35);
 
   /* Layout */
-  --app-min-viewport-width: 1100px;
   --container-max: 1536px;
   --drawer-width: 360px;
   --app-top-nav-height: 59px;
@@ -1960,6 +1959,66 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+}
+
+@media (max-width: 1000px), (max-height: 450px) {
+  .app-shell {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .app-top-nav {
+    position: relative;
+  }
+
+  .app-main {
+    height: auto;
+    padding-top: 0;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 1000px) {
+  .app-header {
+    height: auto;
+    padding: var(--space-xs) var(--space-md);
+  }
+
+  .app-header-content {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-xs) var(--space-sm);
+  }
+
+  .tab-bar {
+    grid-area: 2 / 1 / auto / -1;
+    justify-self: stretch;
+    justify-content: flex-start;
+  }
+
+  .tab-items {
+    flex-wrap: wrap;
+    gap: 0 var(--space-sm);
+  }
+}
+
+@media (max-width: 460px) {
+  .app-header-brand,
+  .app-header-wordmark {
+    white-space: normal;
+  }
+
+  .app-header-brand {
+    gap: var(--space-xs);
+  }
+
+  .app-header-logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .app-header-actions {
+    gap: var(--space-xs);
+  }
 }
 
 /* ============================================
@@ -4383,6 +4442,52 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-height: 280px;
   max-height: calc(var(--clinical-input-default-height) * 2);
   resize: vertical;
+}
+
+@media (max-width: 720px) {
+  .stitch-dili-grid {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .stitch-dili-main.stitch-dili-workbench {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  .stitch-dili-workbench textarea.stitch-dili-input-unified {
+    height: 45dvh;
+  }
+
+  .inspection-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inspection-toolbar-list {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  }
+
+  .inspection-widget-header,
+  .inspection-controls-knowledge {
+    flex-wrap: wrap;
+  }
+
+  .inspection-controls-half {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .inspection-scroll-frame {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 1000px), (max-height: 450px) {
+  .inspection-page-workbench {
+    height: auto;
+    max-height: none;
+  }
 }
 
 :root[data-theme="dark"] .stitch-dili-main.stitch-dili-workbench {

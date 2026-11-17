@@ -84,6 +84,29 @@ def test_dilu_agent_page_loads(page: Page, base_url: str):
 
 
 ###############################################################################
+def test_compact_viewport_keeps_workspace_and_navigation_usable(
+    page: Page, base_url: str
+):
+    page.set_viewport_size({"width": 320, "height": 240})
+    page.goto(base_url)
+
+    page.get_by_label("Clinical Input").fill("Short synthetic input")
+    page.get_by_role("button", name="Run DILI analysis").click()
+    dialog = page.get_by_role("dialog", name="Prepare analysis")
+    expect(dialog.get_by_text("Visit date is missing")).to_be_visible()
+    dialog.get_by_role("button", name="Cancel", exact=True).click()
+
+    page.get_by_role("tab", name="Settings").click()
+    page.get_by_role("link", name="Database").click()
+    expect(page.get_by_role("heading", name="Database", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Test connection").click()
+    expect(page.get_by_text("Connection succeeded", exact=False)).to_be_visible()
+    assert page.evaluate(
+        "document.documentElement.scrollWidth === document.documentElement.clientWidth"
+    )
+
+
+###############################################################################
 def test_home_initial_load_has_no_console_errors_or_failed_requests(
     page: Page, base_url: str
 ):

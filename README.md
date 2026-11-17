@@ -40,7 +40,7 @@ DILIGENT brings a structured DILI assessment workflow, saved clinical sessions, 
 - **Knowledge** – local drug and liver-injury references (RxNav, LiverTox, FDA DILIrank 2.0), a drug terminology mapper (RxNorm, DrugCentral, ChEMBL, Swissmedic) with reviewer decisions, and optional RAG over your own documents.
 - **Settings** – local Ollama or hosted model providers per role, runtime and network options, drug matching, and a SQLite or PostgreSQL database.
 
-The app runs as a single-user application on Windows, either as the packaged desktop app or from source in a browser. It is designed for a wide desktop window (about 1100 px or more), not a phone-sized screen.
+The app runs as a single-user application on Windows, either as the packaged desktop app or from source in a browser. Navigation wraps and workspaces can stack vertically in compact windows.
 
 ## Screenshots
 

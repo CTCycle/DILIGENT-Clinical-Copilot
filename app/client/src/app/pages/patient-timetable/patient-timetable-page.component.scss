@@ -227,6 +227,16 @@ svg {
   border-left-color: var(--color-status-warning-border);
 }
 
+@media (max-width: 760px) {
+  .timetable-header {
+    flex-wrap: wrap;
+  }
+
+  .generation-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .generation-summary.is-warning .status-indicator {
   background: var(--color-status-warning-text);
 }

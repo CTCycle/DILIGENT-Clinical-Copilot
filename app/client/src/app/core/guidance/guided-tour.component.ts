@@ -180,10 +180,10 @@ export class GuidedTourComponent implements OnDestroy {
   }
 
   private positionCard(target: DOMRect | null, preferredPlacement = 'bottom'): void {
-    const width = Math.min(390, Math.max(280, window.innerWidth - 24));
-    const height = document.querySelector<HTMLElement>('.guidance-tour-dialog')?.offsetHeight || 260;
     const margin = 12;
     const gap = 16;
+    const width = Math.min(390, window.innerWidth - 2 * margin);
+    const height = document.querySelector<HTMLElement>('.guidance-tour-dialog')?.offsetHeight || 260;
     if (!target) {
       this.cardPosition.set({
         top: Math.max(margin, (window.innerHeight - height) / 2),

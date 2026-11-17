@@ -54,6 +54,17 @@
   box-shadow: var(--shadow-lg);
 }
 
+@media (max-width: 540px) {
+  .notification-center {
+    position: static;
+  }
+
+  .notification-history {
+    top: 48px;
+    right: var(--space-md);
+  }
+}
+
 .notification-history-header {
   display: flex;
   align-items: center;

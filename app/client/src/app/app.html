@@ -1,22 +1,12 @@
 <!-- Copyright © 2023–2025 Thomas Virdis -->
 <!-- Licensed under the GNU General Public License, version 3 or later. -->
-<div class="app-runtime">
-  <div class="app-shell">
-    <app-nav-sidebar (navigate)="navigateToPage($event)" (helpRequested)="openTips()"></app-nav-sidebar>
-    <div class="app-main">
-      <router-outlet></router-outlet>
-    </div>
-    <app-status-bar></app-status-bar>
+<div class="app-shell">
+  <app-nav-sidebar (navigate)="navigateToPage($event)" (helpRequested)="openTips()"></app-nav-sidebar>
+  <div class="app-main">
+    <router-outlet></router-outlet>
   </div>
-  <app-notification-toast></app-notification-toast>
-  <app-tips-and-tricks [isOpen]="tipsOpen()" (closed)="tipsOpen.set(false)"></app-tips-and-tricks>
-  <app-guided-tour></app-guided-tour>
+  <app-status-bar></app-status-bar>
 </div>
-
-<aside class="minimum-viewport-notice" role="alert" aria-labelledby="minimum-viewport-title">
-  <div class="minimum-viewport-card">
-    <span class="minimum-viewport-kicker">Desktop window required</span>
-    <h1 id="minimum-viewport-title">Widen the application window to continue</h1>
-    <p>DILIGENT Clinical Copilot is designed for desktop browser windows at least 1100 pixels wide.</p>
-  </div>
-</aside>
+<app-notification-toast></app-notification-toast>
+<app-tips-and-tricks [isOpen]="tipsOpen()" (closed)="tipsOpen.set(false)"></app-tips-and-tricks>
+<app-guided-tour></app-guided-tour>

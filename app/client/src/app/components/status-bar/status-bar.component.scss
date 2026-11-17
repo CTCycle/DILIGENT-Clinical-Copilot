@@ -27,6 +27,24 @@
   min-width: 0;
 }
 
+@media (max-width: 720px) {
+  .status-bar,
+  .status-group {
+    flex-wrap: wrap;
+  }
+
+  .status-bar {
+    height: auto;
+    row-gap: 0;
+    padding-block: var(--space-xs);
+  }
+
+  .status-group {
+    row-gap: var(--space-xs);
+    padding-block: var(--space-xs);
+  }
+}
+
 .status-item {
   display: inline-flex;
   align-items: center;

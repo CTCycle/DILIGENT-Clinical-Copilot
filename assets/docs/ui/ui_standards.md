@@ -27,7 +27,7 @@ Last updated: 2026-11-03
 - Instructional placeholder text uses the theme text tokens at full opacity.
 - Use `ModalShellComponent` for app dialogs unless a page has a documented specialized modal pattern.
 - Modal content uses an opaque theme surface; the overlay provides background dimming.
-- Tabs and dense navigation remain desktop-oriented and must not clip labels at the supported minimum width of `1100px`.
+- Keep navigation labels and controls reachable as the window narrows. Wrap tabs and allow dense tables to scroll within their panels.
 - Cards and panels should use `--radius-sm` through `--radius-xl` and `--shadow-sm` through `--shadow-lg`.
 
 ## Do And Don't

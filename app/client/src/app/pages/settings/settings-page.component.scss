@@ -81,3 +81,20 @@
 .settings-content {
   min-width: 0;
 }
+
+@media (max-width: 760px) {
+  .settings-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-navigation {
+    position: static;
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .settings-navigation-list {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}

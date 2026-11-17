@@ -32,7 +32,7 @@ http://127.0.0.1:7690/api/health
 
 For frontend development, `npm run dev` serves the UI at `http://127.0.0.1:9847` and proxies `/api` to FastAPI.
 
-- DILIGENT is designed for desktop browser windows at least `1100px` wide. If the window is narrower, enlarge it to continue.
+- In narrow windows, navigation wraps and multi-column workspaces can stack vertically. Scroll to reach the rest of the workspace.
 - Windows tablets are supported when they behave like a normal desktop browser and can display the desktop interface at that width.
 
 - If `settings/.env` uses different ports, use the local configured values instead. Packaged desktop uses a random localhost backend port recorded in `desktop-backend-ready.json`.

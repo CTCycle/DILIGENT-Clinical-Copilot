@@ -17,6 +17,12 @@
   flex: 1 1 0;
 }
 
+@media (max-width: 460px) {
+  .wizard-stepper ol {
+    flex-wrap: wrap;
+  }
+}
+
 .wizard-step {
   display: flex;
   align-items: center;

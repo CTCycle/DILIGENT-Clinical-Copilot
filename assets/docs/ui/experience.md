@@ -71,13 +71,9 @@ Last updated: 2026-11-01
   report is shown when one exists. Copy and Download stay compact in the
   header. The original input is in a collapsible **Clinical input** section.
 
-## Desktop viewport
-- DILIGENT is a desktop application delivered through web technologies.
-- The supported viewport is at least `1100px` wide in CSS pixels.
-- At narrower widths, keep the desktop interface behind the minimum-window-size notice; do not switch to a mobile navigation or stacked layout.
-- Optimize for mouse and keyboard use, information density, and horizontal workspace utilization.
-- Windows tablets are supported only when they present a normal desktop browser viewport of at least `1100px`.
-- Keep horizontal scrolling for genuinely dense tables and vertical scrolling for long workspaces.
+## Window sizing
+- Wider windows use side-by-side workspaces. Narrower windows wrap the navigation and stack workspaces where their panels need more room.
+- Compact windows use page scrolling for the main workspace. Dense tables can scroll within their panels.
 
 ## Accessibility
 - Support keyboard navigation for navigation, tabs, modal actions, and key controls.

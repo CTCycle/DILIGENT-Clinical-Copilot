@@ -54,6 +54,17 @@
   box-shadow: var(--shadow-lg);
 }
 
+@media (max-width: 540px) {
+  .jobs-monitor {
+    position: static;
+  }
+
+  .jobs-monitor-panel {
+    top: 48px;
+    right: var(--space-md);
+  }
+}
+
 .jobs-monitor-header {
   display: flex;
   align-items: baseline;

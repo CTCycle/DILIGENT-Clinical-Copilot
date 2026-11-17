@@ -27,7 +27,6 @@
   display: flex;
   flex-direction: column;
   height: calc(100dvh - var(--app-chrome-height));
-  max-height: calc(100dvh - var(--app-chrome-height));
   min-height: 0;
   padding: var(--space-2xl);
   background: var(--app-background);
@@ -1049,15 +1048,32 @@
 }
 
 @media (max-width: 900px) {
-  .clinical-session-metadata-actions {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-    row-gap: var(--space-lg);
+  :is(.clinical-sessions-layout, .clinical-session-preview, .clinical-session-metadata-actions) {
+    grid-template: auto / minmax(0, 1fr);
   }
 
-  .clinical-session-metadata-column,
-  .clinical-session-metadata-action-card {
+  .clinical-session-preview {
+    height: auto;
+  }
+
+  .clinical-sessions-results { max-height: 18rem; }
+
+  .clinical-session-preview-side {
+    border-inline-start: 0;
+    border-top: 1px solid var(--cs-section-divider);
+    padding: var(--space-lg) 0 0;
+  }
+
+  .clinical-session-metadata-actions { row-gap: var(--space-lg); }
+
+  :is(.clinical-session-metadata-column, .clinical-session-metadata-action-card) {
     grid-row: auto;
     grid-template-rows: none;
+  }
+}
+
+@media (max-width: 1000px), (max-height: 450px) {
+  .clinical-sessions-page {
+    height: auto;
   }
 }

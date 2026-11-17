@@ -23,7 +23,6 @@ import { TipsAndTricksComponent } from './core/guidance/tips-and-tricks.componen
   selector: 'app-root',
   imports: [RouterOutlet, NavSidebarComponent, StatusBarComponent, NotificationToastComponent, GuidedTourComponent, TipsAndTricksComponent],
   templateUrl: './app.html',
-  styleUrl: './app.scss',
 })
 export class App {
   readonly stateService = inject(AppStateService);
