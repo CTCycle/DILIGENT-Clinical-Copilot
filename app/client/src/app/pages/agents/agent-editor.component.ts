@@ -166,6 +166,22 @@ export class AgentEditorComponent implements OnInit {
       this.lastResetKey = key;
       untracked(() => (creating ? this.resetForCreate() : agent && this.reset(agent)));
     });
+    // Cloud catalogs are cache-only on the server: load any never-loaded provider the draft uses.
+    effect(() => {
+      this.modelConfig.data();
+      const config = this.config();
+      if (!config) return;
+      const refs = [
+        config.assessment.models.extraction,
+        config.assessment.models.clinical,
+        ...Object.values(config.assessment.models.extraction_overrides),
+        config.revision.models.planning,
+        ...Object.values(config.revision.models.stage_overrides),
+        config.timeline.model,
+      ];
+      const providers = refs.flatMap((ref) => (ref?.provider ? [ref.provider] : []));
+      untracked(() => void this.modelConfig.ensureCatalogs(providers));
+    });
     this.modelConfig.load().catch(() => undefined);
   }
 
