@@ -6,27 +6,19 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 import {
   AgentModelRef,
   AssessmentConfig,
-  ExtractionStage,
   ReportTemplate,
 } from '../../core/models/agent-types';
-import { EvidenceSourceId, ReasoningLevel } from '../../core/models/types';
+import { EvidenceSourceId } from '../../core/models/types';
 import { ModelConfigStateService } from '../../core/state/model-config-state.service';
 import { AgentModelFieldComponent } from './agent-model-field.component';
 import { INSTRUCTION_MAX_LENGTH, ModelCatalog, ProviderOption } from './agent-form';
 import { ReportTemplateFieldComponent } from './report-template-field.component';
 
-const EXTRACTION_STAGES: ReadonlyArray<{ stage: ExtractionStage; label: string }> = [
-  { stage: 'therapy_drugs', label: 'Therapy drugs' },
-  { stage: 'anamnesis_drugs', label: 'Anamnesis drugs' },
-  { stage: 'diseases', label: 'Diseases' },
-  { stage: 'laboratory', label: 'Laboratory' },
+const EVIDENCE_SOURCES: ReadonlyArray<{ id: EvidenceSourceId; label: string; hint: string }> = [
+  { id: 'livertox', label: 'LiverTox', hint: 'NIH drug-induced liver injury monographs.' },
+  { id: 'dilirank', label: 'DILIrank', hint: 'FDA DILI concern rankings.' },
+  { id: 'documents', label: 'Documents', hint: 'Your uploaded reference documents.' },
 ];
-const EVIDENCE_SOURCES: ReadonlyArray<{ id: EvidenceSourceId; label: string }> = [
-  { id: 'livertox', label: 'LiverTox' },
-  { id: 'dilirank', label: 'DILIrank' },
-  { id: 'documents', label: 'Documents' },
-];
-const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
 
 type NumericRetrievalKey =
   | 'retrieval_candidate_count'
@@ -51,9 +43,7 @@ export class AssessmentSectionsComponent {
   readonly disabled = input(false);
   readonly configChange = output<AssessmentConfig>();
 
-  readonly extractionStages = EXTRACTION_STAGES;
   readonly evidenceSources = EVIDENCE_SOURCES;
-  readonly reasoningLevels = REASONING;
   readonly limit = INSTRUCTION_MAX_LENGTH;
 
   readonly busy = this.modelConfig.catalogBusy;
@@ -67,7 +57,7 @@ export class AssessmentSectionsComponent {
   /** One refresh for every provider this tab's models use. */
   async refreshModels(): Promise<void> {
     const { models } = this.config();
-    const providers = [models.clinical, models.extraction, ...Object.values(models.extraction_overrides)]
+    const providers = [models.clinical, models.extraction]
       .map((ref) => ref?.provider)
       .filter((provider): provider is string => !!provider);
     this.refreshMessage.set('');
@@ -82,6 +72,8 @@ export class AssessmentSectionsComponent {
   private update(change: (draft: AssessmentConfig) => void): void {
     const draft = structuredClone(this.config());
     change(draft);
+    // Every extraction stage is mandatory in the pipeline and always uses the extraction model.
+    draft.models.extraction_overrides = {};
     this.configChange.emit(draft);
   }
 
@@ -95,21 +87,6 @@ export class AssessmentSectionsComponent {
 
   setModel(role: 'extraction' | 'clinical', ref: AgentModelRef | null): void {
     if (ref) this.update((d) => (d.models[role] = ref));
-  }
-
-  setOverride(stage: ExtractionStage, ref: AgentModelRef | null): void {
-    this.update((d) => {
-      if (ref) d.models.extraction_overrides[stage] = ref;
-      else delete d.models.extraction_overrides[stage];
-    });
-  }
-
-  setReasoning(level: string): void {
-    this.update((d) => (d.reasoning_level = level as ReasoningLevel));
-  }
-
-  setSeed(value: string): void {
-    this.update((d) => (d.ollama_seed = value.trim() === '' ? null : Number(value)));
   }
 
   toggleSource(id: EvidenceSourceId, checked: boolean): void {

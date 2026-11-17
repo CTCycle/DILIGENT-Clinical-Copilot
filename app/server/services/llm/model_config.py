@@ -73,7 +73,10 @@ class ModelConfigSnapshotStore(Protocol):
 
     # -------------------------------------------------------------------------
     def save_snapshot(
-        self, *, rag_settings: dict[str, object] | object = ...
+        self,
+        *,
+        rag_settings: dict[str, object] | object = ...,
+        ollama_seed: int | None | object = ...,
     ) -> ModelConfigSnapshot: ...
 
 
@@ -128,6 +131,10 @@ class ModelConfigService:
             )
             snapshot = await asyncio.to_thread(
                 self.serializer.save_snapshot, rag_settings=rag_settings
+            )
+        if "ollama_seed" in payload.model_fields_set:
+            snapshot = await asyncio.to_thread(
+                self.serializer.save_snapshot, ollama_seed=payload.ollama_seed
             )
         return self.build_persist_response(snapshot)
 
@@ -323,6 +330,7 @@ class ModelConfigService:
     ) -> ModelConfigPersistResponse:
         return ModelConfigPersistResponse(
             rag_settings=self.shared_rag_settings(snapshot),
+            ollama_seed=snapshot.ollama_seed,
             updated_at=snapshot.updated_at,
         )
 
@@ -345,6 +353,7 @@ class ModelConfigService:
             local_catalog=local_catalog
             or model_catalog.local_catalog_metadata(self.catalog_cache),
             rag_settings=self.shared_rag_settings(snapshot),
+            ollama_seed=snapshot.ollama_seed,
             embedding_runtime=self.build_embedding_runtime_status(),
             embedding_index=self.build_embedding_index_status(),
             updated_at=snapshot.updated_at,

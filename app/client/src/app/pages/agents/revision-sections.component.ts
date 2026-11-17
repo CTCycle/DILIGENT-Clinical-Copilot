@@ -76,10 +76,6 @@ export class RevisionSectionsComponent {
     this.update((d) => (d.reasoning_level = level as ReasoningLevel));
   }
 
-  setSeed(value: string): void {
-    this.update((d) => (d.ollama_seed = value.trim() === '' ? null : Number(value)));
-  }
-
   setLimit(key: 'max_tasks' | 'max_tool_iterations', value: string): void {
     this.update((d) => (d.limits[key] = Number(value)));
   }

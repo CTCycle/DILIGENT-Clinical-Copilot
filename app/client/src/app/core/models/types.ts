@@ -44,6 +44,7 @@ export type ModelConfigStateResponse = {
   cloud_providers: CloudProviderDescriptor[];
   local_catalog: LocalCatalogMetadata;
   rag_settings: RagSettings;
+  ollama_seed: number | null;
   embedding_runtime: EmbeddingRuntimeStatus;
   embedding_index: EmbeddingIndexStatus;
   updated_at: string | null;
@@ -51,6 +52,7 @@ export type ModelConfigStateResponse = {
 
 export type ModelConfigPersistResponse = {
   rag_settings: RagSettings;
+  ollama_seed: number | null;
   updated_at: string | null;
 };
 
@@ -77,6 +79,7 @@ export type EmbeddingStatusResponse = {
 
 export type ModelConfigUpdateRequest = {
   rag_settings?: Partial<RagSettings>;
+  ollama_seed?: number | null;
 };
 
 export type AccessKeyProvider =

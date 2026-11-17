@@ -529,6 +529,7 @@ def build_default_application_configuration_payload(
     payload = build_settings_payload({}, env)
     return {
         "rag_settings": {key: payload["rag"][key] for key in SHARED_RAG_SETTING_KEYS},
+        "ollama_seed": 42,
         "jobs": payload["jobs"],
         "runtime": payload["runtime"],
         "ingestion": payload["ingestion"],

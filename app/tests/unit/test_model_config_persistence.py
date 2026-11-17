@@ -134,6 +134,23 @@ def test_model_config_update_rejects_agent_owned_fields(
 
 
 ###############################################################################
+def test_global_ollama_seed_update_distinguishes_unset_from_random() -> None:
+    serializer = InMemorySerializer(_snapshot(rag_settings={}))
+    service = ModelConfigService(serializer=serializer)
+
+    def update(payload: dict[str, object]) -> object:
+        request = ModelConfigUpdateRequest.model_validate(payload)
+        return asyncio.run(service.update_state(request))
+
+    assert update({"ollama_seed": 7}).ollama_seed == 7
+    assert update({"ollama_seed": None}).ollama_seed is None
+    serializer.snapshot = ModelConfigSnapshot(rag_settings={}, ollama_seed=9)
+    assert update({}).ollama_seed == 9
+    with pytest.raises(ValidationError):
+        ModelConfigUpdateRequest.model_validate({"ollama_seed": -1})
+
+
+###############################################################################
 def test_shared_rag_save_does_not_probe_ollama_or_remote_catalogs(
     monkeypatch,
 ) -> None:
@@ -159,7 +176,11 @@ def test_shared_rag_save_does_not_probe_ollama_or_remote_catalogs(
     assert response.rag_settings.chunk_size == 1024
     assert serializer.snapshot.rag_settings is not None
     assert serializer.snapshot.rag_settings["chunk_size"] == 1024
-    assert set(response.model_dump()) == {"rag_settings", "updated_at"}
+    assert set(response.model_dump()) == {
+        "rag_settings",
+        "ollama_seed",
+        "updated_at",
+    }
 
 
 ###############################################################################

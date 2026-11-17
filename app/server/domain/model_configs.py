@@ -40,6 +40,7 @@ class ModelConfigSnapshot:
     """Shared, non-execution configuration; agents own models and roles."""
 
     rag_settings: dict[str, object] | None = None
+    ollama_seed: int | None = 42
     updated_at: datetime | None = None
 
 
@@ -103,6 +104,8 @@ class SharedRagSettingsResponse(BaseModel):
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rag_settings: SharedRagSettingsUpdateRequest | None = None
+    # Global Ollama seed; an explicit null means "random".
+    ollama_seed: int | None = Field(default=None, ge=0)
 
 
 ###############################################################################
@@ -129,6 +132,7 @@ class ModelConfigStateResponse(BaseModel):
     cloud_providers: list[CloudProviderDescriptor]
     local_catalog: LocalCatalogMetadata
     rag_settings: SharedRagSettingsResponse
+    ollama_seed: int | None = None
     embedding_runtime: EmbeddingRuntimeStatus
     embedding_index: EmbeddingIndexStatus
     updated_at: datetime | None = None
@@ -139,6 +143,7 @@ class ModelConfigPersistResponse(BaseModel):
     """Configuration values returned after a persistence-only update."""
 
     rag_settings: SharedRagSettingsResponse
+    ollama_seed: int | None = None
     updated_at: datetime | None = None
 
 

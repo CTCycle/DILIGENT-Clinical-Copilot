@@ -53,104 +53,80 @@
         (refChange)="setModel('extraction', $event)" />
     </div>
   </div>
-  <div class="field-grid compact">
-    <label class="field">Agent reasoning level
-      <select (change)="setReasoning($any($event.target).value)">
-        @for (level of reasoningLevels; track level) {
-          <option [value]="level" [selected]="config().reasoning_level === level">{{ level }}</option>
-        }
-      </select>
-    </label>
-    <label class="field">Ollama seed
-      <input type="number" min="0" step="1" placeholder="Random" [value]="config().ollama_seed ?? ''"
-        (input)="setSeed($any($event.target).value)" />
-    </label>
-  </div>
-
-  <div class="group">
-    <h4>Extraction stage overrides</h4>
-    <p class="agent-section-note">Stages left off use the extraction model.</p>
-    <div class="stage-grid">
-      @for (item of extractionStages; track item.stage) {
-        <div class="stage-tile" [class.is-on]="!!config().models.extraction_overrides[item.stage]">
-          <app-agent-model-field [label]="item.label" [optional]="true" layout="stack" [refreshable]="false"
-            [ref]="config().models.extraction_overrides[item.stage]" [fallback]="config().models.extraction"
-            [providerOptions]="providerOptions()" [catalog]="catalog()"
-            (refChange)="setOverride(item.stage, $event)" />
-          @if (!config().models.extraction_overrides[item.stage]) {
-            <span class="field-hint">Uses {{ config().models.extraction.model || 'the extraction model' }}</span>
-          }
-        </div>
-      }
-    </div>
-  </div>
 </section>
 
 <section class="subsection" aria-labelledby="dili-rag-heading">
   <h3 id="dili-rag-heading">Evidence and retrieval</h3>
-  <div class="group">
-    <h4>Evidence sources</h4>
-    <div class="chip-row" role="group" aria-label="Evidence sources">
+  <p class="agent-section-note">Choose what the agent may cite, how candidates are found, and how many reach the report.</p>
+
+  <div class="rag-step">
+    <h4><span class="step-no">1</span> Evidence sources</h4>
+    <div class="source-grid" role="group" aria-label="Evidence sources">
       @for (source of evidenceSources; track source.id) {
-        <label class="chip-check" [class.is-on]="config().retrieval.evidence_sources.includes(source.id)">
+        <label class="option" [class.is-on]="config().retrieval.evidence_sources.includes(source.id)">
           <input type="checkbox" [checked]="config().retrieval.evidence_sources.includes(source.id)"
             (change)="toggleSource(source.id, $any($event.target).checked)" />
-          {{ source.label }}
+          <span><strong>{{ source.label }}</strong><span class="field-hint">{{ source.hint }}</span></span>
         </label>
       }
     </div>
   </div>
 
-  <div class="group">
-    <h4>Retrieval strategy</h4>
-    <div class="option-grid">
-      <label class="option">
-        <input type="checkbox" [checked]="config().retrieval.use_hybrid_search"
-          (change)="setFlag('use_hybrid_search', $any($event.target).checked)" />
-        <span><strong>Hybrid search</strong><span class="field-hint">Blend vector and text matches.</span></span>
-      </label>
-      <label class="option">
-        <input type="checkbox" [checked]="config().retrieval.use_reranking"
-          (change)="setFlag('use_reranking', $any($event.target).checked)" />
-        <span><strong>Reranking</strong><span class="field-hint">Reorder candidates with a reranker model.</span></span>
-      </label>
-    </div>
-  </div>
-
-  <details class="advanced">
-    <summary>Advanced retrieval parameters</summary>
-    <div class="advanced-body">
-      @if (config().retrieval.use_reranking || !config().retrieval.reranker_model.trim()) {
-        <label class="field">Reranker model
-          <input type="text" [value]="config().retrieval.reranker_model"
-            (input)="setReranker($any($event.target).value)" />
+  <div class="rag-step">
+    <h4><span class="step-no">2</span> Search strategy and result size</h4>
+    <div class="strategy-grid">
+      <div class="option strategy" [class.is-on]="config().retrieval.use_hybrid_search">
+        <label class="strategy-head">
+          <input type="checkbox" [checked]="config().retrieval.use_hybrid_search"
+            (change)="setFlag('use_hybrid_search', $any($event.target).checked)" />
+          <span><strong>Hybrid search</strong><span class="field-hint">Blend vector and text matches.</span></span>
         </label>
-      }
-      <div class="number-grid">
-        <label class="field">Candidate count
-          <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_candidate_count"
-            (input)="setNumber('retrieval_candidate_count', $any($event.target).value)" />
-        </label>
-        <label class="field">Selected count
-          <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_selected_count"
-            (input)="setNumber('retrieval_selected_count', $any($event.target).value)" />
-        </label>
-        @if (config().retrieval.use_hybrid_search) {
+        <div class="param-row">
           <label class="field">Vector weight
-            <input type="number" min="0" max="1" step="0.05" [value]="config().retrieval.hybrid_vector_weight"
+            <input type="number" min="0" max="1" step="0.05" [disabled]="!config().retrieval.use_hybrid_search" [value]="config().retrieval.hybrid_vector_weight"
               (input)="setNumber('hybrid_vector_weight', $any($event.target).value)" />
           </label>
           <label class="field">Text weight
-            <input type="number" min="0" max="1" step="0.05" [value]="config().retrieval.hybrid_text_weight"
+            <input type="number" min="0" max="1" step="0.05" [disabled]="!config().retrieval.use_hybrid_search" [value]="config().retrieval.hybrid_text_weight"
               (input)="setNumber('hybrid_text_weight', $any($event.target).value)" />
           </label>
-        }
+        </div>
+        <p class="field-hint card-foot">Combined weight {{ weightSum() }}. Each weight must be between 0 and 1.</p>
       </div>
-      @if (config().retrieval.use_hybrid_search) {
-        <p class="field-hint">Combined weight {{ weightSum() }}. Each weight must be between 0 and 1.</p>
-      }
+
+      <div class="option strategy" [class.is-on]="config().retrieval.use_reranking">
+        <label class="strategy-head">
+          <input type="checkbox" [checked]="config().retrieval.use_reranking"
+            (change)="setFlag('use_reranking', $any($event.target).checked)" />
+          <span><strong>Reranking</strong><span class="field-hint">Reorder candidates with a reranker model.</span></span>
+        </label>
+        <div class="param-row">
+          <label class="field wide">Reranker model
+            <input type="text" [disabled]="!config().retrieval.use_reranking" [value]="config().retrieval.reranker_model"
+              (input)="setReranker($any($event.target).value)" />
+          </label>
+        </div>
+        <p class="field-hint card-foot">Applied to the retrieved candidates before the final selection.</p>
+      </div>
+
+      <div class="option strategy is-on">
+        <div class="strategy-head">
+          <span><strong>Result size</strong><span class="field-hint">How many passages reach the report.</span></span>
+        </div>
+        <div class="param-row">
+          <label class="field">Candidates retrieved
+            <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_candidate_count"
+              (input)="setNumber('retrieval_candidate_count', $any($event.target).value)" />
+          </label>
+          <label class="field">Passages kept
+            <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_selected_count"
+              (input)="setNumber('retrieval_selected_count', $any($event.target).value)" />
+          </label>
+        </div>
+        <p class="field-hint card-foot">Passages kept must not exceed candidates retrieved.</p>
+      </div>
     </div>
-  </details>
+  </div>
   <p class="field-hint">Index, chunking and embedding settings are shared; see Settings → Providers & Models.</p>
 </section>
 </fieldset>

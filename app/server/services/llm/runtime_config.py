@@ -140,7 +140,8 @@ class LLMRuntimeConfig:
         role_models: dict[str, dict[str, object]] = {}
         overrides: dict[str, object] = {
             "reasoning_level": config.reasoning_level.value,
-            "ollama_seed": config.ollama_seed,
+            # The seed is a global setting, not an agent property.
+            "ollama_seed": ModelConfigSerializer().load_snapshot().ollama_seed,
             "agent": {
                 "agent_id": context.agent_id,
                 "agent_name": context.agent_name,

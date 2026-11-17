@@ -19,6 +19,28 @@
     (booleanChange)="setDraftRagBoolean($event.key, $event.value)"
   ></app-rag-resources-panel>
 
+  <section class="seed-card" aria-labelledby="ollama-seed-heading">
+    <div>
+      <h3 id="ollama-seed-heading">Ollama seed</h3>
+      <p>Fixed seed for local Ollama generations, shared by every agent. Leave blank for random.</p>
+    </div>
+    <label class="seed-field">
+      <span class="visually-hidden">Ollama seed</span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        placeholder="Random"
+        [value]="ollamaSeed() ?? ''"
+        [disabled]="isLoading()"
+        (change)="saveOllamaSeed($any($event.target).value)"
+      />
+    </label>
+    @if (seedError()) {
+      <p class="seed-error" role="alert">{{ seedError() }}</p>
+    }
+  </section>
+
   <app-provider-catalog-panel
     [disabled]="isLoading()"
     [actionsDisabled]="isLoading() || !!catalogProviderInFlight()"

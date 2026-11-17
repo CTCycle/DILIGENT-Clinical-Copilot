@@ -42,12 +42,6 @@ function checkRef(errors: string[], label: string, ref: AgentModelRef | null | u
   }
 }
 
-function checkSeed(errors: string[], seed: number | null): void {
-  if (seed !== null && (!Number.isInteger(seed) || seed < 0)) {
-    errors.push('Ollama seed must be a non-negative whole number.');
-  }
-}
-
 function checkInstructions(errors: string[], instructions: object): void {
   for (const [field, text] of Object.entries(instructions)) {
     if (String(text).length > INSTRUCTION_MAX_LENGTH) {
@@ -76,16 +70,10 @@ export function validateAgentDraft(
   checkInstructions(errors, assessment.instructions);
   checkInstructions(errors, revision.instructions);
   checkInstructions(errors, timeline.instructions);
-  checkSeed(errors, assessment.ollama_seed);
-  checkSeed(errors, revision.ollama_seed);
-  checkSeed(errors, timeline.ollama_seed);
 
   const { models, retrieval } = assessment;
   checkRef(errors, 'Extraction model', models.extraction);
   checkRef(errors, 'Clinical model', models.clinical);
-  Object.entries(models.extraction_overrides).forEach(([stage, ref]) =>
-    checkRef(errors, `Extraction override (${stage})`, ref),
-  );
   if (!retrieval.reranker_model.trim()) errors.push('Reranker model is required.');
   const counts = [retrieval.retrieval_candidate_count, retrieval.retrieval_selected_count];
   if (counts.some((n) => !Number.isInteger(n) || n < 1 || n > 10000)) {

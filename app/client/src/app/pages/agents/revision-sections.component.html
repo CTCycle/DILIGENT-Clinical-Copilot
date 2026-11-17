@@ -38,10 +38,6 @@
         }
       </select>
     </label>
-    <label class="field">Ollama seed
-      <input type="number" min="0" step="1" [value]="config().ollama_seed ?? ''"
-        (input)="setSeed($any($event.target).value)" />
-    </label>
   </div>
 </section>
 

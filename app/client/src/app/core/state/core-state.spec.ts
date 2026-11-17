@@ -56,6 +56,7 @@ function modelConfigPayload(): ModelConfigStateResponse {
     local_models: [],
     cloud_providers: [],
     local_catalog: { status: 'available', updated_at: null, message: null },
+    ollama_seed: 42,
     rag_settings: {
       allow_local_filesystem_access: true,
       vector_collection_name: 'documents',

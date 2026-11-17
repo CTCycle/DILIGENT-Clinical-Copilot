@@ -395,7 +395,7 @@ def _context(
 ###############################################################################
 @pytest.fixture
 def persisted_snapshot(monkeypatch: pytest.MonkeyPatch) -> ModelConfigSnapshot:
-    snapshot = ModelConfigSnapshot(rag_settings={"chunk_size": 777})
+    snapshot = ModelConfigSnapshot(rag_settings={"chunk_size": 777}, ollama_seed=11)
     monkeypatch.setattr(ModelConfigSerializer, "load_snapshot", lambda self: snapshot)
     return snapshot
 
@@ -450,7 +450,7 @@ def test_each_capability_resolves_only_its_own_configuration(
         timeline={
             "model": {"provider": "openai", "model": "gpt-4.1-mini"},
             "instructions": {"timeline_focus": "Dates first."},
-            "ollama_seed": 11,
+            "ollama_seed": 5,
         },
     )
     prompt = "Build the timeline."
@@ -461,6 +461,7 @@ def test_each_capability_resolves_only_its_own_configuration(
             "openai",
             "gpt-4.1-mini",
         )
+        # The seed is global: the persisted value wins over the agent's own field.
         assert LLMRuntimeConfig.get_ollama_seed() == 11
         assert "Dates first." in LLMRuntimeConfig.with_agent_guidance(
             prompt, "timeline_focus"
@@ -472,7 +473,7 @@ def test_each_capability_resolves_only_its_own_configuration(
             "anthropic",
             "claude-x",
         )
-        assert LLMRuntimeConfig.get_ollama_seed() == 42
+        assert LLMRuntimeConfig.get_ollama_seed() == 11
         assert (
             LLMRuntimeConfig.with_agent_guidance(prompt, "timeline_focus") == prompt
         )

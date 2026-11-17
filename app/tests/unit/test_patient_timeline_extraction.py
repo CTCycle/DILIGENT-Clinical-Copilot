@@ -695,7 +695,8 @@ def test_timeline_runtime_settings_follow_the_timeline_capability() -> None:
     assert settings["timeline_model"] == "beam-free"
     assert settings["llm_provider"] == "opencode_go"
     assert settings["reasoning_level"] == "low"
-    assert settings["ollama_seed"] == 5
+    # The seed is global; the agent's own field no longer drives the run.
+    assert settings["ollama_seed"] == 42
     assert settings["agent"]["agent_revision_id"] == 41
     assert settings["agent"]["agent_capability"] == "timeline"
 

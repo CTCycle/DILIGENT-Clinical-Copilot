@@ -174,7 +174,6 @@ export class AgentEditorComponent implements OnInit {
       const refs = [
         config.assessment.models.extraction,
         config.assessment.models.clinical,
-        ...Object.values(config.assessment.models.extraction_overrides),
         config.revision.models.planning,
         ...Object.values(config.revision.models.stage_overrides),
         config.timeline.model,

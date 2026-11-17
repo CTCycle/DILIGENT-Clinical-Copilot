@@ -34,7 +34,6 @@ LEGACY_EXECUTION_KEYS: frozenset[str] = frozenset(
         "revision_model",
         "timeline_model",
         "reasoning_level",
-        "ollama_seed",
     }
 )
 
@@ -131,8 +130,11 @@ class ModelConfigSerializer:
         self,
         *,
         rag_settings: dict[str, object] | object = UNSET,
+        ollama_seed: int | None | object = UNSET,
     ) -> ModelConfigSnapshot:
         updates: dict[str, object] = {}
+        if ollama_seed is not UNSET:
+            updates["ollama_seed"] = ollama_seed
         if rag_settings is not UNSET:
             updates["rag_settings"] = self.normalize_rag_settings(rag_settings)
         saved_payload, updated_at = self.application_configuration.update_payload(
@@ -160,6 +162,7 @@ class ModelConfigSerializer:
     ) -> ModelConfigSnapshot:
         return ModelConfigSnapshot(
             rag_settings=cls.normalize_rag_settings(payload.get("rag_settings")),
+            ollama_seed=cls.normalize_seed(payload.get("ollama_seed", 42)),
             updated_at=updated_at,
         )
 
@@ -176,6 +179,13 @@ class ModelConfigSerializer:
     @staticmethod
     def has_legacy_keys(payload: Mapping[str, object]) -> bool:
         return bool(LEGACY_EXECUTION_KEYS & set(payload))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_seed(value: object) -> int | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return int(value) if value >= 0 else None
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -18,6 +18,8 @@
 }
 
 .field {
+  /* The global .field adds a bottom margin (none on :last-child), which skews aligned rows. */
+  margin: 0;
   display: grid;
   gap: var(--space-xs);
   font-size: var(--font-sm);
@@ -71,7 +73,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
   gap: var(--space-md);
-  align-items: start;
+  align-items: end;
 }
 @media (max-width: 720px) {
   .model-row { grid-template-columns: minmax(0, 1fr); }
@@ -164,39 +166,26 @@ h4 { margin: 0; font-size: var(--font-sm); font-weight: 600; color: var(--color-
   background: var(--color-surface-alt);
   min-width: 0;
 }
-.field-grid.compact { grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); }
-.stage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-sm); }
-.stage-tile {
-  display: grid;
-  align-content: start;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  min-width: 0;
-}
-.stage-tile.is-on { border-color: var(--color-brand); background: var(--color-surface-alt); }
-.stage-tile .check { font-size: var(--font-sm); font-weight: 600; }
 @media (max-width: 720px) {
   .model-columns { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Evidence and retrieval */
-.chip-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.chip-check, .option input, .check input { accent-color: var(--color-brand); }
-.chip-check {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  min-height: var(--control-height-md);
-  padding: 0 var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-size: var(--font-sm);
-  cursor: pointer;
+.option input, .check input { accent-color: var(--color-brand); }
+.rag-step { display: grid; gap: var(--space-sm); }
+.rag-step > h4 { display: flex; align-items: center; gap: var(--space-sm); }
+.step-no {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: var(--color-surface);
+  font-size: var(--font-xs);
+  font-weight: 700;
 }
-.chip-check.is-on { border-color: var(--color-brand); color: var(--color-brand); }
-.option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-sm); }
+.source-grid, .strategy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-sm); align-items: stretch; }
 .option {
   display: flex;
   align-items: flex-start;
@@ -207,15 +196,21 @@ h4 { margin: 0; font-size: var(--font-sm); font-weight: 600; color: var(--color-
   font-size: var(--font-sm);
   cursor: pointer;
 }
-.option > span { display: grid; gap: 2px; }
-.advanced { border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-.advanced > summary {
-  padding: var(--space-sm) var(--space-md);
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  cursor: pointer;
+.option.is-on { border-color: var(--color-brand); background: var(--color-surface-alt); }
+.option > span, .strategy-head > span { display: grid; gap: 2px; }
+/* Strategy cards share one structure (head, inputs, footer) so they match in height and rows. */
+.option.strategy {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin: 0;
+  cursor: default;
 }
-.advanced-body { display: grid; gap: var(--space-sm); padding: 0 var(--space-md) var(--space-md); }
-.number-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 150px)); gap: var(--space-md); }
-.number-grid input { font-variant-numeric: tabular-nums; }
+.option.strategy:not(.is-on) :is(.param-row, .card-foot) { opacity: 0.5; }
+.strategy-head { display: flex; align-items: flex-start; gap: var(--space-sm); min-height: 44px; cursor: pointer; }
+.card-foot { margin-top: auto; }
+.field.wide { grid-column: 1 / -1; }
+/* Inputs in one row share a baseline: labels sit on top, controls line up at the bottom. */
+.param-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); align-items: end; }
+.param-row input { font-variant-numeric: tabular-nums; }

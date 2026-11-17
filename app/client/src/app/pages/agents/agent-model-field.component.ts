@@ -69,7 +69,7 @@ const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
           </label>
           <label class="field">Reasoning
             <select (change)="setReasoning($any($event.target).value)">
-              <option value="" [selected]="!current.reasoning_level">Inherit agent level</option>
+              <option value="" [selected]="!current.reasoning_level">Model default</option>
               @for (level of levelsFor(current); track level) {
                 <option [value]="level" [selected]="current.reasoning_level === level">{{ level }}</option>
               }

@@ -219,6 +219,31 @@ export class ProvidersResourcesComponent implements OnInit, OnDestroy {
     () => this.selectedCloudProvider()?.credential_scope ?? null,
   );
 
+  // Global Ollama seed (blank means random)
+  readonly ollamaSeed = computed(() => this.modelConfigState.data()?.ollama_seed ?? null);
+  readonly seedError = signal('');
+
+  async saveOllamaSeed(raw: string): Promise<void> {
+    const text = raw.trim();
+    const value = text === '' ? null : Number(text);
+    if (value !== null && (!Number.isInteger(value) || value < 0)) {
+      this.seedError.set('Seed must be a non-negative whole number.');
+      return;
+    }
+    if (value === this.ollamaSeed()) {
+      this.seedError.set('');
+      return;
+    }
+    try {
+      const payload = await updateModelConfigState({ ollama_seed: value });
+      this.modelConfigState.applyPersistedResponse(payload);
+      this.seedError.set('');
+      this.statusMessage.set('Ollama seed saved.');
+    } catch (error) {
+      this.seedError.set(formatUnknownError(error, 'Unable to save the Ollama seed.'));
+    }
+  }
+
   // Shared RAG index settings
   readonly ragSettings = computed(() => normalizeRagSettings(this.modelConfigState.data()?.rag_settings));
   readonly draftRagSettings = signal<DraftRagSettings>({ ...DEFAULT_RAG_SETTINGS });

@@ -368,20 +368,15 @@ describe('AgentEditorComponent', () => {
     expect(el().querySelectorAll('.model-card')[0].textContent).toContain('Add a Gemini key.');
   });
 
-  it('shows stage override fields only when enabled and hides weights when hybrid search is off', async () => {
+  it('disables hybrid weights when hybrid search is off and offers no extraction overrides', async () => {
     modelConfig = sampleConfig();
     await open('a2');
     await goTo('DILI Assessment');
-    const tile = (): Element => el().querySelectorAll('.stage-tile')[0];
-    expect(tile().querySelectorAll('select').length).toBe(0);
-    tile().querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+    expect(el().querySelectorAll('.stage-tile').length).toBe(0);
+    const weight = (): HTMLInputElement => el().querySelector<HTMLInputElement>('.strategy input[type="number"]')!;
+    expect(weight().disabled).toBe(false);
+    el().querySelectorAll<HTMLInputElement>('.strategy-head input')[0].click();
     await flush();
-    expect(tile().querySelectorAll('select').length).toBe(3);
-    const labels = (): string[] =>
-      Array.from(el().querySelectorAll('.advanced .field')).map((f) => f.textContent!.trim());
-    expect(labels().some((l) => l.startsWith('Vector weight'))).toBe(true);
-    el().querySelectorAll<HTMLInputElement>('.option input')[0].click();
-    await flush();
-    expect(labels().some((l) => l.startsWith('Vector weight'))).toBe(false);
+    expect(weight().disabled).toBe(true);
   });
 });

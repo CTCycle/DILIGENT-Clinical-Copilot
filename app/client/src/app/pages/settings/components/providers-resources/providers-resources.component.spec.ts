@@ -35,6 +35,7 @@ function statePayload(): ModelConfigStateResponse {
     }],
     cloud_providers: [],
     local_catalog: { status: 'available', updated_at: null, message: null },
+    ollama_seed: 42,
     rag_settings: {
       allow_local_filesystem_access: true,
       vector_collection_name: 'documents',
@@ -63,7 +64,7 @@ describe('ProvidersResourcesComponent', () => {
   beforeEach(async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
       const body = init?.method === 'PUT'
-        ? { rag_settings: JSON.parse(String(init.body)).rag_settings, updated_at: null }
+        ? { ...JSON.parse(String(init.body)), updated_at: null }
         : statePayload();
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
@@ -102,6 +103,17 @@ describe('ProvidersResourcesComponent', () => {
     expect(body.rag_settings.chunk_size).toBe(1024);
     expect(component.ragSettings().chunk_size).toBe(1024);
     expect(component.isRagDirty()).toBe(false);
+  });
+
+  it('saves the global Ollama seed, blank meaning random, and rejects invalid values', async () => {
+    expect(component.ollamaSeed()).toBe(42);
+    await component.saveOllamaSeed('');
+    expect(JSON.parse(String(calls('PUT')[0][1]?.body))).toEqual({ ollama_seed: null });
+    expect(component.ollamaSeed()).toBeNull();
+
+    await component.saveOllamaSeed('-3');
+    expect(calls('PUT')).toHaveLength(1);
+    expect(component.seedError()).toContain('non-negative');
   });
 
   it('does not save an invalid chunk overlap', async () => {

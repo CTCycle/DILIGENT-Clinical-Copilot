@@ -46,10 +46,6 @@ const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
               }
             </select>
           </label>
-          <label class="field">Ollama seed
-            <input type="number" min="0" step="1" [value]="config().ollama_seed ?? ''"
-              (input)="setSeed($any($event.target).value)" />
-          </label>
         </div>
       </section>
     </fieldset>
@@ -81,9 +77,5 @@ export class TimelineSectionsComponent {
 
   setReasoning(level: string): void {
     this.update((d) => (d.reasoning_level = level as ReasoningLevel));
-  }
-
-  setSeed(value: string): void {
-    this.update((d) => (d.ollama_seed = value.trim() === '' ? null : Number(value)));
   }
 }
