@@ -12,7 +12,6 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
 };
 
 export type ExtractionStage = "therapy_drugs" | "anamnesis_drugs" | "diseases" | "laboratory";
-export type RevisionStage = "planning" | "tool_selection" | "editing" | "qa";
 
 export type AgentModelRef = {
   provider: CatalogProvider;
@@ -54,48 +53,32 @@ export type AssessmentConfig = {
   instructions: AssessmentInstructions;
   report_template: ReportTemplate | null;
   models: AssessmentModels;
-  reasoning_level: ReasoningLevel;
-  ollama_seed: number | null;
   retrieval: AgentRetrievalPolicy;
 };
 
 export type RevisionInstructions = {
-  review_objectives: string;
-  editing_style: string;
+  custom_instructions: string;
 };
 
 export type RevisionModels = {
   planning: AgentModelRef;
-  stage_overrides: Partial<Record<RevisionStage, AgentModelRef>>;
 };
 
-export type RevisionExecutionLimits = {
-  max_tasks: number;
-  max_tool_iterations: number;
-  allowed_tools: string[] | null;
-};
-
+/** Review stages, limits and tools are fixed by the pipeline. */
 export type RevisionConfig = {
   enabled: boolean;
   instructions: RevisionInstructions;
   models: RevisionModels;
-  reasoning_level: ReasoningLevel;
-  ollama_seed: number | null;
-  limits: RevisionExecutionLimits;
 };
 
-export type TimelineInstructions = { timeline_focus: string };
-
+/** Timeline extraction is scripted; only its model is configurable. */
 export type TimelineConfig = {
   enabled: boolean;
-  instructions: TimelineInstructions;
   model: AgentModelRef;
-  reasoning_level: ReasoningLevel;
-  ollama_seed: number | null;
 };
 
 export type AgentConfig = {
-  schema_version: 3;
+  schema_version: 4;
   assessment: AssessmentConfig;
   revision: RevisionConfig;
   timeline: TimelineConfig;

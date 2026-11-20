@@ -8,7 +8,7 @@ const OLLAMA = { provider: 'ollama', model: 'qwen3' } as const;
 /** A complete three-capability configuration; override any capability slice. */
 export function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
-    schema_version: 3,
+    schema_version: 4,
     assessment: {
       enabled: true,
       instructions: { custom_instructions: '' },
@@ -18,8 +18,6 @@ export function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConf
         clinical: { provider: 'openai', model: 'gpt-x' },
         extraction_overrides: {},
       },
-      reasoning_level: 'off',
-      ollama_seed: 42,
       retrieval: {
         evidence_sources: ['livertox', 'dilirank'],
         use_hybrid_search: true,
@@ -33,18 +31,12 @@ export function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConf
     },
     revision: {
       enabled: true,
-      instructions: { review_objectives: '', editing_style: '' },
-      models: { planning: { ...OLLAMA }, stage_overrides: {} },
-      reasoning_level: 'off',
-      ollama_seed: 42,
-      limits: { max_tasks: 8, max_tool_iterations: 24, allowed_tools: null },
+      instructions: { custom_instructions: '' },
+      models: { planning: { ...OLLAMA } },
     },
     timeline: {
       enabled: true,
-      instructions: { timeline_focus: '' },
       model: { ...OLLAMA },
-      reasoning_level: 'off',
-      ollama_seed: 42,
     },
     ...overrides,
   };
@@ -76,7 +68,7 @@ export function makeAgent(
     revision: {
       revision_id: 1,
       revision_number: 1,
-      schema_version: 2,
+      schema_version: 4,
       configuration_hash: 'h',
       configuration: config,
       created_at: null,

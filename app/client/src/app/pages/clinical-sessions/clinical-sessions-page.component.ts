@@ -234,8 +234,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     const config = this.revisionAgent()?.revision.configuration.revision;
     if (!config) return '';
     const { planning } = config.models;
-    const { max_tasks: tasks, max_tool_iterations: iterations } = config.limits;
-    return `${planning.provider} / ${planning.model} · up to ${tasks} tasks, ${iterations} tool iterations`;
+    return `${planning.provider} / ${planning.model}`;
   });
   readonly revisionAgentLoading = computed(() => this.agentsState.status() === 'loading');
   readonly revisionAgentError = computed(() => {

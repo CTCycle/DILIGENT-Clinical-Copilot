@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 
 import { AgentModelRef } from '../../core/models/agent-types';
 import { ReasoningLevel } from '../../core/models/types';
@@ -10,45 +10,33 @@ import { ModelCatalog, ProviderOption } from './agent-form';
 
 const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
 
+let nextFieldId = 0;
+
 /**
  * Provider, model and reasoning selectors for one agent role.
- * `layout="row"` aligns them on one row; `layout="stack"` stacks them for column cards.
+ * `layout="row"` aligns them on one row; `layout="stack"` stacks them for side-by-side columns.
+ * Catalog notes render on their own line below the controls, so a warning never shifts or
+ * misaligns neighbouring selects; in stack layout that line keeps its height when empty so
+ * adjacent columns stay aligned.
  */
 @Component({
   selector: 'app-agent-model-field',
   standalone: true,
   styleUrl: './agent-sections.scss',
   template: `
-    <div class="model-field">
-      @if (headed()) {
-        <div class="model-field-header">
-          @if (optional()) {
-            <label class="check">
-              <input type="checkbox" [checked]="!!ref()" (change)="toggle($any($event.target).checked)" />
-              {{ label() }}
-            </label>
-          } @else {
-            <strong>{{ label() }} <span aria-hidden="true">*</span></strong>
-          }
-          @if (refreshable() && ref(); as current) {
-            <button type="button" class="btn" [disabled]="refreshing()"
-              [attr.aria-label]="'Refresh models for ' + label()" (click)="refresh(current.provider)">
-              {{ refreshing() ? 'Refreshing…' : 'Refresh models' }}
-            </button>
-          }
-        </div>
-      }
-      @if (ref(); as current) {
-        <div class="model-row" [class.is-stack]="layout() === 'stack'">
+    @if (ref(); as current) {
+      <div class="model-field" [class.is-stack]="layout() === 'stack'">
+        <div class="model-row">
           <label class="field">Provider
-            <select (change)="setProvider($any($event.target).value)">
+            <select [attr.aria-label]="label() + ' provider'" (change)="setProvider($any($event.target).value)">
               @for (option of providers(); track option.value) {
                 <option [value]="option.value" [selected]="option.value === current.provider">{{ option.label }}</option>
               }
             </select>
           </label>
           <label class="field">Model
-            <select (change)="patch({ model: $any($event.target).value })" [disabled]="loading()">
+            <select [attr.aria-label]="label() + ' model'" [attr.aria-describedby]="modelNote() ? noteId : null"
+              (change)="patch({ model: $any($event.target).value })" [disabled]="loading()">
               @if (loading()) {
                 <option value="" selected>Loading models…</option>
               } @else {
@@ -63,12 +51,9 @@ const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
                 }
               }
             </select>
-            @if (modelNote(); as note) {
-              <span class="field-hint" [class.is-warning]="note.warn">{{ note.text }}</span>
-            }
           </label>
           <label class="field">Reasoning
-            <select (change)="setReasoning($any($event.target).value)">
+            <select [attr.aria-label]="label() + ' reasoning'" (change)="setReasoning($any($event.target).value)">
               <option value="" [selected]="!current.reasoning_level">Model default</option>
               @for (level of levelsFor(current); track level) {
                 <option [value]="level" [selected]="current.reasoning_level === level">{{ level }}</option>
@@ -76,11 +61,11 @@ const REASONING: readonly ReasoningLevel[] = ['off', 'low', 'medium', 'high'];
             </select>
           </label>
         </div>
-        @if (refreshError()) {
-          <p class="field-error" role="alert">{{ refreshError() }}</p>
-        }
-      }
-    </div>
+        <p class="model-note" [id]="noteId" [class.is-warning]="modelNote()?.warn" aria-live="polite">
+          {{ modelNote()?.text ?? '' }}
+        </p>
+      </div>
+    }
   `,
 })
 export class AgentModelFieldComponent {
@@ -88,20 +73,12 @@ export class AgentModelFieldComponent {
 
   readonly label = input.required<string>();
   readonly ref = input<AgentModelRef | null | undefined>(null);
-  readonly optional = input(false);
-  /** Seed used when an optional override is switched on. */
-  readonly fallback = input<AgentModelRef | null>(null);
   readonly providerOptions = input<readonly ProviderOption[]>([]);
   readonly catalog = input<ModelCatalog>({});
   readonly layout = input<'row' | 'stack'>('row');
-  /** When false the field shows no refresh button; the parent offers one refresh for all fields. */
-  readonly refreshable = input(true);
-  /** When false the label/toggle header is omitted (the parent renders its own). */
-  readonly headed = input(true);
-  readonly refChange = output<AgentModelRef | null>();
+  readonly refChange = output<AgentModelRef>();
 
-  readonly refreshing = signal(false);
-  readonly refreshError = signal('');
+  readonly noteId = `agent-model-note-${nextFieldId++}`;
   readonly providers = computed(() => {
     const options = this.providerOptions();
     const current = this.ref()?.provider;
@@ -161,11 +138,6 @@ export class AgentModelFieldComponent {
       : levels;
   }
 
-  toggle(enabled: boolean): void {
-    const base = this.fallback();
-    this.refChange.emit(enabled ? { provider: base?.provider ?? 'ollama', model: base?.model ?? '' } : null);
-  }
-
   patch(change: Partial<AgentModelRef>): void {
     const current = this.ref();
     if (!current) return;
@@ -182,14 +154,5 @@ export class AgentModelFieldComponent {
 
   setReasoning(value: string): void {
     this.patch({ reasoning_level: (value || null) as ReasoningLevel | null });
-  }
-
-  async refresh(provider: string): Promise<void> {
-    if (this.refreshing()) return;
-    this.refreshing.set(true);
-    this.refreshError.set('');
-    const failures = await this.modelConfig.refreshCatalogs([provider]);
-    this.refreshError.set(failures[provider] ?? '');
-    this.refreshing.set(false);
   }
 }

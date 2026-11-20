@@ -132,7 +132,7 @@ describe('AgentEditorComponent', () => {
     const body = JSON.parse(put[1].body);
     expect(body.expected_revision).toBe(1);
     expect(body.name).toBe('Renamed');
-    expect(body.configuration.schema_version).toBe(3);
+    expect(body.configuration.schema_version).toBe(4);
     expect(el().textContent).toContain('Saved as revision 2');
   });
 
@@ -149,12 +149,13 @@ describe('AgentEditorComponent', () => {
   it('keeps edits across tabs and saves every section together', async () => {
     await open('a2');
     await type(nameInput(), 'Renamed');
-    await goTo('Timeline');
-    const focus = el().querySelector<HTMLTextAreaElement>('app-timeline-sections textarea')!;
-    focus.value = 'Dates first';
-    focus.dispatchEvent(new Event('input'));
+    await goTo('DILI Report Review');
+    const notes = (): HTMLTextAreaElement => el().querySelector<HTMLTextAreaElement>('app-revision-sections textarea')!;
+    notes().value = 'Dates first';
+    notes().dispatchEvent(new Event('input'));
     await flush();
 
+    await goTo('Timeline');
     capabilitySwitch().checked = false;
     capabilitySwitch().dispatchEvent(new Event('change'));
     await flush();
@@ -165,15 +166,15 @@ describe('AgentEditorComponent', () => {
     expect(el().querySelector('.capability-state')!.textContent).toContain('Enabled');
     await goTo('Overview');
     expect(nameInput().value).toBe('Renamed');
-    await goTo('Timeline');
-    expect(el().querySelector<HTMLTextAreaElement>('app-timeline-sections textarea')!.value).toBe('Dates first');
+    await goTo('DILI Report Review');
+    expect(notes().value).toBe('Dates first');
 
     button('Save').click();
     await flush();
     const body = JSON.parse(fetchSpy.mock.calls.find(([, init]) => init?.method === 'PUT')![1].body);
     expect(body.name).toBe('Renamed');
     expect(body.configuration.timeline.enabled).toBe(false);
-    expect(body.configuration.timeline.instructions.timeline_focus).toBe('Dates first');
+    expect(body.configuration.revision.instructions.custom_instructions).toBe('Dates first');
     expect(body.configuration.assessment.enabled).toBe(true);
     expect(body.configuration.revision.enabled).toBe(true);
   });
@@ -284,6 +285,40 @@ describe('AgentEditorComponent', () => {
     });
   });
 
+  it('toggles the template editor with the Write button', async () => {
+    await open('a2');
+    await goTo('DILI Assessment');
+    const write = (): HTMLButtonElement => button('Write');
+    expect(write().getAttribute('aria-pressed')).toBe('false');
+    write().click();
+    await flush();
+    expect(write().getAttribute('aria-pressed')).toBe('true');
+    expect(write().classList.contains('is-active')).toBe(true);
+    write().click();
+    await flush();
+    expect(write().getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('keeps Report Review to one instructions field and one model, and Timeline to a model only', async () => {
+    await open('a2');
+    await goTo('DILI Report Review');
+    const review = el().querySelector('app-revision-sections')!;
+    expect(review.querySelectorAll('textarea').length).toBe(1);
+    expect(review.querySelectorAll('input[type="checkbox"], input[type="number"]').length).toBe(0);
+    expect(review.querySelectorAll('app-agent-model-field').length).toBe(1);
+    expect(review.querySelector('select[aria-label="Review model model"]')).not.toBeNull();
+    const notes = review.querySelector<HTMLTextAreaElement>('textarea')!;
+    await type(notes as unknown as HTMLInputElement, 'Check dates');
+    await goTo('Timeline');
+    const timeline = el().querySelector('app-timeline-sections')!;
+    expect(timeline.querySelectorAll('textarea').length).toBe(0);
+    expect(timeline.querySelectorAll('app-agent-model-field').length).toBe(1);
+    button('Save').click();
+    await flush();
+    const put = fetchSpy.mock.calls.find(([, init]) => init?.method === 'PUT')!;
+    expect(JSON.parse(put[1].body).configuration.revision.instructions.custom_instructions).toBe('Check dates');
+  });
+
   it('rejects unsupported template files', async () => {
     await open('a2');
     await goTo('DILI Assessment');
@@ -307,7 +342,7 @@ describe('AgentEditorComponent', () => {
     ...extra,
   });
   const modelSelects = (card: number): HTMLSelectElement[] =>
-    Array.from(el().querySelectorAll('.model-card')[card].querySelectorAll<HTMLSelectElement>('select'));
+    Array.from(el().querySelectorAll('.model-column')[card].querySelectorAll<HTMLSelectElement>('select'));
   const optionTexts = (select: HTMLSelectElement) => Array.from(select.options).map((o) => o.textContent?.trim());
 
   it('populates model dropdowns per provider and never substitutes a model on provider switch', async () => {
@@ -334,7 +369,7 @@ describe('AgentEditorComponent', () => {
     const model = modelSelects(0)[1];
     expect(optionTexts(model)).toEqual(['gpt-z', 'gpt-x (not in catalog)']);
     expect(model.value).toBe('gpt-x');
-    expect(el().querySelectorAll('.model-card')[0].textContent).toContain('not in the provider');
+    expect(el().querySelectorAll('.model-column')[0].textContent).toContain('not in the provider');
   });
 
   it('loads a never-loaded provider catalog on open and refreshes all used providers once', async () => {
@@ -365,7 +400,12 @@ describe('AgentEditorComponent', () => {
     provider.value = 'gemini';
     provider.dispatchEvent(new Event('change'));
     await flush();
-    expect(el().querySelectorAll('.model-card')[0].textContent).toContain('Add a Gemini key.');
+    const column = el().querySelectorAll('.model-column')[0];
+    const note = column.querySelector('.model-note')!;
+    expect(note.textContent).toContain('Add a Gemini key.');
+    expect(note.closest('label')).toBeNull();
+    expect(modelSelects(0)[1].closest('label')!.contains(note)).toBe(false);
+    expect(modelSelects(0)[1].getAttribute('aria-describedby')).toBe(note.id);
   });
 
   it('disables hybrid weights when hybrid search is off and offers no extraction overrides', async () => {

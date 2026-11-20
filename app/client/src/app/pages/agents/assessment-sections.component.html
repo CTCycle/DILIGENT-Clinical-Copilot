@@ -27,43 +27,31 @@
     (templateChange)="setTemplate($event)" />
 </section>
 
-<section class="subsection" aria-labelledby="dili-models-heading">
-  <div class="section-head">
-    <h3 id="dili-models-heading">Models</h3>
-    <div class="section-head-actions">
-      @if (refreshMessage()) {
-        <span class="field-hint" [class.is-warning]="refreshFailed()" role="status">{{ refreshMessage() }}</span>
-      }
-      <button type="button" class="btn" [disabled]="busy() || disabled()" (click)="refreshModels()">
-        {{ busy() ? 'Refreshing…' : 'Refresh models' }}
-      </button>
-    </div>
-  </div>
+<app-agent-models-section headingId="dili-models-heading" [disabled]="disabled()"
+  [refs]="[config().models.clinical, config().models.extraction]">
   <div class="model-columns">
-    <div class="model-card">
+    <div class="model-column">
       <h4>Clinical model <span aria-hidden="true">*</span></h4>
-      <app-agent-model-field label="Clinical model" layout="stack" [headed]="false" [refreshable]="false"
-        [ref]="config().models.clinical" [providerOptions]="providerOptions()" [catalog]="catalog()"
-        (refChange)="setModel('clinical', $event)" />
+      <app-agent-model-field label="Clinical model" layout="stack" [ref]="config().models.clinical"
+        [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setModel('clinical', $event)" />
     </div>
-    <div class="model-card">
+    <div class="model-column">
       <h4>Extraction model <span aria-hidden="true">*</span></h4>
-      <app-agent-model-field label="Extraction model" layout="stack" [headed]="false" [refreshable]="false"
-        [ref]="config().models.extraction" [providerOptions]="providerOptions()" [catalog]="catalog()"
-        (refChange)="setModel('extraction', $event)" />
+      <app-agent-model-field label="Extraction model" layout="stack" [ref]="config().models.extraction"
+        [providerOptions]="providerOptions()" [catalog]="catalog()" (refChange)="setModel('extraction', $event)" />
     </div>
   </div>
-</section>
+</app-agent-models-section>
 
 <section class="subsection" aria-labelledby="dili-rag-heading">
   <h3 id="dili-rag-heading">Evidence and retrieval</h3>
   <p class="agent-section-note">Choose what the agent may cite, how candidates are found, and how many reach the report.</p>
 
-  <div class="rag-step">
-    <h4><span class="step-no">1</span> Evidence sources</h4>
-    <div class="source-grid" role="group" aria-label="Evidence sources">
+  <div class="rag-group">
+    <h4>Evidence sources</h4>
+    <div class="source-list" role="group" aria-label="Evidence sources">
       @for (source of evidenceSources; track source.id) {
-        <label class="option" [class.is-on]="config().retrieval.evidence_sources.includes(source.id)">
+        <label class="check-option">
           <input type="checkbox" [checked]="config().retrieval.evidence_sources.includes(source.id)"
             (change)="toggleSource(source.id, $any($event.target).checked)" />
           <span><strong>{{ source.label }}</strong><span class="field-hint">{{ source.hint }}</span></span>
@@ -72,61 +60,58 @@
     </div>
   </div>
 
-  <div class="rag-step">
-    <h4><span class="step-no">2</span> Search strategy and result size</h4>
-    <div class="strategy-grid">
-      <div class="option strategy" [class.is-on]="config().retrieval.use_hybrid_search">
-        <label class="strategy-head">
-          <input type="checkbox" [checked]="config().retrieval.use_hybrid_search"
-            (change)="setFlag('use_hybrid_search', $any($event.target).checked)" />
-          <span><strong>Hybrid search</strong><span class="field-hint">Blend vector and text matches.</span></span>
+  <div class="strategy-grid">
+    <div class="strategy" [class.is-off]="!config().retrieval.use_hybrid_search">
+      <label class="check-option strategy-head">
+        <input type="checkbox" [checked]="config().retrieval.use_hybrid_search"
+          (change)="setFlag('use_hybrid_search', $any($event.target).checked)" />
+        <span><strong>Hybrid search</strong><span class="field-hint">Blend vector and text matches.</span></span>
+      </label>
+      <div class="param-row">
+        <label class="field">Vector weight
+          <input type="number" min="0" max="1" step="0.05" [disabled]="!config().retrieval.use_hybrid_search" [value]="config().retrieval.hybrid_vector_weight"
+            (input)="setNumber('hybrid_vector_weight', $any($event.target).value)" />
         </label>
-        <div class="param-row">
-          <label class="field">Vector weight
-            <input type="number" min="0" max="1" step="0.05" [disabled]="!config().retrieval.use_hybrid_search" [value]="config().retrieval.hybrid_vector_weight"
-              (input)="setNumber('hybrid_vector_weight', $any($event.target).value)" />
-          </label>
-          <label class="field">Text weight
-            <input type="number" min="0" max="1" step="0.05" [disabled]="!config().retrieval.use_hybrid_search" [value]="config().retrieval.hybrid_text_weight"
-              (input)="setNumber('hybrid_text_weight', $any($event.target).value)" />
-          </label>
-        </div>
-        <p class="field-hint card-foot">Combined weight {{ weightSum() }}. Each weight must be between 0 and 1.</p>
-      </div>
-
-      <div class="option strategy" [class.is-on]="config().retrieval.use_reranking">
-        <label class="strategy-head">
-          <input type="checkbox" [checked]="config().retrieval.use_reranking"
-            (change)="setFlag('use_reranking', $any($event.target).checked)" />
-          <span><strong>Reranking</strong><span class="field-hint">Reorder candidates with a reranker model.</span></span>
+        <label class="field">Text weight
+          <input type="number" min="0" max="1" step="0.05" [disabled]="!config().retrieval.use_hybrid_search" [value]="config().retrieval.hybrid_text_weight"
+            (input)="setNumber('hybrid_text_weight', $any($event.target).value)" />
         </label>
-        <div class="param-row">
-          <label class="field wide">Reranker model
-            <input type="text" [disabled]="!config().retrieval.use_reranking" [value]="config().retrieval.reranker_model"
-              (input)="setReranker($any($event.target).value)" />
-          </label>
-        </div>
-        <p class="field-hint card-foot">Applied to the retrieved candidates before the final selection.</p>
       </div>
+      <p class="field-hint card-foot">Combined weight {{ weightSum() }}. Each weight must be between 0 and 1.</p>
+    </div>
 
-      <div class="option strategy is-on">
-        <div class="strategy-head">
-          <span><strong>Result size</strong><span class="field-hint">How many passages reach the report.</span></span>
-        </div>
-        <div class="param-row">
-          <label class="field">Candidates retrieved
-            <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_candidate_count"
-              (input)="setNumber('retrieval_candidate_count', $any($event.target).value)" />
-          </label>
-          <label class="field">Passages kept
-            <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_selected_count"
-              (input)="setNumber('retrieval_selected_count', $any($event.target).value)" />
-          </label>
-        </div>
-        <p class="field-hint card-foot">Passages kept must not exceed candidates retrieved.</p>
+    <div class="strategy" [class.is-off]="!config().retrieval.use_reranking">
+      <label class="check-option strategy-head">
+        <input type="checkbox" [checked]="config().retrieval.use_reranking"
+          (change)="setFlag('use_reranking', $any($event.target).checked)" />
+        <span><strong>Reranking</strong><span class="field-hint">Reorder candidates with a reranker model.</span></span>
+      </label>
+      <div class="param-row">
+        <label class="field wide">Reranker model
+          <input type="text" [disabled]="!config().retrieval.use_reranking" [value]="config().retrieval.reranker_model"
+            (input)="setReranker($any($event.target).value)" />
+        </label>
       </div>
+      <p class="field-hint card-foot">Applied to the retrieved candidates before the final selection.</p>
+    </div>
+
+    <div class="strategy">
+      <div class="strategy-head">
+        <span><strong>Result size</strong><span class="field-hint">How many passages reach the report.</span></span>
+      </div>
+      <div class="param-row">
+        <label class="field">Candidates retrieved
+          <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_candidate_count"
+            (input)="setNumber('retrieval_candidate_count', $any($event.target).value)" />
+        </label>
+        <label class="field">Passages kept
+          <input type="number" min="1" max="10000" step="1" [value]="config().retrieval.retrieval_selected_count"
+            (input)="setNumber('retrieval_selected_count', $any($event.target).value)" />
+        </label>
+      </div>
+      <p class="field-hint card-foot">Passages kept must not exceed candidates retrieved.</p>
     </div>
   </div>
-  <p class="field-hint">Index, chunking and embedding settings are shared; see Settings → Providers & Models.</p>
+  <p class="field-hint">Index, chunking and embedding settings are shared; see Settings → Providers &amp; Models.</p>
 </section>
 </fieldset>

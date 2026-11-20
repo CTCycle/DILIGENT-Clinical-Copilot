@@ -31,19 +31,20 @@ const ACCEPT = FORMATS.map((format) => `.${format}`).join(',');
           <span class="field-hint">The default report format is used.</span>
         }
         <span class="template-actions">
-          @if (template() || editing()) {
-            <button type="button" class="btn" (click)="editing.set(!editing())" [attr.aria-expanded]="editing()">
-              {{ editing() ? 'Hide editor' : 'Edit' }}
-            </button>
-          } @else {
-            <button type="button" class="btn" [disabled]="disabled()" (click)="editing.set(true)">Write</button>
-          }
-          <button type="button" class="btn" [disabled]="disabled()" (click)="picker.click()">
-            {{ template() ? 'Replace file' : 'Upload file' }}
-          </button>
           @if (template()) {
-            <button type="button" class="btn" [disabled]="disabled()" (click)="clear()">Clear</button>
+            <button type="button" class="btn btn-tertiary btn-compact" [disabled]="disabled()" (click)="clear()">
+              Clear
+            </button>
           }
+          <span class="button-group" role="group" aria-label="Report template source">
+            <button type="button" [class.is-active]="editing()" [attr.aria-pressed]="editing()"
+              [disabled]="disabled() && !template()" (click)="editing.set(!editing())">
+              {{ template() ? 'Edit' : 'Write' }}
+            </button>
+            <button type="button" [disabled]="disabled()" (click)="picker.click()">
+              {{ template() ? 'Replace file' : 'Upload file' }}
+            </button>
+          </span>
         </span>
       </div>
       @if (editing()) {

@@ -175,7 +175,6 @@ export class AgentEditorComponent implements OnInit {
         config.assessment.models.extraction,
         config.assessment.models.clinical,
         config.revision.models.planning,
-        ...Object.values(config.revision.models.stage_overrides),
         config.timeline.model,
       ];
       const providers = refs.flatMap((ref) => (ref?.provider ? [ref.provider] : []));

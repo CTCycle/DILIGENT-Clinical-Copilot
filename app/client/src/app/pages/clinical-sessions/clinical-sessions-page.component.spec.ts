@@ -551,8 +551,6 @@ describe('ClinicalSessionsPageComponent revision agent', () => {
   let component: ClinicalSessionsPageComponent;
   function revisionAgent(id: string, isDefault: boolean) {
     const config = makeAgentConfig();
-    config.revision.limits = { max_tasks: 6, max_tool_iterations: 12, allowed_tools: null };
-    config.revision.ollama_seed = null;
     return makeAgent(id, { name: `Reviser ${id}`, current_revision: 4, is_default: isDefault }, config);
   }
 
@@ -587,7 +585,7 @@ describe('ClinicalSessionsPageComponent revision agent', () => {
     await component.loadRevisionAgents();
 
     expect(component.revisionAgent()?.id).toBe('r1');
-    expect(component.revisionAgentSummary()).toContain('up to 6 tasks, 12 tool iterations');
+    expect(component.revisionAgentSummary()).toBe('ollama / qwen3');
 
     component.selectRevisionAgent('r2');
     component.updateRevisionInstruction('Check dates');

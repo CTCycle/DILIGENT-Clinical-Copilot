@@ -11,12 +11,6 @@
   line-height: 1.45;
 }
 
-.field-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-md);
-}
-
 .field {
   /* The global .field adds a bottom margin (none on :last-child), which skews aligned rows. */
   margin: 0;
@@ -49,71 +43,42 @@
 .field-counter { font-weight: 400; color: var(--color-text-muted); font-size: var(--font-xs); }
 .field-counter.is-over { color: var(--color-status-error-text); font-weight: 600; }
 
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--font-base);
-  color: var(--color-text-primary);
-}
-
-.check-row { display: flex; flex-wrap: wrap; gap: var(--space-lg); }
-
-.model-field { display: grid; gap: var(--space-sm); }
-.model-field-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  flex-wrap: wrap;
-}
-
-/* Provider | Model | Reasoning on one aligned row; stacks on narrow screens. */
+/*
+ * Provider | Model | Reasoning. Labels and controls align at the top; catalog notes live on their
+ * own line below the controls so a warning never pushes a neighbouring select out of line.
+ */
+.model-field { display: grid; gap: var(--space-xs); min-width: 0; }
 .model-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
   gap: var(--space-md);
-  align-items: end;
+  align-items: start;
 }
+.model-field.is-stack .model-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
 @media (max-width: 720px) {
-  .model-row { grid-template-columns: minmax(0, 1fr); }
+  .model-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
 }
-.model-row.is-stack { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
-.field-hint.is-warning { color: var(--color-status-warning-text); }
+.model-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.model-note:empty { display: none; }
+/* Side-by-side columns reserve the note line so their controls and footers stay level. */
+.model-field.is-stack .model-note:empty { display: block; min-height: 1.45em; }
+.model-note.is-warning, .field-hint.is-warning { color: var(--color-status-warning-text); }
 
 .field select { height: var(--control-height-md); }
 
 .template-field { display: grid; gap: var(--space-sm); }
-.template-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-}
-.template-summary > div:first-child { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
-.template-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.template-preview {
-  margin: 0;
-  max-height: 280px;
-  overflow: auto;
-  padding: var(--space-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-sm);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 .field-error { margin: 0; color: var(--color-status-error-text); font-size: var(--font-sm); }
 
 :is(input, select, textarea):focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
-
-fieldset.check-row { border: 0; margin: 0; padding: 0; }
 
 fieldset.plain { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: var(--space-md); }
 fieldset.plain:disabled { opacity: 0.75; }
@@ -125,11 +90,10 @@ fieldset.plain:disabled { opacity: 0.75; }
   border-top: 1px solid var(--color-divider);
   min-width: 0;
 }
-.subsection:first-child { padding-top: 0; border-top: 0; }
+fieldset.plain > .subsection:first-child { padding-top: 0; border-top: 0; }
 .subsection > h3,
 .section-head > h3 { margin: 0; font-size: var(--font-base); font-weight: 700; }
 h4 { margin: 0; font-size: var(--font-sm); font-weight: 600; color: var(--color-text-secondary); }
-.group { display: grid; gap: var(--space-xs); }
 .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 .section-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
 
@@ -145,7 +109,33 @@ h4 { margin: 0; font-size: var(--font-sm); font-weight: 600; color: var(--color-
   color: var(--color-text-muted);
 }
 .template-state.is-set { color: var(--color-brand); border-color: var(--color-brand); }
-.template-bar .template-actions { margin-left: auto; }
+.template-bar .template-actions { margin-left: auto; align-items: center; }
+
+/* Compact buttons and a joined segmented group, matching the app's .segmented filter control. */
+.btn-compact { min-height: var(--control-height-sm); padding: 0 var(--space-md); font-size: var(--font-sm); }
+.button-group {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+.button-group button {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-md);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.button-group button + button { border-left: 1px solid var(--color-border); }
+.button-group button:hover:not(:disabled) { color: var(--color-text-primary); background: var(--color-surface-alt); }
+.button-group button.is-active { color: var(--color-brand); background: var(--color-brand-bg); }
+.button-group button:disabled { opacity: 0.55; cursor: not-allowed; }
+.button-group button:focus-visible { outline: var(--focus-ring); outline-offset: calc(var(--focus-ring-offset) * -1); }
 .template-editor { display: grid; gap: var(--space-sm); }
 .template-format { max-width: 140px; }
 .field textarea.template-text {
@@ -154,63 +144,38 @@ h4 { margin: 0; font-size: var(--font-sm); font-weight: 600; color: var(--color-
   font-size: var(--font-sm);
 }
 
-/* Models */
-.model-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); }
-.model-card {
-  display: grid;
-  align-content: start;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  min-width: 0;
-}
+/* Models: two open columns, no nested cards. */
+.model-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md) var(--space-xl); }
+.model-column { display: grid; align-content: start; gap: var(--space-sm); min-width: 0; }
 @media (max-width: 720px) {
   .model-columns { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Evidence and retrieval */
-.option input, .check input { accent-color: var(--color-brand); }
-.rag-step { display: grid; gap: var(--space-sm); }
-.rag-step > h4 { display: flex; align-items: center; gap: var(--space-sm); }
-.step-no {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--color-brand);
-  color: var(--color-surface);
-  font-size: var(--font-xs);
-  font-weight: 700;
-}
-.source-grid, .strategy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-sm); align-items: stretch; }
-.option {
+/* Evidence and retrieval: grouped by spacing and headings rather than bordered cards. */
+.check-option input { accent-color: var(--color-brand); }
+.rag-group { display: grid; gap: var(--space-sm); }
+.check-option {
   display: flex;
   align-items: flex-start;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
   font-size: var(--font-sm);
   cursor: pointer;
 }
-.option.is-on { border-color: var(--color-brand); background: var(--color-surface-alt); }
-.option > span, .strategy-head > span { display: grid; gap: 2px; }
-/* Strategy cards share one structure (head, inputs, footer) so they match in height and rows. */
-.option.strategy {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-sm);
-  min-width: 0;
-  margin: 0;
-  cursor: default;
+.check-option input { margin-top: 3px; flex: none; }
+.source-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-sm) var(--space-xl); }
+/* Strategy columns share one structure (head, inputs, footnote) so their rows line up. */
+.strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg) var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-divider);
 }
-.option.strategy:not(.is-on) :is(.param-row, .card-foot) { opacity: 0.5; }
-.strategy-head { display: flex; align-items: flex-start; gap: var(--space-sm); min-height: 44px; cursor: pointer; }
+.strategy { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; }
+.strategy.is-off :is(.param-row, .card-foot) { opacity: 0.5; }
+.strategy-head { display: flex; align-items: flex-start; gap: var(--space-sm); min-height: 44px; font-size: var(--font-sm); }
+.check-option > span, .strategy-head > span { display: grid; gap: 2px; }
 .card-foot { margin-top: auto; }
 .field.wide { grid-column: 1 / -1; }
-/* Inputs in one row share a baseline: labels sit on top, controls line up at the bottom. */
 .param-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); align-items: end; }
 .param-row input { font-variant-numeric: tabular-nums; }

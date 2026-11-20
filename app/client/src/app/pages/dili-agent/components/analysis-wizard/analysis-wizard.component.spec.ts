@@ -47,7 +47,6 @@ function agent(id: string, overrides: Partial<Agent> = {}, sources: string[] = [
   config.assessment.instructions = {
     custom_instructions: 'Focus on RUCAM',
   };
-  config.assessment.ollama_seed = null;
   config.assessment.retrieval.evidence_sources = sources as never;
   const result = makeAgent(id, { name: `Agent ${id}`, current_revision: 2, ...overrides }, config);
   result.revision.revision_number = 2;

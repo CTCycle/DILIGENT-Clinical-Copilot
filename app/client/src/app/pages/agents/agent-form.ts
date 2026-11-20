@@ -8,20 +8,6 @@ export const REPORT_TEMPLATE_MAX_LENGTH = 20000;
 export const NAME_MAX_LENGTH = 120;
 export const DESCRIPTION_MAX_LENGTH = 2000;
 
-/** Mirrors `RevisionToolRegistry.names` (app/server/services/inspection/revision_tools.py). */
-export const REVISION_TOOL_NAMES: readonly string[] = [
-  'read_session_context',
-  'read_result_payload_path',
-  'read_manual_edits',
-  'read_version_lineage',
-  'search_livertox_catalog',
-  'get_livertox_excerpt',
-  'search_dilirank_catalog',
-  'get_dilirank_records',
-  'get_drug_knowledge_bundle',
-  'search_rag',
-];
-
 export type ProviderOption = { value: string; label: string };
 export type ModelCatalog = Record<string, readonly string[]>;
 
@@ -69,7 +55,6 @@ export function validateAgentDraft(
   const { assessment, revision, timeline } = config;
   checkInstructions(errors, assessment.instructions);
   checkInstructions(errors, revision.instructions);
-  checkInstructions(errors, timeline.instructions);
 
   const { models, retrieval } = assessment;
   checkRef(errors, 'Extraction model', models.extraction);
@@ -85,18 +70,7 @@ export function validateAgentDraft(
     if (!(weight >= 0 && weight <= 1)) errors.push('Hybrid weights must be between 0 and 1.');
   }
 
-  checkRef(errors, 'Planning model', revision.models.planning);
-  Object.entries(revision.models.stage_overrides).forEach(([stage, ref]) =>
-    checkRef(errors, `Stage override (${stage})`, ref),
-  );
-  const { max_tasks, max_tool_iterations } = revision.limits;
-  if (!Number.isInteger(max_tasks) || max_tasks < 1 || max_tasks > 8) {
-    errors.push('Max tasks must be a whole number between 1 and 8.');
-  }
-  if (!Number.isInteger(max_tool_iterations) || max_tool_iterations < 1 || max_tool_iterations > 24) {
-    errors.push('Max tool iterations must be a whole number between 1 and 24.');
-  }
-
+  checkRef(errors, 'Review model', revision.models.planning);
   checkRef(errors, 'Timeline model', timeline.model);
   return Array.from(new Set(errors));
 }
