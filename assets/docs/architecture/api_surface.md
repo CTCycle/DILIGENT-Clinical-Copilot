@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-11-12
+Last updated: 2026-11-20
 
 `/api/agents` manages reusable versioned agents that bundle the DILI Assessment, DILI Revision and Timeline capabilities (see
 Agent Routes below). `/api/model-config` manages only the shared provider
@@ -103,10 +103,17 @@ poll only `/status`; there are no clinical job ids on the frontend.
 An agent has one configuration with three independently enabled capability
 slices (`assessment`, `revision`, `timeline`), each with its own `enabled`
 flag. `assessment` carries instructions, extraction/clinical model references
-with per-stage overrides, reasoning level, Ollama seed and a retrieval policy;
-`revision` carries instructions, planning/stage model references, reasoning,
-seed and execution limits; `timeline` carries instructions, a model reference,
-reasoning and seed. Disabling a capability keeps its values. Configuration is
+with per-stage overrides and a retrieval policy; `revision` carries one
+optional `custom_instructions` field (review focus plus writing style,
+terminology and tone) and a single model reference used for every review
+stage; `timeline` carries only a model reference. Configuration schema is 4:
+each model reference carries its own reasoning level (`Model default` sends no
+reasoning preference), and there is no capability-level reasoning or per-agent
+Ollama seed (the Ollama seed is a global setting). The revision pipeline
+(stages, limits and tool availability) is fixed by the application; agents carry
+no stage overrides, execution limits or tool allow-list, and request-level
+limits on the revision API stay application-controlled. Timeline extraction is
+scripted and has no instructions. Disabling a capability keeps its values. Configuration is
 editable (`PUT`) only while the agent is active, unlocked and not archived
 (`409` otherwise). Session revision jobs and timeline jobs accept optional
 `agent_id`/`agent_revision` and use the default agent when omitted; the agent

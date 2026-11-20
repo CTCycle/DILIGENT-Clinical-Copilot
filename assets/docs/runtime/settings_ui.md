@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-11-02
+Last updated: 2026-11-20
 
 ## Scope
 
@@ -98,8 +98,8 @@ Valid edits in operational Settings categories are persisted automatically
 keep the current draft unsaved until corrected. The UI reflects the draft
 immediately and shows inline save status; a failed write leaves the unsaved
 draft visible with an error. The shared index settings in Settings → Providers & Models also
-autosave (`PUT /api/model-config`, shared RAG keys only); per-agent models,
-reasoning and instructions are saved explicitly with **Save agent**, which
+autosave (`PUT /api/model-config`, shared RAG keys only); per-agent models
+(each with its own reasoning level) and instructions are saved explicitly with **Save agent**, which
 creates a new revision. Reset
 to defaults persists the selected operational category immediately.
 
