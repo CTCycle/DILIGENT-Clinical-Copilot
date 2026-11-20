@@ -106,9 +106,10 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     assert created["is_active"] and not created["is_locked"] and not created["is_default"]
 
     # Edit one capability: saving produces a new immutable revision.
-    focus = f"Dates first {studio_cleanup}"
-    _open_tab(page, "Timeline")
-    page.get_by_label("Timeline focus").fill(focus)
+    focus = f"Check chronology {studio_cleanup}"
+    original_timeline_model = created["revision"]["configuration"]["timeline"]["model"]
+    _open_tab(page, "DILI Report Review")
+    page.get_by_label("Custom instructions").fill(focus)
     expect(page.get_by_text("Unsaved changes")).to_be_visible()
     with page.expect_response(
         lambda r: r.request.method == "PUT" and r.url.endswith(f"/api/agents/{created['id']}")
@@ -117,16 +118,19 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     assert saved.value.status == 200, saved.value.text()
     persisted = next(item for item in _agents(api_context) if item["name"] == name)
     assert persisted["current_revision"] == 2
-    assert persisted["revision"]["configuration"]["timeline"]["instructions"]["timeline_focus"] == focus
+    assert persisted["revision"]["configuration"]["revision"]["instructions"]["custom_instructions"] == focus
 
     # Disable one capability independently; its values stay stored.
+    _open_tab(page, "Timeline")
     _set_switch(page, "Timeline", False)
     page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_text("Saved as revision 3")).to_be_visible()
     disabled = next(item for item in _agents(api_context) if item["name"] == name)
-    timeline = disabled["revision"]["configuration"]["timeline"]
+    configuration = disabled["revision"]["configuration"]
     assert disabled["capabilities"] == ["assessment", "revision"]
-    assert timeline["enabled"] is False and timeline["instructions"]["timeline_focus"] == focus
+    assert configuration["timeline"]["enabled"] is False
+    assert configuration["timeline"]["model"] == original_timeline_model
+    assert configuration["revision"]["instructions"]["custom_instructions"] == focus
 
     # Lock from the Overview tab: configuration becomes read-only, unlock stays reachable.
     _open_tab(page, "Overview")

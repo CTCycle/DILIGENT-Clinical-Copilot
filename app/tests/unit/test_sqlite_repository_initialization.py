@@ -256,11 +256,12 @@ def test_legacy_model_configuration_migrates_into_one_default_agent_once(
     assert dili["models"]["clinical"] == {
         "provider": "openai",
         "model": "gpt-clinical",
-        "reasoning_level": None,
+        "reasoning_level": "high",
     }
     assert dili["models"]["extraction"]["model"] == "gpt-parser"
     assert timeline["model"]["model"] == "gpt-timeline"
-    assert dili["reasoning_level"] == "high"
+    assert timeline["model"]["reasoning_level"] == "high"
+    assert "reasoning_level" not in dili
     # The legacy seed becomes the global setting rather than an agent value.
     assert payload["ollama_seed"] == 7
     assert dili["retrieval"]["use_reranking"] is False

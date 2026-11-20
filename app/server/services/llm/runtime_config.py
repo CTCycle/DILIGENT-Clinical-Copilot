@@ -139,7 +139,6 @@ class LLMRuntimeConfig:
 
         role_models: dict[str, dict[str, object]] = {}
         overrides: dict[str, object] = {
-            "reasoning_level": config.reasoning_level.value,
             # The seed is a global setting, not an agent property.
             "ollama_seed": ModelConfigSerializer().load_snapshot().ollama_seed,
             "agent": {
@@ -150,7 +149,12 @@ class LLMRuntimeConfig:
                 "agent_capability": context.capability,
                 "agent_config_hash": context.config_hash,
             },
-            "agent_instructions": config.instructions.model_dump(),
+            # Timeline extraction is scripted and takes no agent guidance.
+            "agent_instructions": (
+                {}
+                if isinstance(config, TimelineConfig)
+                else config.instructions.model_dump()
+            ),
         }
         if isinstance(config, AssessmentConfig):
             models = config.models
@@ -176,8 +180,6 @@ class LLMRuntimeConfig:
             planning = entry(config.models.planning)
             for role in ROLE_PURPOSES:
                 role_models[role] = planning
-            for stage, ref in config.models.stage_overrides.items():
-                role_models[f"revision.{stage}"] = entry(ref)
         elif isinstance(config, TimelineConfig):
             single = entry(config.model)
             for role in ROLE_PURPOSES:

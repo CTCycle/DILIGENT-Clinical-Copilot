@@ -2036,7 +2036,7 @@ def _wait_for_revision(service: DataInspectionService, job_id: str) -> None:
 
 
 ###############################################################################
-def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
+def test_revision_job_keeps_request_limits_and_retry_reuses_agent_revision(
     tmp_path: Path,
 ) -> None:
     from domain.agents import AgentUpdateRequest, parse_agent_config
@@ -2051,12 +2051,7 @@ def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
     agent = service.agent_service.resolve_for_execution(capability="revision")
     limited = service.agent_service.get_agent(agent.agent_id)
     limited = limited.revision.configuration.model_dump(mode="json")
-    limited["revision"]["limits"] = {
-        "max_tasks": 2,
-        "max_tool_iterations": 5,
-        "allowed_tools": ["read_session_context", "search_rag"],
-    }
-    limited["revision"]["instructions"] = {"review_objectives": "Check chronology."}
+    limited["revision"]["instructions"] = {"custom_instructions": "Check chronology."}
     service.agent_service.update_agent(
         agent.agent_id,
         AgentUpdateRequest(
@@ -2068,7 +2063,11 @@ def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
 
     started = service.start_revision_job(
         session_id,
-        SessionRevisionRequest(allowed_tools=["search_rag", "read_manual_edits"]),
+        SessionRevisionRequest(
+            max_tasks=2,
+            max_tool_iterations=5,
+            allowed_tools=["search_rag", "read_manual_edits"],
+        ),
     )
     _wait_for_revision(service, started["job_id"])
     run = service.get_revision_run(started["result"]["pipeline_run_id"])
@@ -2077,13 +2076,12 @@ def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
     assert configuration["effective_limits"] == {
         "max_tasks": 2,
         "max_tool_iterations": 5,
-        "allowed_tools": ["search_rag"],
+        "allowed_tools": ["search_rag", "read_manual_edits"],
     }
     first_revision_id = configuration["agent"]["agent_revision_id"]
     assert configuration["agent"]["agent_revision"] == 2
     assert configuration["runtime_snapshot"]["agent_instructions"] == {
-        "review_objectives": "Check chronology.",
-        "editing_style": "",
+        "custom_instructions": "Check chronology.",
     }
 
     # A later edit must not change what a retry of this run executes.
@@ -2100,48 +2098,3 @@ def test_revision_job_applies_agent_limits_and_retry_reuses_agent_revision(
     retry_run = service.get_revision_run(retried["result"]["pipeline_run_id"])
     assert retry_run is not None
     assert retry_run["configuration"]["agent"]["agent_revision_id"] == first_revision_id
-
-
-###############################################################################
-def test_revision_stage_overrides_route_only_their_stage() -> None:
-    from domain.agents import AgentExecutionContext, parse_agent_config
-    from services.inspection.revision_agent import stage_runtime
-    from services.llm.runtime_config import LLMRuntimeConfig
-
-    config = parse_agent_config(
-        {
-            "assessment": {
-                "models": {
-                    "extraction": {"provider": "openai", "model": "gpt-4.1"},
-                    "clinical": {"provider": "openai", "model": "gpt-4.1"},
-                }
-            },
-            "revision": {
-                "models": {
-                    "planning": {"provider": "openai", "model": "gpt-4.1"},
-                    "stage_overrides": {
-                        "editing": {"provider": "ollama", "model": "qwen3:8b"}
-                    },
-                }
-            },
-            "timeline": {"model": {"provider": "openai", "model": "gpt-4.1"}},
-        }
-    )
-    context = AgentExecutionContext(
-        agent_id="a",
-        agent_name="Reviewer",
-        agent_revision_id=1,
-        revision_number=1,
-        capability="revision",
-        config_hash="h",
-        configuration=config.revision,
-    )
-    base = RevisionAgentRuntime(provider="openai", model="gpt-4.1")
-    with LLMRuntimeConfig.override_for_run(
-        LLMRuntimeConfig.agent_runtime_overrides(context)
-    ):
-        assert stage_runtime(base, GenerationPurpose.REVISION_EDITING) == (
-            RevisionAgentRuntime(provider="ollama", model="qwen3:8b")
-        )
-        assert stage_runtime(base, GenerationPurpose.REVISION_QA) == base
-    assert stage_runtime(base, GenerationPurpose.REVISION_EDITING) == base

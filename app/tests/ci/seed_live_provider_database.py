@@ -17,12 +17,10 @@ if str(SERVER_ROOT) not in sys.path:
 from configurations.startup import get_server_settings  # noqa: E402
 from domain.agents import (  # noqa: E402
     AGENT_CONFIG_SCHEMA_VERSION,
-    CAPABILITIES,
     AgentModelRef,
     agent_config_hash,
     parse_agent_config,
 )
-from domain.model_configs import ReasoningLevel  # noqa: E402
 from repositories.agent_repository import AgentRepository  # noqa: E402
 from repositories.context import RepositoryContext  # noqa: E402
 from repositories.database.initializer import initialize_sqlite_database  # noqa: E402
@@ -49,14 +47,10 @@ def _route_default_agents(context: RepositoryContext) -> None:
     if record is None:
         raise RuntimeError("Database initialization did not seed a default agent.")
     config = parse_agent_config(record["revision"]["configuration"])
-    for name in CAPABILITIES:
-        part = config.capability(name)
-        part.reasoning_level = ReasoningLevel.OFF
     config.assessment.models.extraction = AgentModelRef(**ref)
     config.assessment.models.clinical = AgentModelRef(**ref)
     config.assessment.models.extraction_overrides = {}
     config.revision.models.planning = AgentModelRef(**ref)
-    config.revision.models.stage_overrides = {}
     config.timeline.model = AgentModelRef(**ref)
     if agent_config_hash(config) == record["revision"]["configuration_hash"]:
         return

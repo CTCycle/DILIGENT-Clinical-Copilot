@@ -9,7 +9,6 @@ from collections.abc import Mapping
 
 AGENT_GUIDANCE_LABELS = {
     "custom_instructions": "Custom instructions",
-    "timeline_focus": "Timeline focus",
 }
 
 AGENT_GUIDANCE_PRECEDENCE = (

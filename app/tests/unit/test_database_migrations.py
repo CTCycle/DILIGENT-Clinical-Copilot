@@ -7,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
 
+import json
+
 import pytest
 import repositories.database.migrations as migration_coordinator
 from repositories.database.migrations import (
@@ -306,5 +308,91 @@ def test_lifecycle_migration_preserves_reports_and_the_legacy_draft(
         ]
         assert rows[3][2] == "Unsaved history"
         assert str(rows[0][3]).startswith("2026-10-01")
+    finally:
+        engine.dispose()
+
+
+###############################################################################
+def test_agent_config_v4_migration_rewrites_v3_revisions_in_place(
+    tmp_path: Path,
+) -> None:
+    from domain.agents import agent_config_hash, parse_agent_config
+
+    ref = {"provider": "openai", "model": "gpt-4.1"}
+    v4 = parse_agent_config(
+        {
+            "assessment": {"models": {"extraction": ref, "clinical": ref}},
+            "revision": {"models": {"planning": ref}},
+            "timeline": {"model": ref},
+        }
+    ).model_dump(mode="json")
+    legacy = json.loads(json.dumps(v4))
+    legacy["schema_version"] = 3
+    legacy["assessment"]["reasoning_level"] = "medium"
+    legacy["assessment"]["ollama_seed"] = 3
+    legacy["assessment"]["models"]["clinical"]["reasoning_level"] = "high"
+    legacy["revision"]["reasoning_level"] = "medium"
+    legacy["revision"]["instructions"] = {
+        "review_objectives": "  Check chronology. ",
+        "editing_style": "Be terse.",
+    }
+    legacy["revision"]["models"]["stage_overrides"] = {"editing": ref}
+    legacy["revision"]["limits"] = {
+        "max_tasks": 3,
+        "max_tool_iterations": 4,
+        "allowed_tools": ["search_rag"],
+    }
+    legacy["timeline"]["reasoning_level"] = "off"
+    legacy["timeline"]["instructions"] = {"timeline_focus": "Dates first."}
+
+    engine = _engine(tmp_path / "agent_v4.db")
+    try:
+        with migration_coordinator._migration_transaction(engine) as connection:
+            migration_coordinator._run_command(connection, "upgrade", "202611120002")
+            connection.execute(
+                text(
+                    "insert into agent_definitions (id, name, description, "
+                    "current_revision, is_default, is_active, is_locked, is_archived, "
+                    "created_at, updated_at) values ('agent-1', 'Legacy', '', 1, 1, 1, "
+                    "0, 0, '2026-11-01 10:00:00', '2026-11-01 10:00:00')"
+                )
+            )
+            connection.execute(
+                text(
+                    "insert into agent_revisions (agent_id, revision_number, "
+                    "schema_version, configuration_json, configuration_hash, "
+                    "created_at) values ('agent-1', 1, 3, :config, 'stale', "
+                    "'2026-11-01 10:00:00')"
+                ),
+                {"config": json.dumps(legacy)},
+            )
+
+        migrate_database(engine, database_was_empty=False)
+
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "select schema_version, configuration_json, configuration_hash "
+                    "from agent_revisions"
+                )
+            ).one()
+        version, raw, stored_hash = row
+        config = json.loads(raw) if isinstance(raw, str) else raw
+        assert version == 4 and config["schema_version"] == 4
+        assert config["revision"]["instructions"] == {
+            "custom_instructions": "Check chronology.\n\nBe terse."
+        }
+        assert config["assessment"]["models"]["extraction"]["reasoning_level"] == "medium"
+        # A model's own level wins over the capability-level one.
+        assert config["assessment"]["models"]["clinical"]["reasoning_level"] == "high"
+        assert config["revision"]["models"] == {
+            "planning": {**ref, "reasoning_level": "medium"}
+        }
+        assert config["timeline"]["model"]["reasoning_level"] is None
+        assert "reasoning_level" not in config["assessment"]
+        assert "ollama_seed" not in config["assessment"]
+        assert "limits" not in config["revision"]
+        assert "instructions" not in config["timeline"]
+        assert stored_hash == agent_config_hash(parse_agent_config(config))
     finally:
         engine.dispose()

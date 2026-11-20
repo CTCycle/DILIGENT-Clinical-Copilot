@@ -674,7 +674,6 @@ def test_timeline_runtime_settings_follow_the_timeline_capability() -> None:
                     "model": "beam-free",
                     "reasoning_level": "low",
                 },
-                "ollama_seed": 5,
             },
         }
     )

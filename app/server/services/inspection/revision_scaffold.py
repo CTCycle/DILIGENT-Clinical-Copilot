@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, cast
+from typing import Any
 
 from common.exceptions import ServiceNotFoundError
-from domain.agents import AgentExecutionContext, RevisionConfig
+from domain.agents import AgentExecutionContext
 from domain.inspection import SessionRevisionRequest
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.inspection.revision_agent import (
@@ -105,28 +105,15 @@ class InspectionRevisionScaffoldMixin:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _apply_agent_limits(
+    def _apply_agent_identity(
         request: SessionRevisionRequest,
         agent_context: AgentExecutionContext,
     ) -> SessionRevisionRequest:
-        """Clamp request limits and tools to the agent's execution limits."""
-        limits = cast(RevisionConfig, agent_context.configuration).limits
-        allowed = request.allowed_tools
-        if limits.allowed_tools is not None:
-            allowed = (
-                list(limits.allowed_tools)
-                if allowed is None
-                else [name for name in allowed if name in limits.allowed_tools]
-            )
+        """Stamp the agent on the request; stages, limits and tools stay fixed."""
         return request.model_copy(
             update={
                 "agent_id": agent_context.agent_id,
                 "agent_revision": agent_context.revision_number,
-                "max_tasks": min(request.max_tasks, limits.max_tasks),
-                "max_tool_iterations": min(
-                    request.max_tool_iterations, limits.max_tool_iterations
-                ),
-                "allowed_tools": allowed,
             }
         )
 
@@ -199,7 +186,7 @@ class InspectionRevisionScaffoldMixin:
             raise SessionRevisionValidationError(
                 " ".join(issue.message for issue in readiness_issues)
             )
-        revision_request = self._apply_agent_limits(revision_request, agent_context)
+        revision_request = self._apply_agent_identity(revision_request, agent_context)
 
         pipeline_run_id = uuid.uuid4().hex
         job_id = uuid.uuid4().hex[:8]

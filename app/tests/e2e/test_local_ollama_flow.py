@@ -77,9 +77,8 @@ def test_completed_assessment_on_local_ollama(
                 "extraction": local,
                 "clinical": local,
             },
-            "reasoning_level": "off",
         },
-        "timeline": {**original["timeline"], "model": local, "reasoning_level": "off"},
+        "timeline": {**original["timeline"], "model": local},
     }
     updated = _save_agent(api_context, agent, configuration)
     try:

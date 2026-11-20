@@ -35,8 +35,8 @@ def agent_config_from_legacy_payload(payload: Mapping[str, object]) -> AgentConf
     """Convert a legacy singleton model-configuration payload into one agent config.
 
     Legacy keys: ``use_cloud_models``/``cloud_provider`` (one provider for all
-    roles), the four role models, ``reasoning_level``, ``ollama_seed`` and the
-    per-agent retrieval keys inside ``rag_settings``.
+    roles), the four role models, ``reasoning_level`` (applied to every role
+    model) and the per-agent retrieval keys inside ``rag_settings``.
     """
 
     def text(key: str) -> str:
@@ -47,8 +47,16 @@ def agent_config_from_legacy_payload(payload: Mapping[str, object]) -> AgentConf
     cloud_provider = text("cloud_provider") or text("llm_provider")
     provider = (cloud_provider.lower() if _as_bool(use_cloud) else "ollama") or "ollama"
 
+    reasoning_level = _reasoning_level(payload.get("reasoning_level"))
+
     def ref(key: str) -> AgentModelRef:
-        return AgentModelRef(provider=cast(Any, provider), model=text(key))
+        return AgentModelRef(
+            provider=cast(Any, provider),
+            model=text(key),
+            reasoning_level=(
+                None if reasoning_level == ReasoningLevel.OFF else reasoning_level
+            ),
+        )
 
     raw_rag = payload.get("rag_settings")
     rag = {
@@ -60,28 +68,18 @@ def agent_config_from_legacy_payload(payload: Mapping[str, object]) -> AgentConf
         retrieval = AgentRetrievalPolicy.model_validate(rag)
     except ValidationError:
         retrieval = AgentRetrievalPolicy()
-    reasoning_level = _reasoning_level(payload.get("reasoning_level"))
-    ollama_seed = _seed(payload.get("ollama_seed", 42))
     return AgentConfig(
         assessment=AssessmentConfig(
             models=AssessmentModels(
                 extraction=ref("text_extraction_model"),
                 clinical=ref("clinical_model"),
             ),
-            reasoning_level=reasoning_level,
-            ollama_seed=ollama_seed,
             retrieval=retrieval,
         ),
         revision=RevisionConfig(
             models=RevisionModels(planning=ref("revision_model")),
-            reasoning_level=reasoning_level,
-            ollama_seed=ollama_seed,
         ),
-        timeline=TimelineConfig(
-            model=ref("timeline_model"),
-            reasoning_level=reasoning_level,
-            ollama_seed=ollama_seed,
-        ),
+        timeline=TimelineConfig(model=ref("timeline_model")),
     )
 
 
@@ -98,16 +96,6 @@ def _reasoning_level(value: object) -> ReasoningLevel:
         return ReasoningLevel(str(value or "").strip().lower())
     except ValueError:
         return ReasoningLevel.OFF
-
-
-###############################################################################
-def _seed(value: object) -> int | None:
-    if value is None:
-        return None
-    try:
-        return max(0, int(str(value).strip()))
-    except TypeError, ValueError:
-        return None
 
 
 ###############################################################################

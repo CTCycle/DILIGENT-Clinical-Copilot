@@ -254,8 +254,8 @@ def test_disabling_a_capability_preserves_every_capability_configuration(
     agent_service: AgentService,
 ) -> None:
     payload = agent_payload(
-        timeline={"instructions": {"timeline_focus": "Dates first."}, "ollama_seed": 7},
-        revision={"limits": {"max_tasks": 3}},
+        timeline={"model": {"provider": "openai", "model": "gpt-4.1-mini"}},
+        revision={"instructions": {"custom_instructions": "Check chronology."}},
     )
     created = agent_service.create_agent(
         AgentCreateRequest(name="Bundle", configuration=parse_agent_config(payload))
@@ -271,9 +271,8 @@ def test_disabling_a_capability_preserves_every_capability_configuration(
     assert reloaded.enabled_capabilities() == ["assessment", "revision"]
     # The disabled capability keeps its values; the others are untouched.
     assert reloaded.timeline.enabled is False
-    assert reloaded.timeline.instructions.timeline_focus == "Dates first."
-    assert reloaded.timeline.ollama_seed == 7
-    assert reloaded.revision.limits.max_tasks == 3
+    assert reloaded.timeline.model.model == "gpt-4.1-mini"
+    assert reloaded.revision.instructions.custom_instructions == "Check chronology."
     assert reloaded.assessment.model_dump() == parse_agent_config(payload).assessment.model_dump()
     # Re-enabling restores it as it was.
     restored = agent_service.update_agent(
@@ -282,9 +281,7 @@ def test_disabling_a_capability_preserves_every_capability_configuration(
             expected_revision=2, name="Bundle", configuration=parse_agent_config(payload)
         ),
     )
-    assert restored.revision.configuration.timeline.instructions.timeline_focus == (
-        "Dates first."
-    )
+    assert restored.revision.configuration.timeline.model.model == "gpt-4.1-mini"
 
 
 # -----------------------------------------------------------------------------
@@ -348,33 +345,6 @@ def test_lifecycle_gates_editing_and_selection_without_dead_ends(
 
 
 ###############################################################################
-def test_create_rejects_invalid_tools_but_skips_disabled_capabilities(
-    agent_service: AgentService,
-) -> None:
-    with pytest.raises(ServiceValidationError):
-        agent_service.create_agent(
-            AgentCreateRequest(
-                name="Bad",
-                configuration=parse_agent_config(
-                    agent_payload(revision={"limits": {"allowed_tools": ["format_disk"]}})
-                ),
-            )
-        )
-    # Disabled capabilities are not validated.
-    agent_service.create_agent(
-        AgentCreateRequest(
-            name="Revision off",
-            configuration=parse_agent_config(
-                _disable(
-                    agent_payload(revision={"limits": {"allowed_tools": ["format_disk"]}}),
-                    "revision",
-                )
-            ),
-        )
-    )
-
-
-###############################################################################
 def _context(
     config_payload: dict[str, Any],
     revision_id: int,
@@ -405,10 +375,10 @@ def test_agent_context_routes_roles_stages_reasoning_and_rag(
     persisted_snapshot: ModelConfigSnapshot,
 ) -> None:
     payload = assessment_payload(
-        reasoning_level="low",
         retrieval={"retrieval_selected_count": 5, "retrieval_candidate_count": 20},
     )
     payload["assessment"]["models"]["clinical"]["reasoning_level"] = "high"
+    payload["assessment"]["models"]["extraction"]["reasoning_level"] = "low"
     payload["assessment"]["models"]["extraction_overrides"] = {
         "laboratory": {"provider": "openai", "model": "gpt-4.1-mini"}
     }
@@ -449,8 +419,6 @@ def test_each_capability_resolves_only_its_own_configuration(
         revision={"models": {"planning": {"provider": "anthropic", "model": "claude-x"}}},
         timeline={
             "model": {"provider": "openai", "model": "gpt-4.1-mini"},
-            "instructions": {"timeline_focus": "Dates first."},
-            "ollama_seed": 5,
         },
     )
     prompt = "Build the timeline."
@@ -461,10 +429,10 @@ def test_each_capability_resolves_only_its_own_configuration(
             "openai",
             "gpt-4.1-mini",
         )
-        # The seed is global: the persisted value wins over the agent's own field.
+        # The seed is global and no per-agent guidance is injected for the timeline.
         assert LLMRuntimeConfig.get_ollama_seed() == 11
-        assert "Dates first." in LLMRuntimeConfig.with_agent_guidance(
-            prompt, "timeline_focus"
+        assert (
+            LLMRuntimeConfig.with_agent_guidance(prompt, "timeline_focus") == prompt
         )
     with LLMRuntimeConfig.override_for_run(
         LLMRuntimeConfig.agent_runtime_overrides(_context(payload, 1, "revision"))

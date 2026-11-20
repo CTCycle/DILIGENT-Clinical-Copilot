@@ -30,10 +30,9 @@ from domain.model_configs import CatalogProviderId, ReasoningLevel
 
 Capability = Literal["assessment", "revision", "timeline"]
 CAPABILITIES: tuple[Capability, ...] = ("assessment", "revision", "timeline")
-AGENT_CONFIG_SCHEMA_VERSION = 3
+AGENT_CONFIG_SCHEMA_VERSION = 4
 
 ExtractionStage = Literal["therapy_drugs", "anamnesis_drugs", "diseases", "laboratory"]
-RevisionStage = Literal["planning", "tool_selection", "editing", "qa"]
 ReportTemplateFormat = Literal["md", "json", "xml", "txt"]
 
 INSTRUCTION_MAX_LENGTH = 4000
@@ -51,7 +50,7 @@ class AgentModelRef(_StrictModel):
 
     provider: CatalogProviderId
     model: str = Field(min_length=1, max_length=255)
-    # None inherits the capability-level reasoning preference.
+    # None sends no reasoning preference (the model's default behaviour).
     reasoning_level: ReasoningLevel | None = None
 
 
@@ -135,62 +134,35 @@ class AssessmentConfig(_StrictModel):
     # None keeps the default report formatting instructions.
     report_template: ReportTemplate | None = None
     models: AssessmentModels
-    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
-    ollama_seed: int | None = Field(default=42, ge=0)
     retrieval: AgentRetrievalPolicy = Field(default_factory=AgentRetrievalPolicy)
 
 
 ###############################################################################
 class RevisionInstructions(_StrictModel):
-    review_objectives: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
-    editing_style: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
+    custom_instructions: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
 
 
 ###############################################################################
 class RevisionModels(_StrictModel):
+    # The fixed review pipeline runs every stage on this model.
     planning: AgentModelRef
-    # Optional per-stage overrides; absent stages use ``planning``.
-    stage_overrides: dict[RevisionStage, AgentModelRef] = Field(default_factory=dict)
-
-
-###############################################################################
-class RevisionExecutionLimits(_StrictModel):
-    max_tasks: int = Field(default=8, ge=1, le=8)
-    max_tool_iterations: int = Field(default=24, ge=1, le=24)
-    # None allows every registered revision tool.
-    allowed_tools: list[str] | None = Field(default=None, max_length=12)
-
-    @model_validator(mode="after")
-    def _validate_tools(self) -> RevisionExecutionLimits:
-        if self.allowed_tools is not None and len(set(self.allowed_tools)) != len(
-            self.allowed_tools
-        ):
-            raise ValueError("Allowed tools must be unique.")
-        return self
 
 
 ###############################################################################
 class RevisionConfig(_StrictModel):
+    """Review settings; stages, limits and tools are fixed by the pipeline."""
+
     enabled: bool = True
     instructions: RevisionInstructions = Field(default_factory=RevisionInstructions)
     models: RevisionModels
-    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
-    ollama_seed: int | None = Field(default=42, ge=0)
-    limits: RevisionExecutionLimits = Field(default_factory=RevisionExecutionLimits)
-
-
-###############################################################################
-class TimelineInstructions(_StrictModel):
-    timeline_focus: str = Field(default="", max_length=INSTRUCTION_MAX_LENGTH)
 
 
 ###############################################################################
 class TimelineConfig(_StrictModel):
+    """Timeline extraction is scripted; only its model is configurable."""
+
     enabled: bool = True
-    instructions: TimelineInstructions = Field(default_factory=TimelineInstructions)
     model: AgentModelRef
-    reasoning_level: ReasoningLevel = ReasoningLevel.OFF
-    ollama_seed: int | None = Field(default=42, ge=0)
 
 
 CapabilityConfig = AssessmentConfig | RevisionConfig | TimelineConfig
@@ -200,7 +172,7 @@ CapabilityConfig = AssessmentConfig | RevisionConfig | TimelineConfig
 class AgentConfig(_StrictModel):
     """The complete persisted configuration of one agent revision."""
 
-    schema_version: Literal[3] = AGENT_CONFIG_SCHEMA_VERSION
+    schema_version: Literal[4] = AGENT_CONFIG_SCHEMA_VERSION
     assessment: AssessmentConfig
     revision: RevisionConfig
     timeline: TimelineConfig

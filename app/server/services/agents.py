@@ -65,12 +65,7 @@ def _model_refs(
         )
         return refs
     if isinstance(config, RevisionConfig):
-        refs = [("revision.models.planning", config.models.planning)]
-        refs.extend(
-            (f"revision.models.stage_overrides.{stage}", item)
-            for stage, item in config.models.stage_overrides.items()
-        )
-        return refs
+        return [("revision.models.planning", config.models.planning)]
     return [("timeline.model", config.model)]
 
 
@@ -343,21 +338,6 @@ class AgentService:
                             f"Model '{ref.model}' is not available from "
                             f"provider '{ref.provider}'."
                         ),
-                    )
-                )
-        if isinstance(config, RevisionConfig):
-            # Imported lazily: services.inspection imports this module.
-            from services.inspection.revision_tools import RevisionToolRegistry
-
-            unknown = sorted(
-                set(config.limits.allowed_tools or []) - RevisionToolRegistry.names
-            )
-            if unknown:
-                issues.append(
-                    AgentValidationIssue(
-                        code="revision_tool_unknown",
-                        field="revision.limits.allowed_tools",
-                        message="Unknown revision tools: " + ", ".join(unknown),
                     )
                 )
         return issues
