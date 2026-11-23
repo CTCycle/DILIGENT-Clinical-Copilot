@@ -1989,12 +1989,12 @@ function Remove-LauncherPath {
         }
         for ($index = 0; $index -lt $candidates.Count; $index++) {
             $entry = $candidates[$index]
-            if ($null -ne $progressId) {
+            if ($null -ne $progressId -and ($index % 100 -eq 0 -or $index -eq $candidates.Count - 1)) {
                 Update-LauncherProgress -Id $progressId -Activity $Activity -Status "$($index + 1) of $($candidates.Count): $($entry.Name)" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $candidates.Count)))
             }
             if ($WhatIf) { continue }
             try {
-                Remove-Item -LiteralPath $entry.FullName -Force -Recurse:$entry.PSIsContainer -Confirm:$false -ErrorAction Stop
+                if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop } else { Remove-DiligentPlannedEntry -Path $entry.FullName }
                 [void]$removed.Add($entry.FullName)
             }
             catch {

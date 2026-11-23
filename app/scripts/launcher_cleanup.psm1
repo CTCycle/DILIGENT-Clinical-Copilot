@@ -149,12 +149,49 @@ function New-DiligentCleanupPlan {
     return [pscustomobject]@{ Items = $planned; InitialResults = $initial; AllowedRoots = $roots }
 }
 
+function Test-DiligentReparseChainCached {
+    param([string]$Path, [hashtable]$Cache)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $true }
+    if ($Cache.ContainsKey($Path)) { return $Cache[$Path] }
+    $verdict = $true
+    try {
+        if (([IO.File]::GetAttributes($Path) -band [IO.FileAttributes]::ReparsePoint) -ne 0) { $verdict = $false }
+    } catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
+    catch { $verdict = $false }
+    if ($verdict) {
+        $parent = [IO.Path]::GetDirectoryName($Path)
+        if ($parent -and $parent -ne $Path) { $verdict = Test-DiligentReparseChainCached -Path $parent -Cache $Cache }
+    }
+    $Cache[$Path] = $verdict
+    return $verdict
+}
+
+function Remove-DiligentPlannedEntry {
+    param([string]$Path)
+    $attributes = [IO.File]::GetAttributes($Path)
+    if (($attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Entry became a reparse point after planning.' }
+    $isDirectory = ($attributes -band [IO.FileAttributes]::Directory) -ne 0
+    if ($isDirectory) {
+        $enumerator = [IO.Directory]::EnumerateFileSystemEntries($Path).GetEnumerator()
+        try { if ($enumerator.MoveNext()) { throw 'Directory changed after planning; new contents were left untouched.' } }
+        finally { $enumerator.Dispose() }
+    }
+    try {
+        if ($isDirectory) { [IO.Directory]::Delete($Path, $false) } else { [IO.File]::Delete($Path) }
+    } catch [UnauthorizedAccessException] {
+        # Read-only attribute is the common cause; clear it once and retry. Real ACL denials fail again and are reported.
+        [IO.File]::SetAttributes($Path, [IO.FileAttributes]::Normal)
+        if ($isDirectory) { [IO.Directory]::Delete($Path, $false) } else { [IO.File]::Delete($Path) }
+    }
+}
+
 function Invoke-DiligentCleanupPlan {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][pscustomobject]$Plan, [switch]$DryRun)
 
     $results = [Collections.Generic.List[object]]::new()
     foreach ($item in $Plan.InitialResults) { [void]$results.Add($item) }
+    $chainCache = @{}
     foreach ($item in $Plan.Items) {
         if ($DryRun) {
             [void]$results.Add([pscustomobject]@{ Path = $item.Path; Label = $item.Label; Kind = $item.Kind; Status = 'Planned'; Message = '' })
@@ -164,30 +201,27 @@ function Invoke-DiligentCleanupPlan {
         foreach ($candidate in $Plan.AllowedRoots) {
             if (Test-DiligentPathUnderRoot -Path $item.Path -Root $candidate) { $root = $candidate; break }
         }
-        if (-not $root -or -not (Test-DiligentReparseChain -Path $item.Path)) {
+        if (-not $root -or -not (Test-DiligentReparseChainCached -Path ([IO.Path]::GetDirectoryName($item.Path)) -Cache $chainCache)) {
             [void]$results.Add([pscustomobject]@{ Path = $item.Path; Label = $item.Label; Kind = $item.Kind; Status = 'Skipped'; Message = 'Path changed or became a reparse point after planning.' })
             continue
         }
         try {
-            $current = Get-Item -LiteralPath $item.Path -Force -ErrorAction Stop
-            if (($current.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Entry became a reparse point after planning.' }
-            if ($current.PSIsContainer -and @(Get-ChildItem -LiteralPath $item.Path -Force -ErrorAction Stop).Count -gt 0) {
-                throw 'Directory changed after planning; new contents were left untouched.'
-            }
-            Remove-Item -LiteralPath $item.Path -Force -ErrorAction Stop
+            Remove-DiligentPlannedEntry -Path $item.Path
             [void]$results.Add([pscustomobject]@{ Path = $item.Path; Label = $item.Label; Kind = $item.Kind; Status = 'Cleaned'; Message = '' })
         } catch {
             [void]$results.Add([pscustomobject]@{ Path = $item.Path; Label = $item.Label; Kind = $item.Kind; Status = 'Failed'; Message = $_.Exception.Message })
         }
     }
+    $byStatus = @{ Planned = [Collections.Generic.List[object]]::new(); Cleaned = [Collections.Generic.List[object]]::new(); Skipped = [Collections.Generic.List[object]]::new(); Failed = [Collections.Generic.List[object]]::new(); Preserved = [Collections.Generic.List[object]]::new() }
+    foreach ($result in $results) { if ($byStatus.ContainsKey($result.Status)) { [void]$byStatus[$result.Status].Add($result) } }
     return [pscustomobject]@{
         DryRun = [bool]$DryRun
         Results = @($results)
-        Planned = @($results | Where-Object Status -eq 'Planned')
-        Cleaned = @($results | Where-Object Status -eq 'Cleaned')
-        Skipped = @($results | Where-Object Status -eq 'Skipped')
-        Failed = @($results | Where-Object Status -eq 'Failed')
-        Preserved = @($results | Where-Object Status -eq 'Preserved')
+        Planned = @($byStatus.Planned)
+        Cleaned = @($byStatus.Cleaned)
+        Skipped = @($byStatus.Skipped)
+        Failed = @($byStatus.Failed)
+        Preserved = @($byStatus.Preserved)
     }
 }
 
@@ -450,4 +484,4 @@ function Invoke-DiligentMsiUninstall {
     } catch { return [pscustomobject]@{ Product = $Product; Success = $false; RestartRequired = $false; ExitCode = $null; Message = $_.Exception.Message } }
 }
 
-Export-ModuleMember -Function New-DiligentCleanupPlan, Invoke-DiligentCleanupPlan, Get-DiligentCacheTargets, Get-DiligentUninstallTargets, Select-DiligentMsiProducts, Invoke-DiligentMsiUninstall
+Export-ModuleMember -Function Remove-DiligentPlannedEntry, New-DiligentCleanupPlan, Invoke-DiligentCleanupPlan, Get-DiligentCacheTargets, Get-DiligentUninstallTargets, Select-DiligentMsiProducts, Invoke-DiligentMsiUninstall
