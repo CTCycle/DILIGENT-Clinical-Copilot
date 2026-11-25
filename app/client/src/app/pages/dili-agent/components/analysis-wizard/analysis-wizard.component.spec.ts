@@ -265,7 +265,7 @@ describe('AnalysisWizardComponent', () => {
       expect(component.step()).toBe('review');
       expect(navigate).not.toHaveBeenCalled();
       expect(root().textContent).not.toContain(AGENT_CHANGED_MESSAGE);
-      expect(root().textContent).toContain('Another operation is already running');
+      expect(root().textContent).toContain('Another operation is running.');
     });
 
     it('launches a clean stored draft without rewriting it', async () => {

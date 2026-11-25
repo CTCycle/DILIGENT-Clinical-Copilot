@@ -345,7 +345,7 @@ class LLMRuntimeConfig:
         )
         with cls.override_for_run(agent_overrides):
             snapshot, _ = cls._capture_run_snapshot(evidence_sources=evidence_sources)
-        for key in ("role_models", "agent", "agent_instructions"):
+        for key in ("role_models", "agent", "agent_instructions", "report_template"):
             if key in agent_overrides:
                 snapshot[key] = agent_overrides[key]
         canonical = json.dumps(

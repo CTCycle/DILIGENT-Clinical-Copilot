@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Agent } from '../../core/models/agent-types';
+import { AgentsStateService } from '../../core/state/agents-state.service';
 import { makeAgent } from '../../core/testing/agent-fixtures';
 import { AgentEditorComponent } from './agent-editor.component';
 
@@ -137,13 +138,37 @@ describe('AgentEditorComponent', () => {
   });
 
   it('shows a reload prompt when the server reports a stale revision', async () => {
-    putResponse = () => json({ detail: 'stale' }, 409);
+    putResponse = () => {
+      agents[1] = { ...agents[1], current_revision: 2 };
+      return json({ detail: 'stale' }, 409);
+    };
     await open('a2');
     await type(nameInput(), 'Renamed');
     button('Save').click();
     await flush();
     expect(el().textContent).toContain('changed elsewhere');
     expect(button('Reload')).toBeTruthy();
+    expect(nameInput().value).toBe('Renamed');
+  });
+
+  it('explains a lifecycle conflict instead of claiming the agent changed', async () => {
+    putResponse = () => json({ detail: 'Unlock the agent before editing it.' }, 409);
+    await open('a2');
+    await type(nameInput(), 'Renamed');
+    button('Save').click();
+    await flush();
+    expect(el().textContent).not.toContain('changed elsewhere');
+    expect(el().textContent).toContain('Unlock the agent before editing it.');
+  });
+
+  it('keeps unsaved edits when a newer revision arrives from elsewhere', async () => {
+    await open('a2');
+    await type(nameInput(), 'Draft');
+    agents[1] = { ...agents[1], current_revision: 2, name: 'Remote' };
+    await TestBed.inject(AgentsStateService).load({ force: true });
+    await flush();
+    expect(nameInput().value).toBe('Draft');
+    expect(el().textContent).toContain('changed elsewhere');
   });
 
   it('keeps edits across tabs and saves every section together', async () => {

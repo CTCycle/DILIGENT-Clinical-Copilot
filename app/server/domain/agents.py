@@ -21,9 +21,9 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from domain.clinical.entities import DEFAULT_EVIDENCE_SOURCES, EvidenceSource
 from domain.model_configs import CatalogProviderId, ReasoningLevel
@@ -45,11 +45,23 @@ class _StrictModel(BaseModel):
 
 
 ###############################################################################
+def _reject_blank(value: str | None) -> str | None:
+    if value is not None and not value.strip():
+        raise ValueError("must not be blank")
+    return value
+
+
+# Rejects whitespace-only text without rewriting stored values, so existing
+# configuration hashes stay stable.
+NonBlankText = Annotated[str, AfterValidator(_reject_blank)]
+
+
+###############################################################################
 class AgentModelRef(_StrictModel):
     """A provider/model pair for one execution role."""
 
     provider: CatalogProviderId
-    model: str = Field(min_length=1, max_length=255)
+    model: NonBlankText = Field(min_length=1, max_length=255)
     # None sends no reasoning preference (the model's default behaviour).
     reasoning_level: ReasoningLevel | None = None
 
@@ -262,7 +274,7 @@ class AgentRevisionListResponse(_StrictModel):
 
 ###############################################################################
 class AgentCreateRequest(_StrictModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: NonBlankText = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     configuration: AgentConfig
 
@@ -270,14 +282,14 @@ class AgentCreateRequest(_StrictModel):
 ###############################################################################
 class AgentUpdateRequest(_StrictModel):
     expected_revision: int = Field(ge=1)
-    name: str = Field(min_length=1, max_length=120)
+    name: NonBlankText = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     configuration: AgentConfig
 
 
 ###############################################################################
 class AgentDuplicateRequest(_StrictModel):
-    name: str | None = Field(default=None, min_length=1, max_length=120)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=120)
 
 
 ###############################################################################

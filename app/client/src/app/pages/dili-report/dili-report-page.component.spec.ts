@@ -147,7 +147,7 @@ describe('DiliReportPageComponent', () => {
     buttonByText('Yes, cancel')!.click();
     await settle();
 
-    expect(text()).toContain('Another operation is already running');
+    expect(text()).toContain('Session is not cancellable.');
     expect(buttonByText('Cancel analysis')).toBeDefined();
   });
 

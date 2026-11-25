@@ -383,7 +383,7 @@ def test_agents_navigation(page: Page, base_url: str):
     expect(page.get_by_role("heading", name="Agents")).to_be_visible()
     # The retired Settings → Models page no longer exists.
     page.get_by_role("tab", name="Settings").click()
-    expect(page.get_by_role("link", name="Models")).to_have_count(0)
+    expect(page.get_by_role("link", name="Models", exact=True)).to_have_count(0)
 
 
 ###############################################################################
@@ -654,8 +654,9 @@ def test_dili_run_conflict_surfaces_clear_error_message(page: Page, base_url: st
         page.goto(base_url)
         _fill_required_dili_fields(page)
         _start_analysis_from_wizard(page)
+        # The server's 409 detail is shown instead of a generic message.
         expect(page.get_by_role("alert").filter(has_text="Another operation")).to_contain_text(
-            "Another operation is already running. Please wait and retry."
+            "Another operation is already running."
         )
         expect(
             page.get_by_role("dialog", name="Prepare analysis").get_by_role(

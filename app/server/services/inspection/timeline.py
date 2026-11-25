@@ -25,6 +25,7 @@ from services.inspection.normalization import (
 )
 from services.inspection.runtime import coerce_optional_str
 from services.session.text_section_parser import parse_initial_text_sections
+from sqlalchemy.exc import IntegrityError
 
 ###############################################################################
 T = TypeVar("T")
@@ -441,7 +442,10 @@ class InspectionTimelineMixin:
             if (
                 cached is not None
                 and self.session_timeline_repository.is_latest_timeline_current(
-                    session_id
+                    session_id,
+                    agent_revision_id=(
+                        agent_context.agent_revision_id if agent_context else None
+                    ),
                 )
             ):
                 _raise_if_stopped(stop_check)
@@ -570,12 +574,22 @@ class InspectionTimelineMixin:
                 _report_progress(progress_callback, 82, "Timeline events extracted")
             _raise_if_stopped(stop_check)
             _report_progress(progress_callback, 92, "Saving generated timeline")
-            persisted = self.session_timeline_repository.create_session_timeline_record(
-                session_id,
-                timeline.model_dump(mode="json"),
-                source_text_hash=source.get("source_text_hash"),
-                agent_revision_id=agent_context.agent_revision_id,
-            )
+            try:
+                persisted = (
+                    self.session_timeline_repository.create_session_timeline_record(
+                        session_id,
+                        timeline.model_dump(mode="json"),
+                        source_text_hash=source.get("source_text_hash"),
+                        agent_revision_id=agent_context.agent_revision_id,
+                    )
+                )
+            except IntegrityError as exc:
+                # The agent only gains a saved reference here, so it can be
+                # deleted while generation runs.
+                raise RuntimeError(
+                    "The timeline could not be saved because its session or "
+                    "agent was deleted during generation."
+                ) from exc
             with self.timeline_generation_lock:
                 self.timeline_generation_cooldown_until.pop(safe_session_id, None)
             if isinstance(persisted, dict):

@@ -72,6 +72,10 @@ function buildHttpErrorMessage(statusCode: number, detail: string): string {
     return TIMEOUT_REQUEST_ERROR;
   }
   if (statusCode === 409) {
+    // Conflicts carry their reason (blocked delete, locked agent, busy job).
+    if (isSafeUserFacingMessage(detail)) {
+      return `[ERROR] ${detail}`;
+    }
     return "[ERROR] Another operation is already running. Please wait and retry.";
   }
   if (statusCode === 422 || statusCode === 400) {

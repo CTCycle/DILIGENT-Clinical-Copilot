@@ -109,7 +109,7 @@ def test_agent_lifecycle_create_edit_lock_archive_delete_and_reload(
     focus = f"Check chronology {studio_cleanup}"
     original_timeline_model = created["revision"]["configuration"]["timeline"]["model"]
     _open_tab(page, "DILI Report Review")
-    page.get_by_label("Custom instructions").fill(focus)
+    page.get_by_role("textbox", name="Custom instructions").fill(focus)
     expect(page.get_by_text("Unsaved changes")).to_be_visible()
     with page.expect_response(
         lambda r: r.request.method == "PUT" and r.url.endswith(f"/api/agents/{created['id']}")

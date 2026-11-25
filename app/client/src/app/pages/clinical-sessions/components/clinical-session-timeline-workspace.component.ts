@@ -10,6 +10,7 @@ import { ClinicalSessionDetail, InspectionSessionTimelinePreview } from '../../.
 import { cancelInspectionSessionTimelineJob, deleteInspectionSessionTimeline, fetchInspectionSessionTimelineJobStatus, fetchInspectionSessionTimelineList, startInspectionSessionTimelineJob } from '../../../core/services/session-timeline-api';
 import { JobPollingService } from '../../../core/services/job-polling.service';
 import { AgentsStateService } from '../../../core/state/agents-state.service';
+import { ApiHttpError } from '../../../core/services/http-api';
 import { formatUnknownError } from '../../../core/utils';
 
 @Component({
@@ -130,6 +131,8 @@ export class ClinicalSessionTimelineWorkspaceComponent implements OnInit, OnChan
       if (isCurrentGeneration()) {
         this.generationRunning.set(false); this.generationStatus.set(null); this.generationCancellationState.set('idle'); this.generationError.set(formatUnknownError(error, 'Unable to start timeline generation.'));
       }
+      // The agent may have changed since it was loaded: refresh so a retry pins the current revision.
+      if (error instanceof ApiHttpError && error.statusCode === 409) void this.agents.load({ force: true }).catch(() => undefined);
     }
   }
 

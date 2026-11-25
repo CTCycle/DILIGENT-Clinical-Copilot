@@ -188,8 +188,16 @@ def _agent_seed_payload(stored: dict[str, object] | None) -> dict[str, object]:
     seed = build_default_agent_seed_payload(environment_snapshot_from_os_env())
     if not stored:
         return seed
+    # Blank legacy values (an unset model) keep the configured default rather
+    # than producing an agent that cannot be validated.
     seed.update(
-        {key: value for key, value in stored.items() if key in LEGACY_EXECUTION_KEYS}
+        {
+            key: value
+            for key, value in stored.items()
+            if key in LEGACY_EXECUTION_KEYS
+            and value is not None
+            and not (isinstance(value, str) and not value.strip())
+        }
     )
     stored_rag = stored.get("rag_settings")
     if isinstance(stored_rag, dict):

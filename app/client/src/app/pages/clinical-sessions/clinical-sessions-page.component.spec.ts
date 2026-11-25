@@ -591,7 +591,35 @@ describe('ClinicalSessionsPageComponent revision agent', () => {
     component.updateRevisionInstruction('Check dates');
     await component.startRevision();
 
-    expect(body).toEqual({ revision_instruction: 'Check dates', agent_id: 'r2' });
+    expect(body).toEqual({ revision_instruction: 'Check dates', agent_id: 'r2', agent_revision: 4 });
+  });
+
+  it('reloads agents after a 409 so a retry pins the newer revision', async () => {
+    let revision = 4;
+    const sent: unknown[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/agents')) {
+        return jsonResponse({ agents: [makeAgent('r1', { name: 'Reviser r1', current_revision: revision, is_default: true }, makeAgentConfig())] });
+      }
+      if (url.endsWith('/revision/jobs')) {
+        sent.push(JSON.parse(String(init?.body)).agent_revision);
+        return new Response(
+          JSON.stringify({ detail: 'The selected agent changed after it was checked. Review it and retry.' }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    component.selected.set(sessionDetail(9));
+    await component.loadRevisionAgents();
+    revision = 5;
+
+    await component.startRevision();
+    await vi.waitFor(() => expect(component.revisionAgent()?.current_revision).toBe(5));
+    await component.startRevision();
+
+    expect(sent).toEqual([4, 5]);
   });
 
   it('has no revision agent when none is available, and reads run provenance from the saved run', async () => {

@@ -71,21 +71,40 @@ class SessionTimelineRepository:
             return previews
 
     # -------------------------------------------------------------------------
-    def is_latest_timeline_current(self, session_id: int) -> bool:
+    def is_latest_timeline_current(
+        self, session_id: int, *, agent_revision_id: int | None = None
+    ) -> bool:
+        """Return whether the latest timeline matches the session input.
+
+        With ``agent_revision_id`` the latest timeline must also have been
+        produced by that agent revision, so switching agents regenerates.
+        """
         with self.session_factory() as db_session:
             session_row = db_session.get(ClinicalSession, int(session_id))
             if session_row is None:
                 return False
-            latest_hash = db_session.execute(
-                select(ClinicalSessionTimeline.source_text_hash)
+            latest = db_session.execute(
+                select(
+                    ClinicalSessionTimeline.source_text_hash,
+                    ClinicalSessionTimeline.agent_revision_id,
+                )
                 .where(ClinicalSessionTimeline.session_id == int(session_id))
                 .order_by(
                     ClinicalSessionTimeline.generated_at.desc(),
                     ClinicalSessionTimeline.id.desc(),
                 )
                 .limit(1)
-            ).scalar_one_or_none()
-            return latest_hash is None or latest_hash == session_input_hash(session_row)
+            ).one_or_none()
+            if latest is None:
+                return True
+            if (
+                agent_revision_id is not None
+                and latest.agent_revision_id != agent_revision_id
+            ):
+                return False
+            return latest.source_text_hash is None or (
+                latest.source_text_hash == session_input_hash(session_row)
+            )
 
     # -------------------------------------------------------------------------
     def get_session_timeline_record(

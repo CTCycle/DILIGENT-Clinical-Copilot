@@ -155,6 +155,7 @@ export class AgentEditorComponent implements OnInit {
 
   private revisionsRequest = 0;
   private lastResetKey = '';
+  private resetAgentId = '';
 
   constructor() {
     effect(() => {
@@ -164,7 +165,21 @@ export class AgentEditorComponent implements OnInit {
       const key = `${state}:${creating ? 'new' : (agent?.id ?? '')}:${agent?.current_revision ?? 0}`;
       if (state !== 'ready' || key === this.lastResetKey) return;
       this.lastResetKey = key;
-      untracked(() => (creating ? this.resetForCreate() : agent && this.reset(agent)));
+      untracked(() => {
+        // A newer revision of the agent being edited must not wipe unsaved edits.
+        if (
+          !creating &&
+          agent?.id === this.resetAgentId &&
+          agent.current_revision !== this.baseRevision() &&
+          this.dirty() &&
+          !this.saving()
+        ) {
+          this.conflict.set(true);
+          return;
+        }
+        if (creating) this.resetForCreate();
+        else if (agent) this.reset(agent);
+      });
     });
     // Cloud catalogs are cache-only on the server: load any never-loaded provider the draft uses.
     effect(() => {
@@ -186,6 +201,7 @@ export class AgentEditorComponent implements OnInit {
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       this.lastResetKey = '';
+      this.resetAgentId = '';
       this.routeId.set(params.get('id'));
     });
     this.agents.load({ force: true }).catch(() => undefined);
@@ -258,7 +274,11 @@ export class AgentEditorComponent implements OnInit {
       this.savedNotice.set(`Saved as revision ${saved.current_revision}.`);
     } catch (error) {
       if (error instanceof ApiHttpError && error.statusCode === 409 && !this.creating()) {
-        this.conflict.set(true);
+        // 409 means either a newer revision or a lifecycle block (locked, archived, inactive).
+        await this.agents.load({ force: true }).catch(() => undefined);
+        const fresh = this.agent();
+        if (!fresh || fresh.current_revision !== this.baseRevision()) this.conflict.set(true);
+        else this.saveError.set(stripPrefix(error.message));
       } else {
         this.saveError.set(stripPrefix(error instanceof Error ? error.message : String(error)));
       }
@@ -324,6 +344,8 @@ export class AgentEditorComponent implements OnInit {
   /** Route guard hook: unsaved edits require an explicit confirmation to leave. */
   canLeave(): boolean | Promise<boolean> {
     if (!this.dirty() || this.saving()) return true;
+    // A newer navigation supersedes a pending prompt; settle the old one as "stay".
+    this.leavePrompt()?.(false);
     return new Promise<boolean>((resolve) => this.leavePrompt.set(resolve));
   }
 
@@ -360,6 +382,7 @@ export class AgentEditorComponent implements OnInit {
     this.description.set(agent.description);
     this.config.set(structuredClone(agent.revision.configuration));
     this.baseRevision.set(agent.current_revision);
+    this.resetAgentId = agent.id;
     this.baseline.set(this.snapshot());
     this.clearTransient();
     void this.loadRevisions(agent.id);

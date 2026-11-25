@@ -166,6 +166,32 @@ def test_default_agent_seeds_once_from_legacy_configuration(
     )
 
 
+
+###############################################################################
+def test_blank_legacy_models_seed_configured_defaults() -> None:
+    from repositories.agent_seed import agent_config_from_legacy_payload
+    from repositories.database.initializer import _agent_seed_payload
+
+    seed = _agent_seed_payload(
+        {"clinical_model": "   ", "text_extraction_model": None, "timeline_model": ""}
+    )
+    config = agent_config_from_legacy_payload(seed)
+    assert config.assessment.models.clinical.model.strip()
+    assert config.assessment.models.extraction.model.strip()
+    assert config.timeline.model.model.strip()
+
+
+###############################################################################
+def test_blank_names_and_models_are_rejected() -> None:
+    payload = agent_payload()
+    with pytest.raises(ValidationError):
+        AgentCreateRequest.model_validate(
+            {"name": "   ", "configuration": payload}
+        )
+    payload["timeline"]["model"]["model"] = "  "
+    with pytest.raises(ValidationError):
+        AgentCreateRequest.model_validate({"name": "Agent", "configuration": payload})
+
 ###############################################################################
 def test_agent_saves_are_versioned_and_execution_is_guarded(
     agent_service: AgentService,
@@ -556,9 +582,12 @@ def test_report_template_is_frozen_into_the_run_snapshot(
         ),
         2,
     )
-    with LLMRuntimeConfig.override_for_run(
-        LLMRuntimeConfig.agent_runtime_overrides(templated)
-    ):
+    # The scheduler replays only the captured snapshot, so the template must
+    # survive capture rather than only the live agent overrides.
+    snapshot, _ = LLMRuntimeConfig.capture_run_snapshot(
+        evidence_sources=["livertox"], agent_context=templated
+    )
+    with LLMRuntimeConfig.override_for_run(snapshot):
         assert LLMRuntimeConfig.active_report_template() == (
             "md",
             "# Title\\n## Findings {x}",

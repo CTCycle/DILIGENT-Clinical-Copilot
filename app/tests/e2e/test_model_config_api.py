@@ -17,7 +17,8 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "no-store" in response.headers["cache-control"]
 
     payload = response.json()
-    # Execution settings (models, roles, reasoning, seed) live on agents.
+    # Execution settings (models, roles, reasoning) live on agents; the Ollama
+    # seed is a global setting.
     for removed in (
         "use_cloud_services",
         "llm_provider",
@@ -27,9 +28,9 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
         "revision_model",
         "timeline_model",
         "reasoning_level",
-        "ollama_seed",
     ):
         assert removed not in payload
+    assert "ollama_seed" in payload
     assert "chunk_size" in payload["rag_settings"]
     assert "use_reranking" not in payload["rag_settings"]
     assert payload["local_catalog"]["status"] in {

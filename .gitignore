@@ -3,6 +3,7 @@ data/sources/archives/**
 data/sources/documents/**
 data/sources/vectors/**
 data/database_config.json
+data/access-key-material.json
 app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/

@@ -456,6 +456,29 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
     expect(requests.some((entry) => entry.includes('POST') && entry.includes('force_regenerate'))).toBe(true);
   });
 
+  it('force-reloads agents after a 409 so a retry pins the current revision', async () => {
+    const agents = TestBed.inject(AgentsStateService) as unknown as { load: ReturnType<typeof vi.fn> };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/sessions/1/timelines')) return jsonResponse({ items: [] });
+      if (url.endsWith('/sessions/1/timeline-jobs')) {
+        return new Response(
+          JSON.stringify({ detail: 'The selected agent changed after it was checked. Review it and retry.' }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    fixture.componentRef.setInput('session', session(1));
+    fixture.detectChanges();
+    agents.load.mockClear();
+
+    await component.generateTimeline();
+
+    expect(component.generationError()).toContain('The selected agent changed');
+    expect(agents.load).toHaveBeenCalledWith({ force: true });
+  });
+
   it('drops the previous session timelines and status as soon as the session changes', async () => {
     const second = deferred<Response>();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {

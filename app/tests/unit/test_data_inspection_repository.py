@@ -18,6 +18,7 @@ from domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
 )
+from domain.agents import AgentDuplicateRequest
 from domain.timeline_dates import extract_single_explicit_timeline_date
 from repositories.agent_seed import ensure_default_agent
 from repositories.schemas.base import Base
@@ -691,7 +692,10 @@ class EmptyTimelineExtractionClient:
 def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced() -> (
     None
 ):
-    repository_graph, _ = build_repository_graph_for_test()
+    repository_graph, engine = build_repository_graph_for_test()
+    # Production SQLite enforces foreign keys; mirror it on this connection.
+    with engine.connect() as connection:
+        connection.exec_driver_sql("PRAGMA foreign_keys=ON")
     save_session(
         repository_graph,
         patient_name="Timeline Patient",
@@ -758,6 +762,37 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
     assert len(history) == 2
     assert history[0]["timeline_id"] == regenerated.timeline_id
     assert history[1]["timeline_id"] == generated.timeline_id
+
+    # A different agent must not be served the previous agent's timeline.
+    agents = service.agent_service
+    default_context = agents.resolve_for_execution(capability="timeline")
+    copy = agents.duplicate_agent(
+        default_context.agent_id, AgentDuplicateRequest()
+    )
+    other_context = agents.resolve_for_execution(
+        capability="timeline", agent_id=copy.id
+    )
+    switched = service.generate_session_timeline(
+        session_id, agent_context=other_context
+    )
+    assert switched is not None
+    assert switched.timeline_id != regenerated.timeline_id
+    assert extractor.call_count == 3
+    reused_switched = service.generate_session_timeline(
+        session_id, agent_context=other_context
+    )
+    assert reused_switched is not None
+    assert reused_switched.timeline_id == switched.timeline_id
+    assert extractor.call_count == 3
+
+    # An agent deleted while its timeline runs fails the save cleanly.
+    doomed = agents.duplicate_agent(default_context.agent_id, AgentDuplicateRequest())
+    doomed_context = agents.resolve_for_execution(
+        capability="timeline", agent_id=doomed.id
+    )
+    agents.delete_agent(doomed.id)
+    with pytest.raises(RuntimeError, match="deleted during generation"):
+        service.generate_session_timeline(session_id, agent_context=doomed_context)
 
 
 ###############################################################################

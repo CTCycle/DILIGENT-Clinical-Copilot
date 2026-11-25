@@ -570,7 +570,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   async loadRevisionAgents(): Promise<void> {
     try {
-      await this.agentsState.load();
+      // Agents change in the Agents workspace; never launch from a stale cache.
+      await this.agentsState.load({ force: true });
     } catch {
       // The shared agents resource exposes the visible error state.
     }
@@ -598,6 +599,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       const started = await startSessionRevisionJob(detail.session_id, {
         revision_instruction: this.revisionInstruction().trim() || null,
         agent_id: agent?.id ?? null,
+        // Pin the revision shown to the user; the server rejects a newer one.
+        agent_revision: agent?.current_revision ?? null,
       });
       if (!isCurrentLoad()) return;
       this.revisionJobId.set(started.job_id);
@@ -607,6 +610,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         this.revisionStatus.set(formatUnknownError(error, 'Failed to start revision agent.'));
         this.revisionRunning.set(false);
       }
+      // The agent may have changed since it was loaded: refresh so a retry pins the current revision.
+      if (error instanceof ApiHttpError && error.statusCode === 409) void this.loadRevisionAgents();
     }
   }
 
