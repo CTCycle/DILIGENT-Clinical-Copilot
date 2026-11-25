@@ -181,7 +181,6 @@ class LanceVectorDatabase:
                     "Embedding fingerprint does not match canonical configuration"
                 )
         self.configure_embedding_size(CANONICAL_EMBEDDING_CONFIG.dimension)
-        self.ensure_fixed_embedding_schema(CANONICAL_EMBEDDING_CONFIG.dimension)
         table = self.get_table()
         table.add(records)
         self.ensure_vector_index(table)
@@ -213,46 +212,6 @@ class LanceVectorDatabase:
         connection = self.connect()
         if self.table is None and self.collection_name not in connection.table_names():
             self.schema = self._schema_with_embedding_size(self.embedding_size)
-
-    # -------------------------------------------------------------------------
-    def ensure_fixed_embedding_schema(self, embedding_size: int) -> None:
-        if embedding_size <= 0:
-            return
-        connection = self.connect()
-        if self.collection_name not in connection.table_names():
-            self.schema = self._schema_with_embedding_size(embedding_size)
-            return
-        table = self.get_table()
-        try:
-            embedding_field = table.schema.field("embedding")
-        except KeyError:
-            logger.warning(
-                "LanceDB table '%s' has no 'embedding' field; rebuilding schema.",
-                self.collection_name,
-            )
-            embedding_field = None
-        if isinstance(getattr(embedding_field, "type", None), pa.FixedSizeListType):
-            required_fields = {field.name for field in self.schema}
-            existing_fields = set(table.schema.names)
-            if required_fields.issubset(existing_fields):
-                return
-        target_schema = self._schema_with_embedding_size(embedding_size)
-        self.schema = target_schema
-        logger.info(
-            "Rebuilding LanceDB table '%s' with fixed-size vectors (%d).",
-            self.collection_name,
-            embedding_size,
-        )
-        self.table = connection.create_table(
-            self.collection_name,
-            data=target_schema.empty_table(),
-            schema=target_schema,
-            mode="overwrite",
-        )
-        self.index_ready = False
-        self.index_creation_attempted = False
-        self.fts_index_ready = False
-        self.scalar_indices_ready = False
 
     # -------------------------------------------------------------------------
     def ensure_vector_index(self, table: Table | None = None) -> None:
@@ -465,28 +424,6 @@ class LanceVectorDatabase:
         if total <= 0:
             return []
         return table.search().select(columns).limit(total).to_arrow().to_pylist()
-
-    # -------------------------------------------------------------------------
-    def get_vector_model_signatures(self) -> set[str]:
-        if not self.has_collection():
-            return set()
-        records = self.read_columns(["vector_model_signature"])
-        signatures: set[str] = set()
-        for row in records:
-            value = row.get("vector_model_signature")
-            if isinstance(value, str) and value.strip():
-                signatures.add(value.strip())
-        return signatures
-
-    # -------------------------------------------------------------------------
-    def assert_query_model_matches_index(self, active_signature: str) -> None:
-        signatures = self.get_vector_model_signatures()
-        if not signatures:
-            return
-        if active_signature not in signatures:
-            raise ValueError(
-                "Embedding model mismatch detected. Rebuild the RAG vector store with the active embedding model."
-            )
 
     # -------------------------------------------------------------------------
     def assert_embedding_fingerprint_matches(self, expected_fingerprint: str) -> None:

@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License, version 3 or later.
 
 import { ClinicalSessionDetail } from '../../core/models/inspection-types';
-import { buildPersistedDrugEvidence, previewDetectedDiseases, previewHepatotoxicityPattern, previewLaboratorySummary, previewLabTimeline, previewReport, terminologyResolvedLabel } from './clinical-session-preview';
+import { buildPersistedDrugEvidence, previewDetectedDiseases, previewHepatotoxicityPattern, previewLabTimeline, previewReport, terminologyResolvedLabel } from './clinical-session-preview';
 import { terminologyStatusLabel, terminologyStatusTone } from '../../core/utils/terminology-status';
 import { describe, expect, it } from 'vitest';
 import { type RevisionArtifact, type RevisionPipelineStep } from '../../core/models/revision-types';
@@ -24,31 +24,20 @@ describe('clinical-session-preview', () => {
     session_text: '',
     source_clinical_text: '',
     result_payload: {},
-    report: null,
     official_report_text: null,
     manual_edit_history: [],
     ...overrides,
   });
 
-  it('keeps official report precedence and falls back to payload reports', () => {
-    expect(previewReport(detail({
-      official_report_text: ' official report ',
-      report: 'legacy report',
-      result_payload: { report: 'payload report' },
-    }))).toBe('official report');
-
-    expect(previewReport(detail({
-      report: null,
-      result_payload: { report: ' payload report ' },
-    }))).toBe('payload report');
-
-    expect(previewReport(detail())).toBe('No AI report preview is available for this session.');
+  it('previews only the official report text', () => {
+    expect(previewReport(detail({ official_report_text: ' official report ' }))).toBe('official report');
+    expect(previewReport(detail({ result_payload: { report: 'payload report' } })))
+      .toBe('No AI report preview is available for this session.');
   });
 
   it('exposes the persisted terminology identity of detected drugs', () => {
     const rows = buildPersistedDrugEvidence(detail({
       result_payload: {
-        detected_drugs: ['Augmentin', 'Hydroxazine', 'Legacy drug'],
         matched_drugs: [
           {
             raw_drug_name: 'Augmentin',
@@ -99,30 +88,35 @@ describe('clinical-session-preview', () => {
     expect(terminologyStatusLabel(undefined)).toBe('Not resolved');
   });
 
-  it('uses direct disease payloads before source-text fallback and ignores unknown payload shapes', () => {
-    expect(previewDetectedDiseases(detail({
+  it('marks drug origins and timing from the structured case and the drugs section', () => {
+    const rows = buildPersistedDrugEvidence(detail({
+      sections: { drugs: 'Ramipril 5 mg daily' },
       result_payload: {
-        detected_diseases: ['Direct diagnosis'],
-        anamnesis_diseases: ['Older diagnosis'],
+        matched_drugs: [{ raw_drug_name: 'Ramipril', rxnorm_rxcui: '35296' }],
+        structured_case: {
+          therapy_drugs: [{ name: 'Ramipril', therapy_start_date: '2026-08-01' }],
+          anamnesis_drugs: [{ name: 'Paracetamol' }],
+        },
       },
-      sections: { anamnesis: 'Past history includes diabetes.' },
-    }))).toEqual(['Direct diagnosis']);
+    }));
 
+    expect(rows.map((row) => [row.name, row.inTherapy, row.inAnamnesis, row.temporalReference, row.bibliographyLabel])).toEqual([
+      ['Ramipril', true, false, '2026-08-01', 'RxNav'],
+      ['Paracetamol', false, true, 'time not specified', 'No backend match'],
+    ]);
+  });
+
+  it('reads diseases only from the structured case', () => {
     expect(previewDetectedDiseases(detail({
-      result_payload: {
-        detected_diseases: { unexpected: true },
-        structured_case: ['unexpected'],
-        section_extraction: [],
-      },
-      report: null,
-      session_text: '',
+      result_payload: { anamnesis_diseases: ['Unstructured diagnosis'], structured_case: ['unexpected'] },
+      sections: { anamnesis: 'Past history includes diabetes.' },
+      official_report_text: 'Detected diseases: hepatitis',
     }))).toEqual([]);
   });
 
   it('does not present negated or ruled-out diseases as detected conditions', () => {
     expect(previewDetectedDiseases(detail({
       result_payload: {
-        anamnesis_diseases: ['chronic liver disease', 'gastroesophageal reflux disease'],
         structured_case: {
           anamnesis_diseases: [
             {
@@ -137,17 +131,17 @@ describe('clinical-session-preview', () => {
     }))).toEqual(['gastroesophageal reflux disease']);
   });
 
-  it('extracts laboratory and hepatotoxicity previews without requiring a fixed payload shape', () => {
+  it('reads the lab timeline and the resolved hepatic pattern from the structured payload', () => {
     const session = detail({
       result_payload: {
-        labs: { ALT: 123 },
-        hepatotoxicity: { classification: 'cholestatic' },
+        extraction_metadata: { hepatic_pattern: { final_value: 'cholestatic' } },
         lab_timeline: [{ marker_name: 'ALT', value: 123, relative_time: 'day 1' }],
       },
+      official_report_text: 'Hepatotoxicity pattern: mixed',
     });
 
-    expect(previewLaboratorySummary(session)).toContainEqual({ label: 'ALT', value: '123' });
     expect(previewHepatotoxicityPattern(session)).toBe('cholestatic');
+    expect(previewHepatotoxicityPattern(detail({ official_report_text: 'Classification: mixed' }))).toBe('N/A');
     expect(previewLabTimeline(session)).toEqual([expect.objectContaining({
       marker: 'ALT',
       value: '123',
@@ -166,6 +160,25 @@ describe('clinical-session-revision-display', () => {
       status: 'completed',
       retry_count: 1,
       output_summary: { tool_call_count: 3 },
+      pipeline_run_id: 'run-1',
+      input_hash: null,
+      output_hash: null,
+      input_summary: null,
+      output_payload: null,
+      schema_name: null,
+      schema_version: null,
+      prompt_version: null,
+      parser_version: null,
+      model_provider: null,
+      model_name: null,
+      token_usage: null,
+      latency_ms: null,
+      error: null,
+      started_at: null,
+      completed_at: null,
+      superseded_at: null,
+      created_at: '2026-09-01T08:00:00Z',
+      updated_at: '2026-09-01T08:00:00Z',
     };
 
     expect(formatRevisionStepLabel(step)).toBe('Revision task 4');
@@ -184,6 +197,10 @@ describe('clinical-session-revision-display', () => {
       entity_type: null,
       entity_name: null,
       payload: null,
+      revision_version_id: 1,
+      pipeline_run_id: 'run-1',
+      created_at: '2026-09-01T08:00:00Z',
+      updated_at: '2026-09-01T08:00:00Z',
     };
 
     expect(formatRevisionArtifactLabel(artifact)).toBe('Generated draft');
@@ -200,12 +217,40 @@ describe('clinical-session-revision-display', () => {
       step_count: 6,
       attempt_number: 2,
       status: 'completed',
+      retry_count: 0,
+      output_summary: null,
+      pipeline_run_id: 'run-1',
+      input_hash: null,
+      output_hash: null,
+      input_summary: null,
+      output_payload: null,
+      schema_name: null,
+      schema_version: null,
+      prompt_version: null,
+      parser_version: null,
+      model_provider: null,
+      model_name: null,
+      token_usage: null,
+      latency_ms: null,
+      error: null,
+      started_at: null,
+      completed_at: null,
+      superseded_at: null,
+      created_at: '2026-09-01T08:00:00Z',
+      updated_at: '2026-09-01T08:00:00Z',
     };
     const repairArtifact: RevisionArtifact = {
       artifact_key: 'revision_agent_draft_report_repair',
       artifact_kind: 'pipeline_artifact',
       status: 'pending_qa',
+      entity_type: null,
+      entity_name: null,
+      schema_version: null,
       payload: null,
+      revision_version_id: 1,
+      pipeline_run_id: 'run-1',
+      created_at: '2026-09-01T08:00:00Z',
+      updated_at: '2026-09-01T08:00:00Z',
     };
 
     expect(formatRevisionStepLabel(editorStep)).toBe('Report editor');
@@ -220,13 +265,42 @@ describe('clinical-session-revision-display', () => {
       step_name: 'custom_revision_checkpoint',
       step_index: 1,
       step_count: 1,
+      attempt_number: 1,
       status: 'recorded',
+      retry_count: 0,
+      output_summary: null,
+      pipeline_run_id: 'run-1',
+      input_hash: null,
+      output_hash: null,
+      input_summary: null,
+      output_payload: null,
+      schema_name: null,
+      schema_version: null,
+      prompt_version: null,
+      parser_version: null,
+      model_provider: null,
+      model_name: null,
+      token_usage: null,
+      latency_ms: null,
+      error: null,
+      started_at: null,
+      completed_at: null,
+      superseded_at: null,
+      created_at: '2026-09-01T08:00:00Z',
+      updated_at: '2026-09-01T08:00:00Z',
     };
     const artifact: RevisionArtifact = {
       artifact_key: null,
       artifact_kind: null,
       status: null,
+      entity_type: null,
+      entity_name: null,
+      schema_version: null,
       payload: null,
+      revision_version_id: 1,
+      pipeline_run_id: 'run-1',
+      created_at: '2026-09-01T08:00:00Z',
+      updated_at: '2026-09-01T08:00:00Z',
     };
 
     expect(formatRevisionStepLabel(step)).toBe('Custom Revision Checkpoint');

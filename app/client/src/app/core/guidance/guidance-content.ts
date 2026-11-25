@@ -28,7 +28,7 @@ export const DILI_ASSESSMENT_TOUR: GuidedTourDefinition = {
     {
       target: '[data-guidance-target="dili-review-run"]',
       title: 'Review, then run',
-      body: 'Run opens a short setup: pre-flight checks, evidence sources, model overrides for this session, and a final review before the analysis starts.',
+      body: 'Run opens a short setup: pre-flight checks, the agent that runs the analysis, and a final review before it starts.',
       preferredPlacement: 'top',
     },
   ],
@@ -39,25 +39,7 @@ export const GUIDANCE_DEFINITIONS = {
     id: 'dili-first-assessment',
     version: GUIDANCE_CONTENT_VERSION,
     title: 'Get started with DILI Agent',
-    description: 'Configure a model, structure the clinical input, and review the pre-flight check before running.',
-  },
-  modelRagSettings: {
-    id: 'model-rag-settings',
-    version: GUIDANCE_CONTENT_VERSION,
-    title: 'RAG settings',
-    description: 'These settings control the shared index: chunking, embeddings and storage. Retrieval and reranking are set per agent in Agents.',
-  },
-  clinicalSessionSections: {
-    id: 'clinical-session-sections',
-    version: GUIDANCE_CONTENT_VERSION,
-    title: 'Session sections',
-    description: 'Preview is read-only, Text Editor saves manual edits, Revision creates a new draft, and Timeline stores generated event histories.',
-  },
-  timelineReviewControls: {
-    id: 'timeline-review-controls',
-    version: GUIDANCE_CONTENT_VERSION,
-    title: 'Timeline filters',
-    description: 'Filter by source evidence, adjust density, and inspect any event for its source, timing, and confidence.',
+    description: 'Structure the clinical input, pick an assessment agent, and review the pre-flight check before running.',
   },
 } as const;
 
@@ -65,7 +47,7 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
   {
     id: 'first-assessment',
     title: 'Run a first assessment',
-    body: 'Configure a model, structure the input, then review the pre-flight check before running.',
+    body: 'Structure the input, pick an assessment agent, then review the pre-flight check before running.',
     actionLabel: 'Show me',
     action: 'tour',
   },
@@ -74,12 +56,12 @@ export const TIPS_AND_TRICKS: readonly TipDefinition[] = [
     title: 'Choose agent models',
     body: 'Each DILI agent picks its own clinical, extraction and timeline models. Edit an agent in Agents, then save a new revision.',
     actionLabel: 'Open Agents',
-    action: 'configurations',
+    action: 'agents',
   },
   {
     id: 'rag-boundary',
-    title: 'Choose evidence in the analysis wizard',
-    body: 'The retrieval policy of each agent defines retrieval behaviour; the evidence selection step in the DILI analysis wizard decides what the current assessment uses.',
+    title: 'Evidence follows the agent',
+    body: 'Each agent defines its evidence sources and retrieval policy. The agent you pick in the analysis wizard decides what the current assessment uses.',
   },
   {
     id: 'session-review',

@@ -56,8 +56,8 @@ class VectorDatabaseStub:
         return self.table
 
     # -------------------------------------------------------------------------
-    def assert_query_model_matches_index(self, active_signature: str) -> None:
-        _ = active_signature
+    def assert_embedding_fingerprint_matches(self, expected_fingerprint: str) -> None:
+        _ = expected_fingerprint
         return None
 
 
@@ -69,7 +69,7 @@ class EmbeddingGeneratorStub:
         self.vectors = vectors
 
     # -------------------------------------------------------------------------
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
         return [self.vectors[text] for text in texts]
 
     # -------------------------------------------------------------------------

@@ -251,15 +251,12 @@ function Get-DiligentCacheTargets {
         (Join-Path $RepoRoot 'app\client\node_modules\.vite'),
         (Join-Path $RepoRoot 'app\client\.cache'),
         (Join-Path $RepoRoot 'app\client\dist'),
-        (Join-Path $RepoRoot 'app\client\dist-ssr'),
         (Join-Path $RepoRoot 'app\client\out-tsc'),
         (Join-Path $RepoRoot 'app\client\coverage'),
         (Join-Path $RepoRoot 'app\desktop\node_modules\.cache'),
-        (Join-Path $RepoRoot 'app\desktop\node_modules\.vite'),
         (Join-Path $RepoRoot 'app\desktop\src-tauri\target'),
         (Join-Path $RepoRoot 'app\desktop\src-tauri\gen'),
-        (Join-Path $RepoRoot 'app\desktop\src-tauri\generated'),
-        (Join-Path $RepoRoot 'assets\QA\desktop-release-staging'),
+        (Join-Path $RepoRoot 'assets\QA\desktop\staging'),
         (Join-Path $RepoRoot 'htmlcov'),
         (Join-Path $RepoRoot '.coverage')
     )) { & $add $path 'Generated cache or build output' }
@@ -268,8 +265,8 @@ function Get-DiligentCacheTargets {
         & $add $coverage.FullName 'Parallel Python coverage output'
     }
 
-    $cacheNames = @('__pycache__', '.pytest_cache', '.ruff_cache', '.mypy_cache', '.cache', '.vite', '.angular-cache', 'coverage', 'htmlcov', 'out-tsc')
-    $pruneNames = @('.git', '.venv', 'venv', 'node_modules', 'dist', 'dist-ssr', 'target', 'runtimes', 'release', 'assets', 'fixtures')
+    $cacheNames = @('__pycache__', '.pytest_cache', '.ruff_cache', '.cache', '.vite', '.angular-cache', 'coverage', 'htmlcov', 'out-tsc')
+    $pruneNames = @('.git', '.venv', 'venv', 'node_modules', 'dist', 'target', 'runtimes', 'release', 'assets', 'fixtures')
     $scanRoots = @(
         (Join-Path $RepoRoot 'app\server'),
         (Join-Path $RepoRoot 'app\client'),
@@ -306,31 +303,8 @@ function Get-DiligentCacheTargets {
         }
     }
 
-    $legacyQaRoot = Join-Path $RepoRoot 'app\tests\assets\QA'
-    if (Test-Path -LiteralPath $legacyQaRoot -PathType Container) {
-        $stack = [Collections.Generic.Stack[string]]::new()
-        $stack.Push([IO.Path]::GetFullPath($legacyQaRoot))
-        while ($stack.Count -gt 0) {
-            $directory = $stack.Pop()
-            try { $entries = @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop) }
-            catch { & $add $directory 'Legacy QA cache scan failed' -KeepRoot -PlanError $_.Exception.Message; continue }
-            foreach ($entry in $entries) {
-                if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                    if ($entry.PSIsContainer -and $entry.Name -match '^(?:\.pytest_cache|pytest-cache|pytest-root-cache|pytest-cache-[A-Za-z0-9._-]+)$') {
-                        & $add $entry.FullName 'Legacy QA cache reparse point left untouched'
-                    }
-                    continue
-                }
-                if ($entry.PSIsContainer -and $entry.Name -match '^(?:\.pytest_cache|pytest-cache|pytest-root-cache|pytest-cache-[A-Za-z0-9._-]+)$') {
-                    & $add $entry.FullName 'Ignored disposable pytest cache'
-                } elseif ($entry.PSIsContainer) { $stack.Push($entry.FullName) }
-            }
-        }
-    }
-
     foreach ($bytecodeRoot in @(
         (Join-Path $RepoRoot 'app\server\.venv'),
-        (Join-Path $RepoRoot '.venv'),
         (Join-Path $RepoRoot 'runtimes\python')
     )) {
         if (-not (Test-Path -LiteralPath $bytecodeRoot -PathType Container)) { continue }
@@ -343,13 +317,13 @@ function Get-DiligentCacheTargets {
             catch { & $add $directory 'Python environment cache scan failed' -KeepRoot -PlanError $_.Exception.Message; continue }
             foreach ($entry in $entries) {
                 if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                    if (($entry.PSIsContainer -and $entry.Name -in @('__pycache__', '.pytest_cache', '.ruff_cache', '.mypy_cache', '.cache')) -or $entry.Extension -in @('.pyc', '.pyo')) {
+                    if (($entry.PSIsContainer -and $entry.Name -in @('__pycache__', '.pytest_cache', '.ruff_cache', '.cache')) -or $entry.Extension -in @('.pyc', '.pyo')) {
                         & $add $entry.FullName 'Python environment cache reparse point left untouched'
                     }
                     continue
                 }
                 if ($entry.PSIsContainer) {
-                    if ($entry.Name -in @('__pycache__', '.pytest_cache', '.ruff_cache', '.mypy_cache', '.cache')) {
+                    if ($entry.Name -in @('__pycache__', '.pytest_cache', '.ruff_cache', '.cache')) {
                         & $add $entry.FullName 'Python environment cache'
                     } else { $stack.Push($entry.FullName) }
                 } elseif ($entry.Extension -in @('.pyc', '.pyo')) { & $add $entry.FullName 'Python environment bytecode' }
@@ -406,14 +380,12 @@ function Get-DiligentUninstallTargets {
     [void]$targets.Add([pscustomobject]@{ Path = (Join-Path $RepoRoot 'runtimes'); Label = 'Launcher-managed portable runtimes and caches'; KeepRoot = $false; PreserveNames = @('.gitkeep') })
     foreach ($path in @(
         (Join-Path $RepoRoot 'app\server\.venv'),
-        (Join-Path $RepoRoot '.venv'),
         (Join-Path $RepoRoot 'app\client\node_modules'),
         (Join-Path $RepoRoot 'app\client\dist'),
         (Join-Path $RepoRoot 'app\desktop\node_modules'),
         (Join-Path $RepoRoot 'app\desktop\src-tauri\target'),
         (Join-Path $RepoRoot 'app\desktop\src-tauri\gen'),
-        (Join-Path $RepoRoot 'app\desktop\src-tauri\generated'),
-        (Join-Path $RepoRoot 'assets\QA\desktop-release-staging')
+        (Join-Path $RepoRoot 'assets\QA\desktop\staging')
     )) {
         $preserveNames = if ([IO.Path]::GetFileName([string]$path) -ieq 'node_modules') { @() } else { @('.gitkeep') }
         [void]$targets.Add([pscustomobject]@{ Path = $path; Label = 'Repository dependency or generated build output'; PreserveNames = $preserveNames })

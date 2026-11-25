@@ -19,7 +19,6 @@ from domain.settings.configuration import SHARED_RAG_SETTING_KEYS
 from pydantic import ValidationError
 from repositories.schemas.base import Base
 from repositories.serialization.model_configs import (
-    LEGACY_EXECUTION_KEYS,
     ModelConfigSerializer,
 )
 from repositories.serialization.provider_model_catalog_cache import (
@@ -53,11 +52,6 @@ class InMemorySerializer:
 
 
 ###############################################################################
-def test_model_config_serializer_has_no_clean_break_migration() -> None:
-    assert not hasattr(ModelConfigSerializer, "migrate_cloud_selection_clean_break")
-
-
-###############################################################################
 def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model-config.db'}")
     Base.metadata.create_all(engine)
@@ -80,7 +74,7 @@ def test_model_config_serializer_refreshes_updated_at_on_save(tmp_path) -> None:
 
 
 ###############################################################################
-def test_model_config_update_preserves_other_settings_and_prunes_legacy_keys(
+def test_model_config_update_preserves_other_settings(
     tmp_path,
 ) -> None:
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'settings-merge.db'}")
@@ -88,31 +82,25 @@ def test_model_config_update_preserves_other_settings_and_prunes_legacy_keys(
     serializer = ModelConfigSerializer(engine=engine)
     serializer.application_configuration.save(
         {
-            "clinical_model": "clinical-model",
-            "use_cloud_models": False,
-            "reasoning_level": "high",
-            "rag_settings": {"chunk_size": 300, "use_reranking": False},
+            "rag_settings": {"chunk_size": 300},
             "jobs": {"polling_interval": 2.5},
             "runtime": {"livertox_archive": "custom.tar.gz"},
             "ingestion": {"drug_name_min_length": 4},
-            "database": {"backend": "postgresql"},
         }
     )
 
     updated_snapshot = serializer.save_snapshot(
-        rag_settings={"chunk_size": 400, "use_reranking": True}
+        rag_settings={"chunk_size": 400}
     )
     saved = serializer.application_configuration.load()
 
     assert updated_snapshot.rag_settings is not None
     assert updated_snapshot.rag_settings["chunk_size"] == 400
     assert saved is not None
-    assert not LEGACY_EXECUTION_KEYS & set(saved)
     assert set(saved["rag_settings"]) == set(SHARED_RAG_SETTING_KEYS)
     assert saved["jobs"] == {"polling_interval": 2.5}
     assert saved["runtime"]["livertox_archive"] == "custom.tar.gz"
     assert saved["ingestion"] == {"drug_name_min_length": 4}
-    assert "database" not in saved
 
 
 ###############################################################################

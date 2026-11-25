@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
 
-import json
 
 import pytest
 import repositories.database.migrations as migration_coordinator
@@ -17,6 +16,7 @@ from repositories.database.migrations import (
     migrate_database,
 )
 from sqlalchemy import create_engine, event, inspect, text
+from repositories.database.utils import sqlite_autocommit
 
 
 ###############################################################################
@@ -32,14 +32,8 @@ def _engine(path: Path):
 
 ###############################################################################
 def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:  # type: ignore[no-untyped-def]
-    previous_autocommit = getattr(dbapi_connection, "autocommit", None)
-    if previous_autocommit is not None:
-        dbapi_connection.autocommit = True
-    try:
+    with sqlite_autocommit(dbapi_connection):
         dbapi_connection.execute("PRAGMA foreign_keys=ON")
-    finally:
-        if previous_autocommit is not None:
-            dbapi_connection.autocommit = previous_autocommit
 
 
 ###############################################################################
@@ -157,19 +151,19 @@ def test_unknown_unversioned_schema_is_rejected_before_version_table_creation(
 
 
 ###############################################################################
-def test_unknown_versioned_schema_is_rejected_without_changing_revision(
+def test_pre_v360_database_is_rejected_without_changing_revision(
     tmp_path: Path,
 ) -> None:
-    database_path = tmp_path / "unknown-version.db"
+    database_path = tmp_path / "v350.db"
     engine = _engine(database_path)
     try:
         migrate_database(engine, database_was_empty=True)
         with engine.begin() as connection:
             connection.execute(
-                text("update alembic_version set version_num = 'unknown_revision'")
+                text("update alembic_version set version_num = '202609170001'")
             )
 
-        with pytest.raises(MigrationError, match="unknown Alembic revision"):
+        with pytest.raises(MigrationError, match="upgrade an older database with v3.6.0"):
             migrate_database(engine, database_was_empty=False)
 
         with engine.connect() as connection:
@@ -177,7 +171,7 @@ def test_unknown_versioned_schema_is_rejected_without_changing_revision(
                 connection.execute(
                     text("select version_num from alembic_version")
                 ).scalar_one()
-                == "unknown_revision"
+                == "202609170001"
             )
     finally:
         engine.dispose()
@@ -263,136 +257,3 @@ def test_concurrent_sqlite_startup_attempts_serialize(tmp_path: Path) -> None:
         results = list(executor.map(lambda _item: run_startup(), range(2)))
 
     assert results == [(HEAD_REVISION,), (HEAD_REVISION,)]
-
-
-###############################################################################
-def test_lifecycle_migration_preserves_reports_and_the_legacy_draft(
-    tmp_path: Path,
-) -> None:
-    engine = _engine(tmp_path / "lifecycle.db")
-    try:
-        with migration_coordinator._migration_transaction(engine) as connection:
-            migration_coordinator._run_command(connection, "upgrade", "202611010002")
-            connection.execute(
-                text(
-                    "insert into clinical_sessions (patient_name, session_timestamp, "
-                    "session_status) values ('Old Success', '2026-10-01 10:00:00', "
-                    "'successful'), ('Old Failure', '2026-10-02 10:00:00', 'failed'), "
-                    "('Old Unknown', '2026-10-03 10:00:00', NULL)"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into clinical_input_drafts (id, draft_key, revision, "
-                    "is_active, patient_name, clinical_input, updated_at) values "
-                    "(1, 'key', 3, 1, 'Draft Patient', 'Unsaved history', "
-                    "'2026-10-04 09:00:00')"
-                )
-            )
-
-        migrate_database(engine, database_was_empty=False)
-
-        with engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    "select patient_name, session_status, clinical_input, created_at "
-                    "from clinical_sessions order by id"
-                )
-            ).all()
-            assert not inspect(connection).has_table("clinical_input_drafts")
-        assert [(row[0], row[1]) for row in rows] == [
-            ("Old Success", "completed"),
-            ("Old Failure", "failed"),
-            ("Old Unknown", "completed"),
-            ("Draft Patient", "draft"),
-        ]
-        assert rows[3][2] == "Unsaved history"
-        assert str(rows[0][3]).startswith("2026-10-01")
-    finally:
-        engine.dispose()
-
-
-###############################################################################
-def test_agent_config_v4_migration_rewrites_v3_revisions_in_place(
-    tmp_path: Path,
-) -> None:
-    from domain.agents import agent_config_hash, parse_agent_config
-
-    ref = {"provider": "openai", "model": "gpt-4.1"}
-    v4 = parse_agent_config(
-        {
-            "assessment": {"models": {"extraction": ref, "clinical": ref}},
-            "revision": {"models": {"planning": ref}},
-            "timeline": {"model": ref},
-        }
-    ).model_dump(mode="json")
-    legacy = json.loads(json.dumps(v4))
-    legacy["schema_version"] = 3
-    legacy["assessment"]["reasoning_level"] = "medium"
-    legacy["assessment"]["ollama_seed"] = 3
-    legacy["assessment"]["models"]["clinical"]["reasoning_level"] = "high"
-    legacy["revision"]["reasoning_level"] = "medium"
-    legacy["revision"]["instructions"] = {
-        "review_objectives": "  Check chronology. ",
-        "editing_style": "Be terse.",
-    }
-    legacy["revision"]["models"]["stage_overrides"] = {"editing": ref}
-    legacy["revision"]["limits"] = {
-        "max_tasks": 3,
-        "max_tool_iterations": 4,
-        "allowed_tools": ["search_rag"],
-    }
-    legacy["timeline"]["reasoning_level"] = "off"
-    legacy["timeline"]["instructions"] = {"timeline_focus": "Dates first."}
-
-    engine = _engine(tmp_path / "agent_v4.db")
-    try:
-        with migration_coordinator._migration_transaction(engine) as connection:
-            migration_coordinator._run_command(connection, "upgrade", "202611120002")
-            connection.execute(
-                text(
-                    "insert into agent_definitions (id, name, description, "
-                    "current_revision, is_default, is_active, is_locked, is_archived, "
-                    "created_at, updated_at) values ('agent-1', 'Legacy', '', 1, 1, 1, "
-                    "0, 0, '2026-11-01 10:00:00', '2026-11-01 10:00:00')"
-                )
-            )
-            connection.execute(
-                text(
-                    "insert into agent_revisions (agent_id, revision_number, "
-                    "schema_version, configuration_json, configuration_hash, "
-                    "created_at) values ('agent-1', 1, 3, :config, 'stale', "
-                    "'2026-11-01 10:00:00')"
-                ),
-                {"config": json.dumps(legacy)},
-            )
-
-        migrate_database(engine, database_was_empty=False)
-
-        with engine.connect() as connection:
-            row = connection.execute(
-                text(
-                    "select schema_version, configuration_json, configuration_hash "
-                    "from agent_revisions"
-                )
-            ).one()
-        version, raw, stored_hash = row
-        config = json.loads(raw) if isinstance(raw, str) else raw
-        assert version == 4 and config["schema_version"] == 4
-        assert config["revision"]["instructions"] == {
-            "custom_instructions": "Check chronology.\n\nBe terse."
-        }
-        assert config["assessment"]["models"]["extraction"]["reasoning_level"] == "medium"
-        # A model's own level wins over the capability-level one.
-        assert config["assessment"]["models"]["clinical"]["reasoning_level"] == "high"
-        assert config["revision"]["models"] == {
-            "planning": {**ref, "reasoning_level": "medium"}
-        }
-        assert config["timeline"]["model"]["reasoning_level"] is None
-        assert "reasoning_level" not in config["assessment"]
-        assert "ollama_seed" not in config["assessment"]
-        assert "limits" not in config["revision"]
-        assert "instructions" not in config["timeline"]
-        assert stored_hash == agent_config_hash(parse_agent_config(config))
-    finally:
-        engine.dispose()

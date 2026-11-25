@@ -14,25 +14,20 @@ import {
   ModelConfigStateResponse,
   RagSettings,
 } from '../../../../core/models/types';
-import {
-  loadModelCatalog,
-  refreshModelCatalog,
-  updateModelConfigState,
-} from '../../../../core/services/model-config-api';
+import { updateModelConfigState } from '../../../../core/services/model-config-api';
 import {
   ModelPullJobService,
   ModelPullProgressState,
 } from '../../../../core/services/model-pull-job.service';
-import { AppStateService } from '../../../../core/state/app-state.service';
 import { ModelConfigStateService } from '../../../../core/state/model-config-state.service';
-import { formatUnknownError } from '../../../../core/utils';
-import { ProviderCatalogPanelComponent } from '../../../model-config/components/provider-catalog-panel.component';
+import { formatErrorMessage, formatUnknownError } from '../../../../core/utils';
+import { ProviderCatalogPanelComponent } from './components/provider-catalog-panel.component';
 import {
   CredentialProviderOption,
   ProviderCredentialsPanelComponent,
-} from '../../../model-config/components/provider-credentials-panel.component';
-import { RagResourcesPanelComponent } from '../../../model-config/components/rag-resources-panel.component';
-import { modelMatchesFilters } from '../../../model-config/model-catalog';
+} from './components/provider-credentials-panel.component';
+import { RagResourcesPanelComponent } from './components/rag-resources-panel.component';
+import { modelMatchesFilters } from './model-catalog';
 import {
   DraftRagSettings,
   ModelFilterKey,
@@ -40,7 +35,7 @@ import {
   RagNumberKey,
   RagSettingsSectionKey,
   RagTextKey,
-} from '../../../model-config/model-config.types';
+} from './model-config.types';
 
 const MODEL_BATCH_SIZE = 12;
 const RAG_AUTOSAVE_DELAY_MS = 400;
@@ -125,9 +120,8 @@ function formatTokenCount(tokens: number): string {
   styleUrl: './providers-resources.component.scss',
 })
 export class ProvidersResourcesComponent implements OnInit, OnDestroy {
-  readonly appState = inject(AppStateService);
   private readonly modelConfigState = inject(ModelConfigStateService);
-  private readonly modelPullJobs = inject(ModelPullJobService);
+  readonly modelPullJobs = inject(ModelPullJobService);
 
   readonly isLoading = signal(true);
   readonly statusMessage = signal('');
@@ -308,15 +302,8 @@ export class ProvidersResourcesComponent implements OnInit, OnDestroy {
 
   // Catalog handlers
 
-  private catalogStatus(provider: CatalogProvider): string {
-    if (provider === LOCAL_SOURCE) return this.localCatalog().status;
-    return this.cloudProviders().find((item) => item.id === provider)?.catalog_status || 'not_loaded';
-  }
-
   private async ensureSelectedCatalog(): Promise<void> {
-    if (this.catalogStatus(this.source()) === 'not_loaded') {
-      await this.runCatalogOperation(this.source(), false);
-    }
+    await this.runCatalogOperation(this.source(), false);
   }
 
   async refreshSelectedCatalog(): Promise<void> {
@@ -327,15 +314,12 @@ export class ProvidersResourcesComponent implements OnInit, OnDestroy {
     if (this.catalogProviderInFlight()) return;
     this.catalogProviderInFlight.set(provider);
     try {
-      const result = forceRefresh ? await refreshModelCatalog(provider) : await loadModelCatalog(provider);
-      this.applyState(result.state);
-      if (result.outcome === 'failed') {
-        this.statusMessage.set(`[ERROR] ${result.error || 'Unable to refresh the model catalog.'}`);
-      } else if (forceRefresh) {
-        this.statusMessage.set('Model catalog refreshed.');
+      if (forceRefresh) {
+        const failure = (await this.modelConfigState.refreshCatalogs([provider]))[provider];
+        this.statusMessage.set(failure ? formatErrorMessage(failure) : 'Model catalog refreshed.');
+      } else {
+        await this.modelConfigState.ensureCatalogs([provider]);
       }
-    } catch (error) {
-      this.statusMessage.set(formatUnknownError(error, 'Unable to refresh the model catalog.'));
     } finally {
       this.catalogProviderInFlight.set(null);
     }
@@ -382,7 +366,6 @@ export class ProvidersResourcesComponent implements OnInit, OnDestroy {
     const candidate = modelName.trim();
     if (!candidate) return;
 
-    this.appState.updateDiliAgent({ isPulling: true });
     this.statusMessage.set(`[INFO] Pulling '${candidate}' from Ollama...`);
     let failureMessage = '';
     try {
@@ -397,7 +380,6 @@ export class ProvidersResourcesComponent implements OnInit, OnDestroy {
     } finally {
       await this.loadModelConfig();
       if (failureMessage) this.statusMessage.set(failureMessage);
-      this.appState.updateDiliAgent({ isPulling: false });
     }
   }
 

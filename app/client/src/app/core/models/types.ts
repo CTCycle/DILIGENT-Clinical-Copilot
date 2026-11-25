@@ -72,11 +72,6 @@ export type EmbeddingIndexStatus = {
   built_at: string | null;
 };
 
-export type EmbeddingStatusResponse = {
-  embedding_runtime: EmbeddingRuntimeStatus;
-  embedding_index: EmbeddingIndexStatus;
-};
-
 export type ModelConfigUpdateRequest = {
   rag_settings?: Partial<RagSettings>;
   ollama_seed?: number | null;
@@ -142,8 +137,8 @@ export type CloudProviderDescriptor = {
   credential_scope: AccessKeyProvider;
   capabilities: ProviderCapabilities;
   catalog_status: CatalogStatus;
-  catalog_updated_at?: string | null;
-  catalog_message?: string | null;
+  catalog_updated_at: string | null;
+  catalog_message: string | null;
   models: CloudModelDescriptor[];
 };
 
@@ -152,15 +147,6 @@ export type ModelCatalogOperationResponse = {
   outcome: "cached" | "refreshed" | "failed";
   error: string | null;
   state: ModelConfigStateResponse;
-};
-
-export type ConnectivityCheckRequest = { provider: CloudProvider; model: string };
-export type ConnectivityCheckResponse = {
-  provider: CloudProvider;
-  model: string;
-  ok: boolean;
-  response_preview: string | null;
-  error: string | null;
 };
 
 export type AccessKeyRecord = {
@@ -254,7 +240,7 @@ export type ClinicalInputPreflightIssue = {
   severity: "blocking" | "non_blocking";
   code: string;
   message: string;
-  field?: string | null;
+  field: string | null;
   title: string;
   description: string;
   affected_section: string;
@@ -269,8 +255,8 @@ export type ClinicalInputPreflightResponse = {
   runtime_settings: Record<string, unknown>;
   extraction_quality: Record<string, unknown>;
   deterministic_diagnostics: Record<string, unknown>;
-  rag_readiness?: RagReadiness | null;
-  evidence_sources?: EvidenceSourceStatus[];
+  rag_readiness: RagReadiness | null;
+  evidence_sources: EvidenceSourceStatus[];
 };
 
 export type EvidenceSourceStatus = {
@@ -285,9 +271,9 @@ export type RagReadiness = {
   requested: boolean;
   available: boolean;
   backend: string;
-  model?: string | null;
-  reason_code?: string | null;
-  message?: string | null;
+  model: string | null;
+  reason_code: string | null;
+  message: string | null;
 };
 
 export type ApiResult = {
@@ -339,10 +325,10 @@ export type JobStatusResponse<TJobResult extends Record<string, unknown> = Recor
   progress: number;
   result: TJobResult | null;
   error: string | null;
-  created_at?: number | null;
-  completed_at?: number | null;
-  version?: number | null;
-  stop_requested?: boolean;
+  created_at: number | null;
+  completed_at: number | null;
+  version: number | null;
+  stop_requested: boolean;
 };
 
 export type JobCancelResponse = {

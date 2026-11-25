@@ -104,16 +104,9 @@ fn load_embedded_manifest(
 }
 
 fn is_runtime_link(metadata: &fs::Metadata) -> bool {
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        // FILE_ATTRIBUTE_REPARSE_POINT includes junctions and other redirects.
-        metadata.file_attributes() & 0x400 != 0
-    }
-    #[cfg(not(windows))]
-    {
-        metadata.is_symlink()
-    }
+    use std::os::windows::fs::MetadataExt;
+    // FILE_ATTRIBUTE_REPARSE_POINT includes junctions and other redirects.
+    metadata.file_attributes() & 0x400 != 0
 }
 
 fn validate_runtime_tree(

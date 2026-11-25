@@ -651,9 +651,6 @@ def _runtime_settings(agent_context: AgentExecutionContext) -> dict[str, Any]:
         "clinical"
     )
     return {
-        "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-        "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-        "cloud_model": LLMRuntimeConfig.get_cloud_model(),
         "text_extraction_provider": parser_provider,
         "text_extraction_model": parser_model,
         "clinical_provider": clinical_provider,

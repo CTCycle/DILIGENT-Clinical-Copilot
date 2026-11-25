@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from common.paths import DATABASE_FILE_PATH
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.engine import build_sqlite_engine
+from repositories.database.utils import sqlite_autocommit
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
 
@@ -35,20 +36,16 @@ class SQLiteRepository:
     # -------------------------------------------------------------------------
     @staticmethod
     def _configure_connection(dbapi_connection, _connection_record) -> None:
-        # Python 3.12+ exposes sqlite3 transaction control explicitly.  Run
-        # connection PRAGMAs in autocommit mode, then restore the application
-        # transaction policy so migration DDL can roll back as one unit.
-        previous_autocommit = getattr(dbapi_connection, "autocommit", None)
-        if previous_autocommit is not None:
-            dbapi_connection.autocommit = True
-        cursor = dbapi_connection.cursor()
-        try:
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA busy_timeout=30000")
-            # WAL keeps readers independent from the single SQLite writer and
-            # remains durable across connections and process restarts.
-            cursor.execute("PRAGMA journal_mode=WAL")
-        finally:
-            cursor.close()
-            if previous_autocommit is not None:
-                dbapi_connection.autocommit = previous_autocommit
+        # Run connection PRAGMAs in autocommit mode, then restore the
+        # application transaction policy so migration DDL can roll back as
+        # one unit.
+        with sqlite_autocommit(dbapi_connection):
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA busy_timeout=30000")
+                # WAL keeps readers independent from the single SQLite writer
+                # and remains durable across connections and process restarts.
+                cursor.execute("PRAGMA journal_mode=WAL")
+            finally:
+                cursor.close()

@@ -389,12 +389,7 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
             f"/api/inspection/sessions/{session_id}/revision/jobs",
             data={
                 "revision_instruction": REVISION_INSTRUCTION,
-                "metadata": {"live_provider_e2e": True, "dry_run": False},
-                "max_tasks": 1,
-                "max_tool_iterations": 2,
-                "allowed_tools": ["read_session_context"],
-                "revision_goal": "full_report_revision",
-                "dry_run": False,
+                "metadata": {"live_provider_e2e": True},
             },
         )
         assert revision_start.status == 202, revision_start.text()
@@ -484,7 +479,6 @@ def test_live_opencode_go_provider_and_browser_clinical_flow(
         final_artifacts = final_attempt["artifacts"]
         assert final_job["status"] == "completed", final_run.get("error")
         assert final_run["status"] == "completed"
-        assert final_job["result"].get("revision_status") != "dry_run"
         assert final_run["revision_mode"] == "agentic_revision"
         assert final_run["revision_kind"] == "llm_assisted_revision"
         assert final_run["root_session_id"] == root_session_id

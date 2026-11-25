@@ -1,5 +1,5 @@
 # Startup
-Last updated: 2026-11-02
+Last updated: 2026-11-25
 
 ## Recommended Local Startup
 On Windows, start_on_windows.bat starts the app through PowerShell 7 (pwsh). Run pwsh .\setup_and_maintenance.ps1 to open the setup and maintenance menu.
@@ -29,7 +29,7 @@ The launcher:
 
 All source-mode disposable runtime, application, test, and tool state is rooted
 at `runtimes/cache/`. The launcher routes uv, pip, npm, Playwright, Python
-bytecode, Cargo, pytest, Ruff, Mypy, Angular, logs, embeddings, test
+bytecode, Cargo, pytest, Ruff, Angular, logs, embeddings, test
 databases, Hugging Face metadata, and reports below that root. The hierarchy is disposable and may be
 deleted and recreated without affecting settings, databases, source documents,
 vectors, or user exports. Packaged desktop mode uses the equivalent writable

@@ -143,7 +143,7 @@ export function buildSessionInputPayload(form: ClinicalFormState): ClinicalSessi
   };
 }
 
-export function createDownloadUrl(content: string, filename: string): string {
+export function createDownloadUrl(content: string): string {
   const blob = new Blob([content], { type: "text/markdown" });
   return URL.createObjectURL(blob);
 }

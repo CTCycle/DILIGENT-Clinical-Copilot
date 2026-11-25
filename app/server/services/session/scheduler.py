@@ -129,8 +129,8 @@ class ClinicalSessionScheduler:
                 "patient_image_base64": stored["patient_image_base64"],
             }
         )
-        runtime_snapshot = run_request.get("runtime_snapshot")
-        runtime_snapshot_hash = run_request.get("runtime_snapshot_hash")
+        runtime_snapshot = run_request["runtime_snapshot"]
+        runtime_snapshot_hash = run_request["runtime_snapshot_hash"]
         service = self.service_factory(self.job_manager)
         with LLMRuntimeConfig.override_for_run(runtime_snapshot):
             prepared = prepare_clinical_run_workflow(service, request_payload)
@@ -148,13 +148,12 @@ class ClinicalSessionScheduler:
             )
         if not result:
             return {"session_id": session_id}
-        if runtime_snapshot is not None:
-            result.setdefault("runtime_settings", {}).update(runtime_snapshot)
-            artifacts = result.setdefault("pipeline_artifacts", {})
-            artifacts["runtime_snapshot"] = runtime_snapshot
-            artifacts["runtime_snapshot_hash"] = runtime_snapshot_hash
-            result["runtime_settings"]["runtime_snapshot_hash"] = runtime_snapshot_hash
-            repository.upsert_session_result_payload(session_id, result)
+        result.setdefault("runtime_settings", {}).update(runtime_snapshot)
+        artifacts = result.setdefault("pipeline_artifacts", {})
+        artifacts["runtime_snapshot"] = runtime_snapshot
+        artifacts["runtime_snapshot_hash"] = runtime_snapshot_hash
+        result["runtime_settings"]["runtime_snapshot_hash"] = runtime_snapshot_hash
+        repository.upsert_session_result_payload(session_id, result)
         # The full payload lives on the session; the job keeps only its link.
         return {"session_id": session_id}
 

@@ -20,8 +20,6 @@ def configure_cache_environment() -> None:
         "HF_HOME": cache_root / "huggingface",
         "HF_HUB_CACHE": cache_root / "huggingface" / "hub",
         "HF_ASSETS_CACHE": cache_root / "huggingface" / "assets",
-        "HUGGINGFACE_HUB_CACHE": cache_root / "huggingface" / "hub",
-        "MYPY_CACHE_DIR": cache_root / "mypy",
         "NPM_CONFIG_CACHE": cache_root / "npm",
         "PIP_CACHE_DIR": cache_root / "pip",
         "PLAYWRIGHT_BROWSERS_PATH": cache_root / "playwright",

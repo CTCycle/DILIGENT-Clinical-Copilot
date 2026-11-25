@@ -214,11 +214,7 @@ def database_settings(configuration: DatabaseConfiguration) -> DatabaseSettings:
     password = unprotect_database_password(configuration.password_protected)
     return DatabaseSettings(
         backend=configuration.backend,
-        url=None,
         sqlite_path=configuration.sqlite_path,
-        write_batch_size=configuration.write_batch_size,
-        read_page_size=configuration.read_page_size,
-        embedded_database=configuration.backend == "sqlite",
         engine=configuration.engine if configuration.backend == "postgresql" else None,
         host=configuration.host if configuration.backend == "postgresql" else None,
         port=configuration.port if configuration.backend == "postgresql" else None,
@@ -229,8 +225,6 @@ def database_settings(configuration: DatabaseConfiguration) -> DatabaseSettings:
         ssl_ca=configuration.ssl_ca if configuration.backend == "postgresql" else None,
         connect_timeout=configuration.connect_timeout,
         insert_batch_size=configuration.write_batch_size,
-        insert_commit_interval=5,
-        select_page_size=configuration.read_page_size,
     )
 
 

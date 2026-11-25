@@ -173,9 +173,6 @@
                               }
                             }
                             <small>{{ drug.temporalReference }}</small>
-                            @if (drug.extractionFallback) {
-                              <small class="clinical-session-evidence-fallback">Display fallback</small>
-                            }
                           </td>
                           <td>
                             @if (drug.inAnamnesis || drug.inTherapy) {
@@ -193,13 +190,9 @@
                             <span
                               class="clinical-session-table-value"
                               [class.is-muted]="!drug.liverTox && !drug.rxNav"
-                              [class.is-warn]="drug.bibliographyFallback"
                             >
                               {{ drug.bibliographyLabel }}
                             </span>
-                            @if (drug.bibliographyFallback) {
-                              <small class="clinical-session-evidence-fallback">Not backend-confirmed</small>
-                            }
                           </td>
                         </tr>
                       }
@@ -270,15 +263,6 @@
                       </tbody>
                     </table>
                   </div>
-                } @else if (labSummary().length) {
-                  <dl class="clinical-session-audit-list clinical-session-compact-list">
-                    @for (item of labSummary(); track item.label) {
-                      <div>
-                        <dt>{{ item.label }}</dt>
-                        <dd>{{ item.value }}</dd>
-                      </div>
-                    }
-                  </dl>
                 } @else {
                   <p class="clinical-session-panel-note">No laboratory summary available.</p>
                 }

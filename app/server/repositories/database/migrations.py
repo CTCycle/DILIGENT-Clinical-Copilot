@@ -18,6 +18,7 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from common.utils.logger import logger
+from repositories.database.utils import sqlite_autocommit
 
 HEAD_REVISION = "202611200001"
 MIGRATION_LOCK_KEY = 7362381
@@ -95,42 +96,24 @@ def _user_tables(connection: Connection) -> set[str]:
 ###############################################################################
 def _begin_sqlite_exclusive(connection: Connection) -> None:
     driver_connection: Any = connection.connection.driver_connection
-    previous_autocommit = getattr(driver_connection, "autocommit", None)
-    if previous_autocommit is not None:
-        driver_connection.autocommit = True
-    try:
+    with sqlite_autocommit(driver_connection):
         driver_connection.execute("BEGIN EXCLUSIVE")
-    finally:
-        if previous_autocommit is not None:
-            driver_connection.autocommit = previous_autocommit
 
 
 ###############################################################################
 def _sqlite_foreign_keys_enabled(connection: Connection) -> bool:
     driver_connection: Any = connection.connection.driver_connection
-    previous_autocommit = getattr(driver_connection, "autocommit", None)
-    if previous_autocommit is not None:
-        driver_connection.autocommit = True
-    try:
+    with sqlite_autocommit(driver_connection):
         return bool(driver_connection.execute("PRAGMA foreign_keys").fetchone()[0])
-    finally:
-        if previous_autocommit is not None:
-            driver_connection.autocommit = previous_autocommit
 
 
 ###############################################################################
 def _set_sqlite_foreign_keys(connection: Connection, enabled: bool) -> None:
     driver_connection: Any = connection.connection.driver_connection
-    previous_autocommit = getattr(driver_connection, "autocommit", None)
-    if previous_autocommit is not None:
-        driver_connection.autocommit = True
-    try:
+    with sqlite_autocommit(driver_connection):
         driver_connection.execute(
             f"PRAGMA foreign_keys={'ON' if enabled else 'OFF'}"
         )
-    finally:
-        if previous_autocommit is not None:
-            driver_connection.autocommit = previous_autocommit
 
 
 ###############################################################################
@@ -213,7 +196,9 @@ def _validate_known_revision(config: Config, current_heads: tuple[str, ...]) -> 
     if unknown:
         raise MigrationError(
             "Database references unknown Alembic revision(s): "
-            f"{', '.join(unknown)}. Restore a compatible migration set or obtain a backup."
+            f"{', '.join(unknown)}. Only databases created by DILIGENT v3.6.0 or "
+            "later can be upgraded; upgrade an older database with v3.6.0 first "
+            "or restore a compatible backup."
         )
 
 

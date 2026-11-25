@@ -8,6 +8,8 @@ from services.llm import ollama_chat
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.runtime_config import LLMRuntimeConfig
 import time
+
+import pytest
 from unittest.mock import AsyncMock
 from services.llm.ollama_client import OllamaClient
 from services.llm.ollama_runtime import OllamaError
@@ -344,22 +346,27 @@ def test_prefetch_model_oom_is_non_fatal(monkeypatch) -> None:
 
 
 ###############################################################################
-def test_resolve_text_extraction_models_prefers_live_installed_models() -> None:
-
-
-    ###############################################################################
+def test_missing_pinned_model_fails_without_trying_other_models() -> None:
     class FakeClient:
-        default_model = "gpt-4.1-mini"
+        calls: list[str] = []
 
-        # -------------------------------------------------------------------------
-        async def get_cached_models(self) -> set[str]:
-            return {"qwen3.5:2b", "qwen3.5:9b"}
+        async def chat(self, **kwargs):
+            self.calls.append(kwargs["model"])
+            raise OllamaError("model 'qwen3.5:9b' not found")
 
-    models = asyncio.run(
-        ollama_structured.resolve_text_extraction_models(FakeClient(), "gpt-4.1-mini")
-    )
-
-    assert models == ["qwen3.5:2b", "qwen3.5:9b"]
+    client = FakeClient()
+    with pytest.raises(RuntimeError, match="'qwen3.5:9b' is not installed"):
+        asyncio.run(
+            ollama_structured._chat_structured_model(
+                client,
+                active_model="qwen3.5:9b",
+                messages=[],
+                use_json_mode=True,
+                temperature=0.0,
+                purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
+            )
+        )
+    assert client.calls == ["qwen3.5:9b"]
 
 
 ###############################################################################
@@ -455,41 +462,6 @@ def test_chat_structured_model_forwards_generation_purpose() -> None:
 
     assert result == '{"ok": true}'
     assert client.captured_purpose is GenerationPurpose.STRUCTURED_EXTRACTION
-
-
-###############################################################################
-def test_ollama_client_forwards_generation_purpose_to_structured_models(
-    monkeypatch,
-) -> None:
-    captured: dict[str, object] = {}
-
-    async def fake_call(_client, **kwargs):
-        captured.update(kwargs)
-        return {"ok": True}
-
-    monkeypatch.setattr(
-        ollama_structured,
-        "call_with_structured_models",
-        fake_call,
-    )
-
-    client = OllamaClient.__new__(OllamaClient)
-    result = asyncio.run(
-        client.call_with_structured_models(
-            parser=None,
-            messages=[],
-            system_prompt="",
-            format_instructions="",
-            preferred=["gpt-oss:20b"],
-            temperature=0.0,
-            use_json_mode=True,
-            purpose=GenerationPurpose.STRUCTURED_EXTRACTION,
-            max_repair_attempts=1,
-        )
-    )
-
-    assert result == {"ok": True}
-    assert captured["purpose"] is GenerationPurpose.STRUCTURED_EXTRACTION
 
 
 ###############################################################################

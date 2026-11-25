@@ -6,10 +6,9 @@ use tauri::Url;
 pub fn navigation_handler() -> impl Fn(&Url) -> bool + Send + 'static {
     move |url| {
         let target = url.as_str();
-        let local_app = (url.scheme() == "tauri" && url.host_str() == Some("localhost"))
-            || (matches!(url.scheme(), "http" | "https")
-                && url.host_str() == Some("tauri.localhost")
-                && url.port().is_none());
+        let local_app = url.scheme() == "http"
+            && url.host_str() == Some("tauri.localhost")
+            && url.port().is_none();
         if local_app {
             true
         } else if matches!(url.scheme(), "http" | "https" | "mailto") {
@@ -27,11 +26,12 @@ mod tests {
     use tauri::Url;
 
     #[test]
-    fn allows_tauri_app_routes_and_rejects_file_urls() {
+    fn allows_only_the_app_origin() {
         let handler = navigation_handler();
 
         assert!(handler(&Url::parse("http://tauri.localhost/").unwrap()));
         assert!(handler(&Url::parse("http://tauri.localhost/clinical-sessions").unwrap()));
+        assert!(!handler(&Url::parse("tauri://localhost/").unwrap()));
         assert!(!handler(&Url::parse("file:///C:/outside.html").unwrap()));
     }
 }

@@ -120,7 +120,7 @@
                       [attr.aria-label]="'Install ' + model.name"
                       [attr.title]="modelStatus(model) === 'Installed' ? 'Already installed' : 'Install model'"
                       (click)="pullModelByName(model.name)"
-                      [disabled]="isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
+                      [disabled]="isLoading() || modelPullJobs.isPulling() || modelStatus(model) === 'Installed'"
                     >
                       <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>

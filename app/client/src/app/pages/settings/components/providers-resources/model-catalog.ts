@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { LocalModelCard } from '../../core/models/types';
+import { LocalModelCard } from '../../../../core/models/types';
 import { ModelFilterKey } from './model-config.types';
 
 export type ModelFilterOption = {

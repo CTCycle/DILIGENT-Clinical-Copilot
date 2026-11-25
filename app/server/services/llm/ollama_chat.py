@@ -331,63 +331,6 @@ def extract_chat_content(payload: dict[str, Any]) -> Any:
 
 
 ###############################################################################
-def normalize_embedding_payload(
-    payload: dict[str, Any],
-    expected: int,
-) -> list[list[float]]:
-    if not isinstance(payload, dict):
-        raise OllamaError("Invalid embedding payload returned by Ollama")
-    vectors = payload.get("embeddings")
-    if not isinstance(vectors, list):
-        raise OllamaError("Invalid embedding payload returned by Ollama")
-
-    normalized: list[list[float]] = []
-    for vector in vectors:
-        if not isinstance(vector, list):
-            raise OllamaError("Invalid embedding payload returned by Ollama")
-        try:
-            normalized.append([float(value) for value in vector])
-        except (TypeError, ValueError) as exc:
-            raise OllamaError("Non-numeric values found in Ollama embeddings") from exc
-
-    if len(normalized) != expected:
-        raise OllamaError("Mismatch between Ollama embeddings and inputs")
-    return normalized
-
-
-###############################################################################
-async def embed(
-    self,
-    *,
-    model: str | None = None,
-    input_texts: list[str],
-) -> list[list[float]]:
-    if not input_texts:
-        return []
-
-    resolved_model = self.resolve_model_name(model)
-    await self.ensure_model_ready(resolved_model)
-    try:
-        resp = await self.client.post(
-            "/api/embed",
-            json={"model": resolved_model, "input": input_texts},
-        )
-    except httpx.TimeoutException as exc:
-        raise OllamaTimeout("Timed out requesting Ollama embeddings") from exc
-    except httpx.RequestError as exc:  # noqa: PERF203 - convert to domain error
-        raise OllamaError(f"Failed to request Ollama embeddings: {exc}") from exc
-
-    self.raise_for_status(resp)
-
-    try:
-        payload = resp.json()
-    except (json.JSONDecodeError, ValueError, TypeError) as exc:
-        raise OllamaError("Invalid embedding payload returned by Ollama") from exc
-
-    return normalize_embedding_payload(payload, expected=len(input_texts))
-
-
-###############################################################################
 def raise_for_status(resp: httpx.Response) -> None:
     try:
         resp.raise_for_status()

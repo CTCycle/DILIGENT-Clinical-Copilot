@@ -34,11 +34,12 @@
 
 DILIGENT brings a structured DILI assessment workflow, saved clinical sessions, and local knowledge resources into one desktop application. It helps clinicians organize medication exposure and liver-test timelines, review a model-generated report, and keep the source material available for follow-up.
 
-- **DILI Agent** – enter or paste the anamnesis, therapy, and dated laboratory results; choose evidence sources and optional per-run model overrides; review preflight checks, then run the assessment. Unfinished input can be saved as a draft.
+- **DILI Agent** – enter or paste the anamnesis, therapy, and dated laboratory results; choose the agent that runs the assessment; review preflight checks, then run the assessment. Unfinished input can be saved as a draft.
 - **Clinical Sessions** – every analysis is a session with a visible lifecycle (queued, running, completed, failed, cancelled). Search and filter sessions, open the report, review metadata and attachments, and revise the report with version tracking.
 - **Patient Timeline** – a date-grounded chronology of medication, clinical, and laboratory events with source evidence, available as a list or a horizontal timeline.
 - **Knowledge** – local drug and liver-injury references (RxNav, LiverTox, FDA DILIrank 2.0), a drug terminology mapper (RxNorm, DrugCentral, ChEMBL, Swissmedic) with reviewer decisions, and optional RAG over your own documents.
-- **Settings** – local Ollama or hosted model providers per role, runtime and network options, drug matching, and a SQLite or PostgreSQL database.
+- **Agents** – reusable, versioned agents that bundle the models, reasoning levels, instructions, and retrieval policy for the DILI assessment, report revision, and timeline capabilities.
+- **Settings** – provider access keys and model catalogs, shared RAG index settings, runtime and network options, drug matching, and a SQLite or PostgreSQL database.
 
 The app runs as a single-user application on Windows, either as the packaged desktop app or from source in a browser. Navigation wraps and workspaces can stack vertically in compact windows.
 
@@ -56,7 +57,7 @@ All screenshots show the running application with fictional patients. Reports we
 
 ### Models and retrieval
 
-Model providers and roles are configured in Settings. Local Ollama models and supported hosted providers can be selected; provider availability depends on the configured endpoint and credentials.
+Each agent selects the provider and model for every role it runs. Settings → Providers & Models holds the provider access keys, model catalogs, and shared RAG index settings; provider availability depends on the configured endpoint and credentials.
 
 ![Settings showing the runtime source and local model catalog](assets/figures/05-model-settings.jpg)
 
@@ -95,7 +96,7 @@ The batch launcher prepares and starts the local app. Keep its window open while
 
 ## Typical workflow
 
-1. In **Settings → Models**, choose Local or Cloud and assign a model to each role. Add provider credentials if you use a hosted provider.
+1. In **Agents**, review the default agent or create one, and choose a model for each role. Add provider access keys in **Settings → Providers & Models** if you use a hosted provider.
 2. In **DILI Agent**, enter the clinical context, dated laboratory results, and suspected medication exposures.
 3. Resolve or acknowledge the preflight warnings, then run the assessment.
 4. Follow progress from the session page; queued or running analyses can be cancelled.

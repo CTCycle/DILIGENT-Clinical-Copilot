@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from collections.abc import AsyncGenerator
-from typing import Any, Literal, NoReturn
+from typing import Any, Literal
 
 import httpx
 
@@ -421,15 +421,6 @@ class OllamaClient:
         return await ollama_chat.ensure_model_ready(self, name)
 
     # -------------------------------------------------------------------------
-    async def embed(
-        self,
-        *,
-        model: str | None = None,
-        input_texts: list[str],
-    ) -> list[list[float]]:
-        return await ollama_chat.embed(self, model=model, input_texts=input_texts)
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
         return ollama_chat.raise_for_status(resp)
@@ -676,10 +667,6 @@ class OllamaClient:
         return await ollama_chat.estimate_max_feasible_context(self, model, metadata)
 
     # -------------------------------------------------------------------------
-    async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
-        return await ollama_structured.collect_structured_fallbacks(self, preferred)
-
-    # -------------------------------------------------------------------------
     async def llm_structured_call(
         self,
         *,
@@ -721,15 +708,6 @@ class OllamaClient:
         )
 
     # -------------------------------------------------------------------------
-    async def resolve_text_extraction_models(self, model: str) -> list[str]:
-        return await ollama_structured.resolve_text_extraction_models(self, model)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def is_missing_model_error(err: OllamaError) -> bool:
-        return ollama_structured.is_missing_model_error(err)
-
-    # -------------------------------------------------------------------------
     async def _chat_structured_model(
         self,
         *,
@@ -751,37 +729,9 @@ class OllamaClient:
         )
 
     # -------------------------------------------------------------------------
-    async def _extend_structured_model_queue(
-        self,
-        *,
-        queue: list[str],
-        preferred_models: list[str],
-        tried: set[str],
-        fallbacks: list[str] | None,
-    ) -> list[str]:
-        return await ollama_structured._extend_structured_model_queue(
-            self,
-            queue=queue,
-            preferred_models=preferred_models,
-            tried=tried,
-            fallbacks=fallbacks,
-        )
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
         return ollama_structured._coerce_llm_text(raw)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _raise_structured_models_exhausted(
-        *,
-        last_missing_error: Exception | None,
-        missing: list[str],
-    ) -> NoReturn:
-        return ollama_structured._raise_structured_models_exhausted(
-            last_missing_error=last_missing_error, missing=missing
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -809,35 +759,6 @@ class OllamaClient:
     @staticmethod
     def looks_like_schema_echo(text: str) -> bool:
         return ollama_structured.looks_like_schema_echo(text)
-
-    # -------------------------------------------------------------------------
-    async def call_with_structured_models(
-        self,
-        *,
-        parser: StructuredOutputParser[T],
-        messages: list[dict[str, str]],
-        system_prompt: str,
-        format_instructions: str,
-        preferred: list[str],
-        temperature: float,
-        use_json_mode: bool,
-        purpose: GenerationPurpose = GenerationPurpose.STRUCTURED_EXTRACTION,
-        timeline_complexity: str = "moderate",
-        max_repair_attempts: int,
-    ) -> T:
-        return await ollama_structured.call_with_structured_models(
-            self,
-            parser=parser,
-            messages=messages,
-            system_prompt=system_prompt,
-            format_instructions=format_instructions,
-            preferred=preferred,
-            temperature=temperature,
-            use_json_mode=use_json_mode,
-            purpose=purpose,
-            timeline_complexity=timeline_complexity,
-            max_repair_attempts=max_repair_attempts,
-        )
 
     # -------------------------------------------------------------------------
     async def parse_with_repairs(

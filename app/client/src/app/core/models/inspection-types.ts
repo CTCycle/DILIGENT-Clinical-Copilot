@@ -86,7 +86,6 @@ export type ClinicalSessionDetail = {
   session_text: string;
   source_clinical_text: string;
   result_payload: Record<string, unknown>;
-  report: string | null;
   official_report_text: string | null;
   manual_edit_history: ManualReportEditAudit[];
 };

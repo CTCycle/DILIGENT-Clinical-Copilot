@@ -60,9 +60,7 @@ class EvidenceSelection:
     @classmethod
     def from_sources(cls, sources: Any) -> "EvidenceSelection":
         normalized = normalize_evidence_sources(sources)
-        return cls(
-            tuple(source for source in EVIDENCE_SOURCES if source in normalized)
-        )
+        return cls(tuple(source for source in EVIDENCE_SOURCES if source in normalized))
 
     # -------------------------------------------------------------------------
     @property
@@ -215,7 +213,9 @@ class PatientData(BaseModel):
 
 
 ###############################################################################
-class ClinicalSessionRequest(BaseModel):
+class ClinicalSessionLaunchRequest(BaseModel):
+    """What a client submits to check or launch a clinical session."""
+
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, max_length=200)
@@ -224,38 +224,38 @@ class ClinicalSessionRequest(BaseModel):
         "faithful_only"
     )
     clinical_input: str | None = Field(default=None, max_length=100000)
-    anamnesis: str | None = Field(default=None, max_length=20000)
-    # Set from the selected agent's retrieval policy at preflight/launch.
-    evidence_sources: list[EvidenceSource] = Field(
-        default_factory=lambda: list(DEFAULT_EVIDENCE_SOURCES)
-    )
     # None selects the default DILI agent.
     agent_id: str | None = Field(default=None, min_length=1, max_length=64)
     # Revision checked at preflight; launch fails if the agent changed since.
     agent_revision: int | None = Field(default=None, ge=1)
+    patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
+
+    # -------------------------------------------------------------------------
+    @field_validator("name", "clinical_input", "patient_image_base64", mode="before")
+    @classmethod
+    def strip_text_fields(cls, value: Any) -> str | None:
+        return _strip_text(value)
+
+
+###############################################################################
+class ClinicalSessionRequest(ClinicalSessionLaunchRequest):
+    """A launch request with the sections and evidence the server derives."""
+
+    anamnesis: str | None = Field(default=None, max_length=20000)
     drugs: str | None = Field(default=None, max_length=20000)
     laboratory_analysis: str | None = Field(
         default=None, max_length=MAX_LAB_TEXT_LENGTH
     )
-    patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
+    # Set from the selected agent's retrieval policy at preflight/launch.
+    evidence_sources: list[EvidenceSource] = Field(
+        default_factory=lambda: list(DEFAULT_EVIDENCE_SOURCES)
+    )
 
     # -------------------------------------------------------------------------
-    @field_validator(
-        "name",
-        "clinical_input",
-        "anamnesis",
-        "drugs",
-        "laboratory_analysis",
-        "patient_image_base64",
-        mode="before",
-    )
+    @field_validator("anamnesis", "drugs", "laboratory_analysis", mode="before")
     @classmethod
-    def strip_text_fields(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
-        stripped = without_controls.strip()
-        return stripped or None
+    def strip_section_fields(cls, value: Any) -> str | None:
+        return _strip_text(value)
 
     # -------------------------------------------------------------------------
     @field_validator("evidence_sources", mode="before")
@@ -264,9 +264,24 @@ class ClinicalSessionRequest(BaseModel):
         return normalize_evidence_sources(value)
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def from_launch(
+        cls, payload: ClinicalSessionLaunchRequest
+    ) -> "ClinicalSessionRequest":
+        return cls.model_validate(payload.model_dump())
+
+    # -------------------------------------------------------------------------
     @property
     def evidence(self) -> "EvidenceSelection":
         return EvidenceSelection.from_sources(self.evidence_sources)
+
+
+###############################################################################
+def _strip_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    stripped = CONTROL_CHARACTERS_RE.sub(" ", str(value)).strip()
+    return stripped or None
 
 
 ###############################################################################
@@ -452,7 +467,6 @@ class PipelineIssue(BaseModel):
 
 ###############################################################################
 class ClinicalPipelineValidationError(Exception):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

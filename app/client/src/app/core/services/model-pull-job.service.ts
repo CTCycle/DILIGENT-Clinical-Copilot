@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 
 import { JobStatus } from '../models/types';
 import { resolvePollIntervalMs } from './clinical-api';
@@ -31,6 +31,9 @@ const TERMINAL_JOB_STATUSES: readonly JobStatus[] = ['completed', 'failed', 'can
 @Injectable({ providedIn: 'root' })
 export class ModelPullJobService {
   private readonly jobPolling = inject(JobPollingService);
+  private readonly pulling = signal(false);
+  /** True while a model pull is running. */
+  readonly isPulling = this.pulling.asReadonly();
 
   async pullModels(
     modelNames: readonly string[],
@@ -39,6 +42,20 @@ export class ModelPullJobService {
     const requested = Array.from(new Set(modelNames.map((model) => model.trim()).filter(Boolean)));
     const completedModels: string[] = [];
 
+    this.pulling.set(true);
+    try {
+      await this.pullEach(requested, completedModels, onProgress);
+    } finally {
+      this.pulling.set(false);
+    }
+    return { completedModels };
+  }
+
+  private async pullEach(
+    requested: readonly string[],
+    completedModels: string[],
+    onProgress: ModelPullProgressCallback,
+  ): Promise<void> {
     for (const modelName of requested) {
       onProgress(modelName, {
         progress: 1,
@@ -58,8 +75,6 @@ export class ModelPullJobService {
         onProgress(modelName, null);
       }
     }
-
-    return { completedModels };
   }
 
   private async pollPullJob(

@@ -56,13 +56,11 @@ class RevisionToolRegistry:
         self.context = context
 
     # -------------------------------------------------------------------------
-    def manifest(self, allowed: list[str] | None) -> list[str]:
-        return sorted(
-            self.names if allowed is None else self.names.intersection(allowed)
-        )
+    def manifest(self) -> list[str]:
+        return sorted(self.names)
 
     # -------------------------------------------------------------------------
-    def tool_definitions(self, allowed: list[str] | None) -> list[ToolDefinition]:
+    def tool_definitions(self) -> list[ToolDefinition]:
         schemas: dict[str, ToolDefinition] = {
             "read_session_context": ToolDefinition(
                 name="read_session_context",
@@ -150,14 +148,12 @@ class RevisionToolRegistry:
                 },
             ),
         }
-        return [schemas[name] for name in self.manifest(allowed)]
+        return [schemas[name] for name in self.manifest()]
 
     # -------------------------------------------------------------------------
-    def execute(
-        self, name: str, arguments: dict[str, Any], allowed: list[str] | None
-    ) -> dict[str, Any]:
-        if name not in self.manifest(allowed):
-            raise ValueError("Unknown or disallowed revision tool.")
+    def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        if name not in self.names:
+            raise ValueError("Unknown revision tool.")
         if not isinstance(arguments, dict) or any(
             key.startswith("_") for key in arguments
         ):

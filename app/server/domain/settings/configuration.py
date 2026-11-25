@@ -7,7 +7,6 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from domain.model_configs import ReasoningLevel
 
 
 ###############################################################################
@@ -66,11 +65,7 @@ class JobsSettings(BaseModel):
 class DatabaseSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     backend: str = "sqlite"
-    url: str | None = None
     sqlite_path: str | None = None
-    write_batch_size: int = 1000
-    read_page_size: int = 1000
-    embedded_database: bool
     engine: str | None
     host: str | None
     port: int | None
@@ -81,8 +76,6 @@ class DatabaseSettings(BaseModel):
     ssl_ca: str | None
     connect_timeout: int
     insert_batch_size: int
-    insert_commit_interval: int
-    select_page_size: int
 
 
 ###############################################################################
@@ -163,12 +156,6 @@ class IngestionSettings(BaseModel):
 ###############################################################################
 class LLMRuntimeDefaults(BaseModel):
     model_config = ConfigDict(frozen=True)
-    text_extraction_model: str
-    clinical_model: str
-    llm_provider: str
-    cloud_model: str
-    use_cloud_services: bool
-    reasoning_level: ReasoningLevel
     ollama_host_default: str
 
 

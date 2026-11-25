@@ -402,6 +402,5 @@ class ClinicalSessionConsultationMixin:
         return cls._resolve_runtime_timeout(
             base_timeout_s=configured,
             cloud_cap_s=float(runtime.cloud_llm_timeout_cap),
-            local_cap_s=float(runtime.local_llm_timeout_cap),
         )
 

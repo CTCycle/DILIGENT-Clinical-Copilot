@@ -59,7 +59,6 @@ def _configure_test_embedded_database_path() -> None:
     settings = get_server_settings().database.model_copy(
         update={
             "backend": "sqlite",
-            "embedded_database": True,
             "sqlite_path": str(db_path),
         }
     )

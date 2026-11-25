@@ -139,7 +139,7 @@ class ClinicalLabExtractor:
             self.runtime_revision = -1
         else:
             self.client_provider = "injected"
-            self.runtime_revision = LLMRuntimeConfig.get_revision()
+            self.runtime_revision = -1
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:

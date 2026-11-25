@@ -1,5 +1,5 @@
 # DILI Assessment Pipeline
-Last updated: 2026-11-03
+Last updated: 2026-11-25
 
 ## Section Extraction Contract
 A launched DILI session (`POST /api/clinical/sessions/{session_id}/launch`) uses deterministic section extraction for structural input splitting. The extractor preserves source-verbatim section bodies after newline normalization and records canonical key, payload key, raw and normalized heading, match strategy, confidence score, heading line span, body line span, character span, verbatim coherence, review requirement, and source hash.
@@ -296,11 +296,9 @@ enforced by the backend rather than the UI:
   any selected-but-unavailable source, and an accuracy note when LiverTox was
   excluded). Per-drug bibliography lines list only consulted sources.
 
-Session-only model overrides (`text_extraction_model`, `clinical_model`) are
-applied through `LLMRuntimeConfig.override_for_run` while the run snapshot is
-captured, so the job, its persisted `runtime_snapshot` and the session's
-recorded models reflect the override while the persisted configuration and
-other runs are unaffected.
+Every run executes the agent revision frozen into its `runtime_snapshot`
+through `LLMRuntimeConfig.override_for_run`; the snapshot records one provider
+and model per role (`parser_*`, `clinical_*`, `revision_*`, `timeline_*`).
 
 ## RAG Readiness
 Clinical preflight reports whether the configured RAG embedding backend is ready when the indexed document library is selected. Selecting it while the embedding cache is unavailable blocks the session in both preflight and job submission; the pre-analysis wizard lets the user deselect the source instead. This does not change the saved model configuration.

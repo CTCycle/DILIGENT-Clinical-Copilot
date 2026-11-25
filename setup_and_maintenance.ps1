@@ -48,7 +48,6 @@ $script:EmbeddingCacheDir = Join-Path $RuntimeCacheDir 'embeddings'
 $script:HuggingFaceHomeDir = Join-Path $RuntimeCacheDir 'huggingface'
 $script:HuggingFaceHubCacheDir = Join-Path $HuggingFaceHomeDir 'hub'
 $script:HuggingFaceAssetsCacheDir = Join-Path $HuggingFaceHomeDir 'assets'
-$script:MypyCacheDir = Join-Path $RuntimeCacheDir 'mypy'
 $script:NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
 $script:PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
 $script:PlaywrightCacheDir = Join-Path $RuntimeCacheDir 'playwright'
@@ -74,7 +73,6 @@ $script:UvArchiveSha256 = 'be8d78c992312212e5cc05e9f9de3fa996db73b7c86a186dfb923
 $script:DesktopDir = Join-Path $RepoRoot 'app/desktop'
 $script:DesktopTauriDir = Join-Path $DesktopDir 'src-tauri'
 $script:DesktopBuildDir = Join-Path $RepoRoot 'assets/QA/desktop/staging'
-$script:DesktopGeneratedDir = Join-Path $DesktopTauriDir 'generated'
 $script:DesktopArtifactsDir = Join-Path $RepoRoot 'release'
 $script:DesktopStageRoot = Join-Path $DesktopBuildDir 'staging'
 $script:DesktopNpmCmd = Join-Path $NodeDir 'npm.cmd'
@@ -479,7 +477,6 @@ function Set-LauncherEnvironment {
         $AngularCacheDir,
         $EmbeddingCacheDir,
         $CargoTargetDir,
-        $MypyCacheDir,
         $NpmCacheDir,
         $PipCacheDir,
         $PlaywrightCacheDir,
@@ -499,10 +496,8 @@ function Set-LauncherEnvironment {
     $env:HF_HOME = $HuggingFaceHomeDir
     $env:HF_HUB_CACHE = $HuggingFaceHubCacheDir
     $env:HF_ASSETS_CACHE = $HuggingFaceAssetsCacheDir
-    $env:HUGGINGFACE_HUB_CACHE = $HuggingFaceHubCacheDir
     $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightCacheDir
     $env:RUFF_CACHE_DIR = $RuffCacheDir
-    $env:MYPY_CACHE_DIR = $MypyCacheDir
     $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
     $env:CARGO_TARGET_DIR = $CargoTargetDir
     $env:PYTEST_ADDOPTS = "--basetemp=`"$PytestBaseTempDir`" -o cache_dir=`"$PytestCacheDir`""
@@ -2245,8 +2240,7 @@ function Assert-DesktopReleaseVersion {
     $textManifests = @(
         [pscustomobject]@{ Path = (Join-Path $ServerDir 'pyproject.toml'); Pattern = '(?m)^version\s*=\s*"([^"]+)"' },
         [pscustomobject]@{ Path = (Join-Path $DesktopTauriDir 'Cargo.toml'); Pattern = '(?m)^version\s*=\s*"([^"]+)"' },
-        [pscustomobject]@{ Path = (Join-Path $DesktopTauriDir 'tauri.conf.json'); Pattern = '"version"\s*:\s*"([^"]+)"' },
-        [pscustomobject]@{ Path = (Join-Path $RepoRoot 'app/shared/openapi.json'); Pattern = '"version"\s*:\s*"([^"]+)"' }
+        [pscustomobject]@{ Path = (Join-Path $DesktopTauriDir 'tauri.conf.json'); Pattern = '"version"\s*:\s*"([^"]+)"' }
     )
     foreach ($manifest in $textManifests) {
         $content = Get-Content -LiteralPath $manifest.Path -Raw
@@ -2681,9 +2675,6 @@ function Get-DesktopReleaseVersions {
 function Remove-DesktopGeneratedState {
     foreach ($target in @($DesktopBuildDir, $CargoTargetDir, (Join-Path $DesktopDir 'node_modules'))) {
         if (Test-Path -LiteralPath $target) { [void](Remove-LauncherPath -Path $target -Activity "DILIGENT: remove desktop state $([IO.Path]::GetFileName($target))" -Strict) }
-    }
-    if (Test-Path -LiteralPath $DesktopGeneratedDir) {
-        [void](Remove-LauncherPath -Path $DesktopGeneratedDir -KeepRoot -PreserveNames @('.gitkeep') -Activity 'DILIGENT: remove generated desktop state' -Strict)
     }
 }
 

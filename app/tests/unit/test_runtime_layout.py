@@ -76,8 +76,6 @@ def test_source_and_packaged_layouts_have_one_cache_root(tmp_path: Path, monkeyp
         "HF_HOME",
         "HF_HUB_CACHE",
         "HF_ASSETS_CACHE",
-        "HUGGINGFACE_HUB_CACHE",
-        "MYPY_CACHE_DIR",
         "NPM_CONFIG_CACHE",
         "PIP_CACHE_DIR",
         "PLAYWRIGHT_BROWSERS_PATH",

@@ -24,7 +24,7 @@
       "request": "launch",
       "module": "uvicorn",
       "args": [
-        "server.app:app",
+        "app:app",
         "--host",
         "127.0.0.1",
         "--port",
@@ -43,7 +43,6 @@
         "HF_HOME": "${workspaceFolder}/runtimes/cache/huggingface",
         "HF_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
         "HUGGINGFACE_HUB_CACHE": "${workspaceFolder}/runtimes/cache/huggingface/hub",
-        "MYPY_CACHE_DIR": "${workspaceFolder}/runtimes/cache/mypy",
         "NPM_CONFIG_CACHE": "${workspaceFolder}/runtimes/cache/npm",
         "PIP_CACHE_DIR": "${workspaceFolder}/runtimes/cache/pip",
         "PLAYWRIGHT_BROWSERS_PATH": "${workspaceFolder}/runtimes/cache/playwright",
@@ -52,14 +51,14 @@
         "RUFF_CACHE_DIR": "${workspaceFolder}/runtimes/cache/ruff",
         "UV_CACHE_DIR": "${workspaceFolder}/runtimes/cache/uv"
       },
-      "cwd": "${workspaceFolder}/app",
+      "cwd": "${workspaceFolder}/app/server",
       "console": "integratedTerminal",
       "justMyCode": true,
       "python": "${workspaceFolder}/app/server/.venv/Scripts/python.exe"
     },
     {
       "name": "Debug: Frontend",
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}/app/client",
       "env": {

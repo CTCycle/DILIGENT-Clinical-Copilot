@@ -39,12 +39,6 @@ class AccessKeyEncryptionMaterialSerializer:
     """
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, engine=None, session_factory=None) -> None:
-        # Keep the constructor shape used by the repository serializers while
-        # making it explicit that database handles are no longer consumed.
-        _ = engine, session_factory
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def external_path() -> Path:
         configured = os.getenv(EXTERNAL_KEY_FILE_ENV, "").strip()

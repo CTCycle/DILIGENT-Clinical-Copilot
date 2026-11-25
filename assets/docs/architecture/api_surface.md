@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-11-20
+Last updated: 2026-11-25
 
 `/api/agents` manages reusable versioned agents that bundle the DILI Assessment, DILI Revision and Timeline capabilities (see
 Agent Routes below). `/api/model-config` manages only the shared provider
@@ -10,11 +10,11 @@ agent-owned fields are rejected with 422) is a persistence-only response
 containing the saved configuration and timestamp; catalog and embedding
 refreshes remain explicit GET/status operations.
 
-The persisted role assignments are independent: `clinical_model`,
-`text_extraction_model`, `revision_model`, and `timeline_model`. Revision and
-Timeline job requests do not accept active model overrides; each job resolves
-its configured role when it starts. Cloud model descriptors expose capability
-data through the canonical `model_capabilities` object only.
+Revision and Timeline job requests carry no model settings; each job runs the
+model of the agent revision it resolves when it starts. Revision requests also
+carry no limits or tool lists: the review pipeline owns its 8-task and
+24-tool-iteration limits and its tool set. Cloud model descriptors expose
+capability data through the canonical `model_capabilities` object only.
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -48,8 +48,10 @@ same session configuration:
   preflight checked. Omitted means the default agent. The agent must be
   active, not archived and have the Assessment capability enabled. The agent's
   retrieval policy is authoritative for `evidence_sources` (any of `livertox`,
-  `dilirank`, `documents`; an empty list means LLM knowledge only); the
-  request no longer carries `model_overrides` or `selected_model_providers`.
+  `dilirank`, `documents`; an empty list means LLM knowledge only). The request
+  body carries only `name`, `visit_date`, `report_mode`, `clinical_input`,
+  `agent_id`, `agent_revision` and `patient_image_base64`; the sections and
+  evidence sources are derived on the server.
   Launch returns a conflict when the agent changed after preflight.
 
 Preflight validates the exact configuration that will run. The response adds
@@ -111,8 +113,8 @@ each model reference carries its own reasoning level (`Model default` sends no
 reasoning preference), and there is no capability-level reasoning or per-agent
 Ollama seed (the Ollama seed is a global setting). The revision pipeline
 (stages, limits and tool availability) is fixed by the application; agents carry
-no stage overrides, execution limits or tool allow-list, and request-level
-limits on the revision API stay application-controlled. Timeline extraction is
+no stage overrides, execution limits or tool allow-list, and revision job
+requests carry none either. Timeline extraction is
 scripted and has no instructions. Disabling a capability keeps its values. Configuration is
 editable (`PUT`) only while the agent is active, unlocked and not archived
 (`409` otherwise). Session revision jobs and timeline jobs accept optional

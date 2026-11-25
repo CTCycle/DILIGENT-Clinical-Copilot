@@ -18,7 +18,6 @@ from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
 from repositories.drug_catalog_repository import DrugCatalogRepository
 from repositories.knowledge_repository import KnowledgeRepository
-from services.llm.runtime_config import LLMRuntimeConfig
 from services.runtime.jobs import get_job_manager
 from services.session.scheduler import get_clinical_scheduler
 from services.session.session_service import ClinicalSessionService
@@ -48,7 +47,6 @@ def launch_payload(marker: str) -> dict[str, Any]:
         "name": f"Patient {marker}",
         "visit_date": "2026-06-19",
         "clinical_input": clinical_input(marker),
-        "evidence_sources": ["livertox"],
     }
 
 
@@ -119,9 +117,6 @@ def analyses(monkeypatch) -> FakeAnalyses:
     fake = FakeAnalyses()
     monkeypatch.setattr(
         ClinicalSessionService, "ensure_submission_requirements", lambda self, p: None
-    )
-    monkeypatch.setattr(
-        LLMRuntimeConfig, "is_cloud_enabled", classmethod(lambda cls: False)
     )
     monkeypatch.setattr(
         ClinicalSessionService,

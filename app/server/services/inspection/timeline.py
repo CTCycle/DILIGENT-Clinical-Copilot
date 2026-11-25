@@ -307,26 +307,6 @@ class InspectionTimelineMixin:
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_timeline_runtime_settings() -> dict[str, Any]:
-        """Describe the active timeline runtime (call under the agent override)."""
-        provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
-        use_cloud = provider != "ollama"
-        return {
-            "use_cloud_services": use_cloud,
-            "llm_provider": provider if use_cloud else LLMRuntimeConfig.get_llm_provider(),
-            "cloud_model": model if use_cloud else LLMRuntimeConfig.get_cloud_model(),
-            "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
-            "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "timeline_model": model,
-            "reasoning_level": LLMRuntimeConfig.get_reasoning_level_for(
-                "timeline"
-            ).value,
-            "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
-            "agent": LLMRuntimeConfig.active_agent(),
-        }
-
-    # -------------------------------------------------------------------------
     def build_fallback_timeline(
         self,
         *,
@@ -479,18 +459,11 @@ class InspectionTimelineMixin:
             )
             agent_overrides = LLMRuntimeConfig.agent_runtime_overrides(agent_context)
             with LLMRuntimeConfig.override_for_run(agent_overrides):
-                requested_runtime_settings = self._build_timeline_runtime_settings()
+                model_provider, source_model = (
+                    LLMRuntimeConfig.resolve_provider_and_model("timeline")
+                )
+            use_cloud = model_provider != "ollama"
             _report_progress(progress_callback, 15, "Configuring timeline model")
-            source_model = (
-                requested_runtime_settings["timeline_model"]
-                or requested_runtime_settings["cloud_model"]
-                or requested_runtime_settings["text_extraction_model"]
-            )
-            model_provider = (
-                requested_runtime_settings["llm_provider"]
-                if requested_runtime_settings["use_cloud_services"]
-                else "ollama"
-            )
 
             try:
                 _report_progress(
@@ -503,7 +476,6 @@ class InspectionTimelineMixin:
                                 self.timeline_extractor.extract_timeline(
                                     session_id=session_id,
                                     source_payload=source,
-                                    runtime_settings=requested_runtime_settings,
                                 ),
                                 stop_check=stop_check,
                             ),
@@ -514,11 +486,7 @@ class InspectionTimelineMixin:
                     update={
                         "generation_status": "llm_generated",
                         "source_model": source_model,
-                        "source_kind": (
-                            "cloud"
-                            if requested_runtime_settings["use_cloud_services"]
-                            else "local"
-                        ),
+                        "source_kind": "cloud" if use_cloud else "local",
                         "model_provider": model_provider,
                     }
                 )
@@ -546,10 +514,8 @@ class InspectionTimelineMixin:
                     session_id=safe_session_id,
                     source=source,
                     generation_note=_timeline_fallback_note(
-                        use_cloud_services=bool(
-                            requested_runtime_settings["use_cloud_services"]
-                        ),
-                        provider=requested_runtime_settings.get("llm_provider"),
+                        use_cloud_services=use_cloud,
+                        provider=model_provider,
                         model=source_model,
                         error_code=error_code,
                         diagnostic=diagnostic,
@@ -559,11 +525,7 @@ class InspectionTimelineMixin:
                 timeline = timeline.model_copy(
                     update={
                         "source_model": source_model,
-                        "source_kind": (
-                            "cloud"
-                            if requested_runtime_settings["use_cloud_services"]
-                            else "local"
-                        ),
+                        "source_kind": "cloud" if use_cloud else "local",
                         "model_provider": model_provider,
                     }
                 )

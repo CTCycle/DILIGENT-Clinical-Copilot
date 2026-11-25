@@ -10,7 +10,6 @@ import {
   AgentListResponse,
   AgentRevisionListResponse,
   AgentUpdateRequest,
-  Capability,
 } from "../models/agent-types";
 import {
   ApiHttpError,
@@ -27,17 +26,12 @@ function agentUrl(agentId: string, suffix = ""): string {
 }
 
 export async function fetchAgents(
-  options: { selectableFor?: Capability; includeArchived?: boolean } = {},
+  options: { includeArchived?: boolean } = {},
 ): Promise<AgentListResponse> {
   const query = buildQueryString({
-    selectable_for: options.selectableFor,
     include_archived: options.includeArchived ? "true" : undefined,
   });
   return requestJson<AgentListResponse>(`${API_BASE_URL}/agents${query}`, { method: "GET" });
-}
-
-export async function fetchAgent(agentId: string): Promise<Agent> {
-  return requestJson<Agent>(agentUrl(agentId), { method: "GET" });
 }
 
 export async function createAgent(payload: AgentCreateRequest): Promise<Agent> {

@@ -563,7 +563,7 @@ def test_revision_route_error_contracts(
 
     invalid_start = api_context.post(
         f"/api/inspection/sessions/{session_id}/revision/jobs",
-        data={"max_tasks": 0},
+        data={"agent_revision": 0},
     )
     assert invalid_start.status == 422, invalid_start.text()
 

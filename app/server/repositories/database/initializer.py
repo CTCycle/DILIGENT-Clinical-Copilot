@@ -18,7 +18,6 @@ from common.catalogs.manifest_loader import (
 from common.catalogs.provider import get_catalog_provider
 from common.utils.logger import logger
 from configurations.management import (
-    build_default_agent_seed_payload,
     build_default_application_configuration_payload,
     environment_snapshot_from_os_env,
 )
@@ -35,10 +34,7 @@ from repositories.database.utils import (
     validate_postgres_database_name,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
-from repositories.serialization.model_configs import (
-    LEGACY_EXECUTION_KEYS,
-    ModelConfigSerializer,
-)
+from repositories.serialization.model_configs import ModelConfigSerializer
 
 POSTGRES_CREATE_DATABASE_LOCK_KEY = 7362382
 
@@ -75,7 +71,6 @@ def clone_settings_with_database(
 ) -> DatabaseSettings:
     safe_database_name = validate_postgres_database_name(database_name)
     return DatabaseSettings(
-        embedded_database=False,
         engine=settings.engine,
         host=settings.host,
         port=settings.port,
@@ -86,8 +81,6 @@ def clone_settings_with_database(
         ssl_ca=settings.ssl_ca,
         connect_timeout=settings.connect_timeout,
         insert_batch_size=settings.insert_batch_size,
-        insert_commit_interval=settings.insert_commit_interval,
-        select_page_size=settings.select_page_size,
     )
 
 
@@ -171,10 +164,8 @@ def _seed_model_configuration(
         engine=repository.engine,
         session_factory=repository.session_factory,
     )
-    # Agents are seeded from the raw stored payload first, so legacy
-    # execution settings migrate into them before ensure_defaults prunes them.
-    _seed_default_agents(repository, serializer.load_raw_payload())
     changed = serializer.ensure_defaults(_default_model_configuration_payload())
+    _seed_default_agent(repository)
     logger.info(
         "Model configuration initialization completed for %s: seeded=%s",
         "SQLite" if isinstance(repository, SQLiteRepository) else "PostgreSQL",
@@ -183,36 +174,12 @@ def _seed_model_configuration(
 
 
 ###############################################################################
-def _agent_seed_payload(stored: dict[str, object] | None) -> dict[str, object]:
-    """Configured agent defaults overlaid by any legacy execution settings."""
-    seed = build_default_agent_seed_payload(environment_snapshot_from_os_env())
-    if not stored:
-        return seed
-    # Blank legacy values (an unset model) keep the configured default rather
-    # than producing an agent that cannot be validated.
-    seed.update(
-        {
-            key: value
-            for key, value in stored.items()
-            if key in LEGACY_EXECUTION_KEYS
-            and value is not None
-            and not (isinstance(value, str) and not value.strip())
-        }
-    )
-    stored_rag = stored.get("rag_settings")
-    if isinstance(stored_rag, dict):
-        seed["rag_settings"] = {**dict(seed["rag_settings"]), **stored_rag}
-    return seed
-
-
-###############################################################################
-def _seed_default_agents(
+def _seed_default_agent(
     repository: SQLiteRepository | PostgresRepository,
-    stored_payload: dict[str, object] | None,
 ) -> None:
     from repositories.agent_repository import AgentRepository
     from repositories.context import RepositoryContext
-    from repositories.agent_seed import ensure_default_agent
+    from repositories.agent_seed import default_agent_config, ensure_default_agent
 
     agent_repository = AgentRepository(
         RepositoryContext.create(
@@ -220,7 +187,7 @@ def _seed_default_agents(
             session_factory=repository.session_factory,
         )
     )
-    ensure_default_agent(agent_repository, _agent_seed_payload(stored_payload))
+    ensure_default_agent(agent_repository, default_agent_config())
 
 
 ###############################################################################

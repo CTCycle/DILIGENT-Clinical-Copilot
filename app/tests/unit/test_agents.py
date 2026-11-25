@@ -23,7 +23,7 @@ from domain.agents import (
 )
 from domain.model_configs import ModelConfigSnapshot, ReasoningLevel
 from pydantic import ValidationError
-from repositories.agent_seed import ensure_default_agent
+from repositories.agent_seed import default_agent_config, ensure_default_agent
 from repositories.schemas.base import Base
 from repositories.serialization.model_configs import ModelConfigSerializer
 from repository_fixtures import build_repository_graph
@@ -128,57 +128,27 @@ def agent_service(tmp_path: Path) -> AgentService:
 
 
 ###############################################################################
-def test_default_agent_seeds_once_from_legacy_configuration(
+def test_default_agent_seeds_once_with_local_defaults(
     agent_service: AgentService,
 ) -> None:
-    payload = {
-        "use_cloud_models": True,
-        "cloud_provider": "openai",
-        "cloud_model": "gpt-4.1-mini",
-        "clinical_model": "gpt-4.1",
-        "text_extraction_model": "gpt-4.1-mini",
-        "revision_model": "gpt-4.1",
-        "timeline_model": "gpt-4.1-mini",
-        "rag_settings": {"retrieval_selected_count": 4, "chunk_size": 999},
-    }
     repository = agent_service.repository
-    assert ensure_default_agent(repository, payload) is True
-    assert ensure_default_agent(repository, payload) is False
+    config = default_agent_config()
+    assert ensure_default_agent(repository, config) is True
+    assert ensure_default_agent(repository, config) is False
     assert repository.count_agents() == 1
     assessment = agent_service.resolve_for_execution(capability="assessment")
-    assert assessment.configuration.models.clinical.model_dump() == {  # type: ignore[union-attr]
-        "provider": "openai",
-        "model": "gpt-4.1",
-        "reasoning_level": None,
-    }
-    # Shared index settings never enter an agent.
-    assert assessment.configuration.retrieval.retrieval_selected_count == 4  # type: ignore[union-attr]
-    assert "chunk_size" not in assessment.configuration.retrieval.model_dump()  # type: ignore[union-attr]
+    models = assessment.configuration.models  # type: ignore[union-attr]
+    assert models.extraction.provider == models.clinical.provider == "ollama"
     assert (
         agent_service.resolve_for_execution(capability="revision")
-        .configuration.models.planning.model  # type: ignore[union-attr]
-        == "gpt-4.1"
+        .configuration.models.planning  # type: ignore[union-attr]
+        == models.clinical
     )
     assert (
         agent_service.resolve_for_execution(capability="timeline")
-        .configuration.model.model  # type: ignore[union-attr]
-        == "gpt-4.1-mini"
+        .configuration.model  # type: ignore[union-attr]
+        == models.extraction
     )
-
-
-
-###############################################################################
-def test_blank_legacy_models_seed_configured_defaults() -> None:
-    from repositories.agent_seed import agent_config_from_legacy_payload
-    from repositories.database.initializer import _agent_seed_payload
-
-    seed = _agent_seed_payload(
-        {"clinical_model": "   ", "text_extraction_model": None, "timeline_model": ""}
-    )
-    config = agent_config_from_legacy_payload(seed)
-    assert config.assessment.models.clinical.model.strip()
-    assert config.assessment.models.extraction.model.strip()
-    assert config.timeline.model.model.strip()
 
 
 ###############################################################################
@@ -531,14 +501,13 @@ def test_concurrent_agent_runs_do_not_share_configuration(
         "first": ("openai", "gpt-4.1"),
         "second": ("anthropic", "claude-x"),
     }
-    assert LLMRuntimeConfig.has_role_routing() is False
+    assert LLMRuntimeConfig.active_agent() == {}
 
 
 ###############################################################################
 def test_role_resolution_requires_an_active_agent_runtime() -> None:
     with pytest.raises(ValueError, match="No agent runtime is active for 'clinical'"):
         LLMRuntimeConfig.resolve_provider_and_model("clinical")
-    assert LLMRuntimeConfig.is_cloud_enabled() is False
     assert LLMRuntimeConfig.get_clinical_model() == ""
 
 

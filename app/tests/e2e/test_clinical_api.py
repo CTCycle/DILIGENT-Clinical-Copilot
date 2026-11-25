@@ -30,7 +30,6 @@ def build_minimal_payload() -> dict:
             "Lab 2024-01-15: ALT 100 U/L (ULN 50), ALP 200 U/L (ULN 100), bilirubin 2.0 mg/dL. "
             f"{repeated_words(45)}"
         ),
-        "evidence_sources": ["livertox", "dilirank"],
     }
 
 

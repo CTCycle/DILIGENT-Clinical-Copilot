@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 import re
+import sqlite3
 
 SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_]\w*$", re.ASCII)
 POSTGRES_DATABASE_NAME_RE = re.compile(r"^\w[\w-]{0,62}$", re.ASCII)
@@ -44,3 +47,17 @@ def validate_postgres_database_name(database_name: str) -> str:
 
 
 MISSING_TABLE_MESSAGE = "Table %s does not exist"
+
+
+###############################################################################
+@contextmanager
+def sqlite_autocommit(
+    connection: sqlite3.Connection,
+) -> Generator[sqlite3.Connection]:
+    """Run statements outside the transaction policy, then restore it."""
+    previous = connection.autocommit
+    connection.autocommit = True
+    try:
+        yield connection
+    finally:
+        connection.autocommit = previous

@@ -11,7 +11,6 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 
-from common.catalogs.model_choices import get_cloud_model_choices
 from common.prompts.timeline import (
     PATIENT_TIMELINE_EXTRACTION_SYSTEM_PROMPT,
     build_patient_timeline_user_prompt,
@@ -178,7 +177,7 @@ class PatientTimelineExtractor:
             self.runtime_signature: tuple[str, str] | None = None
         else:
             self.client_provider = "injected"
-            self.runtime_revision = LLMRuntimeConfig.get_revision()
+            self.runtime_revision = -1
             self.runtime_signature = None
 
     # -------------------------------------------------------------------------
@@ -189,52 +188,14 @@ class PatientTimelineExtractor:
         return str(value).strip()
 
     # -------------------------------------------------------------------------
-    @classmethod
-    def _resolve_provider_model_from_runtime_settings(
-        cls,
-        runtime_settings: dict[str, Any] | None,
-    ) -> tuple[str, str]:
-        if runtime_settings is None:
-            return LLMRuntimeConfig.resolve_provider_and_model("timeline")
-
-        use_cloud_services = bool(runtime_settings.get("use_cloud_services"))
-        timeline_model = cls._coerce_optional_text(
-            runtime_settings.get("timeline_model")
-        )
-        llm_provider = cls._coerce_optional_text(
-            runtime_settings.get("llm_provider")
-        ).lower()
-        if not timeline_model:
-            raise ValueError("Runtime settings require an explicit timeline_model.")
-
-        if use_cloud_services:
-            if llm_provider not in get_cloud_model_choices():
-                raise ValueError(
-                    f"Unsupported cloud provider: {llm_provider or '<empty>'}"
-                )
-            return llm_provider, timeline_model
-
-        return "ollama", timeline_model
-
-    # -------------------------------------------------------------------------
-    async def ensure_client(
-        self,
-        *,
-        runtime_settings: dict[str, Any] | None = None,
-    ) -> None:
-        provider, model = self._resolve_provider_model_from_runtime_settings(
-            runtime_settings
-        )
-        revision = LLMRuntimeConfig.get_revision() if runtime_settings is None else -1
-        signature = (provider, model)
+    async def ensure_client(self) -> None:
+        """Bind the client to the active agent runtime's timeline model."""
+        provider, model = LLMRuntimeConfig.resolve_provider_and_model("timeline")
         await ensure_runtime_client(
             self,
             provider=provider,
             model=model,
-            revision=revision,
-            signature=signature,
-            track_revision=runtime_settings is None,
-            track_signature=runtime_settings is not None,
+            revision=LLMRuntimeConfig.get_revision(),
             client_factory=lambda selected_provider, selected_model: (
                 select_llm_provider(
                     provider=selected_provider,
@@ -464,9 +425,8 @@ class PatientTimelineExtractor:
         *,
         session_id: int,
         source_payload: dict[str, Any],
-        runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
-        await self.ensure_client(runtime_settings=runtime_settings)
+        await self.ensure_client()
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for timeline extraction")
 

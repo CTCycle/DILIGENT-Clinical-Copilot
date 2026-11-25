@@ -213,11 +213,6 @@ class InspectionRevisionScaffoldMixin:
             "runtime_snapshot": runtime_snapshot,
             "runtime_snapshot_hash": runtime_snapshot_hash,
             "agent": agent_context.provenance(),
-            "effective_limits": {
-                "max_tasks": revision_request.max_tasks,
-                "max_tool_iterations": revision_request.max_tool_iterations,
-                "allowed_tools": revision_request.allowed_tools,
-            },
         }
         shell = self.session_revision_repository.create_revision_version_shell(
             session_id,

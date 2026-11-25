@@ -666,16 +666,6 @@ class CloudLLMClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def resolve_gemini_model_resource(model: str | None) -> str:
-        model_name = (model or "").strip()
-        if not model_name:
-            raise LLMError("Gemini model is required")
-        if model_name.startswith("models/"):
-            return model_name
-        return f"models/{model_name}"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
     def _normalize_content(content: Any) -> dict[str, Any] | str:
         if isinstance(content, dict):
             return content
@@ -868,91 +858,6 @@ class CloudLLMClient:
             purpose=purpose,
         )
         return json.dumps(raw) if isinstance(raw, dict) else str(raw)
-
-    # -------------------------------------------------------------------------
-    async def embed(
-        self,
-        *,
-        model: str,
-        input_texts: list[str],
-    ) -> list[list[float]]:
-        if not input_texts:
-            return []
-
-        if self.provider == "openai":
-            return await self.embed_openai(model=model, input_texts=input_texts)
-        if self.provider == "gemini":
-            return await self.embed_gemini(model=model, input_texts=input_texts)
-        raise LLMError(f"Provider '{self.provider}' does not support embeddings yet")
-
-    # -------------------------------------------------------------------------
-    async def embed_openai(
-        self,
-        *,
-        model: str,
-        input_texts: list[str],
-    ) -> list[list[float]]:
-        body = {"model": model or self.default_model, "input": input_texts}
-
-        try:
-            resp = await self.client.post("/embeddings", json=body)
-        except httpx.TimeoutException as exc:
-            raise LLMTimeout("Timed out waiting for OpenAI embeddings") from exc
-
-        self.raise_for_status(resp)
-
-        data = resp.json()
-        entries = sorted(data.get("data", []), key=lambda entry: entry.get("index", 0))
-        embeddings: list[list[float]] = []
-        for item in entries:
-            vector = item.get("embedding", [])
-            try:
-                embeddings.append([float(value) for value in vector])
-            except (TypeError, ValueError) as exc:
-                raise LLMError("Non-numeric values found in OpenAI embeddings") from exc
-
-        if len(embeddings) != len(input_texts):
-            raise LLMError("Mismatch between OpenAI embeddings and inputs")
-        return embeddings
-
-    # -------------------------------------------------------------------------
-    async def embed_gemini(
-        self,
-        *,
-        model: str,
-        input_texts: list[str],
-    ) -> list[list[float]]:
-        resolved_model = model or self.default_model
-        model_resource = self.resolve_gemini_model_resource(resolved_model)
-        requests_payload = [
-            {
-                "model": model_resource,
-                "content": {"parts": [{"text": text}]},
-            }
-            for text in input_texts
-        ]
-        body = {"requests": requests_payload}
-        path = f"/{model_resource}:batchEmbedContents"
-
-        try:
-            resp = await self.client.post(path, json=body)
-        except httpx.TimeoutException as exc:
-            raise LLMTimeout("Timed out waiting for Gemini embeddings") from exc
-
-        self.raise_for_status(resp)
-
-        data = resp.json()
-        embeddings: list[list[float]] = []
-        for item in data.get("embeddings", []):
-            values = item.get("values") or item.get("embedding") or []
-            try:
-                embeddings.append([float(value) for value in values])
-            except (TypeError, ValueError) as exc:
-                raise LLMError("Non-numeric values found in Gemini embeddings") from exc
-
-        if len(embeddings) != len(input_texts):
-            raise LLMError("Mismatch between Gemini embeddings and inputs")
-        return embeddings
 
     # -------------------------------------------------------------------------
     async def llm_structured_call(

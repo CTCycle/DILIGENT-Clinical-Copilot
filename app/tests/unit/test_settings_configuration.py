@@ -73,7 +73,7 @@ def test_database_file_is_authoritative_over_environment(monkeypatch, tmp_path: 
 
 
 ###############################################################################
-def test_corrupt_database_file_fails_closed_without_legacy_fallback(
+def test_corrupt_database_file_fails_closed(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     config_path = _patch_configuration_paths(monkeypatch, tmp_path)

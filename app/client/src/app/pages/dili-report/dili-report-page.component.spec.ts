@@ -19,9 +19,8 @@ const DETAIL = {
   clinical_model: 'other:7b',
   metadata: {
     evidence_sources: ['livertox', 'dilirank'],
-    model_overrides: { clinical_model: 'other:7b' },
   },
-  report: '# Stored report',
+  official_report_text: '# Stored report',
   result_payload: {},
 };
 
@@ -109,7 +108,6 @@ describe('DiliReportPageComponent', () => {
     expect(root().querySelector('app-clinical-report-viewer')).not.toBeNull();
     expect(text()).toContain('Stored report');
     expect(text()).toContain('LiverTox, FDA DILIrank 2.0');
-    expect(text()).toContain('Override');
     expect(root().querySelector('[aria-label="Copy report"]')).not.toBeNull();
     expect(buttonByText('Cancel analysis')).toBeUndefined();
   });

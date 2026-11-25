@@ -20,7 +20,6 @@ hiddenimports = [
     "pyarrow",
     "psycopg",
     "psycopg_binary",
-    "psycopg_c",
     "cryptography",
     "uvicorn.logging",
     "uvicorn.loops.auto",
@@ -77,9 +76,8 @@ for migration_file in migrations_root.rglob("*"):
         )
 
 excludedimports = [
-    "pytest", "pytest_cov", "playwright", "ruff", "pyright", "IPython",
-    "notebook", "pip", "setuptools", "wheel", "torch", "transformers",
-    "sentence_transformers", "tkinter",
+    "pytest", "playwright", "ruff", "pyright", "IPython",
+    "notebook", "pip", "setuptools", "wheel", "tkinter",
 ]
 
 analysis = Analysis(

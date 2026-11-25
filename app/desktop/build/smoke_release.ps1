@@ -20,6 +20,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ([version]$UpgradeFromVersion -lt [version]'3.6.0') {
+    throw 'Upgrade smoke supports baselines from v3.6.0 onward.'
+}
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).Path
 $artifactRoot = Join-Path $repoRoot 'release'
 $qaRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'assets/QA'))
@@ -532,14 +535,7 @@ function Invoke-MsiOperation([string]$operation, [string]$package, [string]$labe
 
 function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Capture, [switch]$CheckHead) {
     $dataRoot = Join-Path $upgradeRoot 'DILIGENT/data'
-    # v3.4.0 stores mutable data under resources; v3.5.0 and later use data.
-    $databaseRoot = if ([version]$UpgradeFromVersion -lt [version]'3.5.0') {
-        Join-Path $dataRoot 'resources'
-    }
-    else {
-        $dataRoot
-    }
-    $database = Join-Path $databaseRoot 'database.db'
+    $database = Join-Path $dataRoot 'database.db'
     $python = Join-Path $repoRoot 'app/server/.venv/Scripts/python.exe'
     if ($Seed) {
         $archive = Join-Path $smokeRoot 'baseline-source.zip'
@@ -551,8 +547,7 @@ function Invoke-UpgradeFixture([string]$upgradeRoot, [switch]$Seed, [switch]$Cap
         $baselineMarker = Get-ChildItem -LiteralPath (Join-Path $upgradeRoot "DILIGENT/rt/$UpgradeFromVersion") -Filter extraction.complete -File -Recurse | Select-Object -First 1
         if ($null -eq $baselineMarker) { throw 'The baseline application runtime was not extracted.' }
         $environment = @{
-            DILIGENT_SQLITE_PATH = $database; DATABASE_SQLITE_PATH = $database
-            DILIGENT_DATA_ROOT = $dataRoot; DATABASE_BACKEND = 'sqlite'; EMBEDDED_DATABASE = 'true'
+            DILIGENT_DATA_ROOT = $dataRoot
             DILIGENT_RUNTIME_ROOT = $baselineMarker.DirectoryName
             DILIGENT_RELEASE_VERSION = $UpgradeFromVersion
             PYTHONHOME = Join-Path $repoRoot 'runtimes/python'
@@ -686,13 +681,7 @@ function Invoke-MsiUpgradeSmoke {
     $installedPrevious = $false
     $uninstallAttempted = $false
     $installedExecutable = $null
-    $markerPath = if ([version]$UpgradeFromVersion -lt [version]'3.5.0') {
-        Join-Path $upgradeRoot 'DILIGENT/data/resources/state/upgrade-survival-marker.txt'
-    }
-    else {
-        Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
-    }
-    $upgradedMarkerPath = Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
+    $markerPath = Join-Path $upgradeRoot 'DILIGENT/data/state/upgrade-survival-marker.txt'
     try {
         Invoke-MsiOperation '/i' $previousMsiPath 'msi_baseline_install'
         $installedPrevious = $true
@@ -718,7 +707,7 @@ function Invoke-MsiUpgradeSmoke {
         if (-not $installedExecutable) { throw 'Upgraded MSI executable was not found.' }
         Invoke-PortableSmoke -executable $installedExecutable -label 'msi_upgrade_current' -expectedVersion $Version -isolatedRoot $upgradeRoot | Out-Null
         Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -CheckHead
-        if (-not (Test-Path -LiteralPath $upgradedMarkerPath -PathType Leaf)) {
+        if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
             throw 'Persistent user-data marker did not survive the MSI upgrade.'
         }
         Invoke-MsiOperation '/x' $metadata.ProductCode 'msi_upgrade_uninstall'
@@ -727,7 +716,7 @@ function Invoke-MsiUpgradeSmoke {
         if ($null -ne $remaining -or ($installedExecutable -and (Test-Path -LiteralPath $installedExecutable -PathType Leaf))) {
             throw 'MSI upgrade uninstall left the product registered or executable on disk.'
         }
-        if (-not (Test-Path -LiteralPath $upgradedMarkerPath -PathType Leaf)) {
+        if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
             throw 'Persistent user data was removed by MSI uninstall.'
         }
         Invoke-UpgradeFixture -upgradeRoot $upgradeRoot -CheckHead

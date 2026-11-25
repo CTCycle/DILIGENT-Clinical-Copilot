@@ -5,10 +5,7 @@ export type GuidanceStatus = 'seen' | 'dismissed' | 'skipped' | 'completed' | 'r
 
 export type GuidanceId =
   | 'dili-first-assessment'
-  | 'dili-assessment-tour'
-  | 'model-rag-settings'
-  | 'clinical-session-sections'
-  | 'timeline-review-controls';
+  | 'dili-assessment-tour';
 
 export interface GuidanceStateEntry {
   version: number;
@@ -42,7 +39,7 @@ export interface GuidedTourDefinition extends GuidanceDefinition {
   steps: readonly GuidedTourStep[];
 }
 
-export type TipAction = 'tour' | 'configurations' | 'sessions' | 'data';
+export type TipAction = 'tour' | 'agents' | 'sessions' | 'data';
 
 export interface TipDefinition {
   id: string;

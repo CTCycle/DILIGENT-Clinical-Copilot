@@ -1,9 +1,9 @@
 # Python Rules
-Last updated: 2026-09-21
+Last updated: 2026-11-25
 
 ## Runtime And Tooling
 - Target Python runtime: `3.14.7` for the launcher and release workflow; the project metadata remains compatible with Python 3.14.
-- Use `app/server/.venv` when available, otherwise `runtimes/.venv`.
+- Use `app/server/.venv`.
 - Keep dependency resolution aligned with `uv` and `app/server/uv.lock`.
 - Preferred quality tools:
   - Ruff for lint and format

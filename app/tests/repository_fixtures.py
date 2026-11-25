@@ -10,10 +10,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
-from configurations.management import (
-    build_default_agent_seed_payload,
-    environment_snapshot_from_os_env,
-)
 from domain.agents import (
     AGENT_CONFIG_SCHEMA_VERSION,
     AgentExecutionContext,
@@ -29,7 +25,7 @@ from domain.agents import (
     agent_config_hash,
 )
 from repositories.agent_repository import AgentRepository
-from repositories.agent_seed import agent_config_from_legacy_payload
+from repositories.agent_seed import default_agent_config
 from repositories.schemas.base import Base
 from repositories.clinical_session_repository import ClinicalSessionRepository
 from repositories.context import RepositoryContext
@@ -127,18 +123,32 @@ def build_agent_service(
 
 
 ###############################################################################
-def legacy_model_payload(**values: Any) -> dict[str, Any]:
-    """Pre-agent singleton model configuration (configured defaults + values)."""
-    payload = build_default_agent_seed_payload(environment_snapshot_from_os_env())
-    payload.update(values)
-    return payload
+def agent_test_config(provider: str | None = None, **models: str) -> AgentConfig:
+    """The default agent config with an optional provider for every role and
+    per-role model names (``extraction``, ``clinical``, ``revision``, ``timeline``)."""
+    data = default_agent_config().model_dump()
+    refs = {
+        "extraction": data["assessment"]["models"]["extraction"],
+        "clinical": data["assessment"]["models"]["clinical"],
+        "revision": data["revision"]["models"]["planning"],
+        "timeline": data["timeline"]["model"],
+    }
+    unknown = set(models) - set(refs)
+    if unknown:
+        raise ValueError(f"Unknown agent roles: {sorted(unknown)}")
+    for role, ref in refs.items():
+        if provider is not None:
+            ref["provider"] = provider
+        if role in models:
+            ref["model"] = models[role]
+    return AgentConfig.model_validate(data)
 
 
 ###############################################################################
-def agent_context_from_legacy(
-    capability: Capability = "assessment", **values: Any
+def agent_context(
+    capability: Capability = "assessment", config: AgentConfig | None = None
 ) -> AgentExecutionContext:
-    config = agent_config_from_legacy_payload(legacy_model_payload(**values))
+    config = config or default_agent_config()
     return AgentExecutionContext(
         agent_id=f"test-{capability}",
         agent_name=f"Test {capability} agent",
@@ -153,10 +163,10 @@ def agent_context_from_legacy(
 ###############################################################################
 @contextmanager
 def agent_runtime(
-    capability: Capability = "assessment", **values: Any
+    capability: Capability = "assessment", config: AgentConfig | None = None
 ) -> Iterator[None]:
-    """Execute under an agent run override built from legacy-style values."""
-    context = agent_context_from_legacy(capability, **values)
+    """Execute under an agent run override for ``config`` (default agent)."""
+    context = agent_context(capability, config)
     with LLMRuntimeConfig.override_for_run(
         LLMRuntimeConfig.agent_runtime_overrides(context)
     ):

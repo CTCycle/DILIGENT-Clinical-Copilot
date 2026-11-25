@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from alembic import command
+from domain.agents import agent_config_hash, parse_agent_config
 from repositories.database.migrations import (
     HEAD_REVISION,
     build_alembic_config,
@@ -15,7 +16,7 @@ from repositories.database.migrations import (
 )
 from sqlalchemy import Engine, create_engine, inspect, text
 
-PREVIOUS_RELEASE_HEAD = "202609170001"
+PREVIOUS_RELEASE_HEAD = "202611010003"
 CURRENT_RELEASE_HEAD = HEAD_REVISION
 
 
@@ -87,10 +88,21 @@ def _seed_previous_release_data(engine: Engine) -> None:
             {
                 "payload": json.dumps(
                     {
-                        "clinical_model": "legacy-clinical",
-                        "text_extraction_model": "legacy-extraction",
-                        "revision_model": "legacy-revision",
-                        "timeline_model": "legacy-timeline",
+                        "use_cloud_models": True,
+                        "cloud_provider": "openai",
+                        "cloud_model": "gpt-v360",
+                        "clinical_model": "v360-clinical",
+                        "text_extraction_model": "v360-extraction",
+                        "revision_model": "v360-revision",
+                        "timeline_model": "v360-timeline",
+                        "reasoning_level": "medium",
+                        "ollama_seed": 7,
+                        "rag_settings": {
+                            "chunk_size": 777,
+                            "use_reranking": False,
+                            "retrieval_selected_count": 3,
+                        },
+                        "jobs": {"polling_interval": 2.5},
                     }
                 )
             },
@@ -101,7 +113,7 @@ def _seed_previous_release_data(engine: Engine) -> None:
                 "(id, patient_name, visit_date, anamnesis, session_status) "
                 "values (1, 'Legacy Patient', '2026-09-01', :anamnesis, 'completed')"
             ),
-            {"anamnesis": "Persisted v3.5.0 anamnesis"},
+            {"anamnesis": "Persisted v3.6.0 anamnesis"},
         )
         connection.execute(
             text(
@@ -168,10 +180,10 @@ def _seed_previous_release_data(engine: Engine) -> None:
 
 
 ###############################################################################
-def test_v350_database_is_accepted_at_current_head_without_losing_data(
+def test_v360_database_upgrades_to_head_without_losing_data(
     tmp_path: Path,
 ) -> None:
-    previous_database = _engine(tmp_path / "v350.db")
+    previous_database = _engine(tmp_path / "v360.db")
     current_database = _engine(tmp_path / "current.db")
     try:
         _upgrade_to(previous_database, PREVIOUS_RELEASE_HEAD)
@@ -206,27 +218,43 @@ def test_v350_database_is_accepted_at_current_head_without_losing_data(
                 text("select excerpt from livertox_monographs where id = 1")
             ).scalar_one() == "Legacy LiverTox excerpt"
 
-        upgraded_inspector = inspect(previous_database)
-        # The empty legacy draft table is folded into the session lifecycle.
-        assert not upgraded_inspector.has_table("clinical_input_drafts")
         with previous_database.connect() as connection:
-            assert connection.execute(
-                text("select session_status from clinical_sessions where id = 1")
-            ).scalar_one() == "completed"
-            assert connection.execute(
-                text("select count(*) from clinical_sessions where session_status = 'draft'")
-            ).scalar_one() == 0
-        assert upgraded_inspector.has_table("dilirank_records")
-        assert {
-            index["name"] for index in upgraded_inspector.get_indexes("dilirank_records")
-        } == {
-            "ix_dilirank_records_drug_id",
-            "ix_dilirank_records_compound_name_norm",
-            "ix_dilirank_records_dili_concern",
+            payload = connection.execute(
+                text("select payload from application_configuration where id = 1")
+            ).scalar_one()
+            agents = connection.execute(
+                text(
+                    "select d.name, d.is_default, r.schema_version, "
+                    "r.configuration_json, r.configuration_hash "
+                    "from agent_definitions d join agent_revisions r "
+                    "on r.agent_id = d.id"
+                )
+            ).all()
+        payload = json.loads(payload) if isinstance(payload, str) else payload
+        # Execution settings moved into the agent; shared settings stay.
+        assert payload == {
+            "ollama_seed": 7,
+            "rag_settings": {"chunk_size": 777},
+            "jobs": {"polling_interval": 2.5},
         }
-        assert upgraded_inspector.get_foreign_keys("dilirank_records")[0][
-            "referred_table"
-        ] == "drugs"
+        assert len(agents) == 1
+        name, is_default, schema_version, raw_config, config_hash = agents[0]
+        assert (name, bool(is_default), schema_version) == ("Default agent", True, 4)
+        config = parse_agent_config(
+            json.loads(raw_config) if isinstance(raw_config, str) else raw_config
+        )
+        assert config_hash == agent_config_hash(config)
+        models = config.assessment.models
+        assert (models.extraction.provider, models.extraction.model) == (
+            "openai",
+            "v360-extraction",
+        )
+        assert models.clinical.model == "v360-clinical"
+        assert models.clinical.reasoning_level == "medium"
+        assert config.revision.models.planning.model == "v360-revision"
+        assert config.timeline.model.model == "v360-timeline"
+        assert config.assessment.retrieval.use_reranking is False
+        assert config.assessment.retrieval.retrieval_selected_count == 3
 
         migrate_database(current_database, database_was_empty=True)
         assert _schema_signature(previous_database) == _schema_signature(current_database)

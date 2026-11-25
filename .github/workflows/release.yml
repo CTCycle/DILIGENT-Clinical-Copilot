@@ -35,8 +35,6 @@ env:
   HF_ASSETS_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/assets
   HF_HOME: ${{ github.workspace }}/runtimes/cache/huggingface
   HF_HUB_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/hub
-  HUGGINGFACE_HUB_CACHE: ${{ github.workspace }}/runtimes/cache/huggingface/hub
-  MYPY_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/mypy
   NPM_CONFIG_CACHE: ${{ github.workspace }}/runtimes/cache/npm
   PIP_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/pip
   PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/runtimes/cache/playwright

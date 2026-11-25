@@ -1,22 +1,19 @@
 # Copyright © 2023–2025 Thomas Virdis
 # Licensed under the GNU General Public License, version 3 or later.
 
-"""Seed the default agent from the legacy singleton model configuration."""
+"""Seed the default agent of a database that has none."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, cast
-
-from pydantic import ValidationError
-
+from common.catalogs.model_choices import (
+    get_clinical_model_choices,
+    get_text_extraction_model_choices,
+)
 from common.utils.logger import logger
 from domain.agents import (
     AGENT_CONFIG_SCHEMA_VERSION,
-    AGENT_RAG_SETTING_KEYS,
     AgentConfig,
     AgentModelRef,
-    AgentRetrievalPolicy,
     AssessmentConfig,
     AssessmentModels,
     RevisionConfig,
@@ -24,96 +21,41 @@ from domain.agents import (
     TimelineConfig,
     agent_config_hash,
 )
-from domain.model_configs import ReasoningLevel
 from repositories.agent_repository import AgentRepository
 
 DEFAULT_AGENT_NAME = "Default agent"
 
 
 ###############################################################################
-def agent_config_from_legacy_payload(payload: Mapping[str, object]) -> AgentConfig:
-    """Convert a legacy singleton model-configuration payload into one agent config.
+def default_agent_config() -> AgentConfig:
+    """Local Ollama defaults: the catalog's first extraction and clinical models."""
 
-    Legacy keys: ``use_cloud_models``/``cloud_provider`` (one provider for all
-    roles), the four role models, ``reasoning_level`` (applied to every role
-    model) and the per-agent retrieval keys inside ``rag_settings``.
-    """
-
-    def text(key: str) -> str:
-        value = payload.get(key)
-        return str(value).strip() if value is not None else ""
-
-    use_cloud = payload.get("use_cloud_models", payload.get("use_cloud_services"))
-    cloud_provider = text("cloud_provider") or text("llm_provider")
-    provider = (cloud_provider.lower() if _as_bool(use_cloud) else "ollama") or "ollama"
-
-    reasoning_level = _reasoning_level(payload.get("reasoning_level"))
-
-    def ref(key: str) -> AgentModelRef:
-        return AgentModelRef(
-            provider=cast(Any, provider),
-            model=text(key),
-            reasoning_level=(
-                None if reasoning_level == ReasoningLevel.OFF else reasoning_level
-            ),
-        )
-
-    raw_rag = payload.get("rag_settings")
-    rag = {
-        key: value
-        for key, value in (raw_rag if isinstance(raw_rag, Mapping) else {}).items()
-        if key in AGENT_RAG_SETTING_KEYS
-    }
-    try:
-        retrieval = AgentRetrievalPolicy.model_validate(rag)
-    except ValidationError:
-        retrieval = AgentRetrievalPolicy()
+    extraction = AgentModelRef(
+        provider="ollama", model=get_text_extraction_model_choices()[0]
+    )
+    clinical = AgentModelRef(provider="ollama", model=get_clinical_model_choices()[0])
     return AgentConfig(
         assessment=AssessmentConfig(
-            models=AssessmentModels(
-                extraction=ref("text_extraction_model"),
-                clinical=ref("clinical_model"),
-            ),
-            retrieval=retrieval,
+            models=AssessmentModels(extraction=extraction, clinical=clinical),
         ),
-        revision=RevisionConfig(
-            models=RevisionModels(planning=ref("revision_model")),
-        ),
-        timeline=TimelineConfig(model=ref("timeline_model")),
+        revision=RevisionConfig(models=RevisionModels(planning=clinical)),
+        timeline=TimelineConfig(model=extraction),
     )
 
 
 ###############################################################################
-def _as_bool(value: object) -> bool:
-    if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "yes", "on"}
-    return bool(value)
+def ensure_default_agent(repository: AgentRepository, config: AgentConfig) -> bool:
+    """Create the default agent from ``config`` when no agent exists.
 
-
-###############################################################################
-def _reasoning_level(value: object) -> ReasoningLevel:
-    try:
-        return ReasoningLevel(str(value or "").strip().lower())
-    except ValueError:
-        return ReasoningLevel.OFF
-
-
-###############################################################################
-def ensure_default_agent(
-    repository: AgentRepository, payload: Mapping[str, object]
-) -> bool:
-    """Seed one default agent from a legacy model-configuration payload.
-
-    Idempotent: nothing happens while any agent exists, and existing sessions
-    are never modified. Returns True when an agent was created.
+    Idempotent: nothing happens while any agent exists. Returns True when an
+    agent was created.
     """
 
     if repository.count_agents() > 0:
         return False
-    config = agent_config_from_legacy_payload(payload)
     repository.create_agent(
         name=DEFAULT_AGENT_NAME,
-        description="Created from the existing model configuration.",
+        description="",
         configuration=config.model_dump(mode="json"),
         configuration_hash=agent_config_hash(config),
         schema_version=AGENT_CONFIG_SCHEMA_VERSION,

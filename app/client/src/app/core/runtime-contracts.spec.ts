@@ -127,13 +127,10 @@ describe('buildClinicalPayload', () => {
     clinicalInput: 'test input',
   };
 
-  it('carries the agent id and revision and none of the removed fields', () => {
+  it('carries the agent id and revision', () => {
     const payload = buildClinicalPayload(form, 'agent-1', 3);
     expect(payload.agent_id).toBe('agent-1');
     expect(payload.agent_revision).toBe(3);
-    for (const removed of ['selected_model_providers', 'model_overrides', 'evidence_sources', 'use_rag']) {
-      expect(removed in payload).toBe(false);
-    }
   });
 
   it('sends null agent fields to select the default agent', () => {

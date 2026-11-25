@@ -7,7 +7,7 @@ import re
 from fastapi import HTTPException, status
 
 
-from domain.clinical.entities import ClinicalSessionRequest
+from domain.clinical.entities import ClinicalSessionLaunchRequest
 
 WORD_PATTERN = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ']+\b", re.UNICODE)
 
@@ -19,7 +19,7 @@ def count_words(text: str) -> int:
 
 ###############################################################################
 def validate_clinical_session_request(
-    request: ClinicalSessionRequest,
+    request: ClinicalSessionLaunchRequest,
 ) -> None:
     details: list[dict[str, str]] = []
 

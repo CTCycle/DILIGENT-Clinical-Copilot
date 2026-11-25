@@ -7,6 +7,8 @@ Release notes for DILIGENT Clinical Copilot. Earlier releases (v3.5.1 and before
 - Recover desktop startup after an interrupted runtime extraction and verify the cached runtime before executing it.
 - Block Windows MSI downgrades and include the project license notice and frontend dependency notices in desktop packages.
 - Use stable inputs for freezing the backend and preserve the development environment when dependency downloads fail.
+- Choose models, reasoning levels, instructions, and retrieval preferences per agent in the Agents workspace instead of in Settings. On upgrade, the v3.6.0 model settings become the default agent.
+- Upgrade only from v3.6.0: databases from earlier releases are refused and must first be opened with v3.6.0. Old compatibility code was removed, including readers for pre-agent session payloads, the per-request revision limits, and the automatic switch to another installed Ollama model when the configured one is missing.
 
 ## 3.6.0 (2026-11-03)
 

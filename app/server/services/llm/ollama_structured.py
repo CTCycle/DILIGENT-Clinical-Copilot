@@ -4,12 +4,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, NoReturn
+from typing import Any
 
-from common.catalogs.model_choices import (
-    get_all_cloud_model_names,
-    get_text_extraction_model_choices,
-)
 from common.prompts.structured_output import (
     COMPACT_JSON_REPAIR_SYSTEM_PROMPT,
     build_compact_json_repair_user_prompt,
@@ -19,35 +15,11 @@ from common.prompts.structured_output import (
 from common.utils.logger import logger
 from services.llm.generation_policy import GenerationPurpose
 from services.llm.ollama_runtime import OllamaError
-from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.structured import (
     StructuredOutputParser,
     T,
     parse_json_object_strict,
 )
-
-
-###############################################################################
-async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
-    available: set[str] = set()
-    try:
-        available = await self.get_cached_models()
-    except OllamaError as exc:
-        logger.debug("Failed to list Ollama models for fallback: %s", exc)
-        available = set()
-
-    fallbacks: list[str] = []
-    if available:
-        for name in sorted(available, key=str.casefold):
-            if name not in preferred and name not in fallbacks:
-                fallbacks.append(name)
-    for name in get_text_extraction_model_choices():
-        if available and name not in available:
-            continue
-        if name not in preferred and name not in fallbacks:
-            fallbacks.append(name)
-
-    return fallbacks
 
 
 ###############################################################################
@@ -83,17 +55,24 @@ async def llm_structured_call(
         user_prompt=user_prompt,
         format_instructions=format_instructions,
     )
-    preferred = await self.resolve_text_extraction_models(model)
-    return await self.call_with_structured_models(
-        parser=parser,
+    active_model = (model or self.default_model or "").strip()
+    if not active_model:
+        raise RuntimeError("LLM call failed: no Ollama model is configured.")
+    raw = await self._chat_structured_model(
+        active_model=active_model,
         messages=messages,
-        system_prompt=system_prompt,
-        format_instructions=format_instructions,
-        preferred=preferred,
-        temperature=temperature,
         use_json_mode=use_json_mode,
+        temperature=temperature,
         purpose=purpose,
         timeline_complexity=timeline_complexity,
+    )
+    return await self.parse_with_repairs(
+        parser=parser,
+        text=self._coerce_llm_text(raw),
+        active_model=active_model,
+        system_prompt=system_prompt,
+        format_instructions=format_instructions,
+        use_json_mode=use_json_mode,
         max_repair_attempts=max_repair_attempts,
     )
 
@@ -115,39 +94,6 @@ def build_structured_messages(
         },
         {"role": "user", "content": user_prompt},
     ]
-
-
-###############################################################################
-async def resolve_text_extraction_models(self, model: str) -> list[str]:
-    available = set()
-    try:
-        available = await self.get_cached_models()
-    except OllamaError:
-        available = set()
-    preferred: list[str] = []
-    cloud_model_names = get_all_cloud_model_names()
-    for candidate in (
-        (model or "").strip(),
-        (self.default_model or "").strip(),
-        (LLMRuntimeConfig.get_text_extraction_model() or "").strip(),
-    ):
-        if not candidate or candidate in preferred:
-            continue
-        if available:
-            if candidate in available:
-                preferred.append(candidate)
-            continue
-        if candidate in cloud_model_names:
-            continue
-        if candidate and candidate not in preferred:
-            preferred.append(candidate)
-    if available:
-        for candidate in sorted(available, key=str.casefold):
-            if candidate not in preferred:
-                preferred.append(candidate)
-    if not preferred:
-        preferred = await self.collect_structured_fallbacks([])
-    return preferred
 
 
 ###############################################################################
@@ -177,49 +123,17 @@ async def _chat_structured_model(
             timeline_complexity=timeline_complexity,
         )
     except OllamaError as err:
-        if self.is_missing_model_error(err):
-            raise
+        if is_missing_model_error(err):
+            raise RuntimeError(
+                f"LLM call failed: the Ollama model '{active_model}' is not "
+                "installed. Pull it or select another model for this agent."
+            ) from err
         raise RuntimeError(f"LLM call failed: {err}") from err
-
-
-###############################################################################
-async def _extend_structured_model_queue(
-    self,
-    *,
-    queue: list[str],
-    preferred_models: list[str],
-    tried: set[str],
-    fallbacks: list[str] | None,
-) -> list[str]:
-    computed_fallbacks = (
-        await self.collect_structured_fallbacks(preferred_models)
-        if fallbacks is None
-        else fallbacks
-    )
-    for candidate in computed_fallbacks:
-        if candidate and candidate not in tried and candidate not in queue:
-            queue.append(candidate)
-    return computed_fallbacks
 
 
 ###############################################################################
 def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
     return json.dumps(raw) if isinstance(raw, dict) else str(raw)
-
-
-###############################################################################
-def _raise_structured_models_exhausted(
-    *,
-    last_missing_error: Exception | None,
-    missing: list[str],
-) -> NoReturn:
-    if last_missing_error:
-        attempted = ", ".join(missing)
-        raise RuntimeError(
-            "LLM call failed: no local text extraction models were found. "
-            f"Tried: {attempted}"
-        ) from last_missing_error
-    raise RuntimeError("LLM call failed: no text extraction model candidates available")
 
 
 ###############################################################################
@@ -270,70 +184,6 @@ def looks_like_schema_echo(text: str) -> bool:
         '"$ref"',
     )
     return sum(1 for marker in schema_markers if marker in lowered) >= 3
-
-
-###############################################################################
-async def call_with_structured_models(
-    self,
-    *,
-    parser: StructuredOutputParser[T],
-    messages: list[dict[str, str]],
-    system_prompt: str,
-    format_instructions: str,
-    preferred: list[str],
-    temperature: float,
-    use_json_mode: bool,
-    purpose: GenerationPurpose,
-    timeline_complexity: str = "moderate",
-    max_repair_attempts: int,
-) -> T:
-    queue = preferred.copy()
-    tried: set[str] = set()
-    missing: list[str] = []
-    last_missing_error: Exception | None = None
-    fallbacks: list[str] | None = None
-
-    while queue:
-        active_model = queue.pop(0)
-        if not active_model or active_model in tried:
-            continue
-        tried.add(active_model)
-
-        try:
-            raw = await self._chat_structured_model(
-                active_model=active_model,
-                messages=messages,
-                use_json_mode=use_json_mode,
-                temperature=temperature,
-                purpose=purpose,
-                timeline_complexity=timeline_complexity,
-            )
-        except OllamaError as e:
-            missing.append(active_model)
-            last_missing_error = e
-            fallbacks = await self._extend_structured_model_queue(
-                queue=queue,
-                preferred_models=preferred,
-                tried=tried,
-                fallbacks=fallbacks,
-            )
-            continue
-
-        return await self.parse_with_repairs(
-            parser=parser,
-            text=self._coerce_llm_text(raw),
-            active_model=active_model,
-            system_prompt=system_prompt,
-            format_instructions=format_instructions,
-            use_json_mode=use_json_mode,
-            max_repair_attempts=max_repair_attempts,
-        )
-
-    self._raise_structured_models_exhausted(
-        last_missing_error=last_missing_error,
-        missing=missing,
-    )
-    raise AssertionError("unreachable")
 
 
 ###############################################################################

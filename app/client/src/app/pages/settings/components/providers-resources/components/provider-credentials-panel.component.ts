@@ -3,7 +3,7 @@
 
 import { Component, computed, input, output, signal } from '@angular/core';
 
-import { AccessKeyProvider } from '../../../core/models/types';
+import { AccessKeyProvider } from '../../../../../core/models/types';
 import { AccessKeyModalComponent } from './access-key-modal.component';
 
 export type CredentialProviderOption = {

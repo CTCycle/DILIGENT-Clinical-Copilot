@@ -21,7 +21,7 @@ import {
 import { ClinicalSessionPoller, PollConnection } from '../../core/services/clinical-session-poller';
 import { fetchClinicalSessionDetail } from '../../core/services/clinical-sessions-api';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
-import { createDownloadUrl, formatUnknownError, isRecord } from '../../core/utils';
+import { createDownloadUrl, formatUnknownError } from '../../core/utils';
 import { isActiveSessionStatus, isInterruptedSession, sessionStatusLabel, sessionStatusTone } from '../../core/utils/session-status';
 import { previewReport } from '../clinical-sessions/clinical-session-preview';
 
@@ -102,11 +102,9 @@ export class DiliReportPageComponent {
   readonly models = computed(() => {
     const detail = this.detail();
     if (!detail) return [];
-    const overrides = detail.metadata['model_overrides'];
-    const overridden = isRecord(overrides) ? overrides : {};
     return [
-      { role: 'Text extraction', name: detail.text_extraction_model, overridden: Boolean(overridden['text_extraction_model']) },
-      { role: 'Clinical', name: detail.clinical_model, overridden: Boolean(overridden['clinical_model']) },
+      { role: 'Text extraction', name: detail.text_extraction_model },
+      { role: 'Clinical', name: detail.clinical_model },
     ].filter((model) => model.name);
   });
 
@@ -175,7 +173,7 @@ export class DiliReportPageComponent {
   downloadReport(): void {
     const markdown = this.reportMarkdown();
     if (!markdown) return;
-    const url = createDownloadUrl(markdown, REPORT_EXPORT_FILENAME);
+    const url = createDownloadUrl(markdown);
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = REPORT_EXPORT_FILENAME;

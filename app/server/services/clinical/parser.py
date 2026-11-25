@@ -7,7 +7,6 @@ import asyncio
 import re
 from typing import Any
 
-from services.llm.runtime_config import LLMRuntimeConfig
 from configurations.startup import get_server_settings
 from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.parser_extraction import (
@@ -117,7 +116,7 @@ class DrugsParser(DrugLlmExtractionMixin, DrugRulesMixin):
             self.runtime_revision = -1
         else:
             self.client_provider = "injected"
-            self.runtime_revision = LLMRuntimeConfig.get_revision()
+            self.runtime_revision = -1
         self._embedded_aliases = self._load_embedded_aliases()
         self._non_drug_tokens = self._load_non_drug_tokens()
         self.NON_DRUG_EXACT_NAMES = self._load_non_drug_exact_names()

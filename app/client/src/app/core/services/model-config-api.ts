@@ -5,9 +5,6 @@ import { API_BASE_URL } from "../constants";
 import {
   AccessKeyProvider,
   AccessKeyRecord,
-  ConnectivityCheckRequest,
-  ConnectivityCheckResponse,
-  EmbeddingStatusResponse,
   JobStartResponse,
   JobStatusResponse,
   ModelConfigStateResponse,
@@ -67,23 +64,6 @@ export async function refreshModelCatalog(
     `${API_BASE_URL}/model-config/catalogs/${encodeURIComponent(provider)}/refresh`,
     { method: "POST" },
   );
-}
-
-export async function fetchEmbeddingStatus(): Promise<EmbeddingStatusResponse> {
-  return requestJson<EmbeddingStatusResponse>(`${API_BASE_URL}/model-config/embedding-status`, {
-    method: "GET",
-    cache: "no-store",
-  });
-}
-
-export async function checkCloudConnectivity(
-  payload: ConnectivityCheckRequest,
-): Promise<ConnectivityCheckResponse> {
-  return requestJson<ConnectivityCheckResponse>(`${API_BASE_URL}/model-config/connectivity-check`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
 }
 
 export async function startModelPullJob(

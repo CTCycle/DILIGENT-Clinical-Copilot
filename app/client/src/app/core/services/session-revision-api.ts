@@ -8,7 +8,6 @@ import {
   RevisionClinicalReviewUpdateResponse,
   RevisionJobStatusResponse,
   RevisionPipelineStepListResponse,
-  SessionVersionDetailResponse,
   SessionVersionSummary,
   SessionRevisionRequest,
 } from "../models/revision-types";
@@ -20,16 +19,6 @@ export async function fetchSessionVersions(
 ): Promise<{ items: SessionVersionSummary[] }> {
   return requestJson<{ items: SessionVersionSummary[] }>(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions`,
-    { method: "GET" },
-  );
-}
-
-export async function fetchSessionVersion(
-  sessionId: number,
-  versionId: number,
-): Promise<SessionVersionDetailResponse> {
-  return requestJson<SessionVersionDetailResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}`,
     { method: "GET" },
   );
 }

@@ -329,7 +329,10 @@ describe('InspectionUpdateJobTrackerService combined updates', () => {
       progress: 67,
       result: { sources },
       error: null,
+      created_at: null,
+      completed_at: null,
       version: 1,
+      stop_requested: false,
     });
   }
 

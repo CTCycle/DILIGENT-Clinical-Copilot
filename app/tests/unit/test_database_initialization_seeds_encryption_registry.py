@@ -23,7 +23,6 @@ from sqlalchemy.orm import sessionmaker
 ###############################################################################
 def make_sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
-        embedded_database=True,
         engine="postgres",
         host="127.0.0.1",
         port=5432,
@@ -34,8 +33,6 @@ def make_sqlite_settings() -> DatabaseSettings:
         ssl_ca=None,
         connect_timeout=10,
         insert_batch_size=1000,
-        insert_commit_interval=100,
-        select_page_size=1000,
     )
 
 
@@ -64,10 +61,7 @@ def test_sqlite_fresh_creation_uses_external_material(monkeypatch) -> None:  # t
         assert Path(repository.db_path).exists()
 
         assert not material_path.exists()
-        material = AccessKeyEncryptionMaterialSerializer(
-            engine=repository.engine,
-            session_factory=repository.session_factory,
-        ).ensure_seeded()
+        material = AccessKeyEncryptionMaterialSerializer().ensure_seeded()
         assert material.key_version == 1
         assert material_path.exists()
     finally:
@@ -89,14 +83,8 @@ def test_sqlite_reopen_with_existing_db_reuses_external_material(monkeypatch) ->
         initializer.initialize_sqlite_database(settings, seed_catalogs=False)
         first = SQLiteRepository(settings)
         second = SQLiteRepository(settings)
-        first_material = AccessKeyEncryptionMaterialSerializer(
-            engine=first.engine,
-            session_factory=first.session_factory,
-        ).ensure_seeded()
-        second_material = AccessKeyEncryptionMaterialSerializer(
-            engine=second.engine,
-            session_factory=second.session_factory,
-        ).ensure_seeded()
+        first_material = AccessKeyEncryptionMaterialSerializer().ensure_seeded()
+        second_material = AccessKeyEncryptionMaterialSerializer().ensure_seeded()
         assert first_material.key_material == second_material.key_material
         assert first.db_path == second.db_path
     finally:
@@ -108,7 +96,6 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
     settings = DatabaseSettings(
-        embedded_database=False,
         engine="postgres",
         host="127.0.0.1",
         port=5432,
@@ -119,8 +106,6 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
         ssl_ca=None,
         connect_timeout=10,
         insert_batch_size=1000,
-        insert_commit_interval=100,
-        select_page_size=1000,
     )
 
     order: list[str] = []
@@ -225,16 +210,8 @@ def test_external_material_does_not_duplicate_on_reopen(monkeypatch) -> None:  #
 
         settings = make_sqlite_settings()
         initializer.initialize_sqlite_database(settings, seed_catalogs=False)
-        repository = SQLiteRepository(settings)
-        material = AccessKeyEncryptionMaterialSerializer(
-            engine=repository.engine,
-            session_factory=repository.session_factory,
-        ).ensure_seeded()
-        repository_again = SQLiteRepository(settings)
-        material_again = AccessKeyEncryptionMaterialSerializer(
-            engine=repository_again.engine,
-            session_factory=repository_again.session_factory,
-        ).ensure_seeded()
+        material = AccessKeyEncryptionMaterialSerializer().ensure_seeded()
+        material_again = AccessKeyEncryptionMaterialSerializer().ensure_seeded()
         assert material.key_material == material_again.key_material
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
@@ -374,7 +351,6 @@ def test_database_initialization_converts_unavailable_connection_to_exit(
 def _sqlite_settings() -> DatabaseSettings:
     return DatabaseSettings(
         backend="sqlite",
-        embedded_database=True,
         engine="postgres",
         host="127.0.0.1",
         port=5432,
@@ -385,8 +361,6 @@ def _sqlite_settings() -> DatabaseSettings:
         ssl_ca=None,
         connect_timeout=10,
         insert_batch_size=1000,
-        insert_commit_interval=100,
-        select_page_size=1000,
     )
 
 
@@ -394,7 +368,6 @@ def _sqlite_settings() -> DatabaseSettings:
 def _postgres_settings() -> DatabaseSettings:
     return DatabaseSettings(
         backend="postgresql",
-        embedded_database=False,
         engine="postgres",
         host="127.0.0.1",
         port=5432,
@@ -405,8 +378,6 @@ def _postgres_settings() -> DatabaseSettings:
         ssl_ca=None,
         connect_timeout=10,
         insert_batch_size=1000,
-        insert_commit_interval=100,
-        select_page_size=1000,
     )
 
 

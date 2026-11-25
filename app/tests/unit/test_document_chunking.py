@@ -6,8 +6,6 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from domain.documents import Document
-from repositories.serialization.document_chunker import DocumentChunker
 from repositories.serialization.document_serializer import DocumentSerializer
 
 
@@ -201,26 +199,3 @@ def test_modified_content_stops_being_considered_a_duplicate(tmp_path: Path) -> 
 
     assert len(documents) == 2
     assert all(document.metadata["is_duplicate"] is False for document in documents)
-
-
-###############################################################################
-def test_structure_aware_chunking_preserves_heading_metadata() -> None:
-    chunker = DocumentChunker(chunk_size=40, chunk_overlap=5)
-    document = Document(
-        page_content=(
-            "INTRODUCTION\n\n"
-            "Short opening paragraph.\n\n"
-            "METHODS\n\n"
-            "This paragraph is intentionally longer than the configured chunk size."
-        ),
-        metadata={"document_id": "doc-1", "file_name": "study.txt"},
-    )
-
-    chunks = chunker.chunk_documents([document])
-
-    assert chunks
-    assert chunks[0].metadata["section_title"] == "INTRODUCTION"
-    assert chunks[-1].metadata["section_title"] == "METHODS"
-    assert chunks[-1].metadata["heading_path"] == "METHODS"
-    assert all("chunk_index" in chunk.metadata for chunk in chunks)
-    assert all("start_index" in chunk.metadata for chunk in chunks)

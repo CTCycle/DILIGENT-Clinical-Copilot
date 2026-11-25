@@ -150,19 +150,16 @@ def test_launch_requires_active_cloud_key_before_extraction(
 
 
 ###############################################################################
-def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: True,
-    )
-
+def test_resolve_runtime_timeout_without_a_cap_keeps_the_base(monkeypatch) -> None:
     resolved = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=7200.0)
 
     assert resolved == 7200.0
 
 
 ###############################################################################
-def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
+def test_resolve_runtime_timeout_ignores_the_cloud_cap_for_local_roles(
+    monkeypatch,
+) -> None:
     fake_settings = SimpleNamespace(
         runtime=SimpleNamespace(
             minimum_llm_timeout=5.0,
@@ -173,14 +170,13 @@ def test_resolve_runtime_timeout_does_not_apply_local_cap(monkeypatch) -> None:
         lambda: fake_settings,
     )
     monkeypatch.setattr(
-        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: False,
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_purpose",
+        lambda purpose, **_: False,
     )
 
     resolved = ClinicalSessionService._resolve_runtime_timeout(
         base_timeout_s=3600.0,
         cloud_cap_s=300.0,
-        local_cap_s=45.0,
     )
 
     assert resolved == 3600.0
@@ -228,8 +224,8 @@ def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) ->
             lambda: fake_settings,
         )
     monkeypatch.setattr(
-        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: True,
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_purpose",
+        lambda purpose, **_: True,
     )
 
     resolved = ClinicalSessionService._resolve_consultation_timeout()

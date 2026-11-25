@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-11-03
+Last updated: 2026-11-25
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -181,7 +181,7 @@ Copy-Item -LiteralPath data/database.db -Destination $checkDb -Force
 4. Restart the backend and verify health:
 
 ```powershell
-app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app --host 127.0.0.1 --port 7690 --log-level info
+app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app/server --host 127.0.0.1 --port 7690 --log-level info
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7690/api/health
 ```
 

@@ -22,11 +22,6 @@ from common.constants import (
     OLLAMA_DEFAULT_PORT,
     OLLAMA_DEFAULT_SCHEME,
 )
-from common.catalogs.model_choices import (
-    get_cloud_model_choices,
-    get_clinical_model_choices,
-    get_text_extraction_model_choices,
-)
 from common.version import resolve_application_version
 from common.utils.types import (
     coerce_bool,
@@ -36,7 +31,6 @@ from common.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
-from domain.model_configs import ReasoningLevel
 from domain.settings.configuration import (
     ClinicalLanguageDetectionSettings,
     DEFAULT_RAG_SETTINGS,
@@ -203,21 +197,7 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
 def _default_llm_runtime_defaults(
     environment: EnvironmentSnapshot,
 ) -> LLMRuntimeDefaults:
-    text_choices = get_text_extraction_model_choices()
-    clinical_choices = get_clinical_model_choices()
-    cloud_choices = get_cloud_model_choices()
-    text_extraction_default = text_choices[0] if text_choices else ""
-    clinical_default = clinical_choices[0] if clinical_choices else ""
-    provider_default = "openai"
-    provider_models = cloud_choices.get(provider_default, [])
-    cloud_default = provider_models[0] if provider_models else ""
     return LLMRuntimeDefaults(
-        text_extraction_model=text_extraction_default,
-        clinical_model=clinical_default,
-        llm_provider=provider_default,
-        cloud_model=cloud_default,
-        use_cloud_services=False,
-        reasoning_level=ReasoningLevel.OFF,
         ollama_host_default=resolve_ollama_base_url(
             ollama_url=environment.ollama_url,
             ollama_host=environment.ollama_host,
@@ -267,9 +247,7 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
 
 
 ###############################################################################
-def _build_rag_settings(
-    data: dict[str, Any], defaults: LLMRuntimeDefaults
-) -> RagSettings:
+def _build_rag_settings(data: dict[str, Any]) -> RagSettings:
     selected_count = coerce_positive_int(
         data.get("retrieval_selected_count"),
         DEFAULT_RAG_SETTINGS["retrieval_selected_count"],
@@ -505,7 +483,7 @@ def build_settings_payload(
         "drugs_matcher": _build_drugs_matcher_settings(
             drugs_matcher_payload
         ).model_dump(),
-        "rag": _build_rag_settings(rag_payload, llm_defaults).model_dump(),
+        "rag": _build_rag_settings(rag_payload).model_dump(),
         "runtime": _build_runtime_settings(
             runtime_payload,
             fallback_timeout=3600.0,
@@ -536,30 +514,4 @@ def build_default_application_configuration_payload(
         "session_pipeline": payload["session_pipeline"],
         "clinical_language_detection": payload["clinical_language_detection"],
         "drugs_matcher": payload["drugs_matcher"],
-    }
-
-
-###############################################################################
-def build_default_agent_seed_payload(env: EnvironmentSnapshot) -> dict[str, Any]:
-    """Legacy-shaped execution defaults used only to seed agents on a fresh DB."""
-    llm_defaults = _default_llm_runtime_defaults(env)
-    return {
-        "clinical_model": llm_defaults.clinical_model,
-        "text_extraction_model": llm_defaults.text_extraction_model,
-        "revision_model": (
-            llm_defaults.cloud_model
-            if llm_defaults.use_cloud_services
-            else llm_defaults.clinical_model
-        ),
-        "timeline_model": (
-            llm_defaults.cloud_model
-            if llm_defaults.use_cloud_services
-            else llm_defaults.text_extraction_model
-        ),
-        "use_cloud_models": llm_defaults.use_cloud_services,
-        "cloud_provider": llm_defaults.llm_provider,
-        "cloud_model": llm_defaults.cloud_model,
-        "reasoning_level": llm_defaults.reasoning_level.value,
-        "ollama_seed": 42,
-        "rag_settings": dict(DEFAULT_RAG_SETTINGS),
     }

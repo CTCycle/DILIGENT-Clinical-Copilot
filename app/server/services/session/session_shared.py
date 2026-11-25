@@ -49,12 +49,8 @@ def build_failed_session_payload(
     }
     safe_error_message = "Clinical analysis failed before completion."
     runtime_settings = {
-        "use_cloud_services": bool(LLMRuntimeConfig.is_cloud_enabled()),
-        "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-        "cloud_model": LLMRuntimeConfig.get_cloud_model(),
         "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-        "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
         "resolved_runtime": {},
         "stage_elapsed_ms": {},
         "fallback_reasons": {},

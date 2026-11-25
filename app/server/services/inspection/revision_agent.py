@@ -58,6 +58,9 @@ REVISION_AGENT_SCHEMA_NAME = "revision_issue_scan_result"
 REVISION_AGENT_SCHEMA_VERSION = "1"
 REVISION_AGENT_STEP_NAME = "revision_agent_issue_scan"
 REVISION_PROVIDER_MAX_RETRIES = 2
+# The fixed review pipeline owns its limits.
+REVISION_MAX_TASKS = 8
+REVISION_MAX_TOOL_ITERATIONS = 24
 MAX_QA_REPAIR_ATTEMPTS = 1
 
 
@@ -75,28 +78,6 @@ ProgressUpdate = Callable[[dict[str, Any]], None]
 class RevisionAgentRuntime:
     provider: str
     model: str
-
-
-REVISION_STAGE_BY_PURPOSE: dict[GenerationPurpose, str] = {
-    GenerationPurpose.REVISION_PLANNING: "planning",
-    GenerationPurpose.REVISION_TOOL_SELECTION: "tool_selection",
-    GenerationPurpose.REVISION_EDITING: "editing",
-    GenerationPurpose.REVISION_QA: "qa",
-}
-
-
-###############################################################################
-def stage_runtime(
-    runtime: RevisionAgentRuntime, purpose: GenerationPurpose
-) -> RevisionAgentRuntime:
-    """Apply a Revision agent's per-stage model override, if any."""
-    stage = REVISION_STAGE_BY_PURPOSE.get(purpose)
-    if stage is None or not LLMRuntimeConfig.has_role_routing():
-        return runtime
-    provider, model = LLMRuntimeConfig.resolve_provider_and_model(
-        "revision", stage=stage
-    )
-    return RevisionAgentRuntime(provider=provider, model=model)
 
 
 ###############################################################################
@@ -755,16 +736,13 @@ class RevisionAgentRunner:
             session=session,
             context=context,
         )
-        manifest = registry.manifest(request.allowed_tools)
-        native_tool_definitions = registry.tool_definitions(request.allowed_tools)
-        tool_runtime = stage_runtime(
-            runtime, GenerationPurpose.REVISION_TOOL_SELECTION
-        )
+        manifest = registry.manifest()
+        native_tool_definitions = registry.tool_definitions()
         capabilities = resolve_model_capabilities(
-            provider=tool_runtime.provider,
-            model=tool_runtime.model,
+            provider=runtime.provider,
+            model=runtime.model,
             descriptor=LLMRuntimeConfig.get_model_descriptor(
-                tool_runtime.provider, tool_runtime.model
+                runtime.provider, runtime.model
             ),
         )
         use_native_tools = (
@@ -779,7 +757,7 @@ class RevisionAgentRunner:
             artifact_key="revision_agent_context",
             payload=context,
         )
-        stage_count = max(3, request.max_tasks + 3)
+        stage_count = max(3, REVISION_MAX_TASKS + 3)
         plan = self._call_revision_stage(
             runtime=runtime,
             pipeline_run_id=pipeline_run_id,
@@ -800,7 +778,7 @@ class RevisionAgentRunner:
                 "expected_final_output_type": value.expected_final_output_type,
             },
         )
-        plan.tasks = plan.tasks[: request.max_tasks]
+        plan.tasks = plan.tasks[: REVISION_MAX_TASKS]
         self.session_revision_repository.persist_revision_artifact(
             pipeline_run_id=pipeline_run_id,
             revision_version_id=revision_version_id,
@@ -812,7 +790,7 @@ class RevisionAgentRunner:
         self._publish_phase(progress_update, "tool_selection")
         for task_index, task in enumerate(plan.tasks, start=1):
             self._raise_if_stopped(stop_check)
-            remaining_tool_calls = request.max_tool_iterations - tool_calls
+            remaining_tool_calls = REVISION_MAX_TOOL_ITERATIONS - tool_calls
             if remaining_tool_calls <= 0:
                 break
             step = self.session_revision_repository.start_revision_step(
@@ -866,7 +844,6 @@ class RevisionAgentRunner:
                             observation = registry.execute(
                                 decision.tool_name,
                                 decision.arguments,
-                                request.allowed_tools,
                             )
                         except ValueError as exc:
                             observation = {
@@ -907,7 +884,7 @@ class RevisionAgentRunner:
                     latency_ms=int((perf_counter() - task_started) * 1000),
                 )
                 raise
-            if tool_calls >= request.max_tool_iterations:
+            if tool_calls >= REVISION_MAX_TOOL_ITERATIONS:
                 break
         self._raise_if_stopped(stop_check)
         self.session_revision_repository.persist_revision_artifact(
@@ -1109,7 +1086,7 @@ class RevisionAgentRunner:
             if qa.blocking_issues
             else "passed"
         )
-        if not request.dry_run and not qa.blocking_issues and has_validated_edit:
+        if not qa.blocking_issues and has_validated_edit:
             root_session_id = int(model_configuration["root_session_id"])
             session_sections = session.get("sections")
             sections: dict[str, Any] = (
@@ -1127,7 +1104,7 @@ class RevisionAgentRunner:
                     "session_status": "completed",
                     "clinical_input": session.get("session_text"),
                     "anamnesis": sections.get("anamnesis"),
-                    "drugs": sections.get("drugs") or sections.get("therapy"),
+                    "drugs": sections.get("drugs"),
                     "laboratory_analysis": sections.get("laboratory_analysis"),
                     "final_report": applied_report,
                     "session_result_payload": {
@@ -1147,15 +1124,14 @@ class RevisionAgentRunner:
             )
             if revised_session_id is None:
                 raise RuntimeError("Revision draft could not be persisted.")
-        if not request.dry_run:
-            self.session_revision_repository.finalize_revision_version(
-                pipeline_run_id=pipeline_run_id,
-                persisted_session_id=revised_session_id,
-                model_configuration=model_configuration,
-                version_status=version_status,
-                llm_qa_status=llm_qa_status,
-                clinical_review_status="not_reviewed",
-            )
+        self.session_revision_repository.finalize_revision_version(
+            pipeline_run_id=pipeline_run_id,
+            persisted_session_id=revised_session_id,
+            model_configuration=model_configuration,
+            version_status=version_status,
+            llm_qa_status=llm_qa_status,
+            clinical_review_status="not_reviewed",
+        )
         self.session_revision_repository.create_or_update_revision_run(
             pipeline_run_id=pipeline_run_id,
             session_id=int(session["session_id"]),
@@ -1178,7 +1154,7 @@ class RevisionAgentRunner:
             "pipeline_run_id": pipeline_run_id,
             "revision_version_id": revision_version_id,
             "revised_session_id": revised_session_id,
-            "revision_status": "dry_run" if request.dry_run else version_status,
+            "revision_status": version_status,
             "task_count": len(plan.tasks),
             "tool_call_count": tool_calls,
             "blocking_issue_count": len(qa.blocking_issues),
@@ -1223,7 +1199,6 @@ class RevisionAgentRunner:
         max_tool_calls: int,
         stop_check: StopCheck | None,
     ) -> ToolLoopResult:
-        runtime = stage_runtime(runtime, GenerationPurpose.REVISION_TOOL_SELECTION)
         client = select_llm_provider(
             provider=runtime.provider,
             default_model=runtime.model,
@@ -1233,9 +1208,7 @@ class RevisionAgentRunner:
         try:
             executor = ToolLoopExecutor(
                 chat=client.chat_result,  # type: ignore[attr-defined]
-                execute=lambda name, arguments: registry.execute(
-                    name, arguments, manifest
-                ),
+                execute=registry.execute,
                 max_iterations=max(1, max_tool_calls),
                 max_tool_calls=max(1, max_tool_calls),
                 stop_check=stop_check,
@@ -1284,7 +1257,6 @@ class RevisionAgentRunner:
         *,
         purpose: GenerationPurpose,
     ) -> Any:
-        runtime = stage_runtime(runtime, purpose)
         if self.structured_call is not None:
             return schema.model_validate(
                 self.structured_call(

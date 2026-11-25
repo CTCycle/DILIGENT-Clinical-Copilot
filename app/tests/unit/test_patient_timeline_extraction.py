@@ -20,7 +20,6 @@ from domain.timeline_dates import normalize_timeline_interval
 from repositories.serialization.session_timelines import build_timeline_preview_payload
 from services.clinical import timeline as timeline_service
 from services.clinical.timeline import PatientTimelineExtractor
-from services.inspection import timeline as inspection_timeline
 from services.inspection.timeline import _timeline_error_code, _timeline_fallback_note
 from services.llm.cloud import LLMError
 
@@ -634,73 +633,6 @@ def test_timeline_complexity_is_deterministic_and_escalates_for_large_payloads()
 
 
 ###############################################################################
-def test_timeline_uses_the_centralized_timeline_role_before_legacy_runtime_fields() -> (
-    None
-):
-    assert PatientTimelineExtractor._resolve_provider_model_from_runtime_settings(
-        {
-            "use_cloud_services": True,
-            "llm_provider": "opencode_go",
-            "cloud_model": "fallback-cloud-model",
-            "text_extraction_model": "fallback-parser-model",
-            "timeline_model": "deepseek-v4-flash",
-        }
-    ) == ("opencode_go", "deepseek-v4-flash")
-
-
-###############################################################################
-def test_timeline_runtime_settings_follow_the_timeline_capability() -> None:
-    from domain.agents import (
-        AgentExecutionContext,
-        agent_config_hash,
-        parse_agent_config,
-    )
-    from services.llm.runtime_config import LLMRuntimeConfig
-
-    config = parse_agent_config(
-        {
-            "assessment": {
-                "models": {
-                    "extraction": {"provider": "ollama", "model": "qwen3:8b"},
-                    "clinical": {"provider": "ollama", "model": "qwen3:8b"},
-                }
-            },
-            "revision": {
-                "models": {"planning": {"provider": "ollama", "model": "qwen3:8b"}}
-            },
-            "timeline": {
-                "model": {
-                    "provider": "opencode_go",
-                    "model": "beam-free",
-                    "reasoning_level": "low",
-                },
-            },
-        }
-    )
-    context = AgentExecutionContext(
-        agent_id="agent-1",
-        agent_name="Origin",
-        agent_revision_id=41,
-        revision_number=3,
-        capability="timeline",
-        config_hash=agent_config_hash(config),
-        configuration=config.timeline,
-    )
-    mixin = inspection_timeline.InspectionTimelineMixin()
-    overrides = LLMRuntimeConfig.agent_runtime_overrides(context)
-    with inspection_timeline.LLMRuntimeConfig.override_for_run(overrides):
-        settings = mixin._build_timeline_runtime_settings()
-
-    assert settings["timeline_model"] == "beam-free"
-    assert settings["llm_provider"] == "opencode_go"
-    assert settings["reasoning_level"] == "low"
-    # The seed is global; the agent's own field no longer drives the run.
-    assert settings["ollama_seed"] == 42
-    assert settings["agent"]["agent_revision_id"] == 41
-    assert settings["agent"]["agent_capability"] == "timeline"
-
-
-###############################################################################
 def test_timeline_request_rejects_active_model_overrides() -> None:
     with pytest.raises(ValueError):
         SessionTimelineRegenerateRequest.model_validate(
@@ -709,9 +641,13 @@ def test_timeline_request_rejects_active_model_overrides() -> None:
 
 
 ###############################################################################
-def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
+def test_timeline_client_follows_the_timeline_capability(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from domain.agents import AgentExecutionContext, agent_config_hash
+    from repository_fixtures import agent_test_config
+    from services.llm.runtime_config import LLMRuntimeConfig
+
     captured: dict[str, object] = {}
 
     def fake_select_llm_provider(**kwargs: object) -> dict[str, object]:
@@ -722,9 +658,7 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
         captured["runtime_kwargs"] = kwargs
         factory = kwargs["client_factory"]
         assert callable(factory)
-        owner.client = factory("opencode_go", "deepseek-v4-flash")
-        owner.client_provider = "opencode_go"
-        owner.model = "deepseek-v4-flash"
+        owner.client = factory(kwargs["provider"], kwargs["model"])
 
     monkeypatch.setattr(
         timeline_service, "select_llm_provider", fake_select_llm_provider
@@ -733,17 +667,23 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
         timeline_service, "ensure_runtime_client", fake_ensure_runtime_client
     )
 
-    extractor = PatientTimelineExtractor()
-    asyncio.run(
-        extractor.ensure_client(
-            runtime_settings={
-                "use_cloud_services": True,
-                "llm_provider": " OpenCode_Go ",
-                "cloud_model": " deepseek-v4-flash ",
-                "timeline_model": " deepseek-v4-flash ",
-            }
-        )
+    config = agent_test_config()
+    config.timeline.model.provider = "opencode_go"
+    config.timeline.model.model = "deepseek-v4-flash"
+    context = AgentExecutionContext(
+        agent_id="agent-1",
+        agent_name="Origin",
+        agent_revision_id=41,
+        revision_number=3,
+        capability="timeline",
+        config_hash=agent_config_hash(config),
+        configuration=config.timeline,
     )
+    extractor = PatientTimelineExtractor()
+    with LLMRuntimeConfig.override_for_run(
+        LLMRuntimeConfig.agent_runtime_overrides(context)
+    ):
+        asyncio.run(extractor.ensure_client())
 
     runtime_kwargs = captured["runtime_kwargs"]
     assert isinstance(runtime_kwargs, dict)
@@ -753,8 +693,6 @@ def test_timeline_resolves_persisted_opencode_go_model_for_separate_client(
     assert isinstance(factory_kwargs, dict)
     assert factory_kwargs["provider"] == "opencode_go"
     assert factory_kwargs["default_model"] == "deepseek-v4-flash"
-    assert extractor.client_provider == "opencode_go"
-    assert extractor.model == "deepseek-v4-flash"
 
 
 ###############################################################################

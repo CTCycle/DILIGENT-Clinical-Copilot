@@ -9,7 +9,6 @@ import uuid
 from pathlib import Path
 
 from domain.settings.configuration import (
-    DEFAULT_RAG_SETTINGS,
     SHARED_RAG_SETTING_KEYS,
     DatabaseSettings,
 )
@@ -19,20 +18,16 @@ from repositories.database.initializer import initialize_sqlite_database
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.base import Base
 from repositories.schemas.configuration import (
-    AgentDefinition,
-    AgentRevision,
     ApplicationConfiguration,
     ReferenceCatalogEntry,
 )
-from repositories.serialization.model_configs import LEGACY_EXECUTION_KEYS
-from sqlalchemy import create_engine, delete, func, inspect, select
+from sqlalchemy import create_engine, func, inspect, select
 
 
 ###############################################################################
 def _build_settings() -> DatabaseSettings:
     return DatabaseSettings(
         backend="sqlite",
-        embedded_database=True,
         engine=None,
         host=None,
         port=None,
@@ -43,8 +38,6 @@ def _build_settings() -> DatabaseSettings:
         ssl_ca=None,
         connect_timeout=10,
         insert_batch_size=1000,
-        insert_commit_interval=5,
-        select_page_size=2000,
     )
 
 
@@ -175,7 +168,6 @@ def test_sqlite_initializer_seeds_complete_application_configuration(
         "drugs_matcher",
     }.issubset(payload)
     assert set(payload["rag_settings"]) == set(SHARED_RAG_SETTING_KEYS)
-    assert not LEGACY_EXECUTION_KEYS & set(payload)
     assert "rag" not in payload
 
 
@@ -202,84 +194,26 @@ def _read_configuration_and_agents(
 
 
 ###############################################################################
-def test_legacy_model_configuration_migrates_into_one_default_agent_once(
+def test_fresh_database_seeds_one_default_agent_once(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
-    database_path = tmp_path / "legacy-config.db"
     monkeypatch.setattr(
         "repositories.database.sqlite.DATABASE_FILE_PATH",
-        database_path,
+        tmp_path / "fresh-agent.db",
     )
     settings = _build_settings()
     initialize_sqlite_database(settings, seed_catalogs=False)
+    payload, agent, agent_count = _read_configuration_and_agents(settings)
 
-    # Recreate a pre-agent database: legacy execution keys, no agents.
-    repository = SQLiteRepository(settings)
-    with repository.session_factory() as db_session:
-        db_session.execute(delete(AgentRevision))
-        db_session.execute(delete(AgentDefinition))
-        configuration = db_session.get(ApplicationConfiguration, 1)
-        assert configuration is not None
-        configuration.payload = {
-            **dict(configuration.payload),
-            "clinical_model": "gpt-clinical",
-            "text_extraction_model": "gpt-parser",
-            "revision_model": "gpt-revision",
-            "timeline_model": "gpt-timeline",
-            "use_cloud_models": True,
-            "cloud_provider": "openai",
-            "cloud_model": "gpt-clinical",
-            "reasoning_level": "high",
-            "ollama_seed": 7,
-            "rag_settings": {
-                **DEFAULT_RAG_SETTINGS,
-                "chunk_size": 777,
-                "use_reranking": False,
-                "reranker_model": "custom-reranker",
-                "retrieval_candidate_count": 30,
-                "retrieval_selected_count": 5,
-            },
-        }
-        db_session.add(configuration)
-        db_session.commit()
-    repository.engine.dispose()
+    assert agent_count == 1
+    assert agent["assessment"]["models"]["clinical"]["provider"] == "ollama"
+    assert agent["revision"]["models"]["planning"] == agent["assessment"]["models"]["clinical"]
+    assert agent["timeline"]["model"] == agent["assessment"]["models"]["extraction"]
 
     initialize_sqlite_database(settings, seed_catalogs=False)
-    payload, agents, agent_count = _read_configuration_and_agents(settings)
-
-    dili, revision, timeline = (
-        agents["assessment"],
-        agents["revision"],
-        agents["timeline"],
-    )
-    assert all(part["enabled"] for part in (dili, revision, timeline))
-    assert dili["models"]["clinical"] == {
-        "provider": "openai",
-        "model": "gpt-clinical",
-        "reasoning_level": "high",
-    }
-    assert dili["models"]["extraction"]["model"] == "gpt-parser"
-    assert timeline["model"]["model"] == "gpt-timeline"
-    assert timeline["model"]["reasoning_level"] == "high"
-    assert "reasoning_level" not in dili
-    # The legacy seed becomes the global setting rather than an agent value.
-    assert payload["ollama_seed"] == 7
-    assert dili["retrieval"]["use_reranking"] is False
-    assert dili["retrieval"]["reranker_model"] == "custom-reranker"
-    assert dili["retrieval"]["retrieval_candidate_count"] == 30
-    assert dili["retrieval"]["retrieval_selected_count"] == 5
-    assert revision["models"]["planning"]["provider"] == "openai"
-    assert revision["models"]["planning"]["model"] == "gpt-revision"
-
-    assert not LEGACY_EXECUTION_KEYS & set(payload)
-    assert set(payload["rag_settings"]) == set(SHARED_RAG_SETTING_KEYS)
-    assert payload["rag_settings"]["chunk_size"] == 777
-    assert payload["runtime"]["cloud_llm_timeout_cap"] == 1800.0
-
-    initialize_sqlite_database(settings, seed_catalogs=False)
-    second_payload, second_agents, second_count = _read_configuration_and_agents(
+    second_payload, second_agent, second_count = _read_configuration_and_agents(
         settings
     )
     assert second_payload == payload
-    assert second_agents == agents
-    assert second_count == agent_count == 1
+    assert second_agent == agent
+    assert second_count == 1

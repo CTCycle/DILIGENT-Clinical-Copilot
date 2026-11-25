@@ -505,14 +505,13 @@ def test_failed_session_payload_omits_raw_clinical_text_and_base64_image() -> No
 ###############################################################################
 def test_runtime_timeout_respects_provider_cap(monkeypatch) -> None:
     monkeypatch.setattr(
-        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: True,
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_purpose",
+        lambda purpose, **_: True,
     )
 
     timeout = ClinicalSessionService._resolve_runtime_timeout(
         base_timeout_s=180.0,
         cloud_cap_s=30.0,
-        local_cap_s=45.0,
     )
 
     assert timeout == 30.0
@@ -523,8 +522,8 @@ def test_runtime_timeout_allows_thirty_minute_cloud_clinical_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
-        lambda: True,
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_purpose",
+        lambda purpose, **_: True,
     )
 
     timeout = ClinicalSessionService._resolve_runtime_timeout(

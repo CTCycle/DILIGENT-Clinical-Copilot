@@ -129,7 +129,6 @@ export function formatRevisionStatusLabel(status: string | null | undefined): st
       return 'Completed';
     case 'running':
     case 'started':
-    case 'in_progress':
       return 'In progress';
     case 'pending':
     case 'queued':
@@ -138,7 +137,6 @@ export function formatRevisionStatusLabel(status: string | null | undefined): st
     case 'error':
       return 'Failed';
     case 'cancelled':
-    case 'canceled':
       return 'Cancelled';
     case 'qa_failed':
       return 'QA failed';
@@ -154,7 +152,6 @@ export function formatRevisionStatusLabel(status: string | null | undefined): st
       return 'Derived';
     case 'pending_qa':
       return 'Pending QA';
-    case 'recorded':
     case '':
       return 'Recorded';
     default:
@@ -176,11 +173,9 @@ export function revisionStatusTone(status: string | null | undefined): RevisionA
       return 'error';
     case 'running':
     case 'started':
-    case 'in_progress':
     case 'pending':
     case 'queued':
     case 'cancelled':
-    case 'canceled':
     case 'requires_human_review':
     case 'under_review':
     case 'pending_qa':

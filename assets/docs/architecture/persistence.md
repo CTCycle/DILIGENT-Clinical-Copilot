@@ -1,5 +1,5 @@
 # Persistence
-Last updated: 2026-11-20
+Last updated: 2026-11-25
 
 ## Relational Database
 
@@ -276,17 +276,19 @@ erDiagram
 - Startup and installation serialize migration attempts, inspect the current
   Alembic head, and apply pending revisions before repositories or services run.
 - SQLite migrations that rebuild referenced tables temporarily disable foreign-key enforcement within the atomic migration transaction, run `PRAGMA foreign_key_check` before commit, and restore the prior enforcement setting. Any violation aborts the migration.
-- Fresh databases are upgraded through the linear Alembic history before the
-  application starts. The current head is `202611010003` (session lifecycle). The v2.4 baseline and revisions through `202610240001` remain
-  available, so databases from the v3.5.x releases upgrade to the head without
-  losing user rows. Populated
+- The Alembic history has two revisions: the `202611010003` baseline (the
+  complete v3.6.0 schema) and the `202611200001` head (agents). Fresh databases
+  are created through both before the application starts, and v3.6.0 databases,
+  already stamped at the baseline, upgrade to the head without losing user rows.
+  Databases from releases before v3.6.0 carry an unknown revision and are
+  refused with a message to upgrade them with v3.6.0 first. Populated
   databases without an Alembic revision and databases with unknown or
   divergent revisions are rejected before application tables are changed; the
   runtime never guesses or stamps migration history.
 - SQLAlchemy update timestamps use an application-level update hook shared by SQLite and PostgreSQL.
 - Version listing and detail reads are side-effect-free; synchronization is reserved for explicit write paths.
 - Durable loose JSON or Markdown assessment files are not part of the runtime contract.
-- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`. One observation (marker, date, value, unit) is stored once even when several sections restate it; differing sources are kept as `source: merged` in the lab timeline. Migration `202611010001` collapsed previously duplicated rows.
+- Canonical repeated observations are stored in `clinical_lab_observations` and ordered drug mentions in `clinical_drug_mentions`. One observation (marker, date, value, unit) is stored once even when several sections restate it; differing sources are kept as `source: merged` in the lab timeline.
 - Metadata-tab images, JSON and documents are stored as bytes in `clinical_session_attachments`, scoped to a session and its version (unique on session, version and SHA-256, so repeated uploads are idempotent) and removed with the session or version by cascade. The stored media type and kind are derived server-side from the file extension and verified image signature (`services/inspection/attachment_policy.py`), never from the client declaration; active formats (HTML, SVG, XML, scripts, executables) are rejected.
 - Access-key ciphertext remains in the database; versioned Fernet key material is stored in the protected `DILIGENT_ACCESS_KEY_MATERIAL_FILE` store.
 - Canonical drug identifiers use `drug_identifiers` with unique `(identifier_system, identifier_value)` ownership.
@@ -294,15 +296,6 @@ erDiagram
 - Complete RxNav and LiverTox refreshes reconcile their source-owned aliases, mappings, monographs, and source metadata after successful preparation in one database transaction. Shared `Drug` entities and records owned by other sources are preserved when obsolete source rows are removed.
 - Drug terminology (`drugs` concept types, `drug_aliases` validation status and provenance, `drug_concept_relations`, `drug_atc_codes`, `medicinal_products`, `medicinal_product_ingredients`, `terminology_conflicts`, `terminology_import_runs`, `drug_livertox_links`) is described in [drug_terminology.md](drug_terminology.md). Only `verified` and `confirmed` aliases resolve; reviewer decisions use alias source `reviewer` and survive every source refresh.
 - `application_configuration` is the fixed-ID singleton for validated configuration payloads, and `reference_catalog_manifests` records installed manifest state.
-
-## Session Lifecycle Migration
-
-Migration `202611010003` maps legacy `successful` (and unset) statuses to
-`completed`, keeps `failed`, backfills lifecycle timestamps from
-`session_timestamp`, and rebuilds `clinical_input` from the stored section
-text. The single legacy `clinical_input_drafts` row, when it held any content,
-becomes a `draft` session before that table is dropped. No legacy draft API or
-storage remains.
 
 ## Focused Repository Ownership
 
@@ -374,14 +367,12 @@ The extracted runtime is versioned and hash-addressed so it can be replaced duri
 - `agent_definitions` holds one row per agent (name, description, and the lifecycle flags `is_default`, `is_active`, `is_locked`, `is_archived`); `agent_revisions` holds its immutable, numbered configuration snapshots with a configuration hash. Saving an agent appends a revision (optimistic concurrency via `expected_revision`); nothing is edited in place.
 - `clinical_sessions.agent_revision_id` and the revision-run records link each execution to the exact revision that produced it. The run snapshot also freezes the resolved agent configuration, so replays and queued work never pick up later edits.
 - Exactly one default agent exists (enforced by a partial unique index). The default cannot become inactive or archived. Configuration is editable only while an agent is active, unlocked and not archived; lifecycle changes never create revisions. A permanent delete is refused for the default agent, locked agents, and agents referenced by `clinical_sessions`, revision runs or `clinical_session_timelines` (`agent_revision_id`); archive those instead.
-- Alembic `202611110001` creates the tables; `202611120001` unifies agents: it drops the per-kind columns, adds the lifecycle flags and a timeline agent-revision link, discards the earlier kind-specific agents and clears their run links (runs keep their frozen runtime snapshot). At database initialization with no agents, one "Default agent" with all three capabilities enabled is seeded from the legacy singleton model settings (`repositories/agent_seed.py`). `202611120002` moves assessment agents to config schema 3 (single custom instruction, optional report template) and discards stored agents again (no legacy compatibility). `202611200001` moves agent configurations to schema 4 in place (no discard): it merges the two revision instruction fields into `custom_instructions`, folds a non-off capability reasoning level into model references that inherited it, drops the removed keys (revision stage overrides, execution limits, tool allow-list, timeline focus, capability reasoning, per-agent Ollama seed) and recomputes the configuration hash.
+- Alembic `202611200001` creates the agent tables and the `agent_revision_id` links on sessions, revision runs and timelines. On a v3.6.0 database it converts the stored singleton execution settings (provider, role models, reasoning level, agent-owned retrieval keys) into one schema-4 "Default agent" and removes them from `application_configuration`. A database that still has no agent after migration (fresh, or without a complete stored configuration) gets one "Default agent" at initialization, built from the local catalog defaults (`repositories/agent_seed.py`).
 
 ## Model Configuration Persistence
 
 - `application_configuration` keeps only the shared RAG index settings (chunking, embeddings, vector index); model roles, reasoning, seed and per-agent retrieval choices (hybrid search, reranking, candidate counts) belong to agents.
 
-- A newly initialized database receives canonical model defaults.
-- Existing provider and model selections are read as stored; unsupported values fail validation and are not silently translated.
 - Provider model catalogs are persisted in `provider_model_catalog_cache`, keyed by provider and a fingerprint of the catalog endpoint plus the active credential (or normalized Ollama endpoint). Secrets are never stored.
 - `GET /api/model-config` reads cached catalog state only. The provider-specific `load` operation contacts a provider only for a cold cache, while `refresh` is the explicit replacement operation.
 - Failed attempts are persisted with sanitized metadata. A failed cloud refresh preserves the last valid list; an empty Ollama installation is a valid cached result. Endpoint or active-key changes invalidate the old scope without affecting inactive credentials.

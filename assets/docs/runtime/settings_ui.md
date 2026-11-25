@@ -1,5 +1,5 @@
 # Runtime Settings UI
-Last updated: 2026-11-20
+Last updated: 2026-11-25
 
 ## Scope
 
@@ -38,32 +38,29 @@ The Settings routes are:
    is created with the default embedded SQLite configuration.
 2. The selected database is connected and migrated. A new application schema
    or empty reference catalog is seeded before startup validation.
-3. Database migrations seed a complete typed default payload when the
-   singleton is missing. Existing database model selections are preserved while
-   missing operational defaults are added.
+3. Initialization seeds a complete typed default payload when the singleton is
+   missing and adds missing operational defaults to an existing one. A database
+   without agents gets one default agent.
 4. The persisted singleton is loaded into the in-process `ConfigurationManager`
    and validated before providers, jobs, and startup validation run.
 5. Settings API writes update the same singleton document and
    refresh the manager for newly created work.
-
-The former standalone settings file is not read, written, copied into desktop
-archives, or required for startup. Its values are not imported; fresh defaults
-are defined by typed application models.
 
 ## Settings categories
 
 | Category | Ownership | Controls |
 | --- | --- | --- |
 | General | Jobs | Polling interval, the LLM output token limit (reasoning tokens count toward it), and the maximum concurrent DILI analyses (1-8, default 2; enforced by the backend scheduler, applied to new starts without a restart) |
-| Models | Application configuration | Provider, access-key workflow, model roles, reasoning, and the complete RAG payload |
+| Providers & Models | Application configuration | Provider access keys, provider model catalogs, and the shared RAG index settings (models, reasoning, and retrieval preferences belong to agents) |
 | Data Processing | Ingestion, session pipeline, language detection | Drug-name limits, batch/concurrency limits, and clinical language thresholds |
 | Integrations | Runtime integrations | NCBI/LiverTox contact and download/archive/worker controls, RxNav request timeout, terminology download timeout, and the DrugCentral (connection), ChEMBL (clinical phase), and Swissmedic source switches |
 | Drug Matching | Terminology resolver | Spelling-correction length, short-name threshold, edit bounds, runner-up margin, shortlist size, resolution cache size, and the RxNav fallback switch (the only control for the fallback; the Knowledge → Terminology resolver has no local override), per-name request budget, and negative-result lifetime |
 | Advanced | LLM/evidence runtime | Role-specific timeouts, timeout floors/caps, Ollama startup timeout, and excerpt length |
 
-RAG is represented once as `rag_settings` in the database payload. The Models
-page and retrieval/settings services use that same typed payload; there is no
-JSON base layer or second RAG override store.
+Shared RAG index settings are represented once as `rag_settings` in the
+database payload. The Providers & Models page and retrieval/settings services
+use that same typed payload; an agent's retrieval policy overlays it for that
+agent's runs.
 
 ## API
 
@@ -83,8 +80,9 @@ The typed operational API is:
   switches the live runtime.
 
 Unknown fields and environment-owned fields are rejected. The API never
-returns secrets or `.env` values. Model/provider/RAG updates use the existing
-model API, which writes the same `application_configuration` row.
+returns secrets or `.env` values. `PUT /api/model-config` updates only the
+shared `rag_settings` and the Ollama seed in the same
+`application_configuration` row.
 
 ## Validation and persistence
 

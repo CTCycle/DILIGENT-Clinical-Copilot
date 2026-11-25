@@ -1,7 +1,7 @@
 // Copyright © 2023–2025 Thomas Virdis
 // Licensed under the GNU General Public License, version 3 or later.
 
-import { RagSettings } from '../../core/models/types';
+import { RagSettings } from '../../../../core/models/types';
 
 export type ModelFilterKey = 'installed' | 'missing' | 'small' | 'large' | 'quantized';
 

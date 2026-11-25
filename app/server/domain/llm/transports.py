@@ -144,9 +144,3 @@ class ConnectivityResult(BaseModel):
     ok: bool
     response_preview: str | None = None
     error: str | None = None
-
-
-###############################################################################
-class EmbeddingRequest(BaseModel):
-    model: str
-    inputs: list[str]

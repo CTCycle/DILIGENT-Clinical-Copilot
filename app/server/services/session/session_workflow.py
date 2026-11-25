@@ -825,12 +825,8 @@ async def process_single_patient_workflow(
         "fallback_reasons": dict(service.fallback_reasons),
         "structured_failure_kind": dict(service.structured_failure_kind),
         "runtime_settings": {
-            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
             "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "reasoning_level": LLMRuntimeConfig.get_reasoning_level().value,
             "ollama_seed": LLMRuntimeConfig.get_ollama_seed(),
             "evidence_sources": list(payload.evidence_sources),
             "agent": LLMRuntimeConfig.active_agent(),

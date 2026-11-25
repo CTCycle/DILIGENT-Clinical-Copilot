@@ -4,9 +4,9 @@
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
-import { HelpPopoverComponent } from '../../../core/guidance/help-popover.component';
-import { ModelConfigStateResponse } from '../../../core/models/types';
+import { ModalShellComponent } from '../../../../../components/modal-shell/modal-shell.component';
+import { HelpPopoverComponent } from '../../../../../core/guidance/help-popover.component';
+import { ModelConfigStateResponse } from '../../../../../core/models/types';
 import {
   DraftRagSettings,
   RagBooleanKey,

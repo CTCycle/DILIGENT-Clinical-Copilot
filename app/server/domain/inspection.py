@@ -141,15 +141,6 @@ class SessionRevisionRequest(BaseModel):
     agent_id: str | None = Field(default=None, min_length=1, max_length=64)
     agent_revision: int | None = Field(default=None, ge=1)
 
-    max_tasks: int = Field(default=8, ge=1, le=8)
-    ###############################################################################
-    max_tool_iterations: int = Field(default=24, ge=1, le=24)
-    allowed_tools: list[str] | None = Field(default=None, max_length=12)
-    revision_goal: Literal[
-        "full_report_revision", "selected_text_revision", "metadata_review"
-    ] = "full_report_revision"
-    dry_run: bool = False
-
 
 ###############################################################################
 class ManualReportEditRequest(BaseModel):

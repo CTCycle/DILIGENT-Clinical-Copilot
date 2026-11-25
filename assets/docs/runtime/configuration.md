@@ -1,11 +1,10 @@
 # Configuration
-Last updated: 2026-10-29
+Last updated: 2026-11-25
 
 Temperature is not a deployment or operator setting; it is resolved by the
 source-controlled effective inference policy immediately before each LLM call.
-The model configuration API persists `reasoning_level` as `off`, `low`,
-`medium`, or `high`. The obsolete boolean reasoning field is not accepted or
-translated; callers must send `reasoning_level` explicitly.
+Reasoning (`off`, `low`, `medium`, or `high`) is chosen per model reference on
+each agent revision; a reference without a level sends no reasoning preference.
 
 See [generation policy](generation_policy.md) for the purpose responsibility
 matrix, capability catalog, provider transport rules, and context-budget
@@ -83,15 +82,16 @@ instead.
 - `settings/.env`
   - local host and port values
   - frontend API base URL and source-mode CORS origin allowlist
-  - data paths, Ollama endpoints, deployment values, and secrets
+  - data paths and deployment values
+  - optional Ollama endpoint: `OLLAMA_URL`, or `OLLAMA_HOST` and/or
+    `OLLAMA_PORT` (default `http://127.0.0.1:11434`); `OLLAMA_URL` wins
 - `<data-root>/database_config.json`
   - selected database backend and its connection parameters only
   - PostgreSQL password protected with Windows DPAPI; no application settings
 - `application_configuration` database singleton
   - job polling interval
   - LLM output token limit (general, applies to all models; default 32768, capped by a smaller model-reported maximum)
-  - model/provider selections and access-key references
-  - complete RAG settings
+  - shared RAG index settings and the global Ollama seed
   - ingestion, session pipeline, language detection, matcher, integration,
     timeout, and evidence settings
 - `data/catalogs/*.json`
@@ -149,9 +149,7 @@ edited on the Settings > Integrations and Drug Matching pages:
   `fuzzy_short_name_length`, `fuzzy_short_max_distance`,
   `fuzzy_long_max_distance`, `fuzzy_min_margin`, `resolution_cache_limit`,
   `external_fallback_enabled`, `external_max_requests_per_name` and
-  `external_negative_cache_days`. Migration `202610290001` rewrote stored
-  legacy matcher keys (confidences, catalog index limit, spelling distances,
-  `rxnav_max_concurrency`) to this block.
+  `external_negative_cache_days`.
 - Curated abbreviations and blocked abbreviations are catalog data in
   `data/catalogs/drug_matching.json` (`terminology_aliases`,
   `error_prone_abbreviations`) and are applied by the RxNav and Terminology

@@ -6,9 +6,9 @@ import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { ModelConfigStateResponse } from '../../../../core/models/types';
-import { ProviderCatalogPanelComponent } from '../../../model-config/components/provider-catalog-panel.component';
-import { ProviderCredentialsPanelComponent } from '../../../model-config/components/provider-credentials-panel.component';
-import { RagResourcesPanelComponent } from '../../../model-config/components/rag-resources-panel.component';
+import { ProviderCatalogPanelComponent } from './components/provider-catalog-panel.component';
+import { ProviderCredentialsPanelComponent } from './components/provider-credentials-panel.component';
+import { RagResourcesPanelComponent } from './components/rag-resources-panel.component';
 import { ProvidersResourcesComponent } from './providers-resources.component';
 
 const SHARED_RAG_KEYS = [
@@ -88,8 +88,6 @@ describe('ProvidersResourcesComponent', () => {
     expect(fixture.debugElement.query(By.directive(ProviderCredentialsPanelComponent))).toBeTruthy();
     expect(root.querySelector('main')).toBeNull();
     expect(root.textContent).toContain('qwen3:8b');
-    expect(root.textContent).not.toContain('Runtime Source');
-    expect(root.querySelector('app-model-role-action-button')).toBeNull();
   });
 
   it('saves a shared index change with only the shared keys', async () => {

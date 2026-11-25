@@ -48,10 +48,7 @@ class AccessKeySerializer:
             session_factory=session_factory,
             expire_on_commit=False,
         )
-        self.encryption_material_serializer = AccessKeyEncryptionMaterialSerializer(
-            engine=self.engine,
-            session_factory=self.session_factory,
-        )
+        self.encryption_material_serializer = AccessKeyEncryptionMaterialSerializer()
 
     # -------------------------------------------------------------------------
     def resolve_table(self, provider: ProviderName) -> type[AccessKey]:

@@ -22,8 +22,9 @@ from domain.inspection import (
 )
 from pydantic import ValidationError
 from repositories.schemas.base import Base
-from repositories.agent_seed import ensure_default_agent
-from repository_fixtures import build_repository_graph, legacy_model_payload
+from domain.agents import AgentConfig
+from repositories.agent_seed import default_agent_config, ensure_default_agent
+from repository_fixtures import agent_test_config, build_repository_graph
 from services.inspection.revision_agent import (
     REVISION_PROVIDER_MAX_RETRIES,
     RevisionAgentRunner,
@@ -43,17 +44,16 @@ from sqlalchemy import create_engine
 
 
 ###############################################################################
-def build_file_serializer(tmp_path: Path, **legacy_values: Any) -> Any:
+def build_file_serializer(
+    tmp_path: Path, agent_config: AgentConfig | None = None
+) -> Any:
     engine = create_engine(
         f"sqlite+pysqlite:///{tmp_path / 'revision.db'}", future=True
     )
     Base.metadata.create_all(engine)
     graph = build_repository_graph(engine=engine)
-    # Revision jobs run the default Revision agent, seeded from a model
-    # configuration exactly as database initialization does.
-    ensure_default_agent(
-        graph.agent_repository, legacy_model_payload(**legacy_values)
-    )
+    # Revision jobs run the default agent, seeded as database initialization does.
+    ensure_default_agent(graph.agent_repository, agent_config or default_agent_config())
     return graph
 
 
@@ -1969,10 +1969,7 @@ def test_revision_job_keeps_runtime_frozen_at_creation(
         lambda self, provider: [type("Key", (), {"is_active": True})()],
     )
     serializer = build_file_serializer(
-        tmp_path,
-        use_cloud_models=True,
-        cloud_provider="openai",
-        revision_model="gpt-4.1",
+        tmp_path, agent_test_config("openai", revision="gpt-4.1")
     )
     agents = serializer.agent_repository
     observed: list[tuple[str, str]] = []
@@ -2061,23 +2058,11 @@ def test_revision_job_keeps_request_limits_and_retry_reuses_agent_revision(
         ),
     )
 
-    started = service.start_revision_job(
-        session_id,
-        SessionRevisionRequest(
-            max_tasks=2,
-            max_tool_iterations=5,
-            allowed_tools=["search_rag", "read_manual_edits"],
-        ),
-    )
+    started = service.start_revision_job(session_id, SessionRevisionRequest())
     _wait_for_revision(service, started["job_id"])
     run = service.get_revision_run(started["result"]["pipeline_run_id"])
     assert run is not None
     configuration = run["configuration"]
-    assert configuration["effective_limits"] == {
-        "max_tasks": 2,
-        "max_tool_iterations": 5,
-        "allowed_tools": ["search_rag", "read_manual_edits"],
-    }
     first_revision_id = configuration["agent"]["agent_revision_id"]
     assert configuration["agent"]["agent_revision"] == 2
     assert configuration["runtime_snapshot"]["agent_instructions"] == {

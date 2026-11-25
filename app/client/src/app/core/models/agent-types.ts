@@ -87,7 +87,7 @@ export type AgentConfig = {
 export type AgentRevision = {
   revision_id: number;
   revision_number: number;
-  schema_version: number;
+  schema_version: 4;
   configuration_hash: string;
   configuration: AgentConfig;
   created_at: string | null;

@@ -5,31 +5,18 @@ Models are chosen per **agent**, not globally. Open **Agents** to see your agent
 
 **Settings → Providers & Models** is shared by every agent: access keys, provider model catalogs (install or refresh), and the knowledge-index (RAG) settings, which autosave. Per-agent model pickers use these catalogs.
 
-Last updated: 2026-11-20
+Last updated: 2026-11-25
 
 Sampling settings are selected automatically according to the provider, model
 family, and operation. They are not user-configurable.
 
 ## Configure Models
-Open **Settings** from the sidebar and choose the **Models** page.
-
-This page controls how the application calls a model during analysis. Expect controls for:
-- local provider configuration
-- cloud provider configuration
-- model selection
-- automatically saved model settings
-- provider access-key management where credentials are required
-
-Recommended workflow:
-1. Decide whether the run should use a local or cloud provider.
-2. For local testing, select an Ollama-compatible model if available.
-3. Select a catalog model independently for the **Clinical**, **Text extraction**,
-   **Revision**, and **Timeline** roles. A model may hold more than one role.
-4. Valid model assignments, reasoning preferences, and RAG settings save automatically
-   after a short pause. If a provider change clears the role assignments, select
-   a model for each role to complete and save the configuration.
-5. Add and activate an access key if the provider requires one. Key creation and
-   activation remain explicit actions in the access-key controls.
+1. Add and activate a provider access key in **Settings → Providers & Models** if a
+   hosted provider is used, then load or refresh that provider's catalog.
+2. Open **Agents**, edit the default agent or create one, and pick a catalog model
+   for each role of each enabled workflow. A model may hold more than one role.
+3. Save the agent. Each save creates a new revision; runs keep the revision they
+   started with.
 
 ## Manage Access Keys
 Supported provider key operations currently cover:
@@ -64,11 +51,10 @@ HTTP detail if structured extraction is rejected; it does not silently switch
 to another model or provider.
 
 ## Local Model Notes
-- Local runtime saves only installed Ollama models for clinical, extraction,
-  Revision, and Timeline roles.
-- Revision and Timeline workflows show the configured role model and link back to
-  this page; they do not contain per-run provider/model selectors.
-- If you switch from cloud to local mode, cloud-only role selections are cleared automatically.
+- Agent model pickers list only installed Ollama models for the local provider.
+- A run uses exactly the model its agent revision names. If that Ollama model is
+  no longer installed, the run fails with a message naming the model; it does not
+  switch to another installed model.
 - When installed, `qwen3.5:2b` is a fast local extractor and `qwen3.5:9b` is the
   stronger local backup option for bounded extraction tests. Note that the
   validated timeline boundary is model-specific: exact `qwen3.5:2b` does not

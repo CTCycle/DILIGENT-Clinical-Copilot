@@ -14,7 +14,6 @@ from domain.settings.configuration import (
     ServerSettings,
 )
 from domain.settings.environment import EnvironmentSnapshot
-from domain.settings.runtime import LLMRuntimeState
 
 __all__ = [
     "DatabaseSettings",
@@ -26,7 +25,6 @@ __all__ = [
     "IngestionSettings",
     "JobsSettings",
     "LLMRuntimeDefaults",
-    "LLMRuntimeState",
     "RagSettings",
     "ServerSettings",
 ]

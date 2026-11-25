@@ -11,12 +11,11 @@ from pydantic import ValidationError
 from common.exceptions import (
     ServiceValidationError,
 )
-from services.llm.runtime_config import LLMRuntimeConfig
+from services.llm.runtime_config import LLMRuntimeConfig, RolePurpose
 from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
-    EvidenceSource,
     PatientData,
     PatientRucamAssessmentBundle,
     PipelineIssue,
@@ -222,18 +221,15 @@ class ClinicalSessionService(
         *,
         base_timeout_s: float,
         cloud_cap_s: float | None = None,
-        local_cap_s: float | None = None,
+        purpose: RolePurpose = "clinical",
     ) -> float:
+        """Apply ``cloud_cap_s`` only when ``purpose`` runs on a cloud provider."""
         runtime_settings = get_server_settings().runtime
         minimum_timeout_s = float(getattr(runtime_settings, "minimum_llm_timeout", 1.0))
         base = max(float(base_timeout_s), minimum_timeout_s)
-        if LLMRuntimeConfig.is_cloud_enabled():
-            requested = cloud_cap_s
-        else:
-            requested = None
-        if requested is None:
+        if cloud_cap_s is None or not LLMRuntimeConfig.is_cloud_purpose(purpose):
             return base
-        return min(base, max(float(requested), minimum_timeout_s))
+        return min(base, max(float(cloud_cap_s), minimum_timeout_s))
 
     # -------------------------------------------------------------------------
     async def preprocess_unified_input(
@@ -271,98 +267,6 @@ class ClinicalSessionService(
             ),
             extraction,
         )
-
-    # -------------------------------------------------------------------------
-    async def prepare_revision_source_request(
-        self,
-        *,
-        session_detail: dict[str, Any],
-        evidence_sources: list[EvidenceSource],
-    ) -> tuple[
-        ClinicalSessionRequest,
-        ClinicalSectionExtractionResult | None,
-        str,
-    ]:
-        source_text = str(session_detail.get("session_text") or "").strip()
-        if not source_text:
-            raise ServiceValidationError("Clinical source text is required.")
-
-        payload = session_detail.get("result_payload")
-        section_extraction_payload = (
-            payload.get("section_extraction") if isinstance(payload, dict) else None
-        )
-        section_extraction: ClinicalSectionExtractionResult | None = None
-        if isinstance(section_extraction_payload, ClinicalSectionExtractionResult):
-            section_extraction = section_extraction_payload
-        elif isinstance(section_extraction_payload, dict):
-            try:
-                section_extraction = ClinicalSectionExtractionResult.model_validate(
-                    section_extraction_payload
-                )
-            except ValidationError:
-                section_extraction = None
-        if (
-            section_extraction is not None
-            and section_extraction.anamnesis
-            and section_extraction.drugs
-            and section_extraction.laboratory_analysis
-        ):
-            return (
-                ClinicalSessionRequest(
-                    name=session_detail.get("patient_name"),
-                    visit_date=session_detail.get("visit_date"),
-                    clinical_input=source_text,
-                    anamnesis=section_extraction.anamnesis,
-                    drugs=section_extraction.drugs,
-                    laboratory_analysis=section_extraction.laboratory_analysis,
-                    evidence_sources=evidence_sources,
-                ),
-                section_extraction,
-                "persisted_section_extraction",
-            )
-
-        sections = session_detail.get("sections")
-        if isinstance(sections, dict):
-            anamnesis = str(sections.get("anamnesis") or "").strip()
-            drugs = str(sections.get("drugs") or sections.get("therapy") or "").strip()
-            laboratory_analysis = str(
-                sections.get("laboratory_analysis")
-                or sections.get("laboratory_history")
-                or ""
-            ).strip()
-            if anamnesis and drugs and laboratory_analysis:
-                section_extraction = ClinicalSectionExtractionResult(
-                    source_text=source_text,
-                    anamnesis=anamnesis,
-                    drugs=drugs,
-                    laboratory_analysis=laboratory_analysis,
-                    confidence=1.0,
-                    metadata={"parser": "persisted_session_sections_v1"},
-                )
-                return (
-                    ClinicalSessionRequest(
-                        name=session_detail.get("patient_name"),
-                        visit_date=session_detail.get("visit_date"),
-                        clinical_input=source_text,
-                        anamnesis=anamnesis,
-                        drugs=drugs,
-                        laboratory_analysis=laboratory_analysis,
-                        evidence_sources=evidence_sources,
-                    ),
-                    section_extraction,
-                    "persisted_session_sections",
-                )
-
-        request = ClinicalSessionRequest(
-            name=session_detail.get("patient_name"),
-            visit_date=session_detail.get("visit_date"),
-            clinical_input=source_text,
-            evidence_sources=evidence_sources,
-        )
-        preprocessed_request, section_extraction = await self.preprocess_unified_input(
-            request
-        )
-        return preprocessed_request, section_extraction, "reparsed_source_text"
 
     # -------------------------------------------------------------------------
     def validate_assessment_prerequisites_without_llm(

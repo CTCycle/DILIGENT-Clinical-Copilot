@@ -46,7 +46,6 @@ function session(sessionId: number): ClinicalSessionDetail {
     session_text: '',
     source_clinical_text: '',
     result_payload: {},
-    report: null,
     official_report_text: null,
     manual_edit_history: [],
   };

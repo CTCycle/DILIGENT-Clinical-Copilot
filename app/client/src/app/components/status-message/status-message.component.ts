@@ -52,7 +52,7 @@ function notificationToneFromStatus(tone: StatusTone): NotificationTone {
 export class StatusMessageComponent implements OnChanges {
   @Input() message = '';
   @Input() tone?: StatusTone;
-  @Input() className = 'model-config-status-message';
+  @Input() className = 'status-message';
   @Input() presentation: StatusPresentation = 'notification';
 
   private readonly notifications = inject(NotificationService);

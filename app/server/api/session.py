@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Response, status
 
 from domain.clinical.entities import (
     ClinicalSectionTemplateResponse,
+    ClinicalSessionLaunchRequest,
     ClinicalSessionRequest,
 )
 from domain.clinical.lifecycle import (
@@ -41,7 +42,6 @@ def _no_store(response: Response) -> None:
 
 ###############################################################################
 class ClinicalSessionEndpoint:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -85,9 +85,11 @@ class ClinicalSessionEndpoint:
     # -------------------------------------------------------------------------
     def validate_clinical_input(
         self,
-        request_payload: ClinicalSessionRequest = Body(...),
+        request_payload: ClinicalSessionLaunchRequest = Body(...),
     ) -> ClinicalInputPreflightResult:
-        return self.service.validate_clinical_input(request_payload)
+        return self.service.validate_clinical_input(
+            ClinicalSessionRequest.from_launch(request_payload)
+        )
 
     # -------------------------------------------------------------------------
     def create_session(
@@ -118,11 +120,13 @@ class ClinicalSessionEndpoint:
         self,
         session_id: int,
         response: Response,
-        request_payload: ClinicalSessionRequest = Body(...),
+        request_payload: ClinicalSessionLaunchRequest = Body(...),
     ) -> ClinicalSessionState:
         _no_store(response)
         validate_clinical_session_request(request_payload)
-        return self.lifecycle.launch(session_id, request_payload)
+        return self.lifecycle.launch(
+            session_id, ClinicalSessionRequest.from_launch(request_payload)
+        )
 
     # -------------------------------------------------------------------------
     def get_session_status(
@@ -141,22 +145,62 @@ class ClinicalSessionEndpoint:
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         routes = (
-            ("/clinical/section-template", self.get_section_template, "GET",
-             ClinicalSectionTemplateResponse, status.HTTP_200_OK),
-            ("/clinical/validate-input", self.validate_clinical_input, "POST",
-             ClinicalInputPreflightResult, status.HTTP_200_OK),
-            ("/clinical/sessions", self.create_session, "POST",
-             ClinicalSessionState, status.HTTP_201_CREATED),
-            ("/clinical/sessions/{session_id}/input", self.get_session_input, "GET",
-             ClinicalSessionInput, status.HTTP_200_OK),
-            ("/clinical/sessions/{session_id}/input", self.update_session_input, "PUT",
-             ClinicalSessionState, status.HTTP_200_OK),
-            ("/clinical/sessions/{session_id}/launch", self.launch_session, "POST",
-             ClinicalSessionState, status.HTTP_202_ACCEPTED),
-            ("/clinical/sessions/{session_id}/status", self.get_session_status, "GET",
-             ClinicalSessionState, status.HTTP_200_OK),
-            ("/clinical/sessions/{session_id}/cancel", self.cancel_session, "POST",
-             ClinicalSessionState, status.HTTP_200_OK),
+            (
+                "/clinical/section-template",
+                self.get_section_template,
+                "GET",
+                ClinicalSectionTemplateResponse,
+                status.HTTP_200_OK,
+            ),
+            (
+                "/clinical/validate-input",
+                self.validate_clinical_input,
+                "POST",
+                ClinicalInputPreflightResult,
+                status.HTTP_200_OK,
+            ),
+            (
+                "/clinical/sessions",
+                self.create_session,
+                "POST",
+                ClinicalSessionState,
+                status.HTTP_201_CREATED,
+            ),
+            (
+                "/clinical/sessions/{session_id}/input",
+                self.get_session_input,
+                "GET",
+                ClinicalSessionInput,
+                status.HTTP_200_OK,
+            ),
+            (
+                "/clinical/sessions/{session_id}/input",
+                self.update_session_input,
+                "PUT",
+                ClinicalSessionState,
+                status.HTTP_200_OK,
+            ),
+            (
+                "/clinical/sessions/{session_id}/launch",
+                self.launch_session,
+                "POST",
+                ClinicalSessionState,
+                status.HTTP_202_ACCEPTED,
+            ),
+            (
+                "/clinical/sessions/{session_id}/status",
+                self.get_session_status,
+                "GET",
+                ClinicalSessionState,
+                status.HTTP_200_OK,
+            ),
+            (
+                "/clinical/sessions/{session_id}/cancel",
+                self.cancel_session,
+                "POST",
+                ClinicalSessionState,
+                status.HTTP_200_OK,
+            ),
         )
         for path, endpoint, method, response_model, status_code in routes:
             self.router.add_api_route(

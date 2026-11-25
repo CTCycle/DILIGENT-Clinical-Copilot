@@ -16,7 +16,7 @@ describe('SettingsPageComponent', () => {
     }).compileComponents();
   });
 
-  it('renders the persistent settings navigation without model configuration', () => {
+  it('renders the persistent settings navigation', () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
 

@@ -4,7 +4,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { CatalogProvider } from '../../../core/models/types';
+import { CatalogProvider } from '../../../../../core/models/types';
 import { MODEL_FILTERS } from '../model-catalog';
 import { ModelFilterKey } from '../model-config.types';
 

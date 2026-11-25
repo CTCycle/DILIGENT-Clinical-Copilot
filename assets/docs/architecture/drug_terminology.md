@@ -1,5 +1,5 @@
 # Drug Terminology Resolution
-Last updated: 2026-11-03
+Last updated: 2026-11-25
 
 ## Purpose
 
@@ -28,7 +28,7 @@ The Knowledge > Terminology view shows each source's license and attribution.
 
 ## Schema
 
-Migration `202610290001` extends the existing drug tables instead of adding a
+The terminology schema extends the existing drug tables instead of adding a
 parallel concept store:
 
 - `drugs` is the concept. It gains `concept_type` (`ingredient`,

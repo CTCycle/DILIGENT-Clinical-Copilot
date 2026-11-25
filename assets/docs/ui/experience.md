@@ -1,5 +1,5 @@
 # Experience
-Last updated: 2026-11-01
+Last updated: 2026-11-25
 
 ## Page Structure
 - Routes:
@@ -7,7 +7,8 @@ Last updated: 2026-11-01
   - `/report/:sessionId` for a session's execution and report view
   - `/clinical-sessions` for Clinical Sessions
   - `/data` for Knowledge
-  - `/settings` (and `/settings/models` for model configuration)
+  - `/agents` for Agents and `/agents/:id` for the agent editor (`/agents/new` creates one)
+  - `/settings` with General, Data Processing, Integrations, Providers & Models, Drug Matching, Advanced, and Database pages
   - `/sessions/:sessionId/timetable` for Patient Timeline
   - `/sessions/:sessionId/timetable/:timelineId` for a saved timeline
 - App shell uses the root shell plus shared navigation through `NavSidebarComponent`.

@@ -69,11 +69,10 @@ fn main() {
             std::thread::spawn(move || {
                 let session_secret = Uuid::new_v4().to_string();
                 let startup_result = runtime::prepare_runtime(&version).and_then(|paths| {
-                    let process = backend::BackendProcess::start(&paths, &version, &session_secret)?;
-                    Ok((paths, process))
+                    backend::BackendProcess::start(&paths, &version, &session_secret)
                 });
                 match startup_result {
-                    Ok((paths, mut process)) => {
+                    Ok(mut process) => {
                         let startup = app_handle.state::<StartupState>();
                         if startup.cancelled.load(Ordering::Acquire) {
                             process.stop();
@@ -108,7 +107,6 @@ fn main() {
                             );
                             return;
                         }
-                        let _ = paths;
                     }
                     Err(_) => show_startup_error(
                         &startup_window,

@@ -17,19 +17,6 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
     assert "no-store" in response.headers["cache-control"]
 
     payload = response.json()
-    # Execution settings (models, roles, reasoning) live on agents; the Ollama
-    # seed is a global setting.
-    for removed in (
-        "use_cloud_services",
-        "llm_provider",
-        "cloud_model",
-        "clinical_model",
-        "text_extraction_model",
-        "revision_model",
-        "timeline_model",
-        "reasoning_level",
-    ):
-        assert removed not in payload
     assert "ollama_seed" in payload
     assert "chunk_size" in payload["rag_settings"]
     assert "use_reranking" not in payload["rag_settings"]
@@ -40,8 +27,6 @@ def test_model_config_get_returns_runtime_payload(api_context: APIRequestContext
         "unavailable",
         "authentication_required",
     }
-    assert "cloud_temperature" not in payload
-    assert "ollama_temperature" not in payload
 
 
 ###############################################################################
@@ -55,21 +40,6 @@ def test_model_config_put_rejects_agent_owned_fields(
     assert response.status == 422
     detail = response.json().get("detail") or []
     assert any("use_cloud_services" in str(item.get("loc", [])) for item in detail)
-
-
-###############################################################################
-def test_model_config_put_rejects_removed_temperature_field(
-    api_context: APIRequestContext,
-):
-    response = api_context.put(
-        "/api/model-config",
-        data={"cloud_temperature": 2.5},
-    )
-    assert response.status == 422
-    payload = response.json()
-    detail = payload.get("detail") or []
-    assert detail
-    assert any("cloud_temperature" in str(item.get("loc", [])) for item in detail)
 
 
 ###############################################################################

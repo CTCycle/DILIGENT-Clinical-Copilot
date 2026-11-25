@@ -8,7 +8,6 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
-    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,

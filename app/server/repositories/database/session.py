@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from configurations.startup import get_server_settings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
+from repositories.database.utils import sqlite_autocommit
 
 
 ###############################################################################
@@ -62,14 +63,8 @@ def begin_immediate_write(db_session: Session) -> None:
     if connection.dialect.name != "sqlite":
         return
     driver_connection: Any = connection.connection.driver_connection
-    previous_autocommit = getattr(driver_connection, "autocommit", None)
-    if previous_autocommit is not None:
-        driver_connection.autocommit = True
-    try:
+    with sqlite_autocommit(driver_connection):
         driver_connection.execute("BEGIN IMMEDIATE")
-    finally:
-        if previous_autocommit is not None:
-            driver_connection.autocommit = previous_autocommit
 
 
 ###############################################################################

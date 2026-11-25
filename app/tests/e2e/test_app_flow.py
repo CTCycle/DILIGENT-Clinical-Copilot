@@ -41,7 +41,6 @@ def _build_variant_heading_payload() -> dict:
             + "## Laboratory tests\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
         ),
         "patient_image_base64": None,
-        "evidence_sources": ["livertox", "dilirank"],
     }
 
 

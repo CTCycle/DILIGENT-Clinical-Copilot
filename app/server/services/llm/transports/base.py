@@ -18,7 +18,6 @@ from domain.llm.transports import (
     ChatResult,
     ChatStreamEvent,
     ConnectivityResult,
-    EmbeddingRequest,
     StructuredRequest,
 )
 from services.llm.transports.errors import TransportCancellation, TransportUnsupportedCapability
@@ -259,13 +258,6 @@ class CloudTransport(Protocol):
 
     # -------------------------------------------------------------------------
     async def close(self) -> None: ...
-
-
-###############################################################################
-class EmbeddingTransport(Protocol):
-
-    # -------------------------------------------------------------------------
-    async def embed(self, request: EmbeddingRequest) -> list[list[float]]: ...
 
 
 ###############################################################################

@@ -64,7 +64,6 @@ export class ClinicalSessionDraftService {
     this.stateService.updateDiliAgent({
       ...DEFAULT_DILI_AGENT_STATE,
       form: { ...DEFAULT_FORM_STATE },
-      isPulling: this.vm.isPulling,
     });
   }
 

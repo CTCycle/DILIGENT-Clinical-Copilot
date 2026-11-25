@@ -20,7 +20,8 @@ from domain.patient_timeline import (
 )
 from domain.agents import AgentDuplicateRequest
 from domain.timeline_dates import extract_single_explicit_timeline_date
-from repositories.agent_seed import ensure_default_agent
+from domain.agents import AgentConfig
+from repositories.agent_seed import default_agent_config, ensure_default_agent
 from repositories.schemas.base import Base
 from repositories.schemas.clinical import ClinicalDrugMention, ClinicalSession
 from repositories.schemas.knowledge import (
@@ -30,12 +31,13 @@ from repositories.schemas.knowledge import (
     KbMatchCache,
     LiverToxMonograph,
 )
-from repository_fixtures import build_repository_graph, legacy_model_payload
+from repository_fixtures import agent_test_config, build_repository_graph
 from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection import DataInspectionService
 from services.inspection.timeline import InspectionTimelineMixin
+from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
 from sqlalchemy import create_engine, select
@@ -45,7 +47,7 @@ from sqlalchemy.pool import StaticPool
 
 ###############################################################################
 def build_repository_graph_for_test(
-    agent_snapshot: dict[str, Any] | None = None,
+    agent_config: AgentConfig | None = None,
 ) -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -53,7 +55,7 @@ def build_repository_graph_for_test(
     # Timelines run the session's DILI agent (default for pre-agent sessions).
     ensure_default_agent(
         graph.agent_repository,
-        agent_snapshot or legacy_model_payload(),
+        agent_config or default_agent_config(),
     )
     return graph, engine
 
@@ -625,7 +627,7 @@ class FakeTimelineExtractor:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.call_count = 0
-        self.last_runtime_settings: dict[str, Any] | None = None
+        self.last_timeline_runtime: tuple[str, str] | None = None
 
     # -------------------------------------------------------------------------
     async def extract_timeline(
@@ -633,11 +635,12 @@ class FakeTimelineExtractor:
         *,
         session_id: int,
         source_payload: dict[str, Any],
-        runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
         _ = source_payload
         self.call_count += 1
-        self.last_runtime_settings = runtime_settings
+        self.last_timeline_runtime = LLMRuntimeConfig.resolve_provider_and_model(
+            "timeline"
+        )
         return PatientTimeline(
             session_id=session_id,
             generated_at=datetime(2026, 1, 1, 12, 0),
@@ -670,9 +673,8 @@ class FailingTimelineExtractor:
         *,
         session_id: int,
         source_payload: dict[str, Any],
-        runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
-        _ = session_id, source_payload, runtime_settings
+        _ = session_id, source_payload
         raise LLMError(
             f"structured extraction failed: {self.error_code}",
             error_code=self.error_code,
@@ -720,9 +722,7 @@ def test_timeline_generation_persists_history_and_reuses_latest_when_not_forced(
     assert generated.timeline_id is not None
     assert generated.events[0].title == "Therapy started"
     assert extractor.call_count == 1
-    assert extractor.last_runtime_settings is not None
-    assert "text_extraction_model" in extractor.last_runtime_settings
-    assert "clinical_model" in extractor.last_runtime_settings
+    assert extractor.last_timeline_runtime is not None
 
     previews = repository_graph.session_timeline_repository.list_session_timelines(
         session_id
@@ -1063,12 +1063,12 @@ def test_timeline_generation_does_not_mutate_persisted_runtime_settings() -> Non
 ###############################################################################
 def test_timeline_generation_follows_the_dili_agent_not_session_settings() -> None:
     repository_graph, _ = build_repository_graph_for_test(
-        legacy_model_payload(
-            use_cloud_models=False,
-            clinical_model="qwen3.5:9b",
-            text_extraction_model="qwen3.5:9b",
-            revision_model="qwen3.5:9b",
-            timeline_model="qwen3.5:9b",
+        agent_test_config(
+            "ollama",
+            extraction="qwen3.5:9b",
+            clinical="qwen3.5:9b",
+            revision="qwen3.5:9b",
+            timeline="qwen3.5:9b",
         )
     )
     persisted_runtime_settings = {
@@ -1105,9 +1105,7 @@ def test_timeline_generation_follows_the_dili_agent_not_session_settings() -> No
     generated = service.generate_session_timeline(session_id, force_regenerate=True)
 
     assert generated is not None
-    assert extractor.last_runtime_settings is not None
-    assert extractor.last_runtime_settings["use_cloud_services"] is False
-    assert extractor.last_runtime_settings["timeline_model"] == "qwen3.5:9b"
+    assert extractor.last_timeline_runtime == ("ollama", "qwen3.5:9b")
     assert generated.source_kind == "local"
     assert generated.model_provider == "ollama"
 
@@ -1211,7 +1209,7 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
     ensure_default_agent(
-        repository_graph.agent_repository, legacy_model_payload()
+        repository_graph.agent_repository, default_agent_config()
     )
     save_session(
         repository_graph,
@@ -1262,7 +1260,7 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
     ensure_default_agent(
-        repository_graph.agent_repository, legacy_model_payload()
+        repository_graph.agent_repository, default_agent_config()
     )
     save_session(
         repository_graph,
@@ -1295,9 +1293,8 @@ def test_timeline_job_cancellation_stops_extraction_before_persistence() -> None
             *,
             session_id: int,
             source_payload: dict[str, Any],
-            runtime_settings: dict[str, Any] | None = None,
         ) -> PatientTimeline:
-            _ = session_id, source_payload, runtime_settings
+            _ = session_id, source_payload
             self.started.set()
             try:
                 await asyncio.sleep(60.0)
@@ -1376,7 +1373,7 @@ def test_timeline_persistence_failure_keeps_history_unchanged_and_can_retry() ->
     Base.metadata.create_all(engine)
     repository_graph = build_repository_graph(engine=engine)
     ensure_default_agent(
-        repository_graph.agent_repository, legacy_model_payload()
+        repository_graph.agent_repository, default_agent_config()
     )
     save_session(
         repository_graph,

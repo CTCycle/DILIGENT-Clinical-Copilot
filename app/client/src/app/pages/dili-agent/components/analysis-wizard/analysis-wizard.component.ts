@@ -70,6 +70,7 @@ function preflightUnavailable(): ClinicalInputPreflightResponse {
     extraction_quality: {},
     deterministic_diagnostics: {},
     rag_readiness: null,
+    evidence_sources: [],
   };
 }
 

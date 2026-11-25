@@ -6,13 +6,11 @@ data/database_config.json
 data/access-key-material.json
 app/client/node_modules/
 app/client/dist/
-app/client/dist-ssr/
 runtimes/**
 !runtimes/cache/
 runtimes/cache/**
 !runtimes/cache/.gitkeep
 assets/QA/**
-!assets/QA/README.md
 .playwright-mcp/
 
 # Python
@@ -27,7 +25,6 @@ build/
 # Node / JS
 **/node_modules/
 **/dist/
-**/dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -58,8 +55,6 @@ release/**
 # Desktop generated build inputs
 app/desktop/src-tauri/target/
 app/desktop/node_modules/
-app/desktop/src-tauri/generated/**
-!app/desktop/src-tauri/generated/.gitkeep
 app/desktop/src-tauri/gen/**
 !app/desktop/package-lock.json
 !app/desktop/src-tauri/Cargo.lock

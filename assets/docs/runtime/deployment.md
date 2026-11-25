@@ -1,5 +1,5 @@
 # Local Deployment
-Last updated: 2026-10-22
+Last updated: 2026-11-25
 
 ## Supported Runtime
 - DILIGENT supports local single-user operation.
@@ -57,9 +57,9 @@ existing output contract and does not require this source-mode marker.
   `uv run alembic -c alembic.ini upgrade head` and
   `uv run alembic -c alembic.ini current --check-heads`, followed by
   `uv run alembic -c alembic.ini check`.
-- Keep one linear head. Back up production data before upgrades. Known
-  revisions from the v2.4 baseline through `202610240001` upgrade through the
-  checked-in history. Populated databases without a revision and databases
+- Keep one linear head. Back up production data before upgrades. Databases
+  created by v3.6.0 or later upgrade through the checked-in history; older
+  databases are refused and must first be upgraded with v3.6.0. Populated databases without a revision and databases
   with unknown or divergent revisions are rejected; the runtime does not
   guess or stamp unversioned migration history.
 - Use Alembic downgrade commands only for reviewed development or recovery

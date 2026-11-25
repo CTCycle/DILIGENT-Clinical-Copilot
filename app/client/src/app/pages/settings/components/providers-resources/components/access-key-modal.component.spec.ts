@@ -3,7 +3,7 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AccessKeyRecord } from '../../../core/models/types';
+import { AccessKeyRecord } from '../../../../../core/models/types';
 import { AccessKeyModalComponent } from './access-key-modal.component';
 
 describe('AccessKeyModalComponent', () => {

@@ -7,7 +7,6 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..\..") do set "PROJECT_ROOT=%%~fI"
 set "APP_DIR=%PROJECT_ROOT%\app"
 set "SERVER_DIR=%APP_DIR%\server"
-set "CLIENT_DIR=%APP_DIR%\client"
 set "TESTS_DIR=%APP_DIR%\tests"
 set "CACHE_DIR=%PROJECT_ROOT%\runtimes\cache"
 set "PYTEST_CACHE_DIR=%CACHE_DIR%\pytest"
@@ -16,27 +15,23 @@ set "UV_CACHE_DIR=%CACHE_DIR%\uv"
 set "RUFF_CACHE_DIR=%CACHE_DIR%\ruff"
 set "NPM_CONFIG_CACHE=%CACHE_DIR%\npm"
 set "PLAYWRIGHT_BROWSERS_PATH=%CACHE_DIR%\playwright"
-set "MYPY_CACHE_DIR=%CACHE_DIR%\mypy"
 set "PIP_CACHE_DIR=%CACHE_DIR%\pip"
 set "PYTHONPYCACHEPREFIX=%CACHE_DIR%\python"
 set "CARGO_TARGET_DIR=%CACHE_DIR%\cargo\target"
 set "HF_HOME=%CACHE_DIR%\huggingface"
 set "HF_HUB_CACHE=%HF_HOME%\hub"
 set "HF_ASSETS_CACHE=%HF_HOME%\assets"
-set "HUGGINGFACE_HUB_CACHE=%HF_HUB_CACHE%"
 set "SETTINGS_ENV=%PROJECT_ROOT%\settings\.env"
 set "VENV_PYTHON=%SERVER_DIR%\.venv\Scripts\python.exe"
 set "UV_EXE=%PROJECT_ROOT%\runtimes\uv\uv.exe"
 set "RUNTIME_PYTHON=%PROJECT_ROOT%\runtimes\python\python.exe"
-set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
 
 set "FASTAPI_HOST=127.0.0.1"
-set "FASTAPI_PORT=8000"
+set "FASTAPI_PORT=7690"
 set "UI_HOST=127.0.0.1"
-set "UI_PORT=7861"
+set "UI_PORT=9847"
 set "TEST_RESULT=0"
 set "STARTED_BACKEND=0"
-set "STARTED_FRONTEND=0"
 
 if exist "%SETTINGS_ENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%SETTINGS_ENV%") do (
@@ -61,8 +56,6 @@ if /i "%TEST_UI_HOST%"=="::" set "TEST_UI_HOST=127.0.0.1"
 
 set "APP_TEST_BACKEND_URL=http://%TEST_FASTAPI_HOST%:%FASTAPI_PORT%"
 set "APP_TEST_FRONTEND_URL=http://%TEST_UI_HOST%:%UI_PORT%"
-set "API_BASE_URL=%APP_TEST_BACKEND_URL%"
-set "UI_BASE_URL=%APP_TEST_FRONTEND_URL%"
 
 if not exist "%VENV_PYTHON%" (
   echo [ERROR] Missing backend venv: "%VENV_PYTHON%"
@@ -72,12 +65,6 @@ set "PYTHON_CMD=%VENV_PYTHON%"
 
 if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%" >nul 2>&1
 set "PYTEST_TEMP_ARGS=--basetemp "%PYTEST_BASETEMP%" -o cache_dir="%PYTEST_CACHE_DIR%""
-
-if exist "%RUNTIME_NPM%" (
-  set "NPM_CMD=%RUNTIME_NPM%"
-) else (
-  set "NPM_CMD=npm"
-)
 
 set "UVICORN_APP=app:app"
 set "BACKEND_WORKDIR=%SERVER_DIR%"
@@ -101,26 +88,23 @@ echo ============================================================
 echo 1. Unit tests
 echo 2. Integration tests
 echo 3. End-to-end tests
-echo 4. Regression tests
-echo 5. All tests
-echo 6. Model-config regression slice
-echo 7. Model-config full pass
+echo 4. All tests
+echo 5. Model-config regression slice
+echo 6. Model-config full pass
 echo.
-set /p SUITE="Select an option (1-7): "
+set /p SUITE="Select an option (1-6): "
 
 if "%SUITE%"=="1" set "SUITE=unit"
 if "%SUITE%"=="2" set "SUITE=integration"
 if "%SUITE%"=="3" set "SUITE=e2e"
-if "%SUITE%"=="4" set "SUITE=regression"
-if "%SUITE%"=="5" set "SUITE=all"
-if "%SUITE%"=="6" set "SUITE=modelconfig"
-if "%SUITE%"=="7" set "SUITE=modelconfigfull"
+if "%SUITE%"=="4" set "SUITE=all"
+if "%SUITE%"=="5" set "SUITE=modelconfig"
+if "%SUITE%"=="6" set "SUITE=modelconfigfull"
 
 :suite_selected
 set "PYTEST_TARGET=%TESTS_DIR%\unit"
 set "NEED_BACKEND=0"
 set "NEED_FRONTEND=0"
-set "EXTRA_PYTEST_ARGS="
 
 if /i "%SUITE%"=="unit" goto :suite_done
 if /i "%SUITE%"=="integration" (
@@ -135,11 +119,6 @@ if /i "%SUITE%"=="e2e" (
   set "NEED_FRONTEND=1"
   goto :suite_done
 )
-if /i "%SUITE%"=="regression" (
-  set "PYTEST_TARGET=%TESTS_DIR%\unit"
-  set "EXTRA_PYTEST_ARGS=-k cloud_llm_native or native_embeddings or ollama_native"
-  goto :suite_done
-)
 if /i "%SUITE%"=="all" (
   set "PYTEST_TARGET=%TESTS_DIR%"
   set "NEED_BACKEND=1"
@@ -147,16 +126,12 @@ if /i "%SUITE%"=="all" (
   goto :suite_done
 )
 if /i "%SUITE%"=="modelconfig" (
-  set "FASTAPI_PORT=7690"
-  set "UI_PORT=9847"
   set "NEED_BACKEND=1"
   set "NEED_FRONTEND=1"
   set "MODELCONFIG_KIND=slice"
   goto :suite_done
 )
 if /i "%SUITE%"=="modelconfigfull" (
-  set "FASTAPI_PORT=7690"
-  set "UI_PORT=9847"
   set "NEED_BACKEND=1"
   set "NEED_FRONTEND=1"
   set "MODELCONFIG_KIND=full"
@@ -177,7 +152,7 @@ echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
 echo.
 
 echo [STEP] Running PowerShell launcher cleanup safety fixtures...
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TESTS_DIR%\test_launcher_cleanup.ps1"
+pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TESTS_DIR%\test_launcher_cleanup.ps1"
 if errorlevel 1 exit /b 1
 
 if "%NEED_FRONTEND%"=="1" (
@@ -226,29 +201,12 @@ if "%NEED_BACKEND%"=="1" (
 )
 
 if "%NEED_FRONTEND%"=="1" (
-  if not exist "%CLIENT_DIR%\node_modules" (
-    echo [INFO] Installing frontend dependencies...
-    call "%NPM_CMD%" --prefix "%CLIENT_DIR%" install
-    if errorlevel 1 set "TEST_RESULT=1" & goto cleanup
+  curl -s --max-time 2 "%APP_TEST_FRONTEND_URL%" >nul 2>&1
+  if errorlevel 1 (
+    echo [ERROR] No UI is reachable at %APP_TEST_FRONTEND_URL%. Start the frontend before running this suite.
+    set "TEST_RESULT=1"
+    goto cleanup
   )
-  echo [INFO] Starting frontend preview server...
-  start "" /B /D "%CLIENT_DIR%" "%NPM_CMD%" run preview -- --host %UI_HOST% --port %UI_PORT%
-  set "STARTED_FRONTEND=1"
-)
-
-if "%NEED_FRONTEND%"=="1" (
-  set "FRONTEND_READY=0"
-  for /l %%I in (1,1,90) do (
-    if "!FRONTEND_READY!"=="0" (
-      curl -s --max-time 2 "%APP_TEST_FRONTEND_URL%" >nul 2>&1
-      if not errorlevel 1 (
-        set "FRONTEND_READY=1"
-      ) else (
-        ping -n 2 127.0.0.1 >nul
-      )
-    )
-  )
-  if not "!FRONTEND_READY!"=="1" set "TEST_RESULT=1" & goto cleanup
 )
 
 if defined MODELCONFIG_KIND (
@@ -259,9 +217,6 @@ if defined MODELCONFIG_KIND (
   echo [STEP] Running model-config unit tests...
   "%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "!MC_UNIT!" -q !PYTEST_TEMP_ARGS!
   if errorlevel 1 set "TEST_RESULT=1" & goto cleanup
-
-  set "APP_TEST_BACKEND_URL=http://127.0.0.1:7690"
-  set "APP_TEST_FRONTEND_URL=http://127.0.0.1:9847"
 
   if /i "%MODELCONFIG_KIND%"=="slice" (
     set "MC_K=runtime_toggle_enables_save_and_submits_put or model_config or dili_run_burst_click_submits_single_job or dili_run_conflict_surfaces_clear_error_message"
@@ -276,18 +231,14 @@ if defined MODELCONFIG_KIND (
 )
 
 echo [STEP] Running pytest...
-"%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS% !PYTEST_TEMP_ARGS!
+"%UV_EXE%" run --project "%SERVER_DIR%" --extra test --python "%RUNTIME_PYTHON%" python -m pytest "%PYTEST_TARGET%" -v --tb=short !PYTEST_TEMP_ARGS!
 if errorlevel 1 set "TEST_RESULT=1"
 
 :cleanup
 if "%STARTED_BACKEND%"=="1" (
   for /f "tokens=5" %%P in ('netstat -ano ^| findstr LISTENING ^| findstr ":%FASTAPI_PORT%"') do taskkill /PID %%P /F >nul 2>&1
 )
-if "%STARTED_FRONTEND%"=="1" (
-  for /f "tokens=5" %%P in ('netstat -ano ^| findstr LISTENING ^| findstr ":%UI_PORT%"') do taskkill /PID %%P /F >nul 2>&1
-)
 if defined PYTEST_BASETEMP if exist "!PYTEST_BASETEMP!" rmdir /s /q "!PYTEST_BASETEMP!" >nul 2>&1
 if defined PYTEST_CACHE if exist "!PYTEST_CACHE!" rmdir /s /q "!PYTEST_CACHE!" >nul 2>&1
-if defined RUN_DB if exist "!RUN_DB!" del /f "!RUN_DB!" >nul 2>&1
 
 exit /b %TEST_RESULT%

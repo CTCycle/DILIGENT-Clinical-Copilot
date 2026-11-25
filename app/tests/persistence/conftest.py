@@ -12,6 +12,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from repositories.database.migrations import migrate_database
+from repositories.database.utils import sqlite_autocommit
 
 
 ###############################################################################
@@ -26,18 +27,14 @@ def persistence_engine(request: pytest.FixtureRequest, tmp_path: Path) -> Engine
 
         @event.listens_for(engine, "connect")
         def configure_sqlite(dbapi_connection, _connection_record) -> None:
-            previous_autocommit = getattr(dbapi_connection, "autocommit", None)
-            if previous_autocommit is not None:
-                dbapi_connection.autocommit = True
-            cursor = dbapi_connection.cursor()
-            try:
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.execute("PRAGMA busy_timeout=30000")
-                cursor.execute("PRAGMA journal_mode=WAL")
-            finally:
-                cursor.close()
-                if previous_autocommit is not None:
-                    dbapi_connection.autocommit = previous_autocommit
+            with sqlite_autocommit(dbapi_connection):
+                cursor = dbapi_connection.cursor()
+                try:
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.execute("PRAGMA busy_timeout=30000")
+                    cursor.execute("PRAGMA journal_mode=WAL")
+                finally:
+                    cursor.close()
     else:
         url = os.getenv("TEST_DATABASE_URL")
         if not url:

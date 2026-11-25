@@ -1093,9 +1093,7 @@ class ClinicalSessionRepository:
             if value_raw is None and upper_limit_raw is None:
                 continue
             observation_at = session_result_data.parse_datetime(
-                item.get("observation_at")
-                or item.get("date")
-                or item.get("sample_date")
+                item.get("sample_date")
             )
             unit = repository_values.normalize_string(item.get("unit"))
             observation_key = (lab_code, observation_at, value_raw, upper_limit_raw, unit)

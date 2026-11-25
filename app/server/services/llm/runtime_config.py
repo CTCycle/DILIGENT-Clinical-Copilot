@@ -6,7 +6,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
-from datetime import datetime
 import hashlib
 import json
 from typing import Literal, cast
@@ -97,23 +96,6 @@ class LLMRuntimeConfig:
     def _role_model(cls, role: RolePurpose) -> str:
         item = cls._role_models(cls._overrides()).get(role)
         return (cls._coerce_optional_text(item.get("model")) or "") if item else ""
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _cloud_role(cls) -> dict[str, object] | None:
-        """First cloud-routed role of the active agent ("clinical" first)."""
-        role_models = cls._role_models(cls._overrides())
-        for role in ("clinical", *ROLE_PURPOSES):
-            item = role_models.get(role)
-            if item and str(item.get("provider") or "ollama") != "ollama":
-                return item
-        return None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def has_role_routing(cls) -> bool:
-        """True when an agent run routes each role to its own provider."""
-        return bool(cls._role_models(cls._runtime_override.get() or {}))
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -288,29 +270,6 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def get_llm_provider(cls) -> str:
-        item = cls._cloud_role()
-        return str(item.get("provider") or "").strip() if item else ""
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_cloud_model(cls) -> str:
-        item = cls._cloud_role()
-        return (cls._coerce_optional_text(item.get("model")) or "") if item else ""
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def is_cloud_enabled(cls) -> bool:
-        """True when at least one role of the active agent uses a cloud provider."""
-        return cls._cloud_role() is not None
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_reasoning_level(cls) -> ReasoningLevel:
-        return cls._coerce_reasoning_level(cls._overrides().get("reasoning_level"))
-
-    # -------------------------------------------------------------------------
-    @classmethod
     def get_ollama_seed(cls) -> int | None:
         return cls._coerce_optional_int(cls._overrides().get("ollama_seed"))
 
@@ -407,25 +366,17 @@ class LLMRuntimeConfig:
             timeline_complexity="moderate",
         )
         snapshot: dict[str, object] = {
-            "use_cloud_services": cls.is_cloud_enabled(),
-            "llm_provider": cls.get_llm_provider(),
-            "cloud_model": cls.get_cloud_model(),
-            "text_extraction_model": cls.get_text_extraction_model(),
-            "clinical_model": cls.get_clinical_model(),
-            "reasoning_level": cls.get_reasoning_level().value,
             "ollama_seed": cls.get_ollama_seed(),
             "evidence_sources": list(evidence_sources),
             "rag_settings": cls.get_rag_settings(),
             "parser_provider": parser_provider,
             "parser_model": parser_model,
             "clinical_provider": clinical_provider,
-            "clinical_model_resolved": clinical_model,
-            "revision_model": cls.get_revision_model(),
-            "timeline_model": cls.get_timeline_model(),
+            "clinical_model": clinical_model,
             "revision_provider": revision_provider,
-            "revision_model_resolved": revision_model,
+            "revision_model": revision_model,
             "timeline_provider": timeline_provider,
-            "timeline_model_resolved": timeline_model,
+            "timeline_model": timeline_model,
             "sampling_policy_version": parser_policy.policy_version,
             "parser_sampling_policy": cls._policy_snapshot(
                 parser_policy, parser_effective
@@ -577,16 +528,14 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_revision(cls) -> int:
+        """A stable identity of the active agent runtime (cache invalidation key)."""
         overrides = cls._runtime_override.get()
-        if overrides:
-            canonical = json.dumps(
-                overrides, sort_keys=True, default=str, separators=(",", ":")
-            )
-            return int(hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:15], 16)
-        updated_at = ModelConfigSerializer().load_snapshot().updated_at
-        if not isinstance(updated_at, datetime):
-            return 0
-        return int(updated_at.timestamp() * 1_000_000)
+        if not overrides:
+            raise ValueError("No agent runtime is active.")
+        canonical = json.dumps(
+            overrides, sort_keys=True, default=str, separators=(",", ":")
+        )
+        return int(hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:15], 16)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -617,10 +566,9 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_reasoning_level_for(cls, purpose: RolePurpose) -> ReasoningLevel:
+        """The role model's own level; no level on the reference means OFF."""
         item = cls._role_models(cls._runtime_override.get() or {}).get(purpose)
-        if item and item.get("reasoning_level"):
-            return cls._coerce_reasoning_level(item["reasoning_level"])
-        return cls.get_reasoning_level()
+        return cls._coerce_reasoning_level(item.get("reasoning_level") if item else None)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -628,4 +576,4 @@ class LLMRuntimeConfig:
         cls, purpose: GenerationPurpose
     ) -> ReasoningLevel:
         role = GENERATION_PURPOSE_ROLES.get(purpose)
-        return cls.get_reasoning_level_for(role) if role else cls.get_reasoning_level()
+        return cls.get_reasoning_level_for(role) if role else ReasoningLevel.OFF

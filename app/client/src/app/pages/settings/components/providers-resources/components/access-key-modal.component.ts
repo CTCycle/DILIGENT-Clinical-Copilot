@@ -14,16 +14,16 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { AccessKeyProvider, AccessKeyRecord } from '../../../core/models/types';
+import { AccessKeyProvider, AccessKeyRecord } from '../../../../../core/models/types';
 import {
   activateAccessKey,
   createAccessKey,
   deleteAccessKey,
   fetchAccessKeys,
-} from '../../../core/services/model-config-api';
-import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
-import { StatusMessageComponent } from '../../../components/status-message/status-message.component';
-import { formatAppDateTime } from '../../../core/utils/date-formatting';
+} from '../../../../../core/services/model-config-api';
+import { ModalShellComponent } from '../../../../../components/modal-shell/modal-shell.component';
+import { StatusMessageComponent } from '../../../../../components/status-message/status-message.component';
+import { formatAppDateTime } from '../../../../../core/utils/date-formatting';
 
 const MASKED_KEY_LABEL = '********************';
 const MIN_ACCESS_KEY_LENGTH = 16;

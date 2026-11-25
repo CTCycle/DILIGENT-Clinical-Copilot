@@ -39,6 +39,7 @@ function preflight(blocking: ClinicalInputPreflightIssue[] = [], warnings: Clini
     extraction_quality: {},
     deterministic_diagnostics: {},
     rag_readiness: null,
+    evidence_sources: [],
   } satisfies ClinicalInputPreflightResponse;
 }
 
@@ -122,13 +123,10 @@ describe('AnalysisWizardComponent', () => {
     vi.restoreAllMocks();
   });
 
-  it('runs preflight on open with the default agent and none of the removed fields', () => {
+  it('runs preflight on open with the default agent', () => {
     expect(payloads).toHaveLength(1);
     expect(payloads[0].agent_id).toBe('a1');
     expect(payloads[0].agent_revision).toBe(2);
-    for (const removed of ['evidence_sources', 'model_overrides', 'selected_model_providers']) {
-      expect(removed in payloads[0]).toBe(false);
-    }
   });
 
   it('returns to preflight when reopened after the clinical input changed', async () => {

@@ -20,23 +20,6 @@ from repositories.serialization.application_configuration import (
 
 UNSET = object()
 
-# Execution settings the singleton held before agents owned them. They are
-# read once to seed the default agents and then pruned from the payload.
-LEGACY_EXECUTION_KEYS: frozenset[str] = frozenset(
-    {
-        "use_cloud_models",
-        "use_cloud_services",
-        "cloud_provider",
-        "llm_provider",
-        "cloud_model",
-        "text_extraction_model",
-        "clinical_model",
-        "revision_model",
-        "timeline_model",
-        "reasoning_level",
-    }
-)
-
 
 ###############################################################################
 class ModelConfigSerializer:
@@ -77,15 +60,9 @@ class ModelConfigSerializer:
             )
 
     # -------------------------------------------------------------------------
-    def load_raw_payload(self) -> dict[str, object] | None:
-        """Return the stored payload unchanged (legacy keys included)."""
-        payload, _ = self.application_configuration.load_with_metadata()
-        return dict(payload) if isinstance(payload, dict) else None
-
-    # -------------------------------------------------------------------------
     def ensure_defaults(self, payload: dict[str, object]) -> bool:
-        """Fill missing shared defaults, preserve saved values, prune legacy keys."""
-        defaults = self.prune_legacy_keys(payload)
+        """Fill missing shared defaults and preserve saved values."""
+        defaults = dict(payload)
         defaults["rag_settings"] = self.normalize_rag_settings(
             defaults.get("rag_settings")
         )
@@ -95,7 +72,7 @@ class ModelConfigSerializer:
             return self.application_configuration.save_if_missing(defaults)
 
         merged = dict(defaults)
-        merged.update(self.prune_legacy_keys(current))
+        merged.update(current)
         for block_name in (
             "jobs",
             "runtime",
@@ -147,9 +124,6 @@ class ModelConfigSerializer:
     def _merge_latest_configuration(
         self, updates: dict[str, object], payload: dict[str, object]
     ) -> None:
-        payload.pop("database", None)
-        for key in LEGACY_EXECUTION_KEYS:
-            payload.pop(key, None)
         payload["rag_settings"] = self.normalize_rag_settings(
             payload.get("rag_settings")
         )
@@ -165,20 +139,6 @@ class ModelConfigSerializer:
             ollama_seed=cls.normalize_seed(payload.get("ollama_seed", 42)),
             updated_at=updated_at,
         )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def prune_legacy_keys(payload: Mapping[str, object]) -> dict[str, object]:
-        return {
-            key: value
-            for key, value in payload.items()
-            if key not in LEGACY_EXECUTION_KEYS
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def has_legacy_keys(payload: Mapping[str, object]) -> bool:
-        return bool(LEGACY_EXECUTION_KEYS & set(payload))
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -29,8 +29,6 @@ import {
 } from '../../core/services/clinical-sessions-api';
 import { ApiHttpError } from '../../core/services/http-api';
 import {
-  fetchInspectionLiverToxCatalog,
-  fetchInspectionRxNavCatalog,
 } from '../../core/services/knowledge-catalog-api';
 import {
   cancelSessionRevisionJob,
@@ -79,14 +77,10 @@ import {
   DetectedDrugEvidence,
   diseaseTemporalLabel as previewDiseaseTemporalLabel,
   LabTimelineRow,
-  normalizeDrugName,
   previewDetectedDiseases as extractDetectedDiseases,
-  previewDetectedDrugs as extractDetectedDrugs,
   previewHepatotoxicityPattern as extractHepatotoxicityPattern,
-  previewLaboratorySummary as extractLaboratorySummary,
   previewLabTimeline as extractLabTimeline,
   previewReport as extractReport,
-  resolveDrugBibliographyLabel,
   terminologyResolvedLabel,
 } from './clinical-session-preview';
 import { TerminologyCandidate } from '../../core/models/inspection-types';
@@ -203,7 +197,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly terminologyStatusTone = terminologyStatusTone;
   readonly terminologyResolvedLabel = terminologyResolvedLabel;
   readonly detectedDiseases = signal<string[]>([]);
-  readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
   readonly labTimeline = signal<LabTimelineRow[]>([]);
   readonly hepatotoxicityPattern = signal<string>('N/A');
   readonly revisionInstruction = signal('');
@@ -360,11 +353,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.metadataText.set(JSON.stringify(normalizeClinicalSessionMetadata(detail.metadata || {}), null, 2));
       this.activeSection.set(section);
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
-      this.labSummary.set(this.previewLaboratorySummary(detail));
       this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
       void this.loadAttachments(detail.session_id, detailLoadGeneration);
-      void this.loadDetectedDrugEvidence(detail, detailLoadGeneration);
+      this.detectedDrugEvidence.set(buildPersistedDrugEvidence(detail));
       void this.loadPersistedRevision(detail.session_id, revisionLoadGeneration);
       if (updateUrl) this.syncQueryParams();
     } catch (error) {
@@ -434,7 +426,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.attachments.set([]);
     this.detectedDrugEvidence.set([]);
     this.detectedDiseases.set([]);
-    this.labSummary.set([]);
     this.labTimeline.set([]);
     this.hepatotoxicityPattern.set('N/A');
     this.revisionPollCancelled = true;
@@ -971,16 +962,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return this.markdownRenderer.render(this.previewOfficialReport(detail)).html;
   }
 
-  previewDetectedDrugs(detail: ClinicalSessionDetail): string[] {
-    return extractDetectedDrugs(detail);
-  }
-
   previewDetectedDiseases(detail: ClinicalSessionDetail): string[] {
     return extractDetectedDiseases(detail);
-  }
-
-  previewLaboratorySummary(detail: ClinicalSessionDetail): Array<{ label: string; value: string }> {
-    return extractLaboratorySummary(detail);
   }
 
   previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRow[] {
@@ -1033,57 +1016,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.terminologyDecisionPending.set(false);
     }
   }
-
-  private async loadDetectedDrugEvidence(
-    detail: ClinicalSessionDetail,
-    detailLoadGeneration: number,
-  ): Promise<void> {
-    const isCurrentLoad = (): boolean => (
-      detailLoadGeneration === this.detailLoadGeneration
-      && this.selected()?.session_id === detail.session_id
-    );
-    const rows = buildPersistedDrugEvidence(detail);
-    if (isCurrentLoad()) {
-      this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => row));
-    }
-    if (!rows.length) return;
-
-    const needsFallback = rows.filter((row) => !row.hasPersistedMatch || !row.rxNav);
-    if (!needsFallback.length) return;
-
-    const fallbackByName = new Map<string, Partial<DetectedDrugEvidence>>();
-    await Promise.all(needsFallback.map(async (row) => {
-      const [rxNav, liverTox] = await Promise.all([
-        row.rxNav ? Promise.resolve(true) : this.catalogHasDrug('rxnav', row.name),
-        row.liverTox || row.hasPersistedMatch ? Promise.resolve(row.liverTox) : this.catalogHasDrug('livertox', row.name),
-      ]);
-      fallbackByName.set(row.name, { rxNav, liverTox });
-    }));
-    if (isCurrentLoad()) {
-      this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => ({
-        ...row,
-        bibliographyLabel: resolveDrugBibliographyLabel(row, fallbackByName.get(row.name)),
-        bibliographyFallback: row.bibliographyFallback
-          || (!row.liverTox && Boolean(fallbackByName.get(row.name)?.liverTox))
-          || (!row.rxNav && Boolean(fallbackByName.get(row.name)?.rxNav)),
-      })));
-    }
-  }
-
-
-  private async catalogHasDrug(source: 'rxnav' | 'livertox', name: string): Promise<boolean> {
-    const normalized = normalizeDrugName(name);
-    const search = normalized || name;
-    try {
-      const payload = source === 'rxnav'
-        ? await fetchInspectionRxNavCatalog({ search, offset: 0, limit: 5 })
-        : await fetchInspectionLiverToxCatalog({ search, offset: 0, limit: 5 });
-      return payload.items.some((item) => normalizeDrugName(item.drug_name) === normalized);
-    } catch {
-      return false;
-    }
-  }
-
 
   async downloadAttachment(item: ClinicalSessionAttachment): Promise<void> {
     try {

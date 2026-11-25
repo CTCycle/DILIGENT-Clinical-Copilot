@@ -150,12 +150,6 @@ export function filterSessions(
   return items.filter((item) => matchesFilters(item, filters, now)).sort(compareSessions(filters.sort));
 }
 
-export function activeFilterCount(filters: SessionFilterState): number {
-  return (filters.statuses.length ? 1 : 0)
-    + (filters.date.preset !== 'any' ? 1 : 0)
-    + (filters.query.trim() ? 1 : 0);
-}
-
 /** Builds the server query equivalent to the local filters (used for historical retrieval). */
 export function toServerQuery(
   filters: SessionFilterState,
