@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-11-25
+Last updated: 2026-11-26
 
 `/api/agents` manages reusable versioned agents that bundle the DILI Assessment, DILI Revision and Timeline capabilities (see
 Agent Routes below). `/api/model-config` manages only the shared provider
@@ -238,9 +238,12 @@ one of `openai`, `gemini`, `deepseek`, `anthropic`, `opencode`, or `brave`.
 - Terminology routes: `summary` reports per-source versions, last runs, counts, license and attribution, open conflicts and fuzzy-index statistics; `resolve` is the try-it resolver (takes only `name`; the RxNav fallback follows Settings → Drug Matching); `aliases/confirm` and `aliases/reject` store reviewer decisions as `reviewer` aliases (`404` for an unknown concept). `POST /api/inspection/rxnav/jobs` accepts only `force_full`; `POST /api/inspection/terminology/jobs` accepts `force_full`, `drugcentral_enabled`, `chembl_enabled` and `swissmedic_enabled`. See [drug_terminology.md](drug_terminology.md).
 - `POST /api/inspection/sessions/{session_id}/timeline-jobs` accepts
   `force_regenerate` and returns a job for polling. The job resolves the
-  timeline configuration of the selected agent (`agent_id`/`agent_revision`,
-  default agent when omitted) at start and stores the agent revision with the
-  timeline; models are managed in Agents. Timeline previews include source-evidence,
+  timeline configuration of the selected agent (`agent_id` up to 64 characters
+  and `agent_revision`, default agent when omitted) at start and stores the
+  agent revision with the timeline; models are managed in Agents. Agent
+  readiness failures (for example a cloud model without active credentials)
+  return `422`, as for session launch and revision jobs; `409` is reserved for
+  a stale `agent_revision` or a timeline job already running for the session. Timeline previews include source-evidence,
   missing-evidence, uncertain, and undated counts, plus `is_stale` when the
   session input changed after generation. Drafts can generate timelines from
   the deterministic section split of their input; this never changes the

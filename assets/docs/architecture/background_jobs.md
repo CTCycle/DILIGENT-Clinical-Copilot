@@ -1,5 +1,5 @@
 # Background Jobs
-Last updated: 2026-11-10
+Last updated: 2026-11-26
 
 ## Scope
 DILIGENT uses a centralized thread-based job manager for long-running operations.
@@ -192,7 +192,8 @@ stateDiagram-v2
 - Completed results include database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`.
 - DILI sessions perform deterministic section validation before clinical extraction and may parallelize parser-model extraction only when parser batch preflight marks concurrency as safe; otherwise the workflow falls back to sequential execution.
 - DILI LiverTox/evidence preparation has a hard bounded timeout. Timeout records a sanitized timeout warning and continues without prepared evidence; it must not be reported as an unavailable or empty knowledge base. RAG-off progress explicitly states that vector retrieval is disabled.
-- Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts.
+- Revision concurrency is scoped per root clinical session; a second revision for the same root session conflicts. The job manager does not enforce scope keys, so the inspection service makes the running-job check and the start atomic for revision and timeline jobs: simultaneous starts admit one job and return `409` for the rest.
+- Timeline jobs for different sessions may run concurrently with different agents' models, so each job binds its own LLM client to the shared extractor settings and closes it when extraction ends.
 - Structured catalog update concurrency uses one shared catalog scope, so individual RxNav, LiverTox, terminology, DILIrank, and combined jobs cannot overlap while shared identity data are changing.
 
 ## New Job Checklist
