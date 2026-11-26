@@ -13,7 +13,7 @@ from string import ascii_uppercase
 from threading import Lock
 from typing import Any, Literal
 
-from common.exceptions import ServiceConflictError
+from common.exceptions import ServiceConflictError, ServiceValidationError
 from common.paths import VECTOR_DB_PATH
 from repositories.agent_repository import AgentRepository
 from services.agents import AgentService
@@ -158,6 +158,7 @@ class DataInspectionService(
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs
         self.timeline_generation_lock = Lock()
+        self.job_start_lock = Lock()
         self.timeline_generation_inflight: set[int] = set()
         self.timeline_generation_cooldown_until: dict[int, float] = {}
         self.update_job_runner = DataInspectionUpdateJobRunner(
@@ -987,14 +988,10 @@ class DataInspectionService(
         )
         readiness_issues = self.agent_service.collect_context_issues(agent_context)
         if readiness_issues:
-            raise ValueError(" ".join(issue.message for issue in readiness_issues))
-        scope_key = f"session_timeline:{safe_session_id}"
-        if self.jobs.is_job_running(
-            self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key
-        ):
-            raise ValueError(
-                "Timeline regeneration is already in progress for this session."
+            raise ServiceValidationError(
+                " ".join(issue.message for issue in readiness_issues)
             )
+        scope_key = f"session_timeline:{safe_session_id}"
         runner = partial(
             self.run_session_timeline_job,
             safe_session_id,
@@ -1002,11 +999,18 @@ class DataInspectionService(
             source=source,
             agent_context=agent_context,
         )
-        job_id = self.jobs.start_job(
-            job_type=self.SESSION_TIMELINE_JOB_TYPE,
-            runner=runner,
-            scope_key=scope_key,
-        )
+        with self.job_start_lock:
+            if self.jobs.is_job_running(
+                self.SESSION_TIMELINE_JOB_TYPE, scope_key=scope_key
+            ):
+                raise ValueError(
+                    "Timeline regeneration is already in progress for this session."
+                )
+            job_id = self.jobs.start_job(
+                job_type=self.SESSION_TIMELINE_JOB_TYPE,
+                runner=runner,
+                scope_key=scope_key,
+            )
         payload = self.jobs.get_job_status(job_id)
         if payload is None:
             raise RuntimeError("Failed to initialize session timeline job")

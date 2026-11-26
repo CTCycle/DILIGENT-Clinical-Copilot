@@ -296,8 +296,10 @@ class AgentService:
                         code="provider_key_missing",
                         field=field,
                         message=(
-                            f"Configure an active {ref.provider} access key "
-                            "before running this agent."
+                            # Plain wording: the client hides messages that
+                            # mention keys or tokens.
+                            f"Add active {ref.provider} credentials in Settings "
+                            "→ Providers & Models before running this agent."
                         ),
                     )
                 )

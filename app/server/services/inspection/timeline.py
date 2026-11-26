@@ -23,6 +23,7 @@ from services.inspection.normalization import (
     extract_lab_marker,
     normalize_text,
 )
+from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection.runtime import coerce_optional_str
 from services.session.text_section_parser import parse_initial_text_sections
 from sqlalchemy.exc import IntegrityError
@@ -62,6 +63,24 @@ class TimelineGenerationCancelled(Exception):
 ###############################################################################
 async def _run_awaitable(awaitable: Awaitable[T]) -> T:
     return await awaitable
+
+
+###############################################################################
+async def _extract_timeline(
+    extractor: Any,
+    *,
+    owns_client: bool,
+    session_id: int,
+    source_payload: dict[str, Any],
+) -> PatientTimeline:
+    try:
+        return await extractor.extract_timeline(
+            session_id=session_id, source_payload=source_payload
+        )
+    finally:
+        if owns_client and extractor.client is not None:
+            with suppress(Exception):
+                await extractor.client.close()
 
 
 ###############################################################################
@@ -391,6 +410,22 @@ class InspectionTimelineMixin:
         )
 
     # -------------------------------------------------------------------------
+    def _timeline_extractor_for_job(self) -> tuple[Any, bool]:
+        """Concurrent jobs may run different agents' models, so each job binds
+        its own client; injected extractors are reused as given."""
+        shared = self.timeline_extractor
+        if (
+            type(shared) is not PatientTimelineExtractor
+            or shared.client_provider == "injected"
+        ):
+            return shared, False
+        extractor = PatientTimelineExtractor(
+            temperature=shared.temperature, timeout_s=shared.timeout_s
+        )
+        extractor.extraction_retry_attempts = shared.extraction_retry_attempts
+        return extractor, True
+
+    # -------------------------------------------------------------------------
     def generate_session_timeline(
         self,
         session_id: int,
@@ -417,22 +452,20 @@ class InspectionTimelineMixin:
                     "Timeline regeneration is already in progress for this session."
                 )
             self.timeline_generation_inflight.add(safe_session_id)
-        if not force_regenerate:
-            cached = self.get_session_timeline(session_id)
-            if (
-                cached is not None
-                and self.session_timeline_repository.is_latest_timeline_current(
-                    session_id,
-                    agent_revision_id=(
-                        agent_context.agent_revision_id if agent_context else None
-                    ),
-                )
-            ):
-                _raise_if_stopped(stop_check)
-                with self.timeline_generation_lock:
-                    self.timeline_generation_inflight.discard(safe_session_id)
-                return cached
         try:
+            if not force_regenerate:
+                cached = self.get_session_timeline(session_id)
+                if (
+                    cached is not None
+                    and self.session_timeline_repository.is_latest_timeline_current(
+                        session_id,
+                        agent_revision_id=(
+                            agent_context.agent_revision_id if agent_context else None
+                        ),
+                    )
+                ):
+                    _raise_if_stopped(stop_check)
+                    return cached
             _report_progress(progress_callback, 5, "Preparing session timeline source")
             _raise_if_stopped(stop_check)
             if source is None:
@@ -445,12 +478,9 @@ class InspectionTimelineMixin:
             _raise_if_stopped(stop_check)
             # Budget every extractor attempt so retryable failures can be retried;
             # the cap stays below the client's 360 s job polling deadline.
-            attempt_timeout_s = float(
-                getattr(self.timeline_extractor, "timeout_s", 90.0)
-            )
-            attempts = int(
-                getattr(self.timeline_extractor, "extraction_retry_attempts", 1)
-            )
+            extractor, owns_client = self._timeline_extractor_for_job()
+            attempt_timeout_s = float(getattr(extractor, "timeout_s", 90.0))
+            attempts = int(getattr(extractor, "extraction_retry_attempts", 1))
             timeline_timeout_s = max(
                 20.0, min(330.0, attempt_timeout_s * max(1, attempts) + 15.0)
             )
@@ -473,7 +503,9 @@ class InspectionTimelineMixin:
                     timeline = asyncio.run(
                         asyncio.wait_for(
                             _await_with_stop_check(
-                                self.timeline_extractor.extract_timeline(
+                                _extract_timeline(
+                                    extractor,
+                                    owns_client=owns_client,
                                     session_id=session_id,
                                     source_payload=source,
                                 ),

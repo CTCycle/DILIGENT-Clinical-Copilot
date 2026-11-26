@@ -42,6 +42,7 @@ class InspectionRevisionScaffoldMixin:
     session_revision_repository: Any
     agent_service: Any
     jobs: Any
+    job_start_lock: Any
     revision_agent_runner: Any
     REVISION_JOB_TYPE: str
     get_session_detail: Any
@@ -146,6 +147,21 @@ class InspectionRevisionScaffoldMixin:
         request: SessionRevisionRequest | None = None,
         *,
         agent_context: AgentExecutionContext | None = None,
+    ) -> dict[str, Any]:
+        # The job manager does not enforce scope keys, so the running-job check
+        # and the start must be atomic or concurrent starts race on the shell.
+        with self.job_start_lock:
+            return self._start_revision_job(
+                session_id, request, agent_context=agent_context
+            )
+
+    # -------------------------------------------------------------------------
+    def _start_revision_job(
+        self,
+        session_id: int,
+        request: SessionRevisionRequest | None,
+        *,
+        agent_context: AgentExecutionContext | None,
     ) -> dict[str, Any]:
         revision_request = self._coerce_revision_request(request)
         session = self.get_session_detail(session_id)

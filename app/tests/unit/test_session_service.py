@@ -141,7 +141,7 @@ def test_launch_requires_active_cloud_key_before_extraction(
 
     request = ClinicalSessionRequest(clinical_input="raw input")
     with pytest.raises(
-        ServiceValidationError, match="Configure an active gemini access key"
+        ServiceValidationError, match="Add active gemini credentials"
     ) as exc_info:
         validate_clinical_launch_workflow(service, request)
 

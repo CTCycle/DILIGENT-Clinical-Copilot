@@ -566,8 +566,13 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_reasoning_level_for(cls, purpose: RolePurpose) -> ReasoningLevel:
-        """The role model's own level; no level on the reference means OFF."""
-        item = cls._role_models(cls._runtime_override.get() or {}).get(purpose)
+        """The role model's own level (stage override first, as for routing);
+        no level on the reference means OFF."""
+        role_models = cls._role_models(cls._runtime_override.get() or {})
+        stage = cls._stage.get()
+        item = (role_models.get(f"{purpose}.{stage}") if stage else None) or (
+            role_models.get(purpose)
+        )
         return cls._coerce_reasoning_level(item.get("reasoning_level") if item else None)
 
     # -------------------------------------------------------------------------

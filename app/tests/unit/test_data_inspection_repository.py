@@ -36,7 +36,10 @@ from services.clinical.knowledge import ClinicalKnowledgeComposer
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection import DataInspectionService
-from services.inspection.timeline import InspectionTimelineMixin
+from services.inspection.timeline import (
+    InspectionTimelineMixin,
+    TimelineGenerationCancelled,
+)
 from services.llm.runtime_config import LLMRuntimeConfig
 from services.llm.cloud import LLMError
 from services.runtime.jobs import JobManager
@@ -1247,6 +1250,63 @@ def test_timeline_job_reuses_source_loaded_at_start(monkeypatch) -> None:
     assert status is not None
     assert status["status"] == "completed"
     assert source_reads == 1
+
+
+###############################################################################
+def _timeline_service_with_session(patient_name: str) -> tuple[Any, int]:
+    engine = create_engine(
+        "sqlite+pysqlite://",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    repository_graph = build_repository_graph(engine=engine)
+    ensure_default_agent(repository_graph.agent_repository, default_agent_config())
+    save_session(
+        repository_graph,
+        patient_name=patient_name,
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="completed",
+        report="Timeline report",
+        anamnesis="Symptoms started in January 2025.",
+    )
+    rows, _ = repository_graph.clinical_session_repository.list_sessions(
+        search=patient_name, offset=0, limit=10,
+    )
+    service = build_service(
+        repository_graph, timeline_extractor=FakeTimelineExtractor(), jobs=JobManager()
+    )
+    return service, int(rows[0]["session_id"])
+
+
+###############################################################################
+def test_timeline_cache_hit_stop_releases_the_session() -> None:
+    service, session_id = _timeline_service_with_session("Cache Stop Patient")
+    assert service.generate_session_timeline(session_id, force_regenerate=True)
+    checks = iter([False, True])
+
+    with pytest.raises(TimelineGenerationCancelled):
+        service.generate_session_timeline(
+            session_id, stop_check=lambda: next(checks, True)
+        )
+
+    assert session_id not in service.timeline_generation_inflight
+    assert service.generate_session_timeline(session_id) is not None
+
+
+###############################################################################
+def test_timeline_jobs_bind_their_own_extractor_client() -> None:
+    service, _ = _timeline_service_with_session("Extractor Patient")
+    injected = service.timeline_extractor
+    assert service._timeline_extractor_for_job() == (injected, False)
+
+    service.timeline_extractor = PatientTimelineExtractor(timeout_s=12.0)
+    first, first_owned = service._timeline_extractor_for_job()
+    second, _ = service._timeline_extractor_for_job()
+    assert first_owned is True
+    assert first is not service.timeline_extractor and first is not second
+    assert first.timeout_s == 12.0
 
 
 ###############################################################################

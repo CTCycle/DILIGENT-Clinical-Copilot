@@ -569,7 +569,11 @@ def test_extraction_stage_scope_routes_stage_override(
 ) -> None:
     payload = agent_payload()
     payload["assessment"]["models"]["extraction_overrides"] = {
-        "diseases": {"provider": "openai", "model": "gpt-4.1-mini"}
+        "diseases": {
+            "provider": "openai",
+            "model": "gpt-4.1-mini",
+            "reasoning_level": "high",
+        }
     }
     with LLMRuntimeConfig.override_for_run(
         LLMRuntimeConfig.agent_runtime_overrides(_context(payload, 3))
@@ -578,6 +582,9 @@ def test_extraction_stage_scope_routes_stage_override(
             assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (
                 "openai",
                 "gpt-4.1-mini",
+            )
+            assert LLMRuntimeConfig.get_reasoning_level_for("parser") == (
+                ReasoningLevel.HIGH
             )
         with LLMRuntimeConfig.stage_scope("laboratory"):
             assert LLMRuntimeConfig.resolve_provider_and_model("parser") == (

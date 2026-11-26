@@ -1927,6 +1927,42 @@ def test_revision_job_rejects_same_root_concurrent_start(tmp_path: Path) -> None
 
 
 ###############################################################################
+def test_simultaneous_revision_starts_admit_exactly_one(tmp_path: Path) -> None:
+    serializer = build_file_serializer(tmp_path)
+    session_id = save_revision_source_session(serializer)
+    service = build_service(serializer, JobManager())
+    service.revision_agent_runner = SlowRevisionRunner()
+    barrier = threading.Barrier(4)
+    outcomes: list[object] = []
+
+    def start() -> None:
+        barrier.wait()
+        try:
+            outcomes.append(service.start_revision_job(session_id, SessionRevisionRequest()))
+        except Exception as exc:  # noqa: BLE001 - every failure is asserted below
+            outcomes.append(exc)
+
+    threads = [threading.Thread(target=start) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    started = [item for item in outcomes if isinstance(item, dict)]
+    assert len(started) == 1
+    assert all(
+        isinstance(item, SessionRevisionConflictError)
+        for item in outcomes
+        if not isinstance(item, dict)
+    )
+    for _ in range(40):
+        status = service.get_revision_job_status(started[0]["job_id"])
+        if status and status["status"] in {"completed", "failed", "cancelled"}:
+            break
+        time.sleep(0.05)
+
+
+###############################################################################
 def test_revision_shell_uses_explicit_source_version(tmp_path: Path) -> None:
     serializer = build_file_serializer(tmp_path)
     session_id = save_revision_source_session(serializer)
