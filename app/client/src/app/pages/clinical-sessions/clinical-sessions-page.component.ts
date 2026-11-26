@@ -53,7 +53,7 @@ import {
 } from '../../core/models/revision-types';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { JobPollingService } from '../../core/services/job-polling.service';
-import { AgentsStateService } from '../../core/state/agents-state.service';
+import { AgentsStateService, mayReflectAgentChange } from '../../core/state/agents-state.service';
 import { formatErrorMessage, formatUnknownError, isRecord } from '../../core/utils';
 import {
   DEFAULT_CLINICAL_SESSION_METADATA_TEXT,
@@ -601,8 +601,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         this.revisionStatus.set(formatUnknownError(error, 'Failed to start revision agent.'));
         this.revisionRunning.set(false);
       }
-      // The agent may have changed since it was loaded: refresh so a retry pins the current revision.
-      if (error instanceof ApiHttpError && error.statusCode === 409) void this.loadRevisionAgents();
+      // The agent may have changed or gone since it was loaded: refresh so a retry pins the current one.
+      if (mayReflectAgentChange(error)) void this.loadRevisionAgents();
     }
   }
 

@@ -80,10 +80,13 @@ export class AgentEditorComponent implements OnInit {
     const agent = this.agent();
     return agent && this.name() === agent.name ? this.agents.displayName(agent) : this.name();
   });
-  readonly loadState = computed<'loading' | 'ready' | 'missing' | 'no-seed'>(() => {
+  readonly agentsError = computed(() => stripPrefix(this.agents.error() ?? 'Agents could not be loaded.'));
+  readonly loadState = computed<'loading' | 'ready' | 'error' | 'missing' | 'no-seed'>(() => {
     if (this.agents.status() === 'idle' || this.agents.status() === 'loading') {
       return this.agents.all().length ? 'ready' : 'loading';
     }
+    // A failed load is not proof that the agent is gone.
+    if (this.agents.status() === 'error' && !this.agents.all().length) return 'error';
     if (this.creating()) return this.seed() ? 'ready' : 'no-seed';
     return this.agent() ? 'ready' : 'missing';
   });
@@ -298,7 +301,11 @@ export class AgentEditorComponent implements OnInit {
     if (fresh) this.reset(fresh);
   }
 
-  async setLifecycle(change: AgentLifecycleRequest): Promise<void> {
+  retryLoad(): void {
+    this.agents.load({ force: true }).catch(() => undefined);
+  }
+
+  async setLifecycle(change: AgentLifecycleRequest, toggle?: HTMLInputElement): Promise<void> {
     const agent = this.agent();
     if (!agent || this.lifecycleBusy()) return;
     this.lifecycleBusy.set(true);
@@ -306,7 +313,10 @@ export class AgentEditorComponent implements OnInit {
     try {
       await this.agents.setLifecycle(agent.id, change);
     } catch (error) {
+      // The switch flipped before the request: restore it and show the server's current state.
+      if (toggle) toggle.checked = !toggle.checked;
       this.lifecycleError.set(stripPrefix(error instanceof Error ? error.message : String(error)));
+      this.agents.load({ force: true }).catch(() => undefined);
     } finally {
       this.lifecycleBusy.set(false);
     }

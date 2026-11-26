@@ -21,6 +21,15 @@ import {
   setDefaultAgent,
   updateAgent,
 } from '../services/agents-api';
+import { ApiHttpError } from '../services/http-api';
+
+/**
+ * Launch failures that can mean the chosen agent changed (409), was deleted (404)
+ * or is no longer selectable (422); callers refresh agents so pickers do not go stale.
+ */
+export function mayReflectAgentChange(error: unknown): boolean {
+  return error instanceof ApiHttpError && [404, 409, 422].includes(error.statusCode);
+}
 
 export type AgentsLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 

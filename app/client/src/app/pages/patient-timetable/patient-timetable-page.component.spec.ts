@@ -6,7 +6,12 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { InspectionSessionTimeline, InspectionTimelineEvent } from '../../core/models/inspection-types';
+import {
+  InspectionSessionTimeline,
+  InspectionSessionTimelinePreview,
+  InspectionTimelineEvent,
+} from '../../core/models/inspection-types';
+import { makeAgent, makeAgentConfig, withDisabled } from '../../core/testing/agent-fixtures';
 import { PatientTimetablePageComponent } from './patient-timetable-page.component';
 import { formatDayGap } from './timeline-date';
 import { eventDateSummary, precisionLabel } from './timeline-presentation';
@@ -20,6 +25,26 @@ function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => { resolve = next; });
   return { promise, resolve };
+}
+
+function timelinePreview(
+  sessionId: number,
+  timelineId: number,
+  isStale: boolean,
+): InspectionSessionTimelinePreview {
+  return {
+    timeline_id: timelineId,
+    session_id: sessionId,
+    generated_at: '2026-09-17T09:00:00Z',
+    is_stale: isStale,
+    event_count: 0,
+    start_date: null,
+    end_date: null,
+    source_evidence_event_count: 0,
+    missing_evidence_event_count: 0,
+    uncertain_event_count: 0,
+    undated_event_count: 0,
+  };
 }
 
 function jsonResponse(value: unknown): Response {
@@ -277,6 +302,7 @@ describe('PatientTimetablePageComponent', () => {
       const url = String(input);
       if (url.endsWith('/sessions/1/timelines/11')) return firstResponse.promise;
       if (url.endsWith('/sessions/2/timelines/22')) return secondResponse.promise;
+      if (url.endsWith('/timelines')) return jsonResponse({ items: [] });
       throw new Error(`Unexpected request: ${url}`);
     });
     const handleRouteChange = (component as unknown as {
@@ -303,22 +329,53 @@ describe('PatientTimetablePageComponent', () => {
     }));
     await firstLoad;
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
     expect(component.sessionId()).toBe(2);
     expect(component.timelineId()).toBe(22);
     expect(component.timeline()?.session_id).toBe(2);
     expect(component.loading()).toBe(false);
     expect(component.error()).toBeNull();
   });
+  it('regenerates with the preferred Timeline agent, not an implicit default', async () => {
+    const defaultWithoutTimeline = makeAgent(
+      'main', { is_default: true }, withDisabled(makeAgentConfig(), 'timeline'),
+    );
+    const timelineAgent = makeAgent('tl', { current_revision: 4 });
+    const jobBodies: unknown[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/agents')) return jsonResponse({ agents: [defaultWithoutTimeline, timelineAgent] });
+      if (url.endsWith('/sessions/12/timeline-jobs')) {
+        jobBodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ detail: 'Agent not found.' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    component.sessionId.set(12);
+
+    await component.regenerate();
+
+    expect(jobBodies).toEqual([{ force_regenerate: true, agent_id: 'tl', agent_revision: 4 }]);
+    expect(component.error()).toBeTruthy();
+  });
+
   it('shows the stale notice for a stale timeline and clears every trace when the session changes', async () => {
+    // Staleness is only reported on the preview list, never on the full timeline payload.
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
       const sessionId = url.includes('/sessions/1/') ? 1 : 2;
+      const timelineId = sessionId * 11;
+      if (url.endsWith('/timelines')) {
+        return jsonResponse({
+          items: [timelinePreview(sessionId, timelineId, sessionId === 1)],
+        });
+      }
       return jsonResponse({
-        timeline_id: sessionId * 11,
+        timeline_id: timelineId,
         session_id: sessionId,
         generated_at: '2026-09-17T09:00:00Z',
-        is_stale: sessionId === 1,
         events: [],
       });
     });

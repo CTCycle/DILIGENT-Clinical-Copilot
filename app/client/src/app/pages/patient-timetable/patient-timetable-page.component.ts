@@ -24,9 +24,12 @@ import {
   fetchInspectionSessionTimelineList,
   startInspectionSessionTimelineJob,
 } from '../../core/services/session-timeline-api';
+import { Agent } from '../../core/models/agent-types';
 import { JobPollingService } from '../../core/services/job-polling.service';
+import { AgentsStateService, mayReflectAgentChange } from '../../core/state/agents-state.service';
 import {
   InspectionSessionTimeline,
+  InspectionSessionTimelineListResponse,
   InspectionTimelineJobStatusResponse,
   InspectionTimelineEvent,
 } from '../../core/models/inspection-types';
@@ -96,6 +99,7 @@ export class PatientTimetablePageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly jobPolling = inject(JobPollingService);
+  private readonly agents = inject(AgentsStateService);
 
   readonly sessionId = signal<number | null>(null);
   readonly timelineId = signal<number | null>(null);
@@ -282,13 +286,11 @@ export class PatientTimetablePageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const payload = timelineId
-        ? await fetchInspectionSessionTimelineById(sessionId, timelineId)
-        : await this.fetchLatestTimeline(sessionId);
+      const { timeline: payload, isStale } = await this.fetchTimeline(sessionId, timelineId);
       if (!isCurrentLoad()) return;
       this.applyTimeline(payload);
       this.timelineId.set(payload.timeline_id ?? timelineId ?? null);
-      this.isStale.set(payload.is_stale ?? false);
+      this.isStale.set(isStale);
     } catch (error) {
       if (!isCurrentLoad()) return;
       this.timeline.set(null);
@@ -317,7 +319,13 @@ export class PatientTimetablePageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const started = await startInspectionSessionTimelineJob(id, { force_regenerate: true });
+      const agent = await this.timelineAgent();
+      if (!isCurrentGeneration()) return;
+      const started = await startInspectionSessionTimelineJob(id, {
+        force_regenerate: true,
+        agent_id: agent?.id,
+        agent_revision: agent?.current_revision,
+      });
       if (!isCurrentGeneration()) return;
       const job = await this.waitForTimelineJob(id, started.job_id, started.poll_interval, loadGeneration);
       if (!job) return;
@@ -326,13 +334,14 @@ export class PatientTimetablePageComponent implements OnInit {
         throw new Error(job.error || 'Timeline generation did not complete.');
       }
       const generatedTimelineId = job.result?.timeline_id;
-      const payload = typeof generatedTimelineId === 'number'
-        ? await fetchInspectionSessionTimelineById(id, generatedTimelineId)
-        : await this.fetchLatestTimeline(id);
+      const { timeline: payload, isStale } = await this.fetchTimeline(
+        id,
+        typeof generatedTimelineId === 'number' ? generatedTimelineId : null,
+      );
       if (!isCurrentGeneration()) return;
       this.applyTimeline(payload);
       this.timelineId.set(payload.timeline_id ?? null);
-      this.isStale.set(false);
+      this.isStale.set(isStale);
       if (payload.timeline_id) {
         if (!isCurrentGeneration()) return;
         await this.router.navigate(['/sessions', id, 'timetable', payload.timeline_id], { replaceUrl: true });
@@ -341,9 +350,20 @@ export class PatientTimetablePageComponent implements OnInit {
       if (!this.destroyRef.destroyed && isCurrentGeneration()) {
         this.error.set(error instanceof Error ? error.message : 'Failed to regenerate timetable.');
       }
+      if (mayReflectAgentChange(error)) void this.agents.load({ force: true }).catch(() => undefined);
     } finally {
       if (!this.destroyRef.destroyed && isCurrentGeneration()) this.loading.set(false);
     }
+  }
+
+  /** This page has no agent picker: use the Timeline agent the session workspace preselects. */
+  private async timelineAgent(): Promise<Agent | null> {
+    try {
+      await this.agents.load();
+    } catch {
+      // Without agents the backend applies its own default and reports why it cannot run.
+    }
+    return this.agents.preferredFor('timeline');
   }
 
   setViewMode(mode: TimelineViewMode): void {
@@ -478,11 +498,28 @@ export class PatientTimetablePageComponent implements OnInit {
     await this.loadTimeline(sessionId, timelineId, loadGeneration);
   }
 
-  private async fetchLatestTimeline(sessionId: number): Promise<InspectionSessionTimeline> {
-    const timelines = await fetchInspectionSessionTimelineList(sessionId);
-    const latest = timelines.items[0];
-    if (!latest?.timeline_id) throw new Error('Not found');
-    return fetchInspectionSessionTimelineById(sessionId, latest.timeline_id);
+  /** Loads a saved timeline (latest when no id is given); staleness only exists on the preview list. */
+  private async fetchTimeline(
+    sessionId: number,
+    timelineId: number | null,
+  ): Promise<{ timeline: InspectionSessionTimeline; isStale: boolean }> {
+    const listRequest = fetchInspectionSessionTimelineList(sessionId);
+    let timeline: InspectionSessionTimeline;
+    let previews: InspectionSessionTimelineListResponse;
+    if (timelineId) {
+      [timeline, previews] = await Promise.all([
+        fetchInspectionSessionTimelineById(sessionId, timelineId),
+        listRequest,
+      ]);
+    } else {
+      previews = await listRequest;
+      const latestId = previews.items[0]?.timeline_id;
+      if (!latestId) throw new Error('Not found');
+      timeline = await fetchInspectionSessionTimelineById(sessionId, latestId);
+    }
+    const loadedId = timeline.timeline_id ?? timelineId;
+    const preview = previews.items.find((item) => item.timeline_id === loadedId);
+    return { timeline, isStale: preview?.is_stale ?? false };
   }
 
   private async waitForTimelineJob(

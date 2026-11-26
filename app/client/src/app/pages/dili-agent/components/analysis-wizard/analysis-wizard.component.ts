@@ -15,8 +15,7 @@ import {
 import { validateClinicalInput } from '../../../../core/services/clinical-api';
 import { ClinicalSessionDraftService } from '../../../../core/services/clinical-session-draft.service';
 import { launchClinicalSession } from '../../../../core/services/clinical-session-lifecycle-api';
-import { ApiHttpError } from '../../../../core/services/http-api';
-import { AgentsStateService } from '../../../../core/state/agents-state.service';
+import { AgentsStateService, mayReflectAgentChange } from '../../../../core/state/agents-state.service';
 import { AppStateService } from '../../../../core/state/app-state.service';
 import { buildClinicalPayload } from '../../../../core/utils';
 import { buildSectionPreviews, SourceSelection } from './section-preview';
@@ -273,9 +272,9 @@ export class AnalysisWizardComponent {
       await launchClinicalSession(sessionId, payload);
     } catch (error) {
       this.starting.set(false);
-      if (error instanceof ApiHttpError && error.statusCode === 409) {
-        // A 409 is also returned for unrelated conflicts (e.g. another operation running):
-        // only treat it as an agent change when the selected agent really moved on.
+      if (mayReflectAgentChange(error)) {
+        // These statuses are also returned for unrelated conflicts or invalid input:
+        // only treat them as an agent change when the selected agent really moved on.
         await this.agentsState.load({ force: true }).catch(() => undefined);
         const current = this.agent();
         const launchedRevision = typeof checkedRevision === 'number' ? checkedRevision : checked.agentRevision;

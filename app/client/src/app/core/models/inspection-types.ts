@@ -177,7 +177,6 @@ export type InspectionSessionTimeline = {
   timeline_id?: number | null;
   session_id: number;
   generated_at: string;
-  is_stale?: boolean;
   generation_status?: "llm_generated" | "fallback";
   generation_note?: string | null;
   generation_error_code?:

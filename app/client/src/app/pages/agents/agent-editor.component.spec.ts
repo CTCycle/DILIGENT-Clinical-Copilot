@@ -242,6 +242,30 @@ describe('AgentEditorComponent', () => {
     expect(lifecycleSwitch('Archived').disabled).toBe(true);
   });
 
+  it('restores a refused lifecycle switch and reloads the agent state', async () => {
+    await open('a2');
+    fetchSpy.mockImplementationOnce(async () =>
+      json({ detail: 'Choose another default agent before deactivating or archiving this one.' }, 409),
+    );
+    const archive = lifecycleSwitch('Archived');
+    archive.checked = true;
+    archive.dispatchEvent(new Event('change'));
+    await flush();
+    expect(lifecycleSwitch('Archived').checked).toBe(false);
+    expect(el().textContent).toContain('Choose another default agent');
+    const reloads = fetchSpy.mock.calls.filter(([url, init]) => String(url).includes('/agents?') && init?.method === 'GET');
+    expect(reloads.length).toBeGreaterThan(1);
+  });
+
+  it('reports a failed load instead of claiming the agent no longer exists', async () => {
+    fetchSpy.mockImplementation(async (url: string) =>
+      String(url).includes('/agents') ? json({ detail: 'Service is busy.' }, 503) : json(modelConfig),
+    );
+    await open('a2');
+    expect(el().textContent).not.toContain('This agent no longer exists');
+    expect(button('Retry')).toBeTruthy();
+  });
+
   it('creates a new active, unlocked agent from the default configuration', async () => {
     await open('new');
     expect(el().querySelector('h1')!.textContent).toContain('New agent');

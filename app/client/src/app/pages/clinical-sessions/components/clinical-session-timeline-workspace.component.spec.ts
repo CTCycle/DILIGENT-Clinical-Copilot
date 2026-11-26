@@ -455,15 +455,19 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
     expect(requests.some((entry) => entry.includes('POST') && entry.includes('force_regenerate'))).toBe(true);
   });
 
-  it('force-reloads agents after a 409 so a retry pins the current revision', async () => {
+  it.each([
+    [409, 'The selected agent changed after it was checked. Review it and retry.'],
+    [422, 'Archived agents cannot run new operations.'],
+    [404, 'Agent not found.'],
+  ])('force-reloads agents after a %i so the picker does not go stale', async (statusCode, detail) => {
     const agents = TestBed.inject(AgentsStateService) as unknown as { load: ReturnType<typeof vi.fn> };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
       if (url.endsWith('/sessions/1/timelines')) return jsonResponse({ items: [] });
       if (url.endsWith('/sessions/1/timeline-jobs')) {
         return new Response(
-          JSON.stringify({ detail: 'The selected agent changed after it was checked. Review it and retry.' }),
-          { status: 409, headers: { 'Content-Type': 'application/json' } },
+          JSON.stringify({ detail }),
+          { status: statusCode, headers: { 'Content-Type': 'application/json' } },
         );
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -474,7 +478,7 @@ describe('ClinicalSessionTimelineWorkspaceComponent request generations', () => 
 
     await component.generateTimeline();
 
-    expect(component.generationError()).toContain('The selected agent changed');
+    expect(component.generationError()).toBeTruthy();
     expect(agents.load).toHaveBeenCalledWith({ force: true });
   });
 

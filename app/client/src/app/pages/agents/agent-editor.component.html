@@ -3,6 +3,10 @@
 <main class="page-container editor">
   @switch (loadState()) {
     @case ('loading') { <p class="empty" role="status">Loading agent...</p> }
+    @case ('error') {
+      <p class="empty is-error" role="alert">{{ agentsError() }}</p>
+      <button type="button" class="btn" (click)="retryLoad()">Retry</button>
+    }
     @case ('missing') {
       <p class="empty is-error" role="alert">This agent no longer exists.</p>
       <a routerLink="/agents" class="btn">Back to Agents</a>
@@ -98,7 +102,7 @@
                         [attr.title]="current.is_default ? 'The default agent must stay active. Choose another default first.' : null">
                         <input type="checkbox" role="switch" [checked]="current.is_active"
                           [disabled]="current.is_default && current.is_active" aria-label="Active"
-                          (change)="setLifecycle({ is_active: $any($event.target).checked })" />
+                          (change)="setLifecycle({ is_active: $any($event.target).checked }, $any($event.target))" />
                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                       </label>
                     </div>
@@ -109,7 +113,7 @@
                       </span>
                       <label class="toggle-switch">
                         <input type="checkbox" role="switch" [checked]="current.is_locked" aria-label="Locked"
-                          (change)="setLifecycle({ is_locked: $any($event.target).checked })" />
+                          (change)="setLifecycle({ is_locked: $any($event.target).checked }, $any($event.target))" />
                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                       </label>
                     </div>
@@ -122,7 +126,7 @@
                         [attr.title]="current.is_default && !current.is_archived ? 'The default agent cannot be archived. Choose another default first.' : null">
                         <input type="checkbox" role="switch" [checked]="current.is_archived"
                           [disabled]="current.is_default && !current.is_archived" aria-label="Archived"
-                          (change)="setLifecycle({ is_archived: $any($event.target).checked })" />
+                          (change)="setLifecycle({ is_archived: $any($event.target).checked }, $any($event.target))" />
                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                       </label>
                     </div>

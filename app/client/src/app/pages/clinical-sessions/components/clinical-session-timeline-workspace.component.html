@@ -2,9 +2,9 @@
   <section class="timeline-generate" aria-label="Timeline generation">
     <div class="timeline-section-heading" data-guidance-target="timeline-generation-controls">
       <h4>Generate a patient timeline</h4>
-      <p>Uses the Timeline model of the default DILI agent.</p>
+      <p>Uses the Timeline model of the selected agent.</p>
     </div>
-    <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!agentLoading()">Loading default agent…</p>
+    <p class="timeline-loading" aria-live="polite" [class.is-hidden]="!agentLoading()">Loading agents…</p>
     @if (agentError()) {
       <p class="is-error" role="alert">{{ agentError() }}</p>
       <button type="button" class="btn btn-secondary" (click)="loadDefaultAgent()">Retry</button>
